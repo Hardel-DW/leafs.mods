@@ -1,20 +1,20 @@
 package fr.hardel.leafs.region;
 
 /** Packs a section coordinate pair into one long map key: x in the low 32 bits, z in the high 32. */
-final class SectionKey {
+public final class CoordinateKey {
 
-    private SectionKey() {
+    private CoordinateKey() {
     }
 
-    static long pack(int sectionX, int sectionZ) {
+    public static long pack(int sectionX, int sectionZ) {
         return ((long) sectionZ << 32) | (sectionX & 0xFFFFFFFFL);
     }
 
-    static int x(long key) {
+    public static int x(long key) {
         return (int) key;
     }
 
-    static int z(long key) {
+    public static int z(long key) {
         return (int) (key >>> 32);
     }
 }
