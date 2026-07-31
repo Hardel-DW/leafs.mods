@@ -3,6 +3,8 @@
 	"package": "fr.hardel.leafs.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"entity.EntityMixin",
+		"entity.MinecraftServerMixin",
 		"network.PacketProcessorMixin",
 		"network.PacketUtilsMixin",
 		"network.PlayerListMixin",
