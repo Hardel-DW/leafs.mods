@@ -30,7 +30,7 @@ public final class RegionNetworkPhases implements LevelTickPhases {
     public void afterLevelTick(ServerLevel level) {
         MinecraftServer server = level.getServer();
         for (ServerPlayer player : level.players()) {
-            tickPlayConnection(server, ((CommonListenerConnectionAccess) player.connection).leafs$connection());
+            tickPlayConnection(server, player.connection.connection);
         }
     }
 

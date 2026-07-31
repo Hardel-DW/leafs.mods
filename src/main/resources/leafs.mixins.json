@@ -6,10 +6,11 @@
 		"network.PacketProcessorMixin",
 		"network.PacketUtilsMixin",
 		"network.PlayerListMixin",
-		"network.ServerCommonPacketListenerImplMixin",
 		"network.ServerConnectionListenerMixin",
 		"network.ServerGamePacketListenerImplMixin",
-		"ticking.MinecraftServerMixin"
+		"ticking.MinecraftServerMixin",
+		"world.LevelMixin",
+		"world.ServerLevelMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
