@@ -92,6 +92,6 @@ final class RegionSection<R> {
     }
 
     private String describe() {
-        return "[" + SectionKey.x(key) + ", " + SectionKey.z(key) + "]";
+        return "[" + CoordinateKey.x(key) + ", " + CoordinateKey.z(key) + "]";
     }
 }
