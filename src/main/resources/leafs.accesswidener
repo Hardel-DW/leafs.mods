@@ -1,0 +1,7 @@
+accessWidener v2 official
+
+accessible field net/minecraft/world/level/Level neighborUpdater Lnet/minecraft/world/level/redstone/CollectingNeighborUpdater;
+accessible field net/minecraft/server/level/ServerLevel blockEvents Lit/unimi/dsi/fastutil/objects/ObjectLinkedOpenHashSet;
+accessible field net/minecraft/server/level/ServerChunkCache chunkHoldersToBroadcast Ljava/util/Set;
+accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/minecraft/world/level/TicketStorage;
+accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;

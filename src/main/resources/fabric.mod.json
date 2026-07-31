@@ -9,6 +9,7 @@
 	],
 	"license": "All-Rights-Reserved",
 	"icon": "assets/leafs/icon.png",
+	"accessWidener": "leafs.accesswidener",
 	"environment": "*",
 	"entrypoints": {
 		"main": [

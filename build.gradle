@@ -20,6 +20,8 @@ dependencies {
 }
 
 loom {
+	accessWidenerPath = file("src/main/resources/leafs.accesswidener")
+
 	runs {
 		configureEach {
 			vmArg "-ea"
