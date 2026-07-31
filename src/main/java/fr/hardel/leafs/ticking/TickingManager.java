@@ -43,6 +43,10 @@ public final class TickingManager {
         return installedPhases;
     }
 
+    public TickBarrier barrier() {
+        return barrier;
+    }
+
     /** Runs one vanilla level tick through the level's region unit: context, crash scope and watchdog engaged. */
     public void tickLevel(ServerLevel level, Runnable vanillaTick) {
         LevelTickUnit unit = unitFor(level);
