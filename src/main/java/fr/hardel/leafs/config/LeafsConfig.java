@@ -25,6 +25,7 @@ public final class LeafsConfig {
     private int gridSectionShift = 4;
     private int mergeRadius = 1;
     private int bufferRadius = 1;
+    private int watchdogWarnSeconds = 60;
     private boolean compatBarrier = true;
     private boolean perRegionLogs = true;
 
@@ -84,6 +85,10 @@ public final class LeafsConfig {
         return bufferRadius;
     }
 
+    public int watchdogWarnSeconds() {
+        return watchdogWarnSeconds;
+    }
+
     public boolean compatBarrier() {
         return compatBarrier;
     }
@@ -105,6 +110,7 @@ public final class LeafsConfig {
         requireRange("gridSectionShift", gridSectionShift, 1, 8);
         requireRange("mergeRadius", mergeRadius, 1, 8);
         requireRange("bufferRadius", bufferRadius, 1, 8);
+        requireRange("watchdogWarnSeconds", watchdogWarnSeconds, 1, 600);
         return this;
     }
 

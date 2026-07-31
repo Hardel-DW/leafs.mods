@@ -1,0 +1,123 @@
+package fr.hardel.leafs.ticking;
+
+import fr.hardel.leafs.ownership.RegionContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class RegionTickSchedulerTest {
+    private RegionTickScheduler scheduler;
+
+    @AfterEach
+    void stopScheduler() {
+        if (scheduler != null) {
+            scheduler.shutdown();
+        }
+    }
+
+    private RegionTickScheduler createScheduler(int threads, Path crashDirectory) {
+        scheduler = new RegionTickScheduler(threads, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
+        return scheduler;
+    }
+
+    @Test
+    void catchUpAdvancesClocksByMissedPeriods() {
+        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000));
+        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS - 1));
+        assertEquals(2, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS));
+        assertEquals(3, RegionTickScheduler.computeTickCount(1_000, 1_000 + 2 * RegionTickScheduler.TICK_PERIOD_NANOS));
+    }
+
+    @Test
+    void attachedTickRunsWithTheRegionContext(@TempDir Path crashDirectory) {
+        RegionTickScheduler attached = createScheduler(1, crashDirectory);
+        AtomicReference<RegionContext> observed = new AtomicReference<>();
+        TestTickHandle handle = new TestTickHandle(7, tickCount -> observed.set(RegionContext.current()));
+
+        attached.runAttached(handle);
+
+        assertEquals("region #7 in test:world", observed.get().describe());
+        assertNull(RegionContext.current());
+        assertEquals(1, handle.currentTick());
+    }
+
+    @Test
+    void attachedCrashWritesTheRegionReportAndPropagates(@TempDir Path crashDirectory) throws IOException {
+        RegionTickScheduler attached = createScheduler(1, crashDirectory);
+        TestTickHandle handle = new TestTickHandle(9, tickCount -> {
+            throw new IllegalStateException("boom");
+        });
+
+        assertThrows(IllegalStateException.class, () -> attached.runAttached(handle));
+
+        assertNull(RegionContext.current());
+        try (Stream<Path> files = Files.list(crashDirectory)) {
+            List<Path> reports = files.toList();
+            assertEquals(1, reports.size());
+            String content = Files.readString(reports.getFirst());
+            assertTrue(content.contains("Region: #9"));
+            assertTrue(content.contains("IllegalStateException: boom"));
+        }
+    }
+
+    @Test
+    void scheduledHandleTicksRepeatedlyUntilCancelled(@TempDir Path crashDirectory) throws InterruptedException {
+        RegionTickScheduler pool = createScheduler(2, crashDirectory);
+        pool.start();
+        CountDownLatch threeTicks = new CountDownLatch(3);
+        AtomicLong ticks = new AtomicLong();
+        TestTickHandle handle = new TestTickHandle(1, tickCount -> {
+            ticks.incrementAndGet();
+            threeTicks.countDown();
+        });
+
+        pool.schedule(handle);
+
+        assertTrue(threeTicks.await(3, TimeUnit.SECONDS), "the handle must tick repeatedly on the pool");
+        handle.cancel();
+        Thread.sleep(150);
+        long after = ticks.get();
+        Thread.sleep(150);
+        assertEquals(after, ticks.get(), "a cancelled handle must stop ticking");
+    }
+
+    @Test
+    void poolTickFailureInvokesThePolicyAndStopsRescheduling(@TempDir Path crashDirectory) throws InterruptedException {
+        CountDownLatch failed = new CountDownLatch(1);
+        ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
+        scheduler = new RegionTickScheduler(1, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> {
+            failures.add(throwable);
+            failed.countDown();
+        });
+        scheduler.start();
+        AtomicLong attempts = new AtomicLong();
+        TestTickHandle handle = new TestTickHandle(1, tickCount -> {
+            attempts.incrementAndGet();
+            throw new IllegalStateException("boom");
+        });
+
+        scheduler.schedule(handle);
+
+        assertTrue(failed.await(3, TimeUnit.SECONDS));
+        Thread.sleep(150);
+        assertEquals(1, attempts.get(), "a failed handle must not be rescheduled");
+        assertEquals("boom", failures.peek().getMessage());
+    }
+}

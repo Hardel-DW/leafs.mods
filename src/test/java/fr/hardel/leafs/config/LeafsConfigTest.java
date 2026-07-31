@@ -70,6 +70,10 @@ class LeafsConfigTest {
         Files.writeString(outOfRange, "{\"gridSectionShift\": 12}");
         assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(outOfRange));
 
+        Path zeroWatchdog = directory.resolve("e.json");
+        Files.writeString(zeroWatchdog, "{\"watchdogWarnSeconds\": 0}");
+        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(zeroWatchdog));
+
         Path empty = directory.resolve("d.json");
         Files.writeString(empty, "");
         assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(empty));

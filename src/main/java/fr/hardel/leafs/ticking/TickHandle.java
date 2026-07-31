@@ -1,0 +1,56 @@
+package fr.hardel.leafs.ticking;
+
+import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ownership.RegionCrashReport;
+
+/** One schedulable tick unit: a whole level until M7, a real region from M11. */
+public abstract class TickHandle {
+    private final RegionContext.Region context;
+    private volatile boolean cancelled;
+    private volatile long currentTick;
+    private volatile long scheduledStartNanos;
+
+    protected TickHandle(long id, String dimension) {
+        this.context = new RegionContext.Region(id, dimension);
+    }
+
+    public long id() {
+        return context.regionId();
+    }
+
+    public String dimension() {
+        return context.dimension();
+    }
+
+    public long currentTick() {
+        return currentTick;
+    }
+
+    public void cancel() {
+        cancelled = true;
+    }
+
+    public boolean isCancelled() {
+        return cancelled;
+    }
+
+    RegionContext.Region context() {
+        return context;
+    }
+
+    void advance(long tickCount) {
+        currentTick += tickCount;
+    }
+
+    long scheduledStartNanos() {
+        return scheduledStartNanos;
+    }
+
+    void setScheduledStartNanos(long scheduledStartNanos) {
+        this.scheduledStartNanos = scheduledStartNanos;
+    }
+
+    protected abstract void tick(long tickCount);
+
+    protected abstract RegionCrashReport buildCrashReport();
+}
