@@ -34,10 +34,13 @@ public final class LevelTickUnit extends TickHandle {
 
         pendingWork = null;
         runQueuedTasks();
-        LevelTickPhases phases = TickingManager.phases();
-        phases.beforeLevelTick(level);
+        for (LevelTickPhases phases : TickingManager.phases()) {
+            phases.beforeLevelTick(level);
+        }
         work.run();
-        phases.afterLevelTick(level);
+        for (LevelTickPhases phases : TickingManager.phases()) {
+            phases.afterLevelTick(level);
+        }
     }
 
     private void runQueuedTasks() {
