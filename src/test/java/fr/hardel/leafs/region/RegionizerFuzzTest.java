@@ -54,8 +54,8 @@ class RegionizerFuzzTest {
         RegionizerAssertions.assertInvariants(regionizer, true);
         for (LongIterator iterator = chunks.iterator(); iterator.hasNext(); ) {
             long chunkKey = iterator.nextLong();
-            int chunkX = SectionKey.x(chunkKey);
-            int chunkZ = SectionKey.z(chunkKey);
+            int chunkX = CoordinateKey.x(chunkKey);
+            int chunkZ = CoordinateKey.z(chunkKey);
             Region<Object> owner = regionizer.regionAt(chunkX, chunkZ);
             assertNotNull(owner, "chunk [" + chunkX + ", " + chunkZ + "] lost its region");
             assertSame(owner, regionizer.regionAtUnsynchronised(chunkX, chunkZ));
@@ -67,14 +67,14 @@ class RegionizerFuzzTest {
         int chunkZ;
         if (!chunkList.isEmpty() && random.nextBoolean()) {
             long anchor = chunkList.getLong(random.nextInt(chunkList.size()));
-            chunkX = SectionKey.x(anchor) + random.nextInt(CLUSTER_SPREAD * 2 + 1) - CLUSTER_SPREAD;
-            chunkZ = SectionKey.z(anchor) + random.nextInt(CLUSTER_SPREAD * 2 + 1) - CLUSTER_SPREAD;
+            chunkX = CoordinateKey.x(anchor) + random.nextInt(CLUSTER_SPREAD * 2 + 1) - CLUSTER_SPREAD;
+            chunkZ = CoordinateKey.z(anchor) + random.nextInt(CLUSTER_SPREAD * 2 + 1) - CLUSTER_SPREAD;
         } else {
             chunkX = random.nextInt(COORDINATE_RANGE * 2 + 1) - COORDINATE_RANGE;
             chunkZ = random.nextInt(COORDINATE_RANGE * 2 + 1) - COORDINATE_RANGE;
         }
 
-        long chunkKey = SectionKey.pack(chunkX, chunkZ);
+        long chunkKey = CoordinateKey.pack(chunkX, chunkZ);
         if (!chunks.add(chunkKey)) {
             return;
         }
@@ -89,7 +89,7 @@ class RegionizerFuzzTest {
         chunkList.set(index, chunkList.getLong(chunkList.size() - 1));
         chunkList.removeLong(chunkList.size() - 1);
         chunks.remove(chunkKey);
-        regionizer.removeChunk(SectionKey.x(chunkKey), SectionKey.z(chunkKey));
+        regionizer.removeChunk(CoordinateKey.x(chunkKey), CoordinateKey.z(chunkKey));
     }
 
     private void markRandomRegionTicking(Random random, Regionizer<Object> regionizer, List<Region<Object>> ticking) {

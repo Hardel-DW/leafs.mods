@@ -29,8 +29,8 @@ final class RegionizerAssertions {
         for (Map.Entry<Long, RegionSection<R>> entry : sections.entrySet()) {
             long key = entry.getKey();
             RegionSection<R> section = entry.getValue();
-            int sectionX = SectionKey.x(key);
-            int sectionZ = SectionKey.z(key);
+            int sectionX = CoordinateKey.x(key);
+            int sectionZ = CoordinateKey.z(key);
             Region<R> owner = section.region();
 
             assertNotNull(owner, "section [" + sectionX + ", " + sectionZ + "] has no owner");
@@ -44,7 +44,7 @@ final class RegionizerAssertions {
                         continue;
                     }
 
-                    RegionSection<R> neighbour = sections.get(SectionKey.pack(sectionX + dx, sectionZ + dz));
+                    RegionSection<R> neighbour = sections.get(CoordinateKey.pack(sectionX + dx, sectionZ + dz));
                     if (neighbour != null && !neighbour.isEmpty()) {
                         expectedNonEmptyNeighbours++;
                     }
@@ -64,7 +64,7 @@ final class RegionizerAssertions {
 
             for (int dx = -mergeRadius; dx <= mergeRadius; dx++) {
                 for (int dz = -mergeRadius; dz <= mergeRadius; dz++) {
-                    RegionSection<R> neighbour = sections.get(SectionKey.pack(sectionX + dx, sectionZ + dz));
+                    RegionSection<R> neighbour = sections.get(CoordinateKey.pack(sectionX + dx, sectionZ + dz));
                     if (neighbour == null || neighbour.region() == owner) {
                         continue;
                     }
