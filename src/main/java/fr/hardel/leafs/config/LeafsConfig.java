@@ -3,6 +3,7 @@ package fr.hardel.leafs.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import fr.hardel.leafs.Leafs;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -33,7 +34,7 @@ public final class LeafsConfig {
     }
 
     public static void load() {
-        instance = load(FabricLoader.getInstance().getConfigDir().resolve("leafs.json"));
+        instance = load(FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json"));
     }
 
     public static LeafsConfig get() {
