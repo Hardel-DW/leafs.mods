@@ -8,14 +8,16 @@ import fr.hardel.leafs.ownership.RegionContext;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Server-scoped orchestrator of the region tick machinery, reached through {@link LeafsServerAccess}. */
 public final class TickingManager {
-    private static volatile LevelTickPhases installedPhases = LevelTickPhases.NONE;
+    private static final List<LevelTickPhases> installedPhases = new CopyOnWriteArrayList<>();
 
     private final TickBarrier barrier = new TickBarrier();
     private final LeafsWatchdog watchdog;
@@ -32,12 +34,12 @@ public final class TickingManager {
         Leafs.LOGGER.info("Leafs ticking engaged — attached mode, {} region threads standing by", config.effectiveRegionThreads());
     }
 
-    /** Installed once at bootstrap, before any server exists. */
+    /** Installed at bootstrap, before any server exists; before-hooks run in install order. */
     public static void installPhases(LevelTickPhases phases) {
-        installedPhases = Objects.requireNonNull(phases);
+        installedPhases.add(Objects.requireNonNull(phases));
     }
 
-    static LevelTickPhases phases() {
+    static List<LevelTickPhases> phases() {
         return installedPhases;
     }
 
