@@ -4,9 +4,12 @@ import fr.hardel.leafs.ownership.RegionCrashReport;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 /** The M3 synthetic region: one whole level, replaced by real regions once M7 feeds the regionizer. */
 public final class LevelTickUnit extends TickHandle {
     private final ServerLevel level;
+    private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
 
     LevelTickUnit(long id, ServerLevel level) {
@@ -18,6 +21,10 @@ public final class LevelTickUnit extends TickHandle {
         pendingWork = work;
     }
 
+    void submit(Runnable task) {
+        tasks.add(task);
+    }
+
     @Override
     protected void tick(long tickCount) {
         Runnable work = pendingWork;
@@ -26,7 +33,19 @@ public final class LevelTickUnit extends TickHandle {
         }
 
         pendingWork = null;
+        runQueuedTasks();
+        LevelTickPhases phases = TickingManager.phases();
+        phases.beforeLevelTick(level);
         work.run();
+        phases.afterLevelTick(level);
+    }
+
+    private void runQueuedTasks() {
+        int budget = tasks.size();
+        Runnable task;
+        while (budget-- > 0 && (task = tasks.poll()) != null) {
+            task.run();
+        }
     }
 
     @Override
