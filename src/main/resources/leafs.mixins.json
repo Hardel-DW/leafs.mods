@@ -3,6 +3,7 @@
 	"package": "fr.hardel.leafs.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"ticking.MinecraftServerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
