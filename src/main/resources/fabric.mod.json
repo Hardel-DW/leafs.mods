@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "leafs",
+	"version": "${version}",
+	"name": "Leafs",
+	"description": "Regionised multithreading for the dedicated server: the world is cut into independent regions, each ticking in parallel on its own thread — like Folia, redesigned for modern vanilla and Fabric.",
+	"authors": [
+		"Hardel"
+	],
+	"license": "All-Rights-Reserved",
+	"icon": "assets/leafs/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"fr.hardel.leafs.Leafs"
+		]
+	},
+	"mixins": [
+		"leafs.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
