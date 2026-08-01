@@ -1,6 +1,5 @@
 package fr.hardel.leafs.mixin.world;
 
-import fr.hardel.leafs.chunk.EntityManagerLevelAccess;
 import fr.hardel.leafs.world.RegionClock;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
@@ -48,6 +47,5 @@ public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
         this.leafs$worldData = new RegionWorldData(new RegionClock(self::getGameTime), self::isPositionTickingWithEntitiesLoaded, self.blockEvents, self.getRandom(), self.neighborUpdater, self.getChunkSource().chunkHoldersToBroadcast);
         this.blockTicks = leafs$worldData.blockTicks();
         this.fluidTicks = leafs$worldData.fluidTicks();
-        ((EntityManagerLevelAccess) self.entityManager).leafs$bindLevel(self);
     }
 }
