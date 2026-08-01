@@ -77,6 +77,43 @@ class RegionTickSchedulerTest {
         }
     }
 
+    /** A crash path must not crash: a report that cannot be built must not hide what actually failed. */
+    @Test
+    void aFailingCrashReportNeverReplacesTheOriginalFailure(@TempDir Path crashDirectory) {
+        RegionTickScheduler attached = createScheduler(1, crashDirectory);
+        TestTickHandle handle = new TestTickHandle(11, tickCount -> {
+            throw new IllegalStateException("boom");
+        }, true);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> attached.runAttached(handle));
+
+        assertEquals("boom", failure.getMessage());
+        assertEquals(1, failure.getSuppressed().length);
+        assertNull(RegionContext.current());
+    }
+
+    /** The barrier must be usable again after a tick that failed anywhere in its scaffolding. */
+    @Test
+    void aFailedTickReleasesItsBarrierEntry(@TempDir Path crashDirectory) throws InterruptedException {
+        TickBarrier barrier = new TickBarrier();
+        scheduler = new RegionTickScheduler(1, barrier, new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
+        TestTickHandle handle = new TestTickHandle(12, tickCount -> {
+            throw new IllegalStateException("boom");
+        }, true);
+
+        assertThrows(IllegalStateException.class, () -> scheduler.runAttached(handle));
+
+        CountDownLatch raised = new CountDownLatch(1);
+        Thread raiser = new Thread(() -> {
+            barrier.raise();
+            raised.countDown();
+            barrier.drop();
+        });
+        raiser.start();
+        assertTrue(raised.await(5, TimeUnit.SECONDS), "the failed tick left a phantom active tick behind");
+        raiser.join(5_000);
+    }
+
     @Test
     void scheduledHandleTicksRepeatedlyUntilCancelled(@TempDir Path crashDirectory) throws InterruptedException {
         RegionTickScheduler pool = createScheduler(2, crashDirectory);
