@@ -20,14 +20,16 @@ class RegionSchedulerTest {
     private static final int SECTION_SHIFT = 4;
 
     private Regionizer<TestRegionData> regionizer;
-    private FakeChunkHolds holds;
+    private FakeChunkHolds tickets;
+    private SharedChunkHolds holds;
     private RegionScheduler<TestRegionData> scheduler;
     private List<String> executed;
 
     @BeforeEach
     void createScheduler() {
         regionizer = new Regionizer<>(SECTION_SHIFT, 1, 1, new TestRegionCallbacks(SECTION_SHIFT));
-        holds = new FakeChunkHolds(regionizer);
+        tickets = new FakeChunkHolds(regionizer);
+        holds = new SharedChunkHolds(tickets);
         scheduler = new RegionScheduler<>(regionizer, holds);
         executed = new ArrayList<>();
     }
@@ -48,7 +50,7 @@ class RegionSchedulerTest {
         assertEquals(1, scheduler.drain(region));
 
         assertEquals(List.of("task"), executed);
-        assertFalse(holds.hasActiveHolds(), "the hold must be released once the task ran");
+        assertFalse(tickets.hasActiveHolds(), "the hold must be released once the task ran");
     }
 
     @Test
@@ -57,29 +59,29 @@ class RegionSchedulerTest {
         scheduler.queue(0, 0, () -> executed.add("second"));
         scheduler.queue(0, 0, () -> executed.add("third"));
 
-        assertEquals(1, holds.acquireCalls, "one hold per chunk, refcounted across tasks");
+        assertEquals(1, tickets.addCalls, "one ticket per chunk, refcounted across tasks");
         assertEquals(3, scheduler.drain(regionizer.regionAt(0, 0)));
         assertEquals(List.of("first", "second", "third"), executed);
-        assertEquals(1, holds.releaseCalls);
+        assertEquals(1, tickets.removeCalls);
     }
 
     @Test
     void runExecutesInlineOnTheOwningRegionThread() {
-        holds.loadChunk(0, 0);
+        tickets.loadChunk(0, 0);
         Region<TestRegionData> region = regionizer.regionAt(0, 0);
         RegionContext.enter(new RegionContext.Region(region.id(), "test:world"));
 
         scheduler.run(0, 0, () -> executed.add("inline"));
 
         assertEquals(List.of("inline"), executed);
-        assertEquals(0, holds.acquireCalls);
+        assertEquals(0, tickets.addCalls);
         assertEquals(0, scheduler.drain(region), "nothing may have been queued");
     }
 
     @Test
     void runFromAForeignContextQueues() {
-        holds.loadChunk(0, 0);
-        holds.loadChunk(80, 0);
+        tickets.loadChunk(0, 0);
+        tickets.loadChunk(80, 0);
         Region<TestRegionData> other = regionizer.regionAt(80, 0);
         RegionContext.enter(new RegionContext.Region(other.id(), "test:world"));
 
@@ -92,13 +94,13 @@ class RegionSchedulerTest {
 
     @Test
     void mergeMovesQueuedTasksInFoliaOrder() {
-        holds.loadChunk(0, 0);
-        holds.loadChunk(80, 0);
+        tickets.loadChunk(0, 0);
+        tickets.loadChunk(80, 0);
         scheduler.queue(0, 0, () -> executed.add("west1"));
         scheduler.queue(0, 0, () -> executed.add("west2"));
         scheduler.queue(80, 0, () -> executed.add("east1"));
 
-        holds.loadChunk(40, 0);
+        tickets.loadChunk(40, 0);
 
         Region<TestRegionData> merged = regionizer.regionAt(40, 0);
         assertEquals(3, scheduler.drain(merged));
@@ -107,15 +109,15 @@ class RegionSchedulerTest {
 
     @Test
     void splitReroutesTasksToTheChildOwningTheirPosition() {
-        holds.loadChunk(0, 0);
-        holds.loadChunk(32, 0);
-        holds.loadChunk(64, 0);
-        holds.loadChunk(96, 0);
+        tickets.loadChunk(0, 0);
+        tickets.loadChunk(32, 0);
+        tickets.loadChunk(64, 0);
+        tickets.loadChunk(96, 0);
         scheduler.queue(0, 0, () -> executed.add("west"));
         scheduler.queue(96, 0, () -> executed.add("east"));
 
-        holds.unloadChunk(32, 0);
-        holds.unloadChunk(64, 0);
+        tickets.unloadChunk(32, 0);
+        tickets.unloadChunk(64, 0);
         Region<TestRegionData> parent = regionizer.regionAt(0, 0);
         assertTrue(parent.tryMarkTicking());
         parent.markNotTicking();
@@ -126,7 +128,7 @@ class RegionSchedulerTest {
         assertEquals(List.of("west"), executed);
         assertEquals(1, scheduler.drain(east));
         assertEquals(List.of("west", "east"), executed);
-        assertFalse(holds.hasActiveHolds());
+        assertFalse(tickets.hasActiveHolds());
     }
 
     @Test
@@ -137,6 +139,56 @@ class RegionSchedulerTest {
 
         Region<TestRegionData> region = regionizer.regionAt(0, 0);
         assertThrows(IllegalStateException.class, () -> scheduler.drain(region));
-        assertFalse(holds.hasActiveHolds());
+        assertFalse(tickets.hasActiveHolds());
+    }
+
+    @Test
+    void throwingTaskLeavesTheOnesBehindItQueuedAndHeld() {
+        scheduler.queue(0, 0, () -> executed.add("before"));
+        scheduler.queue(0, 0, () -> {
+            throw new IllegalStateException("boom");
+        });
+        scheduler.queue(0, 0, () -> executed.add("after"));
+
+        Region<TestRegionData> region = regionizer.regionAt(0, 0);
+        assertThrows(IllegalStateException.class, () -> scheduler.drain(region));
+
+        assertEquals(List.of("before"), executed);
+        assertTrue(tickets.hasActiveHolds(), "the surviving task still holds its chunk");
+        assertEquals(1, scheduler.drain(region), "nothing behind the throw was discarded");
+        assertEquals(List.of("before", "after"), executed);
+        assertFalse(tickets.hasActiveHolds());
+    }
+
+    @Test
+    void aHoldThatMaterialisesNoRegionFailsLoudlyWithoutLeaking() {
+        SharedChunkHolds inertHolds = new SharedChunkHolds(new ChunkHoldController() {
+            @Override
+            public void addHold(int chunkX, int chunkZ) {
+            }
+
+            @Override
+            public void removeHold(int chunkX, int chunkZ) {
+            }
+        });
+        RegionScheduler<TestRegionData> inert = new RegionScheduler<>(regionizer, inertHolds);
+
+        assertThrows(IllegalStateException.class, () -> inert.queue(0, 0, () -> executed.add("never")));
+        assertEquals(0, inertHolds.heldChunks(), "the failed queue must not keep its hold");
+    }
+
+    @Test
+    void tasksQueuedDuringADrainWaitForTheNext() {
+        scheduler.queue(0, 0, () -> {
+            executed.add("first");
+            scheduler.queue(0, 0, () -> executed.add("requeued"));
+        });
+
+        Region<TestRegionData> region = regionizer.regionAt(0, 0);
+        assertEquals(1, scheduler.drain(region));
+        assertEquals(List.of("first"), executed);
+        assertEquals(1, scheduler.drain(region));
+        assertEquals(List.of("first", "requeued"), executed);
+        assertFalse(tickets.hasActiveHolds());
     }
 }

@@ -1,5 +1,6 @@
 package fr.hardel.leafs.scheduler;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -7,10 +8,14 @@ import java.util.function.Consumer;
 
 /**
  * Per-entity task queue, ticked by the owning region. Tasks receive the CURRENT entity instance
- * (teleports recreate the object); once retired, pending tasks fire their retired callback instead.
+ * (teleports recreate the object); once retired, pending tasks fire their retired callback instead —
+ * exactly one of the two callbacks always runs. Retirement can come from another thread mid-tick
+ * (a player disconnecting while their region ticks), so the due tasks stay visible to {@link #retire()}
+ * and the run loop re-checks retirement before every task.
  */
 public final class EntityScheduler<E> {
-    private final List<ScheduledTask<E>> tasks = new ArrayList<>();
+    private final List<ScheduledTask<E>> scheduled = new ArrayList<>();
+    private final ArrayDeque<ScheduledTask<E>> due = new ArrayDeque<>();
     private long currentTick;
     private boolean retired;
 
@@ -19,28 +24,41 @@ public final class EntityScheduler<E> {
             return false;
         }
 
-        tasks.add(new ScheduledTask<>(currentTick + Math.max(1, delayTicks), task, retiredCallback));
+        scheduled.add(new ScheduledTask<>(currentTick + Math.max(1, delayTicks), task, retiredCallback));
         return true;
     }
 
+    /** No-op once retired: the registry hands out schedulers concurrently with removals. */
     public void tick(E entity) {
-        List<ScheduledTask<E>> due = new ArrayList<>();
         synchronized (this) {
             if (retired) {
-                throw new IllegalStateException("Ticked a retired entity scheduler");
+                return;
             }
 
             currentTick++;
-            for (Iterator<ScheduledTask<E>> iterator = tasks.iterator(); iterator.hasNext(); ) {
+            for (Iterator<ScheduledTask<E>> iterator = scheduled.iterator(); iterator.hasNext(); ) {
                 ScheduledTask<E> task = iterator.next();
                 if (task.dueTick() <= currentTick) {
-                    due.add(task);
+                    due.addLast(task);
                     iterator.remove();
                 }
             }
         }
 
-        for (ScheduledTask<E> task : due) {
+        while (true) {
+            ScheduledTask<E> task;
+            synchronized (this) {
+                if (retired) {
+                    return;
+                }
+
+                task = due.pollFirst();
+            }
+
+            if (task == null) {
+                return;
+            }
+
             task.action().accept(entity);
         }
     }
@@ -53,8 +71,10 @@ public final class EntityScheduler<E> {
             }
 
             retired = true;
-            pending = new ArrayList<>(tasks);
-            tasks.clear();
+            pending = new ArrayList<>(due);
+            pending.addAll(scheduled);
+            due.clear();
+            scheduled.clear();
         }
 
         for (ScheduledTask<E> task : pending) {
@@ -66,6 +86,11 @@ public final class EntityScheduler<E> {
 
     public synchronized boolean isRetired() {
         return retired;
+    }
+
+    /** Lets the registry skip idle schedulers instead of looking their entity up every tick. */
+    public synchronized boolean hasPendingTasks() {
+        return !scheduled.isEmpty() || !due.isEmpty();
     }
 
     private record ScheduledTask<E>(long dueTick, Consumer<E> action, Runnable retiredCallback) {
