@@ -8,9 +8,13 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /** The M3 synthetic region: one whole level, replaced by real regions once M7 feeds the regionizer. */
 public final class LevelTickUnit extends TickHandle {
+    private static final int CENSUS_INTERVAL_TICKS = 100;
+
     private final ServerLevel level;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
+    private volatile int lastChunkCount;
+    private volatile int lastEntityCount;
 
     LevelTickUnit(long id, ServerLevel level) {
         super(id, level.dimension().identifier().toString());
@@ -41,6 +45,21 @@ public final class LevelTickUnit extends TickHandle {
         for (LevelTickPhases phases : TickingManager.phases()) {
             phases.afterLevelTick(level);
         }
+
+        if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
+            takeCensus();
+        }
+    }
+
+    /** Counting entities walks every section, so it runs on the owner at a low rate and publishes for off-thread readers. */
+    private void takeCensus() {
+        lastChunkCount = level.getChunkSource().getLoadedChunksCount();
+        int entities = 0;
+        for (Entity _ : level.getAllEntities()) {
+            entities++;
+        }
+
+        lastEntityCount = entities;
     }
 
     private void runQueuedTasks() {
@@ -51,17 +70,13 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
+    /** Last on-owner census; readable from any thread, at most {@value #CENSUS_INTERVAL_TICKS} ticks old. */
     public int chunkCount() {
-        return level.getChunkSource().getLoadedChunksCount();
+        return lastChunkCount;
     }
 
     public int entityCount() {
-        int count = 0;
-        for (Entity _ : level.getAllEntities()) {
-            count++;
-        }
-
-        return count;
+        return lastEntityCount;
     }
 
     @Override
