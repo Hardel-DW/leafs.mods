@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Structural invariant checks shared by the scenario tests and the fuzz test. */
-final class RegionizerAssertions {
+/** Structural invariant checks shared by the scenario tests, the fuzz test and the region-feed test. */
+public final class RegionizerAssertions {
 
     private RegionizerAssertions() {
     }
@@ -21,7 +21,7 @@ final class RegionizerAssertions {
      * Verifies every structural invariant of the regionizer. {@code strict} additionally requires that
      * no merge is pending anywhere — the steady state once every region stopped ticking.
      */
-    static <R> void assertInvariants(Regionizer<R> regionizer, boolean strict) {
+    public static <R> void assertInvariants(Regionizer<R> regionizer, boolean strict) {
         Map<Long, RegionSection<R>> sections = regionizer.sectionsView();
         int bufferRadius = regionizer.bufferRadiusValue();
         int mergeRadius = regionizer.mergeRadiusValue();

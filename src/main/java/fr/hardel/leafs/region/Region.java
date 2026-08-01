@@ -61,6 +61,11 @@ public final class Region<R> {
         return regionizer.chunkCountOf(this);
     }
 
+    /** Sections kept only until the owner is released: reclaim is deliberately lazy, see {@code releaseFromTicking}. */
+    public int deadSectionCount() {
+        return regionizer.deadSectionCountOf(this);
+    }
+
     void setState(RegionState state) {
         this.state = state;
     }

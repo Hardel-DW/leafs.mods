@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.config.LeafsConfig;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
 import fr.hardel.leafs.ownership.RegionContext;
@@ -67,9 +68,38 @@ public final class TickingManager {
         return RegionContext.current() instanceof RegionContext.Region context && context.regionId() == unitFor(level).id();
     }
 
-    public void shutdown() {
+    public void shutdown(MinecraftServer server) {
         scheduler.shutdown();
         watchdog.stop();
+        drainRegions(server);
+    }
+
+    /**
+     * One last handshake per level so emptied regions are reclaimed and what is left is reported. It
+     * walks {@code getAllLevels()} rather than the units, which only hold levels that ticked at least
+     * once, and it never throws: this runs after the worlds are saved, where a crash would only
+     * misattribute the shutdown.
+     */
+    private void drainRegions(MinecraftServer server) {
+        int regions = 0;
+        int sections = 0;
+        for (ServerLevel level : server.getAllLevels()) {
+            LevelRegions levelRegions = ((ServerLevelRegionAccess) level).leafs$regions();
+            try {
+                levelRegions.settle();
+            } catch (RuntimeException exception) {
+                Leafs.LOGGER.error("Leafs region drain failed on {}", level.dimension().identifier(), exception);
+            }
+
+            regions += levelRegions.regionizer().regionsView().size();
+            sections += levelRegions.sections();
+        }
+
+        if (regions == 0 && sections == 0) {
+            Leafs.LOGGER.info("Leafs regions drained: 0 regions, 0 sections");
+        } else {
+            Leafs.LOGGER.error("Leafs regions NOT drained: {} regions and {} sections outlived the chunk holders that feed them", regions, sections);
+        }
     }
 
     private LevelTickUnit unitFor(ServerLevel level) {
