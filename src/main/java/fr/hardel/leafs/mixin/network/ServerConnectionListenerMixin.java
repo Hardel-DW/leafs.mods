@@ -8,7 +8,7 @@ import net.minecraft.server.network.ServerConnectionListener;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Play connections tick on their region; the global loop keeps the disconnection detection. */
+/** Play connections of rostered players tick on their unit; the global loop keeps everything else. */
 @Mixin(ServerConnectionListener.class)
 public abstract class ServerConnectionListenerMixin {
 
