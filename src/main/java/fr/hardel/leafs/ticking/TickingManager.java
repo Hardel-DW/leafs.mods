@@ -31,7 +31,7 @@ public final class TickingManager {
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), barrier, watchdog, crashWriter, (handle, throwable) -> Leafs.LOGGER.error("Region tick failed on #{} in {}", handle.id(), handle.dimension(), throwable));
         watchdog.start();
-        Leafs.LOGGER.info("Leafs ticking engaged — attached mode ({} region workers configured, started at M11)", config.effectiveRegionThreads());
+        Leafs.LOGGER.info("Leafs ticking attached — every level ticks through its region unit on the server thread; the free-running pool starts at M11");
     }
 
     /** Installed at bootstrap, before any server exists; before-hooks run in install order. */
