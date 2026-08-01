@@ -34,6 +34,6 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @Inject(method = "stopServer", at = @At("TAIL"))
     private void leafs$shutdownTicking(CallbackInfo callbackInfo) {
-        leafs$ticking.shutdown();
+        leafs$ticking.shutdown((MinecraftServer) (Object) this);
     }
 }

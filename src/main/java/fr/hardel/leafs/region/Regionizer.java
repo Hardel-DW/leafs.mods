@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ public final class Regionizer<R> {
     private final StampedLock lock = new StampedLock();
     private final ConcurrentHashMap<Long, RegionSection<R>> sections = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Region<R>> regionsById = new ConcurrentHashMap<>();
+    private final Collection<Region<R>> regionsView = Collections.unmodifiableCollection(regionsById.values());
     private final AtomicLong nextRegionId = new AtomicLong(1);
     private volatile Thread writeLockOwner;
 
@@ -123,6 +125,11 @@ public final class Regionizer<R> {
         return section == null ? null : section.region();
     }
 
+    /** Live, read-only view: iteration is weakly consistent, so a region read from it may already be dead. */
+    public Collection<Region<R>> regionsView() {
+        return regionsView;
+    }
+
     boolean tryMarkTicking(Region<R> region) {
         long stamp = writeLock();
         try {
@@ -155,6 +162,19 @@ public final class Regionizer<R> {
         long stamp = lock.readLock();
         try {
             return region.sectionKeys.size();
+        } finally {
+            lock.unlockRead(stamp);
+        }
+    }
+
+    int deadSectionCountOf(Region<R> region) {
+        if (writeLockOwner == Thread.currentThread()) {
+            return region.deadSectionKeys.size();
+        }
+
+        long stamp = lock.readLock();
+        try {
+            return region.deadSectionKeys.size();
         } finally {
             lock.unlockRead(stamp);
         }
@@ -562,10 +582,6 @@ public final class Regionizer<R> {
 
     Map<Long, RegionSection<R>> sectionsView() {
         return sections;
-    }
-
-    Collection<Region<R>> regionsView() {
-        return regionsById.values();
     }
 
     int mergeRadiusValue() {

@@ -67,7 +67,8 @@ public final class LeafsConfig {
         }
     }
 
-    static LeafsConfig defaults() {
+    /** The compiled-in schema values, without touching the config file — the only way to build one headless. */
+    public static LeafsConfig defaults() {
         return new LeafsConfig();
     }
 
