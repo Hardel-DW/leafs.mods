@@ -3,12 +3,14 @@ package fr.hardel.leafs.scheduler;
 import fr.hardel.leafs.region.CoordinateKey;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.function.LongFunction;
 
-/** A closed queue rejects offers, making the scheduler re-resolve the owner — how tasks survive merges and splits. */
+/**
+ * A closed queue rejects offers, making the scheduler re-resolve the owner — how tasks survive merges
+ * and splits. Closing only ever happens under the regionizer's write lock, which is also what orders
+ * the two nested monitors below: no two closures of the same pair can run in opposite directions.
+ */
 public final class RegionTaskQueues {
     private final ArrayDeque<QueuedTask> tasks = new ArrayDeque<>();
     private boolean closed;
@@ -23,11 +25,8 @@ public final class RegionTaskQueues {
         return true;
     }
 
-    synchronized List<QueuedTask> drainSnapshot() {
-        List<QueuedTask> drained = new ArrayList<>(tasks);
-        tasks.clear();
-
-        return drained;
+    synchronized QueuedTask poll() {
+        return tasks.pollFirst();
     }
 
     /** Folia merge order: the closing queue's tasks land before the target's existing ones. */
