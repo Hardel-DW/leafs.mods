@@ -8,8 +8,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -83,5 +87,86 @@ class BarrierWindowTest {
 
         barrier.enterTick();
         barrier.exitTick();
+    }
+
+    /** F-C2: raising used to happen outside the try, so a failure there froze every later tick. */
+    @Test
+    void aFailingRaiseLeavesTheBarrierDown() throws InterruptedException {
+        window.enqueue(() -> executed.add("never"));
+        barrier.enterTick();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread globalPhase = new Thread(() -> {
+            try {
+                window.runGlobalPhase();
+            } catch (Throwable throwable) {
+                failure.set(throwable);
+            }
+        });
+        globalPhase.start();
+
+        Thread.sleep(100);
+        globalPhase.interrupt();
+        globalPhase.join(5_000);
+
+        assertInstanceOf(IllegalStateException.class, failure.get());
+        assertEquals(List.of(), executed);
+        barrier.exitTick();
+
+        window.runGlobalPhase();
+        assertEquals(List.of("never"), executed, "the window must still work after the failed raise");
+    }
+
+    /**
+     * The command-block contract: a unit that defers itself outside the window replays itself once
+     * inside it, sees {@link BarrierWindow#isDraining()} and runs there instead of queueing again —
+     * the property that keeps a chain loop from filling the queue.
+     */
+    @Test
+    void workDeferredFromInsideTheWindowRunsInline() {
+        AtomicInteger executions = new AtomicInteger();
+        Runnable[] unit = new Runnable[1];
+        unit[0] = () -> {
+            if (window.isDraining()) {
+                executions.incrementAndGet();
+                return;
+            }
+
+            window.enqueue(unit[0]);
+        };
+
+        assertFalse(window.isDraining());
+        unit[0].run();
+        assertEquals(0, executions.get());
+        assertEquals(1, window.pendingCount());
+
+        window.runGlobalPhase();
+
+        assertEquals(1, executions.get());
+        assertEquals(0, window.pendingCount());
+        assertFalse(window.isDraining(), "the drain marker must not survive the window");
+    }
+
+    @Test
+    void theDrainMarkerIsClearedWhenATaskThrows() {
+        window.enqueue(() -> {
+            throw new IllegalStateException("command block crash");
+        });
+
+        assertThrows(IllegalStateException.class, window::runGlobalPhase);
+
+        assertFalse(window.isDraining());
+    }
+
+    @Test
+    void theShutdownWindowRunsPendingWorkAndDropsWhatItQueues() {
+        window.enqueue(() -> {
+            executed.add("last");
+            window.enqueue(() -> executed.add("too late"));
+        });
+
+        window.runShutdownPhase();
+
+        assertEquals(List.of("last"), executed);
+        assertEquals(0, window.pendingCount());
     }
 }
