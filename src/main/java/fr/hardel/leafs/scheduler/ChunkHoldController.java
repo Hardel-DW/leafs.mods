@@ -1,12 +1,14 @@
 package fr.hardel.leafs.scheduler;
 
 /**
- * Keeps a task's target chunk loaded until the task runs. {@code acquire} must guarantee a region
- * covers the position before returning. Refcounted by the scheduler: one pair per chunk, not per task.
+ * The per-level hold primitive, implemented by chunk/. Once {@code addHold} returns, the chunk must
+ * have a holder — and therefore a region — covering it; {@code removeHold} gives that up. Vanilla
+ * deduplicates tickets by (type, level), so a chunk carries at most ONE hold: {@link SharedChunkHolds}
+ * is what lets several users share it.
  */
 public interface ChunkHoldController {
 
-    void acquire(int chunkX, int chunkZ);
+    void addHold(int chunkX, int chunkZ);
 
-    void release(int chunkX, int chunkZ);
+    void removeHold(int chunkX, int chunkZ);
 }

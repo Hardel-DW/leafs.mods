@@ -19,8 +19,8 @@ public final class GlobalScheduler {
         while (executed < budget && (task = tasks.poll()) != null) {
             try {
                 task.run();
-            } catch (Exception exception) {
-                Leafs.LOGGER.error("Global task failed", exception);
+            } catch (Throwable throwable) {
+                Leafs.LOGGER.error("Global task failed", throwable);
             }
             executed++;
         }

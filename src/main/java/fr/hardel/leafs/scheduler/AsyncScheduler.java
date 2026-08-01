@@ -21,23 +21,30 @@ public final class AsyncScheduler {
         });
     }
 
+    /** A failing async task never takes a worker down with it — the pool has no world state to protect. */
     public void run(Runnable task) {
         pool.execute(() -> {
             try {
                 task.run();
-            } catch (Exception exception) {
-                Leafs.LOGGER.error("Async task failed", exception);
+            } catch (Throwable throwable) {
+                Leafs.LOGGER.error("Async task failed", throwable);
             }
         });
     }
 
+    /** Interrupts whatever is still running when the timeout expires: daemon workers must not outlive the server. */
     public boolean shutdown(Duration timeout) {
         pool.shutdown();
         try {
-            return pool.awaitTermination(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            if (pool.awaitTermination(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                return true;
+            }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            return false;
         }
+
+        pool.shutdownNow();
+
+        return false;
     }
 }
