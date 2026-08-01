@@ -8,8 +8,8 @@ import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
- * fabric-api-lookup's per-level cache map is mutated by cache creation (game threads) and
- * invalidation (block-entity load on our chunk thread, state changes on game threads). Both entry
+ * fabric-api-lookup's per-level cache map is mutated by cache creation and by invalidation
+ * (block-entity load, block state changes) — one thread today, one per region from M11. Both entry
  * points serialize on the level; priority 1100 so fabric's methods exist when this applies.
  */
 @Mixin(value = ServerLevel.class, priority = 1100)
