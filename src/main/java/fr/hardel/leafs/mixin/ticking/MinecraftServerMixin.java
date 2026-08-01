@@ -20,26 +20,20 @@ import java.util.function.BooleanSupplier;
 public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @Unique
-    private TickingManager leafs$ticking;
+    private final TickingManager leafs$ticking = new TickingManager(LeafsConfig.get());
 
     @Override
     public TickingManager leafs$ticking() {
-        if (leafs$ticking == null) {
-            leafs$ticking = new TickingManager(LeafsConfig.get());
-        }
-
         return leafs$ticking;
     }
 
     @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V"))
     private void leafs$tickLevelThroughRegionUnit(ServerLevel level, BooleanSupplier haveTime, Operation<Void> original) {
-        this.leafs$ticking().tickLevel(level, () -> original.call(level, haveTime));
+        leafs$ticking.tickLevel(level, () -> original.call(level, haveTime));
     }
 
     @Inject(method = "stopServer", at = @At("TAIL"))
     private void leafs$shutdownTicking(CallbackInfo callbackInfo) {
-        if (leafs$ticking != null) {
-            leafs$ticking.shutdown();
-        }
+        leafs$ticking.shutdown();
     }
 }

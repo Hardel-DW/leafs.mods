@@ -6,10 +6,16 @@ import java.util.function.LongConsumer;
 
 final class TestTickHandle extends TickHandle {
     private final LongConsumer body;
+    private final boolean crashReportFails;
 
     TestTickHandle(long id, LongConsumer body) {
+        this(id, body, false);
+    }
+
+    TestTickHandle(long id, LongConsumer body, boolean crashReportFails) {
         super(id, "test:world");
         this.body = body;
+        this.crashReportFails = crashReportFails;
     }
 
     @Override
@@ -19,6 +25,10 @@ final class TestTickHandle extends TickHandle {
 
     @Override
     protected RegionCrashReport buildCrashReport() {
+        if (crashReportFails) {
+            throw new IllegalArgumentException("the level is too broken to describe");
+        }
+
         return new RegionCrashReport(id(), dimension(), currentTick(), 0, 0);
     }
 }
