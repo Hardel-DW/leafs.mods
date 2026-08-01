@@ -8,6 +8,7 @@ import fr.hardel.leafs.ownership.RegionContext;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,8 +31,7 @@ public final class TickingManager {
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), barrier, watchdog, crashWriter, (handle, throwable) -> Leafs.LOGGER.error("Region tick failed on #{} in {}", handle.id(), handle.dimension(), throwable));
         watchdog.start();
-        scheduler.start();
-        Leafs.LOGGER.info("Leafs ticking engaged — attached mode, {} region threads standing by", config.effectiveRegionThreads());
+        Leafs.LOGGER.info("Leafs ticking engaged — attached mode ({} region workers configured, started at M11)", config.effectiveRegionThreads());
     }
 
     /** Installed at bootstrap, before any server exists; before-hooks run in install order. */
@@ -45,6 +45,10 @@ public final class TickingManager {
 
     public TickBarrier barrier() {
         return barrier;
+    }
+
+    public Collection<LevelTickUnit> units() {
+        return levelUnits.values();
     }
 
     /** Runs one vanilla level tick through the level's region unit: context, crash scope and watchdog engaged. */

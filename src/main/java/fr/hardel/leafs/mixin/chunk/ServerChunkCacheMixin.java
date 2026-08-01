@@ -3,10 +3,12 @@ package fr.hardel.leafs.mixin.chunk;
 import fr.hardel.leafs.chunk.ChunkSystemThread;
 import fr.hardel.leafs.chunk.ChunkThreadAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
+import fr.hardel.leafs.config.LeafsConfig;
 import fr.hardel.leafs.ownership.RegionContext;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -21,6 +23,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Iterator;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -51,17 +56,55 @@ public abstract class ServerChunkCacheMixin implements ChunkThreadAccess {
         return leafs$chunkThread;
     }
 
+    @Mutable
+    @Shadow
+    @Final
+    private Set<ChunkHolder> chunkHoldersToBroadcast;
+
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$startChunkThread(CallbackInfo callbackInfo) {
+        if (!LeafsConfig.get().chunkThreads()) {
+            return;
+        }
+
         ServerChunkCache self = (ServerChunkCache) (Object) this;
+        this.chunkHoldersToBroadcast = ConcurrentHashMap.newKeySet();
         this.leafs$chunkThread = new ChunkSystemThread(self, level.dimension().identifier().toString());
         this.mainThread = leafs$chunkThread.start();
         ((TicketStorageAccess) self.ticketStorage).leafs$bindChunkExecutor(self.mainThreadProcessor);
     }
 
+    /** Game threads add holders while the chunk thread drains: remove-as-you-go so a concurrent add is never wiped by the trailing clear. */
+    @Inject(method = "broadcastChangedChunks", at = @At("HEAD"), cancellable = true)
+    private void leafs$lossFreeBroadcastDrain(ProfilerFiller profiler, CallbackInfo callbackInfo) {
+        if (leafs$chunkThread == null) {
+            return;
+        }
+
+        profiler.push("broadcast");
+        for (Iterator<ChunkHolder> iterator = chunkHoldersToBroadcast.iterator(); iterator.hasNext(); ) {
+            ChunkHolder holder = iterator.next();
+            iterator.remove();
+            LevelChunk chunk = holder.getTickingChunk();
+            if (chunk != null) {
+                holder.broadcastChanges(chunk);
+            }
+        }
+        profiler.pop();
+        callbackInfo.cancel();
+    }
+
+    /** Vanilla calls this directly from login spawn preparation (ChunkLoadCounter.track) on game threads. */
+    @Inject(method = "runDistanceManagerUpdates", at = @At("HEAD"), cancellable = true)
+    private void leafs$distanceUpdatesOnChunkThread(CallbackInfoReturnable<Boolean> callbackInfo) {
+        if (leafs$chunkThread != null && !leafs$chunkThread.isCurrentThread()) {
+            callbackInfo.setReturnValue(leafs$chunkThread.supplyBlocking(((ServerChunkCache) (Object) this)::runDistanceManagerUpdates));
+        }
+    }
+
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void leafs$tickOnChunkThread(BooleanSupplier haveTime, boolean tickChunks, CallbackInfo callbackInfo) {
-        if (!leafs$chunkThread.isCurrentThread()) {
+        if (leafs$chunkThread != null && !leafs$chunkThread.isCurrentThread()) {
             leafs$chunkThread.runBlocking(() -> ((ServerChunkCache) (Object) this).tick(haveTime, tickChunks));
             callbackInfo.cancel();
         }
@@ -69,7 +112,7 @@ public abstract class ServerChunkCacheMixin implements ChunkThreadAccess {
 
     @Inject(method = "save", at = @At("HEAD"), cancellable = true)
     private void leafs$saveOnChunkThread(boolean flushStorage, CallbackInfo callbackInfo) {
-        if (!leafs$chunkThread.isCurrentThread()) {
+        if (leafs$chunkThread != null && !leafs$chunkThread.isCurrentThread()) {
             leafs$chunkThread.runBlocking(() -> ((ServerChunkCache) (Object) this).save(flushStorage));
             callbackInfo.cancel();
         }
@@ -77,7 +120,7 @@ public abstract class ServerChunkCacheMixin implements ChunkThreadAccess {
 
     @Inject(method = "deactivateTicketsOnClosing", at = @At("HEAD"), cancellable = true)
     private void leafs$deactivateOnChunkThread(CallbackInfo callbackInfo) {
-        if (!leafs$chunkThread.isCurrentThread()) {
+        if (leafs$chunkThread != null && !leafs$chunkThread.isCurrentThread()) {
             leafs$chunkThread.runBlocking(((ServerChunkCache) (Object) this)::deactivateTicketsOnClosing);
             callbackInfo.cancel();
         }
@@ -85,7 +128,7 @@ public abstract class ServerChunkCacheMixin implements ChunkThreadAccess {
 
     @Inject(method = "close", at = @At("HEAD"), cancellable = true)
     private void leafs$closeOnChunkThread(CallbackInfo callbackInfo) throws java.io.IOException {
-        if (!leafs$chunkThread.isCurrentThread()) {
+        if (leafs$chunkThread != null && !leafs$chunkThread.isCurrentThread()) {
             leafs$chunkThread.runBlocking(() -> {
                 try {
                     ((ServerChunkCache) (Object) this).close();
@@ -100,7 +143,7 @@ public abstract class ServerChunkCacheMixin implements ChunkThreadAccess {
 
     @Inject(method = "getChunkNow", at = @At("HEAD"), cancellable = true)
     private void leafs$directReadForGameThreads(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
-        if (Thread.currentThread() == this.mainThread) {
+        if (leafs$chunkThread == null || Thread.currentThread() == this.mainThread) {
             return;
         }
 
@@ -112,5 +155,23 @@ public abstract class ServerChunkCacheMixin implements ChunkThreadAccess {
         ChunkHolder holder = this.getVisibleChunkIfPresent(ChunkPos.pack(x, z));
         ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(ChunkStatus.FULL);
         callbackInfo.setReturnValue(chunk instanceof LevelChunk levelChunk ? levelChunk : null);
+    }
+
+    /** THE hot path: every block read reaches getChunk; loaded FULL chunks must never pay a chunk-thread round trip. */
+    @Inject(method = "getChunk", at = @At("HEAD"), cancellable = true)
+    private void leafs$directLoadedChunkRead(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
+        if (leafs$chunkThread == null || Thread.currentThread() == this.mainThread || targetStatus != ChunkStatus.FULL) {
+            return;
+        }
+
+        if (RegionContext.current() == null && Thread.currentThread() != level.getServer().getRunningThread()) {
+            return;
+        }
+
+        ChunkHolder holder = this.getVisibleChunkIfPresent(ChunkPos.pack(x, z));
+        ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(ChunkStatus.FULL);
+        if (chunk instanceof LevelChunk) {
+            callbackInfo.setReturnValue(chunk);
+        }
     }
 }

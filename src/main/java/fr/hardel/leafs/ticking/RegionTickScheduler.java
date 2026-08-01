@@ -96,6 +96,7 @@ public final class RegionTickScheduler {
         barrier.enterTick();
         RegionContext.enter(handle.context());
         watchdog.beginTick(handle);
+        long start = System.nanoTime();
         try {
             handle.tick(tickCount);
             handle.advance(tickCount);
@@ -103,6 +104,8 @@ public final class RegionTickScheduler {
             crashWriter.write(handle.buildCrashReport(), throwable);
             throw throwable;
         } finally {
+            long end = System.nanoTime();
+            handle.timings().record(end, end - start);
             watchdog.endTick(handle);
             RegionContext.exit();
             barrier.exitTick();
