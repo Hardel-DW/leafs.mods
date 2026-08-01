@@ -51,13 +51,21 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    @Override
-    protected RegionCrashReport buildCrashReport() {
-        int entityCount = 0;
+    public int chunkCount() {
+        return level.getChunkSource().getLoadedChunksCount();
+    }
+
+    public int entityCount() {
+        int count = 0;
         for (Entity _ : level.getAllEntities()) {
-            entityCount++;
+            count++;
         }
 
-        return new RegionCrashReport(id(), dimension(), currentTick(), level.getChunkSource().getLoadedChunksCount(), entityCount);
+        return count;
+    }
+
+    @Override
+    protected RegionCrashReport buildCrashReport() {
+        return new RegionCrashReport(id(), dimension(), currentTick(), chunkCount(), entityCount());
     }
 }
