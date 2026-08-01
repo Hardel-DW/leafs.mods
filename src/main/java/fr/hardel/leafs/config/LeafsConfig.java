@@ -29,7 +29,6 @@ public final class LeafsConfig {
     private int watchdogWarnSeconds = 60;
     private boolean compatBarrier = true;
     private boolean perRegionLogs = true;
-    private boolean chunkThreads = true;
 
     private LeafsConfig() {
     }
@@ -97,11 +96,6 @@ public final class LeafsConfig {
 
     public boolean perRegionLogs() {
         return perRegionLogs;
-    }
-
-    /** M11 construction site: per-level chunk-system threads. Correct but coordination-bound while attached — off until regions run free. */
-    public boolean chunkThreads() {
-        return chunkThreads;
     }
 
     public int effectiveRegionThreads() {
