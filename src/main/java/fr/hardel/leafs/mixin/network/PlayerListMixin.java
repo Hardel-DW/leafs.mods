@@ -47,10 +47,11 @@ public abstract class PlayerListMixin {
         this.playersByUUID = new ConcurrentHashMap<>();
     }
 
+    /** Attached mode: the server thread owns every level between unit ticks (the integrated server pauses while empty, so a deferred placement would never run — M11 revisits with real region ownership). */
     @Inject(method = "placeNewPlayer", at = @At("HEAD"), cancellable = true)
     private void leafs$placeOnOwningUnit(Connection connection, ServerPlayer player, CommonListenerCookie cookie, CallbackInfo callbackInfo) {
         TickingManager ticking = ((LeafsServerAccess) this.getServer()).leafs$ticking();
-        if (ticking.currentThreadOwns(player.level())) {
+        if (ticking.currentThreadOwns(player.level()) || this.getServer().isSameThread()) {
             return;
         }
 

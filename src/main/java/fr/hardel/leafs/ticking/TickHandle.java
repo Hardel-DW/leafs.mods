@@ -6,6 +6,7 @@ import fr.hardel.leafs.ownership.RegionCrashReport;
 /** One schedulable tick unit: a whole level until M7, a real region from M11. */
 public abstract class TickHandle {
     private final RegionContext.Region context;
+    private final TickTimings timings = new TickTimings();
     private volatile boolean cancelled;
     private volatile long currentTick;
     private volatile long scheduledStartNanos;
@@ -24,6 +25,10 @@ public abstract class TickHandle {
 
     public long currentTick() {
         return currentTick;
+    }
+
+    public TickTimings timings() {
+        return timings;
     }
 
     public void cancel() {

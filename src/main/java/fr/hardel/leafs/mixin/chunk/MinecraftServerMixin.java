@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import fr.hardel.leafs.config.LeafsConfig;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,6 +14,6 @@ public abstract class MinecraftServerMixin {
 
     @WrapOperation(method = "pollTaskInternal", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;pollTask()Z"))
     private boolean leafs$chunkThreadsPumpThemselves(ServerChunkCache cache, Operation<Boolean> original) {
-        return false;
+        return LeafsConfig.get().chunkThreads() ? false : original.call(cache);
     }
 }

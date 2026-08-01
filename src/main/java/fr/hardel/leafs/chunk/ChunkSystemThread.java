@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerChunkCache;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.Supplier;
 
 /**
  * The level's dedicated chunk-system thread: sole owner of the chunk bookkeeping after the executor
@@ -46,6 +47,14 @@ public final class ChunkSystemThread {
         }
 
         CompletableFuture.runAsync(task, cache.mainThreadProcessor).join();
+    }
+
+    public <T> T supplyBlocking(Supplier<T> task) {
+        if (isCurrentThread()) {
+            return task.get();
+        }
+
+        return CompletableFuture.supplyAsync(task, cache.mainThreadProcessor).join();
     }
 
     private void pump(String dimension) {

@@ -4,8 +4,12 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"chunk.DistanceManagerMixin",
+		"chunk.LevelChunkMixin",
 		"chunk.MinecraftServerMixin",
+		"chunk.PersistentEntitySectionManagerMixin",
+		"chunk.PlayerChunkSenderMixin",
 		"chunk.ServerChunkCacheMixin",
+		"chunk.ServerLevelMixin",
 		"chunk.TicketStorageMixin",
 		"compat.FabricApiLookupCacheShim",
 		"compat.FabricLoadedChunksShim",
