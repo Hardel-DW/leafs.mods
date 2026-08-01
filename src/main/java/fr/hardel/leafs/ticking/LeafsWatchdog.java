@@ -5,8 +5,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Replaces the vanilla single-thread watchdog: per-tick-unit deadlines, stack dump of the stuck
- * thread only. Detection and reporting, never recovery.
+ * Per-tick-unit deadlines with a stack dump of the stuck thread only. Detection and reporting,
+ * never recovery: while attached, the vanilla {@code ServerWatchdog} is still the one that kills a
+ * hung server, and it only sees the server thread (mixin #2 replaces it at M11). Reports must
+ * therefore land BEFORE {@code max-tick-time}, which is what bounds the poll interval below.
  */
 public final class LeafsWatchdog {
     private final long warnNanos;
@@ -43,7 +45,7 @@ public final class LeafsWatchdog {
     }
 
     private void watch() {
-        long checkMillis = Math.max(10, warnNanos / 4_000_000);
+        long checkMillis = Math.clamp(warnNanos / 4_000_000L, 10L, 1_000L);
         while (active) {
             try {
                 Thread.sleep(checkMillis);
