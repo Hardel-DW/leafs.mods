@@ -1,6 +1,7 @@
 package fr.hardel.leafs.global;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.vehicle.minecart.MinecartCommandBlock;
 import net.minecraft.world.level.block.CommandBlock;
@@ -30,7 +31,7 @@ public final class CommandBlockWindow {
         BlockPos target = pos.immutable();
 
         return defer(level, () -> {
-            if (!level.hasChunkAt(target)) {
+            if (!level.getChunkSource().hasChunk(SectionPos.blockToSectionCoord(target.getX()), SectionPos.blockToSectionCoord(target.getZ()))) {
                 return;
             }
 
