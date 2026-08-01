@@ -12,25 +12,35 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.function.Consumer;
+
 /**
- * The region-side halves of the network split: inbound packets drained before the level tick,
- * play connections ticked after it (vanilla order inside a tick), replicating the global loop's
- * error handling. Closed connections are left to the global loop, which keeps the disconnection path.
+ * The region-side halves of the network split: inbound packets drained before the level tick, play
+ * connections ticked after it (vanilla order inside a tick), replicating the global loop's error
+ * handling. Closed connections are left to the global loop, which keeps the disconnection path.
+ *
+ * <p>Membership comes from the server roster, not from {@code ServerLevel.players()}: the latter is
+ * an entity-TRACKING list a player can legitimately leave while still connected and still playing
+ * (end credits), and it is a plain {@code ArrayList} mutated by the very packets we drain.
  */
 public final class RegionNetworkPhases implements LevelTickPhases {
 
     @Override
     public void beforeLevelTick(ServerLevel level) {
-        for (ServerPlayer player : level.players()) {
-            ((GameListenerNetworkAccess) player.connection).leafs$inboundQueue().drain();
-        }
+        forEachPlayerOf(level, player -> PacketRouting.queueOf(player.connection).drain());
     }
 
     @Override
     public void afterLevelTick(ServerLevel level) {
         MinecraftServer server = level.getServer();
-        for (ServerPlayer player : level.players()) {
-            tickPlayConnection(server, player.connection.connection);
+        forEachPlayerOf(level, player -> tickPlayConnection(server, player.connection.connection));
+    }
+
+    private void forEachPlayerOf(ServerLevel level, Consumer<ServerPlayer> action) {
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            if (player.level() == level) {
+                action.accept(player);
+            }
         }
     }
 
