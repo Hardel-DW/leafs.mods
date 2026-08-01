@@ -26,7 +26,8 @@ public final class LeafsConfig {
     private int gridSectionShift = 4;
     private int mergeRadius = 1;
     private int bufferRadius = 1;
-    private int watchdogWarnSeconds = 60;
+    private int watchdogWarnSeconds = 15;
+    private int metricsLogSeconds = 0;
     private boolean compatBarrier = true;
     private boolean perRegionLogs = true;
 
@@ -86,8 +87,14 @@ public final class LeafsConfig {
         return bufferRadius;
     }
 
+    /** Below vanilla's 60s {@code max-tick-time} on purpose: at parity the JVM is halted before we can report. */
     public int watchdogWarnSeconds() {
         return watchdogWarnSeconds;
+    }
+
+    /** Period of the CSV tick-metrics log ({@code logs/leafs-metrics.csv}); 0 disables the recorder. */
+    public int metricsLogSeconds() {
+        return metricsLogSeconds;
     }
 
     public boolean compatBarrier() {
@@ -112,6 +119,7 @@ public final class LeafsConfig {
         requireRange("mergeRadius", mergeRadius, 1, 8);
         requireRange("bufferRadius", bufferRadius, 1, 8);
         requireRange("watchdogWarnSeconds", watchdogWarnSeconds, 1, 600);
+        requireRange("metricsLogSeconds", metricsLogSeconds, 0, 3600);
         return this;
     }
 
