@@ -22,13 +22,6 @@ public sealed interface RegionContext {
         }
     }
 
-    record Chunk(String dimension) implements RegionContext {
-        @Override
-        public String describe() {
-            return "chunk thread of " + dimension;
-        }
-    }
-
     String describe();
 
     static RegionContext current() {

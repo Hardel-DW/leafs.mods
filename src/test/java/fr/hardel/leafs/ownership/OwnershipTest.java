@@ -40,7 +40,7 @@ class OwnershipTest {
     void nestedEnterIsABug() {
         RegionContext.enter(RegionContext.GLOBAL);
 
-        assertThrows(IllegalStateException.class, () -> RegionContext.enter(new RegionContext.Chunk("minecraft:the_nether")));
+        assertThrows(IllegalStateException.class, () -> RegionContext.enter(new RegionContext.Region(1, "minecraft:the_nether")));
     }
 
     @Test
