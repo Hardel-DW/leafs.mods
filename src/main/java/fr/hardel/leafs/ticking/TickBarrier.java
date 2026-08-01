@@ -1,10 +1,10 @@
 package fr.hardel.leafs.ticking;
 
 /**
- * The global synchronisation point: {@link #raise()} returns once every tick in flight on another
- * thread finished and keeps new ticks parked until {@link #drop()}. Raisers exclude each other so a
- * single holder ever owns the raised window; the holder may nest. When nothing raises it, ticks pay
- * two uncontended monitor operations — regions never stop.
+ * The global synchronisation point: {@link #raise()} returns once every tick that was in flight on
+ * another thread has finished, and keeps new ticks parked until {@link #drop()}. Raisers exclude
+ * each other so only one holder ever owns the raised window, and that holder may nest. When nothing
+ * raises it, ticks pay two uncontended monitor operations — regions never stop.
  *
  * <p>The barrier can never stay raised: every method leaves it exactly as it found it when it exits
  * exceptionally, and the two ways a holder could block forever on itself (raising from inside its
