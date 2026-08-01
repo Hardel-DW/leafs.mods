@@ -6,6 +6,7 @@ import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.RunningOnDifferentThreadException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -16,6 +17,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Timeout(10)
@@ -29,9 +33,9 @@ class PlayerPacketQueueTest {
         queue.add(listener, new FakePacket("first", handled::add));
         queue.add(listener, new FakePacket("second", handled::add));
 
-        assertEquals(2, queue.drain());
+        queue.drain();
+
         assertEquals(List.of("first", "second"), handled);
-        assertEquals(0, queue.drain());
     }
 
     @Test
@@ -39,20 +43,89 @@ class PlayerPacketQueueTest {
         FakeListener disconnected = new FakeListener(false);
         queue.add(disconnected, new FakePacket("dropped", handled::add));
 
-        assertEquals(1, queue.drain());
+        queue.drain();
+
         assertEquals(List.of(), handled);
     }
 
+    /** {@code ServerGamePacketListenerImpl} keeps accepting the reconfiguration ack after it stops accepting the rest. */
     @Test
-    void handlerExceptionsGoThroughOnPacketError() {
+    void skippablePacketsBypassTheAcceptingCheck() {
+        FakeListener listener = new FakeListener(false);
+        listener.alwaysHandled = "config_ack";
+        queue.add(listener, new FakePacket("dropped", handled::add));
+        queue.add(listener, new FakePacket("config_ack", handled::add));
+
+        queue.drain();
+
+        assertEquals(List.of("config_ack"), handled);
+    }
+
+    @Test
+    void packetsQueuedDuringTheDrainAreHandledInTheSameDrain() {
+        FakeListener listener = new FakeListener(true);
+        queue.add(listener, new FakePacket("first", name -> {
+            handled.add(name);
+            queue.add(listener, new FakePacket("late", handled::add));
+        }));
+
+        queue.drain();
+
+        assertEquals(List.of("first", "late"), handled);
+    }
+
+    /** Vanilla's global drain has no per-packet recovery either: {@code onPacketError} rethrows and the tick dies. */
+    @Test
+    void handlerFailureEscapesTheDrainAndLeavesTheRestQueued() {
         FakeListener listener = new FakeListener(true);
         queue.add(listener, new FakePacket("boom", name -> {
             throw new IllegalStateException(name);
         }));
         queue.add(listener, new FakePacket("survivor", handled::add));
 
-        assertEquals(2, queue.drain());
+        assertThrows(RuntimeException.class, queue::drain);
+
+        assertEquals(List.of(), handled);
+        assertEquals(1, listener.errors.size());
+        assertFalse(PlayerPacketQueue.handlingPackets(), "the handling scope must not leak past a failing drain");
+
+        queue.drain();
         assertEquals(List.of("survivor"), handled);
+    }
+
+    /**
+     * The regression that crashed the server on an ordinary death: the routing hook re-queued and
+     * rethrew because it re-read the listener's player, which respawn had just moved to another
+     * level. The queue owns every packet it drains, whatever a handler does to the player.
+     */
+    @Test
+    void ownershipHoldsForEveryPacketOfADrainAcrossAPlayerSwap() {
+        FakeListener listener = new FakeListener(true);
+        List<Boolean> owned = new ArrayList<>();
+        queue.add(listener, new FakePacket("perform_respawn", _ -> {
+            listener.player = "respawned in another level";
+            owned.add(queue.handledByCurrentThread());
+        }));
+        queue.add(listener, new FakePacket("move_player", _ -> owned.add(queue.handledByCurrentThread())));
+
+        queue.drain();
+
+        assertEquals("respawned in another level", listener.player);
+        assertEquals(List.of(true, true), owned);
+        assertFalse(queue.handledByCurrentThread(), "the scope is thread-local to the drain");
+    }
+
+    /** Why the gate must never re-queue mid-drain: the stackless rethrow becomes a reported crash. */
+    @Test
+    void aRethrowInsideTheDrainEscalatesToACrash() {
+        FakeListener listener = new FakeListener(true);
+        queue.add(listener, new FakePacket("requeued", _ -> {
+            throw RunningOnDifferentThreadException.RUNNING_ON_DIFFERENT_THREAD;
+        }));
+
+        RuntimeException crash = assertThrows(RuntimeException.class, queue::drain);
+
+        assertInstanceOf(RunningOnDifferentThreadException.class, crash.getCause());
         assertEquals(1, listener.errors.size());
     }
 
@@ -74,7 +147,9 @@ class PlayerPacketQueueTest {
         }
         assertTrue(done.await(5, TimeUnit.SECONDS));
 
-        assertEquals(threads * perThread, queue.drain());
+        queue.drain();
+
+        assertEquals(threads * perThread, handled.size());
         for (int thread = 0; thread < threads; thread++) {
             String prefix = "t" + thread + ":";
             List<String> sequence = handled.stream().filter(name -> name.startsWith(prefix)).toList();
@@ -84,9 +159,12 @@ class PlayerPacketQueueTest {
         }
     }
 
+    /** Mirrors {@code ServerCommonPacketListenerImpl}: it records the failure AND rethrows it. */
     private static final class FakeListener implements PacketListener {
         final List<Exception> errors = new ArrayList<>();
         private final boolean accepting;
+        String player = "initial level";
+        String alwaysHandled;
 
         FakeListener(boolean accepting) {
             this.accepting = accepting;
@@ -112,8 +190,15 @@ class PlayerPacketQueueTest {
         }
 
         @Override
+        public boolean shouldHandleMessage(Packet<?> packet) {
+            return PacketListener.super.shouldHandleMessage(packet)
+                || (packet instanceof FakePacket fake && fake.name().equals(alwaysHandled));
+        }
+
+        @Override
         public void onPacketError(Packet packet, Exception cause) {
             errors.add(cause);
+            throw new RuntimeException("Main thread packet handler", cause);
         }
     }
 
