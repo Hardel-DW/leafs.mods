@@ -7,7 +7,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import fr.hardel.leafs.Leafs;
 import net.fabricmc.loader.api.FabricLoader;
@@ -16,15 +18,21 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
+import java.util.List;
 
 public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadius, int bufferRadius, int watchdogWarnSeconds, int metricsLogSeconds, boolean compatBarrier, boolean perRegionLogs) {
     public static final int AUTO_THREADS = 0;
+    public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
-    
-    public static final Codec<LeafsConfig> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-        Codec.intRange(AUTO_THREADS, 1024).optionalFieldOf("region_threads", AUTO_THREADS).forGetter(LeafsConfig::regionThreads),
+
+    private static final Codec<Integer> REGION_THREADS = Codec.intRange(ALL_CORES, 1024)
+        .validate(value -> value == AUTO_THREADS
+            ? DataResult.error(() -> "region_threads 0 is invalid: omit the key for auto, -1 for all cores")
+            : DataResult.success(value));
+
+    private static final MapCodec<LeafsConfig> MAP_CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
+        REGION_THREADS.optionalFieldOf("region_threads", AUTO_THREADS).forGetter(LeafsConfig::regionThreads),
         Codec.intRange(1, 8).optionalFieldOf("grid_section_shift", 4).forGetter(LeafsConfig::gridSectionShift),
         Codec.intRange(1, 8).optionalFieldOf("merge_radius", 1).forGetter(LeafsConfig::mergeRadius),
         Codec.intRange(1, 8).optionalFieldOf("buffer_radius", 1).forGetter(LeafsConfig::bufferRadius),
@@ -33,6 +41,8 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
         Codec.BOOL.optionalFieldOf("compat_barrier", true).forGetter(LeafsConfig::compatBarrier),
         Codec.BOOL.optionalFieldOf("per_region_logs", true).forGetter(LeafsConfig::perRegionLogs)
     ).apply(builder, LeafsConfig::new));
+
+    public static final Codec<LeafsConfig> CODEC = MAP_CODEC.codec();
 
     public static void load() {
         instance = load(FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json"));
@@ -61,6 +71,15 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
             }
 
             JsonElement json = JsonParser.parseString(Files.readString(file));
+            if (json instanceof JsonObject object) {
+                List<String> valid = MAP_CODEC.keys(JsonOps.INSTANCE).map(JsonElement::getAsString).toList();
+                for (String key : object.keySet()) {
+                    if (!valid.contains(key)) {
+                        throw new IllegalArgumentException("Config " + file + " has unknown key \"" + key + "\", valid keys: " + valid);
+                    }
+                }
+            }
+
             return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config " + file + " is invalid: " + error));
         } catch (JsonParseException exception) {
             throw new IllegalArgumentException("Config " + file + " is not valid JSON", exception);
@@ -70,7 +89,7 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
     }
 
     public int effectiveRegionThreads() {
-        return regionThreads == AUTO_THREADS ? Runtime.getRuntime().availableProcessors() : regionThreads;
+        return regionThreads > 0 ? regionThreads : Runtime.getRuntime().availableProcessors();
     }
 
     public int sectionChunkSize() {
