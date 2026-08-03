@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Queue;
 
-/** Hook only — logic in network/PacketRouting: play packets are routed to their player's queue. */
+/** Hook only - logic in network/PacketRouting: play packets are routed to their player's queue. */
 @Mixin(PacketProcessor.class)
 public abstract class PacketProcessorMixin {
 

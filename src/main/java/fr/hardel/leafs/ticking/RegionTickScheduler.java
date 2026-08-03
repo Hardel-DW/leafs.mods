@@ -13,7 +13,7 @@ import java.util.function.BiConsumer;
  * The region thread pool. Free-running handles are paced at 20 TPS with Folia's catch-up model: a
  * late handle ticks once but advances its clocks by the missed periods, and a chronically late one
  * never outranks healthy ones. Until M11 the runtime drives ticks through {@link #runAttached}
- * instead — same context, crash capture and watchdog, executed on the calling thread — and {@link
+ * instead - same context, crash capture and watchdog, executed on the calling thread - and {@link
  * #start()} is never called, so no worker thread and no queue entry exist at runtime.
  */
 public final class RegionTickScheduler {
@@ -99,8 +99,8 @@ public final class RegionTickScheduler {
     /**
      * Every acquisition is paired with its own {@code finally}: a failure to enter the region
      * context or to name the tick can no longer strand a phantom active tick, which would block
-     * every later barrier raise. The crash report is built while the context is still entered —
-     * counting the region's entities is only legal on its owner — and a failing report is attached
+     * every later barrier raise. The crash report is built while the context is still entered -
+     * counting the region's entities is only legal on its owner - and a failing report is attached
      * to the original throwable rather than replacing it.
      */
     private void executeTick(TickHandle handle, long tickCount) {

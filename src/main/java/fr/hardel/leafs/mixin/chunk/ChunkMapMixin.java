@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.function.BooleanSupplier;
 
 /**
- * Hook only — the regionizer feed lives in ticking/LevelRegions; the M11b unload gate that will join
+ * Hook only - the regionizer feed lives in ticking/LevelRegions; the M11b unload gate that will join
  * this class belongs to chunk/. These two sites are the only mutations of {@code updatingChunkMap},
  * and they alternate strictly per position, which is exactly the regionizer's add/remove contract.
  */

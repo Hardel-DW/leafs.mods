@@ -50,8 +50,8 @@ public final class RegionScheduler<R extends RegionTaskHost> {
     }
 
     /**
-     * Runs the tasks queued when the drain started. Tasks are popped one by one, so a throwing task —
-     * a region crash by policy — leaves the ones behind it queued with their holds intact instead of
+     * Runs the tasks queued when the drain started. Tasks are popped one by one, so a throwing task -
+     * a region crash by policy - leaves the ones behind it queued with their holds intact instead of
      * discarding them.
      */
     public int drain(Region<R> region) {

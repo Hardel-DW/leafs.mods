@@ -3,7 +3,7 @@
 	"id": "leafs",
 	"version": "${version}",
 	"name": "Leafs",
-	"description": "Regionised multithreading for the dedicated server: the world is cut into independent regions, each ticking in parallel on its own thread — like Folia, redesigned for modern vanilla and Fabric.",
+	"description": "Regionised multithreading for the dedicated server: the world is cut into independent regions, each ticking in parallel on its own thread - like Folia, redesigned for modern vanilla and Fabric.",
 	"authors": [
 		"Hardel"
 	],

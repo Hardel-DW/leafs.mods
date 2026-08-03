@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 
 /**
  * Per-entity task queue, ticked by the owning region. Tasks receive the CURRENT entity instance
- * (teleports recreate the object); once retired, pending tasks fire their retired callback instead —
+ * (teleports recreate the object); once retired, pending tasks fire their retired callback instead -
  * exactly one of the two callbacks always runs. Retirement can come from another thread mid-tick
  * (a player disconnecting while their region ticks), so the due tasks stay visible to {@link #retire()}
  * and the run loop re-checks retirement before every task.

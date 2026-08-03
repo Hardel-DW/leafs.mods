@@ -42,7 +42,7 @@ public final class Region<R> {
     }
 
     /**
-     * Succeeds only when READY with no pending merge — an awaited merge partner never ticks, which is
+     * Succeeds only when READY with no pending merge - an awaited merge partner never ticks, which is
      * what keeps the buffer invariant safe around deferred merges.
      */
     public boolean tryMarkTicking() {

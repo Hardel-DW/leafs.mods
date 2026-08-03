@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * recovery, OOM escalation.
  *
  * <p>The drain also PUBLISHES the answer both routing hooks need: while a queue drains, the draining
- * thread is the packet-handling thread of that listener. That is the only durable ownership signal —
+ * thread is the packet-handling thread of that listener. That is the only durable ownership signal -
  * {@code ServerGamePacketListenerImpl.player} is reassigned mid-drain by respawn, so anything derived
  * from the player (its level, its region) flips between two packets of the same drain.
  */

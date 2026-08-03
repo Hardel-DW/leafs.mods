@@ -6,7 +6,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 
 import java.util.List;
 
-/** Wires the task queues into region merge/split — the same wiring ticking/ will do for real. */
+/** Wires the task queues into region merge/split - the same wiring ticking/ will do for real. */
 final class TestRegionCallbacks implements RegionCallbacks<TestRegionData> {
     private final int sectionShift;
 
