@@ -25,7 +25,7 @@ class SharedChunkHoldsTest {
         holds.acquire(3, 7);
         holds.acquire(3, 7);
 
-        assertEquals(1, tickets.addCalls, "vanilla keeps one ticket per (type, level) — so must we");
+        assertEquals(1, tickets.addCalls, "vanilla keeps one ticket per (type, level) - so must we");
         assertEquals(1, holds.heldChunks());
     }
 

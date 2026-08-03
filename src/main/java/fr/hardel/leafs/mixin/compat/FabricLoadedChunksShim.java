@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * fabric-lifecycle-events tracks loaded chunks in a plain HashSet, written by chunk promotion and
- * iterated by level ticking — one thread today, one per region from M11. Swapped for a concurrent
+ * iterated by level ticking - one thread today, one per region from M11. Swapped for a concurrent
  * set; priority 1100 so this applies after fabric's mixin created the field.
  */
 @Mixin(value = Level.class, priority = 1100)

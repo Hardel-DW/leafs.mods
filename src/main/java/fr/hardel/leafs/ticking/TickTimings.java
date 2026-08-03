@@ -3,7 +3,7 @@ package fr.hardel.leafs.ticking;
 import java.util.Arrays;
 
 /**
- * Ring of recent tick durations for one tick unit, written by its tick loop and read by debug/ —
+ * Ring of recent tick durations for one tick unit, written by its tick loop and read by debug/ -
  * writes are single-threaded (the owning tick), reads tolerate a torn sample, so a sampler thread
  * may call {@link #sample} without touching the tick path.
  */

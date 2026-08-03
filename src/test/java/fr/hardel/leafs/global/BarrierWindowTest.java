@@ -118,7 +118,7 @@ class BarrierWindowTest {
 
     /**
      * The command-block contract: a unit that defers itself outside the window replays itself once
-     * inside it, sees {@link BarrierWindow#isDraining()} and runs there instead of queueing again —
+     * inside it, sees {@link BarrierWindow#isDraining()} and runs there instead of queueing again -
      * the property that keeps a chain loop from filling the queue.
      */
     @Test

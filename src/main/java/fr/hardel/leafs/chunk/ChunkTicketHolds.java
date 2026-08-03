@@ -8,7 +8,7 @@ import net.minecraft.world.level.ChunkPos;
 
 /**
  * The real {@link ChunkHoldController}: one HOLD ticket at holder-alive level per held chunk. The
- * refcount lives in scheduler/SharedChunkHolds, so add/remove pair exactly one ticket — which is also
+ * refcount lives in scheduler/SharedChunkHolds, so add/remove pair exactly one ticket - which is also
  * what vanilla allows, since it deduplicates tickets by (type, level). Must be called on the thread
  * that owns the level's ticket storage, because the add fires the loading tracker inline.
  */

@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Hook only — logic in entity/EntitySchedulerRegistry: it decides which removals retire the scheduler. */
+/** Hook only - logic in entity/EntitySchedulerRegistry: it decides which removals retire the scheduler. */
 @Mixin(Entity.class)
 public abstract class EntityMixin {
 

@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/** Hook only — the logic lives in ticking/TickingManager: each level tick runs through its region unit. */
+/** Hook only - the logic lives in ticking/TickingManager: each level tick runs through its region unit. */
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin implements LeafsServerAccess {
 

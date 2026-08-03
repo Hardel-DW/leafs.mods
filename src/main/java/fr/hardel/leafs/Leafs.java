@@ -5,7 +5,6 @@ import fr.hardel.leafs.config.LeafsConfig;
 import fr.hardel.leafs.debug.RegionsCommand;
 import fr.hardel.leafs.debug.TickMetricsRecorder;
 import fr.hardel.leafs.entity.EntityTickPhases;
-import fr.hardel.leafs.fakeplayer.FakePlayerCommand;
 import fr.hardel.leafs.network.RegionNetworkPhases;
 import fr.hardel.leafs.ownership.Ownership;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -23,12 +22,11 @@ public final class Leafs implements ModInitializer {
         LeafsTicketTypes.register();
         RegionsCommand.register();
         TickMetricsRecorder.register();
-        FakePlayerCommand.register();
         TickingManager.installPhases(new RegionNetworkPhases());
         TickingManager.installPhases(new EntityTickPhases());
 
         LeafsConfig config = LeafsConfig.get();
-        LOGGER.info("Leafs initialised — {} region threads configured (the pool starts at M11), {}x{}-chunk sections, ownership checks {}",
+        LOGGER.info("Leafs initialised - {} region threads configured (the pool starts at M11), {}x{}-chunk sections, ownership checks {}",
             config.effectiveRegionThreads(), config.sectionChunkSize(), config.sectionChunkSize(),
             Ownership.CHECKS_ENABLED ? "on" : "off");
     }
