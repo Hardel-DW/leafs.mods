@@ -20,7 +20,7 @@ import java.util.concurrent.locks.StampedLock;
 /**
  * Groups loaded chunks into independently tickable {@link Region}s, one instance per level. Every
  * non-empty section is surrounded by owned buffer sections, so two regions are always separated by at
- * least one full section — that spatial invariant, not locks, is what lets a region touch chunks
+ * least one full section - that spatial invariant, not locks, is what lets a region touch chunks
  * slightly beyond the ones it owns. Merges touching a ticking region are deferred to its release;
  * splits and dead-section cleanup only happen at release. Pure data structure, no threads, no
  * Minecraft classes. Design reference: {@code docs/sources/folia/Regionizer.md}.
@@ -560,7 +560,7 @@ public final class Regionizer<R> {
 
     private long writeLock() {
         if (writeLockOwner == Thread.currentThread()) {
-            throw new IllegalStateException("Regionizer lock re-entered — callbacks must not call back into the regionizer");
+            throw new IllegalStateException("Regionizer lock re-entered - callbacks must not call back into the regionizer");
         }
 
         long stamp = lock.writeLock();

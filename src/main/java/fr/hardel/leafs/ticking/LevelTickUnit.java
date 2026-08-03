@@ -44,7 +44,7 @@ public final class LevelTickUnit extends TickHandle {
     protected void tick(long tickCount) {
         Runnable work = pendingWork;
         if (work == null) {
-            throw new IllegalStateException("Level tick unit ticked without prepared work — free-running arrives with M11");
+            throw new IllegalStateException("Level tick unit ticked without prepared work - free-running arrives with M11");
         }
 
         pendingWork = null;

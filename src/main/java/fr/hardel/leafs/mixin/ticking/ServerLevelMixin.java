@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 /**
- * Carrier only — the logic lives in ticking/LevelRegions. The field initialiser runs immediately
+ * Carrier only - the logic lives in ticking/LevelRegions. The field initialiser runs immediately
  * after {@code super(...)}, so the regionizer exists before {@code ServerLevel} builds its chunk
  * source and the very first chunk holder can already be fed to it.
  */

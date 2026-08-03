@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Hook only — logic in network/PacketRouting: ownership is the drain in progress, not thread identity. */
+/** Hook only - logic in network/PacketRouting: ownership is the drain in progress, not thread identity. */
 @Mixin(PacketUtils.class)
 public abstract class PacketUtilsMixin {
 

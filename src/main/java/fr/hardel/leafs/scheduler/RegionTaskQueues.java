@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.function.LongFunction;
 
 /**
- * A closed queue rejects offers, making the scheduler re-resolve the owner — how tasks survive merges
+ * A closed queue rejects offers, making the scheduler re-resolve the owner - how tasks survive merges
  * and splits. Closing only ever happens under the regionizer's write lock, which is also what orders
  * the two nested monitors below: no two closures of the same pair can run in opposite directions.
  */

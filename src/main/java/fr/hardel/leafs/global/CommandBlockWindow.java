@@ -24,7 +24,7 @@ public final class CommandBlockWindow {
 
     /**
      * The block can be broken, replaced or rotated before the window runs, so its state is re-read
-     * there — and only if its chunk is still loaded, because a chunk that went away took its tick
+     * there - and only if its chunk is still loaded, because a chunk that went away took its tick
      * container with it in vanilla too, and the window must never trigger a synchronous load.
      */
     public static boolean deferBlockTick(ServerLevel level, BlockPos pos) {

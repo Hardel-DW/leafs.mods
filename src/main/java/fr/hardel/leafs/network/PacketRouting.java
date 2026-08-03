@@ -16,7 +16,7 @@ public final class PacketRouting {
     private PacketRouting() {
     }
 
-    /** {@code PacketProcessor.scheduleIfPossible} hook — catches Fabric's direct submissions too. */
+    /** {@code PacketProcessor.scheduleIfPossible} hook - catches Fabric's direct submissions too. */
     public static <T extends PacketListener> boolean routeToPlayer(T listener, Packet<T> packet) {
         if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             return false;
@@ -30,7 +30,7 @@ public final class PacketRouting {
      * {@code PacketUtils.ensureRunningOnSameThread} hook: true when the handler may proceed inline
      * because the current thread is already draining this listener's queue, so it IS the owner by
      * construction. Every other case falls through to vanilla, which routes through
-     * {@code scheduleIfPossible} — the single enqueue path, so a closed processor still rejects.
+     * {@code scheduleIfPossible} - the single enqueue path, so a closed processor still rejects.
      */
     public static boolean handledByCurrentDrain(PacketListener listener) {
         return listener instanceof ServerGamePacketListenerImpl game && queueOf(game).handledByCurrentThread();
@@ -43,8 +43,8 @@ public final class PacketRouting {
 
     /**
      * Play connections are ticked by the unit owning their player, which is every player the server
-     * still lists. A listener whose player already left the list — reconfiguration waits for the
-     * client ack with the inbound protocol still on PLAY — stays with the global loop, the only
+     * still lists. A listener whose player already left the list - reconfiguration waits for the
+     * client ack with the inbound protocol still on PLAY - stays with the global loop, the only
      * thing then keeping it flushed and reaped.
      */
     public static boolean ticksOnRegion(Connection connection) {
