@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * one last time before the worlds are saved. It is built at the tail of the constructor rather than
  * from a field initialiser: initialisers of sibling mixins are merged right after {@code super()} in
  * an order we do not control, and this one needs ticking/'s barrier to exist already. Written once
- * on the constructing thread, before {@code spin} starts the server thread — every later reader is
+ * on the constructing thread, before {@code spin} starts the server thread - every later reader is
  * behind that happens-before edge.
  */
 @Mixin(MinecraftServer.class)

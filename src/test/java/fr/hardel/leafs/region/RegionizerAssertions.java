@@ -19,7 +19,7 @@ public final class RegionizerAssertions {
 
     /**
      * Verifies every structural invariant of the regionizer. {@code strict} additionally requires that
-     * no merge is pending anywhere — the steady state once every region stopped ticking.
+     * no merge is pending anywhere - the steady state once every region stopped ticking.
      */
     public static <R> void assertInvariants(Regionizer<R> regionizer, boolean strict) {
         Map<Long, RegionSection<R>> sections = regionizer.sectionsView();

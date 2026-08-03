@@ -34,7 +34,7 @@ class LeafsConfigTest {
     void existingFileOverridesDefaults(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");
         Files.writeString(file, """
-            {"regionThreads": 8, "compatBarrier": false}
+            {"region_threads": 8, "compat_barrier": false}
             """);
 
         LeafsConfig config = LeafsConfig.load(file);
@@ -63,15 +63,15 @@ class LeafsConfigTest {
         assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(malformed));
 
         Path wrongType = directory.resolve("b.json");
-        Files.writeString(wrongType, "{\"regionThreads\": \"lots\"}");
+        Files.writeString(wrongType, "{\"region_threads\": \"lots\"}");
         assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(wrongType));
 
         Path outOfRange = directory.resolve("c.json");
-        Files.writeString(outOfRange, "{\"gridSectionShift\": 12}");
+        Files.writeString(outOfRange, "{\"grid_section_shift\": 12}");
         assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(outOfRange));
 
         Path zeroWatchdog = directory.resolve("e.json");
-        Files.writeString(zeroWatchdog, "{\"watchdogWarnSeconds\": 0}");
+        Files.writeString(zeroWatchdog, "{\"watchdog_warn_seconds\": 0}");
         assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(zeroWatchdog));
 
         Path empty = directory.resolve("d.json");

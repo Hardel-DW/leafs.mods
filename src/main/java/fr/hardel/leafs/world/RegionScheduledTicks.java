@@ -6,6 +6,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.LevelTicks;
 import net.minecraft.world.ticks.ScheduledTick;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ public final class RegionScheduledTicks<T> extends LevelTicks<T> {
     }
 
     @Override
-    public void addContainer(ChunkPos pos, LevelChunkTicks<T> container) {
+    public void addContainer(ChunkPos pos, @NonNull LevelChunkTicks<T> container) {
         containers.put(pos.pack(), container);
         super.addContainer(pos, container);
     }

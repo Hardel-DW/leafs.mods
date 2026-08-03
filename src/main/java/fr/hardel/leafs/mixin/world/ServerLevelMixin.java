@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Builds the region world data at construction and swaps the scheduled-tick indexes for the region
- * ones — registration, scheduling and the drain all flow through the swapped fields untouched.
+ * ones - registration, scheduling and the drain all flow through the swapped fields untouched.
  */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelWorldAccess {

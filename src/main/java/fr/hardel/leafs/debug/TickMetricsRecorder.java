@@ -16,7 +16,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 
 /**
- * Appends one CSV row per tick unit on a fixed period, from its own thread — the tick path pays
+ * Appends one CSV row per tick unit on a fixed period, from its own thread - the tick path pays
  * nothing. Only the timing rings and the published census are read, both of which tolerate an
  * off-thread reader; nothing here touches world state. Off unless {@code metricsLogSeconds > 0}.
  */

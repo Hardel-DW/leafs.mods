@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 public final class EntitySchedulerRegistry {
     private final Map<UUID, EntityScheduler<Entity>> schedulers = new ConcurrentHashMap<>();
 
-    /** False when the entity is already gone for good — neither callback could ever fire. */
+    /** False when the entity is already gone for good - neither callback could ever fire. */
     public boolean schedule(Entity entity, long delayTicks, Consumer<Entity> task, Runnable retiredCallback) {
         if (isGoneForGood(entity, entity.getRemovalReason())) {
             return false;
@@ -56,8 +56,8 @@ public final class EntitySchedulerRegistry {
 
     /**
      * A removal is permanent unless the same UUID comes back: a chunk unload or a logout may never be
-     * followed by a reload, so those retire (upstream Paper's rule). Players are the exception — death
-     * and dimension change recreate them within the tick — and only their disconnect is permanent.
+     * followed by a reload, so those retire (upstream Paper's rule). Players are the exception - death
+     * and dimension change recreate them within the tick - and only their disconnect is permanent.
      */
     private static boolean isGoneForGood(Entity entity, Entity.RemovalReason reason) {
         if (reason == null) {

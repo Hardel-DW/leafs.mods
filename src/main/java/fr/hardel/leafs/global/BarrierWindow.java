@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * The once-per-global-tick window where single-threaded work runs with full world access (command
  * blocks now; functions and Fabric tick events join at M11). Empty queue = the barrier is never
- * raised and regions never pause — the no-op path that keeps scaling intact.
+ * raised and regions never pause - the no-op path that keeps scaling intact.
  *
  * <p>One drain consumes the tasks queued before it and no more, so a task that re-queues itself
  * cannot hold the barrier up forever; it lands in the next window instead. A throwing task
@@ -57,7 +57,7 @@ public final class BarrierWindow {
     /**
      * The last window, run before the worlds are saved so nothing queued by the final tick is lost.
      * Nothing escapes it: a failure here would abort {@code stopServer} and take the world save with
-     * it, which is worse than any command left unrun. Whatever the drain queues in turn is dropped —
+     * it, which is worse than any command left unrun. Whatever the drain queues in turn is dropped -
      * the server is closing.
      */
     public void runShutdownPhase() {

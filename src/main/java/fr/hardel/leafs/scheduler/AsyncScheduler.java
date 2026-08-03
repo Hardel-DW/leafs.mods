@@ -21,7 +21,7 @@ public final class AsyncScheduler {
         });
     }
 
-    /** A failing async task never takes a worker down with it — the pool has no world state to protect. */
+    /** A failing async task never takes a worker down with it - the pool has no world state to protect. */
     public void run(Runnable task) {
         pool.execute(() -> {
             try {

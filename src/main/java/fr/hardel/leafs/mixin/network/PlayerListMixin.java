@@ -23,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Player lists become safe for cross-region reads (broadcasts, PlayerLookup); placement runs on the
- * unit owning the player's spawn level — global builds the player, the region places it.
+ * unit owning the player's spawn level - global builds the player, the region places it.
  */
 @Mixin(PlayerList.class)
 public abstract class PlayerListMixin {
@@ -47,7 +47,7 @@ public abstract class PlayerListMixin {
         this.playersByUUID = new ConcurrentHashMap<>();
     }
 
-    /** Attached mode: the server thread owns every level between unit ticks (the integrated server pauses while empty, so a deferred placement would never run — M11 revisits with real region ownership). */
+    /** Attached mode: the server thread owns every level between unit ticks (the integrated server pauses while empty, so a deferred placement would never run - M11 revisits with real region ownership). */
     @Inject(method = "placeNewPlayer", at = @At("HEAD"), cancellable = true)
     private void leafs$placeOnOwningUnit(Connection connection, ServerPlayer player, CommonListenerCookie cookie, CallbackInfo callbackInfo) {
         TickingManager ticking = ((LeafsServerAccess) this.getServer()).leafs$ticking();

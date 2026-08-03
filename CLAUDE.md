@@ -2,7 +2,7 @@
 Fabric 26.2 mod in Java 25, server side. The goal: bring regionised multithreading to Fabric, like Folia, but completely rethought for the modern Minecraft architecture. Everything through Mixins, no fork, no patched jar, just a mod.
 This is not a port of Folia patches. We take the concepts (regions, one tick loop per region, no global main thread) and we redesign them for vanilla 26.2 + Fabric.
 The mod adds only the multithreading, nothing else. No extra features, no gameplay change, no API bloat.
-The documentation TOC is docs\SUMMARY.md. Always read it first, the design docs (Architecture, Modules, Mixins, Roadmap, Compromises) are the source of truth during dev — we never reopen the vanilla/Folia/Fabric code, everything is in docs\sources\ with class references.
+The documentation TOC is docs\SUMMARY.md. Always read it first, the design docs (Architecture, Modules, Mixins, Roadmap, Compromises) are the source of truth during dev - we never reopen the vanilla/Folia/Fabric code, everything is in docs\sources\ with class references.
 If you need other work check "repository\voxel.studio.mods".
 
 # Reference Code
@@ -35,6 +35,8 @@ Decompiled and reference sources are in the "repository" folder outside the work
 - Maybe per-region or per-thread log files, format to be defined, we'll see when we get there.
 
 # Global Rules
+- Avoid Memory, use docs.
+- No em-dash use ponctuations. Complete sentence
 - No redundancy, we must avoid duplicating truth sources.
 - No function/variable with a single line/reference. Except Getter/Setter...
 - Avoid over engineering.

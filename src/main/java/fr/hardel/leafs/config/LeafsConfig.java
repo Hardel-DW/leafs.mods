@@ -2,7 +2,13 @@ package fr.hardel.leafs.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import fr.hardel.leafs.Leafs;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -11,28 +17,22 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Immutable configuration, loaded once at bootstrap. The fields are the schema: Gson maps them from
- * {@code config/leafs.json}, absent keys keep their default, invalid values fail the boot loudly.
- */
-public final class LeafsConfig {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadius, int bufferRadius, int watchdogWarnSeconds, int metricsLogSeconds, boolean compatBarrier, boolean perRegionLogs) {
     public static final int AUTO_THREADS = 0;
-
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
-
-    private int regionThreads = AUTO_THREADS;
-    private int gridSectionShift = 4;
-    private int mergeRadius = 1;
-    private int bufferRadius = 1;
-    private int watchdogWarnSeconds = 15;
-    private int metricsLogSeconds = 0;
-    private boolean compatBarrier = true;
-    private boolean perRegionLogs = true;
-
-    private LeafsConfig() {
-    }
+    
+    public static final Codec<LeafsConfig> CODEC = RecordCodecBuilder.create(builder -> builder.group(
+        Codec.intRange(AUTO_THREADS, 1024).optionalFieldOf("region_threads", AUTO_THREADS).forGetter(LeafsConfig::regionThreads),
+        Codec.intRange(1, 8).optionalFieldOf("grid_section_shift", 4).forGetter(LeafsConfig::gridSectionShift),
+        Codec.intRange(1, 8).optionalFieldOf("merge_radius", 1).forGetter(LeafsConfig::mergeRadius),
+        Codec.intRange(1, 8).optionalFieldOf("buffer_radius", 1).forGetter(LeafsConfig::bufferRadius),
+        Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(LeafsConfig::watchdogWarnSeconds),
+        Codec.intRange(0, 3600).optionalFieldOf("metrics_log_seconds", 0).forGetter(LeafsConfig::metricsLogSeconds),
+        Codec.BOOL.optionalFieldOf("compat_barrier", true).forGetter(LeafsConfig::compatBarrier),
+        Codec.BOOL.optionalFieldOf("per_region_logs", true).forGetter(LeafsConfig::perRegionLogs)
+    ).apply(builder, LeafsConfig::new));
 
     public static void load() {
         instance = load(FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json"));
@@ -46,64 +46,27 @@ public final class LeafsConfig {
         return instance;
     }
 
+    public static LeafsConfig defaults() {
+        return CODEC.parse(JsonOps.INSTANCE, new JsonObject()).getOrThrow();
+    }
+
     static LeafsConfig load(Path file) {
         try {
             if (Files.notExists(file)) {
                 LeafsConfig defaults = defaults();
+                JsonElement encoded = CODEC.encodeStart(JsonOps.INSTANCE, defaults).getOrThrow();
                 Files.createDirectories(file.getParent());
-                Files.writeString(file, GSON.toJson(defaults) + System.lineSeparator());
+                Files.writeString(file, GSON.toJson(encoded) + System.lineSeparator());
                 return defaults;
             }
 
-            LeafsConfig config = GSON.fromJson(Files.readString(file), LeafsConfig.class);
-            if (config == null)
-                throw new IllegalArgumentException("Config " + file + " is empty");
-
-            return config.validated();
+            JsonElement json = JsonParser.parseString(Files.readString(file));
+            return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config " + file + " is invalid: " + error));
         } catch (JsonParseException exception) {
             throw new IllegalArgumentException("Config " + file + " is not valid JSON", exception);
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to read or create " + file, exception);
         }
-    }
-
-    /** The compiled-in schema values, without touching the config file — the only way to build one headless. */
-    public static LeafsConfig defaults() {
-        return new LeafsConfig();
-    }
-
-    public int regionThreads() {
-        return regionThreads;
-    }
-
-    public int gridSectionShift() {
-        return gridSectionShift;
-    }
-
-    public int mergeRadius() {
-        return mergeRadius;
-    }
-
-    public int bufferRadius() {
-        return bufferRadius;
-    }
-
-    /** Below vanilla's 60s {@code max-tick-time} on purpose: at parity the JVM is halted before we can report. */
-    public int watchdogWarnSeconds() {
-        return watchdogWarnSeconds;
-    }
-
-    /** Period of the CSV tick-metrics log ({@code logs/leafs-metrics.csv}); 0 disables the recorder. */
-    public int metricsLogSeconds() {
-        return metricsLogSeconds;
-    }
-
-    public boolean compatBarrier() {
-        return compatBarrier;
-    }
-
-    public boolean perRegionLogs() {
-        return perRegionLogs;
     }
 
     public int effectiveRegionThreads() {
@@ -112,21 +75,5 @@ public final class LeafsConfig {
 
     public int sectionChunkSize() {
         return 1 << gridSectionShift;
-    }
-
-    private LeafsConfig validated() {
-        requireRange("regionThreads", regionThreads, AUTO_THREADS, 1024);
-        requireRange("gridSectionShift", gridSectionShift, 1, 8);
-        requireRange("mergeRadius", mergeRadius, 1, 8);
-        requireRange("bufferRadius", bufferRadius, 1, 8);
-        requireRange("watchdogWarnSeconds", watchdogWarnSeconds, 1, 600);
-        requireRange("metricsLogSeconds", metricsLogSeconds, 0, 3600);
-        return this;
-    }
-
-    private static void requireRange(String key, int value, int min, int max) {
-        if (value < min || value > max) {
-            throw new IllegalArgumentException("Config '" + key + "' must be in [" + min + ", " + max + "], got " + value);
-        }
     }
 }

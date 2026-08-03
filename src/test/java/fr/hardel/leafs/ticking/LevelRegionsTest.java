@@ -90,7 +90,7 @@ class LevelRegionsTest {
         regions.chunkHolderDestroyed(32, 0);
         regions.chunkHolderDestroyed(64, 0);
 
-        assertEquals(1, regionCount(), "splitting is what settle() exists for — the feed alone never splits");
+        assertEquals(1, regionCount(), "splitting is what settle() exists for - the feed alone never splits");
         assertEquals(0, regions.split());
 
         regions.settle();

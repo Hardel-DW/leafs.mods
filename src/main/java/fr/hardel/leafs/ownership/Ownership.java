@@ -2,7 +2,7 @@ package fr.hardel.leafs.ownership;
 
 /**
  * Thread-ownership checks, enabled by {@code -ea} or {@code -Dleafs.asserts=true} and constant-folded
- * away otherwise. Violations crash early — never corrupt silently.
+ * away otherwise. Violations crash early - never corrupt silently.
  */
 public final class Ownership {
     public static final boolean CHECKS_ENABLED = computeEnabled();

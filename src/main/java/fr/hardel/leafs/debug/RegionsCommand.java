@@ -37,10 +37,10 @@ public final class RegionsCommand {
         units.sort(Comparator.comparingLong(LevelTickUnit::id));
         long now = System.nanoTime();
 
-        /* Attached mode: one thread ticks every unit in sequence, so their rate IS the server's — stated once
+        /* Attached mode: one thread ticks every unit in sequence, so their rate IS the server's - stated once
            rather than repeated per line, where it would read as independent measurements. */
         double tickRate = units.isEmpty() ? 0 : units.getFirst().timings().sample(now).tps();
-        String header = String.format(Locale.ROOT, "Leafs — attached mode (1 game thread, ticks units in sequence), %.1f TPS, %d tick unit%s",
+        String header = String.format(Locale.ROOT, "Leafs - attached mode (1 game thread, ticks units in sequence), %.1f TPS, %d tick unit%s",
             tickRate, units.size(), units.size() == 1 ? "" : "s");
         source.sendSuccess(() -> Component.literal(header), false);
 
@@ -50,7 +50,7 @@ public final class RegionsCommand {
 
         for (LevelTickUnit unit : units) {
             TickTimings.Snapshot timings = unit.timings().sample(now);
-            String line = String.format(Locale.ROOT, "#%d %s — tick %d, %.2f/%.2f/%.2f/%.2fms p50/p95/p99/max (avg %.2f), %d chunks, %d entities",
+            String line = String.format(Locale.ROOT, "#%d %s - tick %d, %.2f/%.2f/%.2f/%.2fms p50/p95/p99/max (avg %.2f), %d chunks, %d entities",
                 unit.id(), unit.dimension(), unit.currentTick(), timings.mspt50(), timings.mspt95(), timings.mspt99(),
                 timings.msptMax(), timings.msptAverage(), unit.chunkCount(), unit.entityCount());
             source.sendSuccess(() -> Component.literal(line), false);
