@@ -52,6 +52,35 @@ class LeafsConfigTest {
     }
 
     @Test
+    void allCoresResolvesToAvailableProcessors(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        Files.writeString(file, "{\"region_threads\": -1}");
+
+        LeafsConfig config = LeafsConfig.load(file);
+
+        assertEquals(LeafsConfig.ALL_CORES, config.regionThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors(), config.effectiveRegionThreads());
+    }
+
+    @Test
+    void explicitZeroThreadsFailsTheBoot(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        Files.writeString(file, "{\"region_threads\": 0}");
+
+        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(file));
+    }
+
+    @Test
+    void unknownKeyFailsTheBootNamingIt(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        Files.writeString(file, "{\"metricsLogSeconds\": 10}");
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(file));
+        assertTrue(exception.getMessage().contains("metricsLogSeconds"));
+        assertTrue(exception.getMessage().contains(file.toString()));
+    }
+
+    @Test
     void sectionChunkSizeDerivesFromShift() {
         assertEquals(16, LeafsConfig.defaults().sectionChunkSize());
     }
