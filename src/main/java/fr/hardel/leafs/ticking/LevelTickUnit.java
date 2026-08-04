@@ -162,6 +162,29 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
+    /** The pause-exempt phase pass, same framing as {@link #tick}: vanilla drains packets while paused, so the per-player queues must too. */
+    void tickPausedNetwork() {
+        regions.ownership().enterLevelSerial();
+        RegionContext.enter(context());
+        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData());
+        try {
+            for (LevelTickPhases phases : TickingManager.phases()) {
+                if (phases.runsWhilePaused()) {
+                    phases.beforeLevelTick(level);
+                }
+            }
+            for (LevelTickPhases phases : TickingManager.phases()) {
+                if (phases.runsWhilePaused()) {
+                    phases.afterLevelTick(level);
+                }
+            }
+        } finally {
+            WorldTickContext.exit();
+            RegionContext.exit();
+            regions.ownership().exitLevelSerial();
+        }
+    }
+
     /** Counting entities walks every section, so it runs on the owner at a low rate and publishes for off-thread readers. */
     private void takeCensus() {
         lastChunkCount = level.getChunkSource().getLoadedChunksCount();
