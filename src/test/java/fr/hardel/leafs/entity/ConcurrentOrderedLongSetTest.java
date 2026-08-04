@@ -245,4 +245,22 @@ class ConcurrentOrderedLongSetTest {
         assertThrows(IllegalArgumentException.class, () -> new ConcurrentOrderedLongSet(0));
         assertThrows(IllegalArgumentException.class, () -> new ConcurrentOrderedLongSet(64));
     }
+
+    /** Vanilla's eager-save scan removes through the iterator (ChunkMap.saveChunksEagerly), so the snapshot iterator removes from the live set. */
+    @Test
+    void iteratorRemoveDeletesFromTheLiveSet() {
+        ConcurrentOrderedLongSet set = new ConcurrentOrderedLongSet(4);
+        set.add(1);
+        set.add(2);
+        set.add(3);
+
+        LongBidirectionalIterator iterator = set.iterator();
+        assertEquals(1, iterator.nextLong());
+        assertEquals(2, iterator.nextLong());
+        iterator.remove();
+
+        assertFalse(set.contains(2));
+        assertEquals(2, set.size());
+        assertThrows(IllegalStateException.class, iterator::remove);
+    }
 }
