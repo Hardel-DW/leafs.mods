@@ -24,5 +24,13 @@
 		"minecraft": "~26.2",
 		"java": ">=25",
 		"fabric-api": "*"
+	},
+	"custom": {
+		"lithium:options": {
+			"mixin.ai.poi": false,
+			"mixin.alloc.chunk_random": false,
+			"mixin.util.data_storage": false,
+			"mixin.world.chunk_ticking.random_block_ticking": false
+		}
 	}
 }

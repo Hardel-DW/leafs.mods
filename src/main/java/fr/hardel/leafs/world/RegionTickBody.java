@@ -1,6 +1,7 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.entity.EntityTickGuard;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
@@ -29,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.LongFunction;
-import java.util.function.Predicate;
+import java.util.function.LongPredicate;
 
 /**
  * The region tick body: every chunk-anchored phase of the vanilla level tick, run over one region's
@@ -69,14 +70,14 @@ public final class RegionTickBody {
         RegionEntityTracking.tickRegion(level, entityData.tickList());
         ServerChunkCache chunkSource = level.getChunkSource();
         // Ticket AND completed 1-radius FULL: vanilla bridges the streaming gap with a sync load a region worker cannot do (Compromise #18).
-        Predicate<BlockPos> tickable = pos -> chunkSource.isPositionTicking(ChunkPos.pack(pos));
+        LongPredicate tickingChunk = chunkSource::isPositionTicking;
         if (runs) {
-            worldData.runBlockEvents(tickable, this::runBlockEvent);
+            worldData.runBlockEvents(pos -> tickingChunk.test(ChunkPos.pack(pos)), this::runBlockEvent);
         }
 
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
             tickEntities(tickRateManager, entityData);
-            worldData.blockEntityTickers().tickAll(runs, tickable);
+            worldData.blockEntityTickers().tickAll(runs, tickingChunk);
         }
     }
 
@@ -163,9 +164,17 @@ public final class RegionTickBody {
         List<TickingBlockEntity> vanilla = level.blockEntityTickers;
         List<TickingBlockEntity> kept = new ArrayList<>();
         for (TickingBlockEntity ticker : vanilla) {
-            RegionWorldData owner = regionByChunk.apply(ChunkPos.pack(ticker.getPos()));
+            BlockPos pos = ticker.getPos();
+            // A ticker already asleep answers no position (Lithium); it stays level-serial where the sleeping guard applies.
+            if (pos == null) {
+                kept.add(ticker);
+                continue;
+            }
+
+            long chunkKey = ChunkPos.pack(pos);
+            RegionWorldData owner = regionByChunk.apply(chunkKey);
             if (owner != null) {
-                owner.blockEntityTickers().add(ticker);
+                owner.blockEntityTickers().add(ticker, chunkKey);
             } else {
                 kept.add(ticker);
             }
@@ -230,7 +239,7 @@ public final class RegionTickBody {
                     entity.stopRiding();
                 }
 
-                level.guardEntityTick(level::tickNonPassenger, entity);
+                level.guardEntityTick(guarded -> EntityTickGuard.tickOrSkip(level::tickNonPassenger, guarded), entity);
             }
         });
     }

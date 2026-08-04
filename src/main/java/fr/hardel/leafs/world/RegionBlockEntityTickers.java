@@ -1,39 +1,47 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.region.CoordinateKey;
-import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.LongFunction;
-import java.util.function.Predicate;
+import java.util.function.LongPredicate;
 
-/** Vanilla {@code Level.tickBlockEntities} semantics, one instance per region. */
+/**
+ * Vanilla {@code Level.tickBlockEntities} semantics, one instance per region. The chunk key is
+ * captured at registration and never re-read from the ticker: a live ticker's position is not
+ * stable - Lithium's sleeping system rebinds it to a placeholder answering null - while the block
+ * entity itself never moves.
+ */
 public final class RegionBlockEntityTickers {
-    private final List<TickingBlockEntity> tickers = new ArrayList<>();
-    private final List<TickingBlockEntity> pending = new ArrayList<>();
-    private boolean ticking;
-
-    public void add(TickingBlockEntity ticker) {
-        (ticking ? pending : tickers).add(ticker);
+    private record Entry(TickingBlockEntity ticker, long chunkKey) {
     }
 
-    public void tickAll(boolean runsNormally, Predicate<BlockPos> tickable) {
+    private final List<Entry> tickers = new ArrayList<>();
+    private final List<Entry> pending = new ArrayList<>();
+    private boolean ticking;
+
+    public void add(TickingBlockEntity ticker, long chunkKey) {
+        (ticking ? pending : tickers).add(new Entry(ticker, chunkKey));
+    }
+
+    public void tickAll(boolean runsNormally, LongPredicate tickingChunk) {
         ticking = true;
         if (!pending.isEmpty()) {
             tickers.addAll(pending);
             pending.clear();
         }
 
-        Iterator<TickingBlockEntity> iterator = tickers.iterator();
+        Iterator<Entry> iterator = tickers.iterator();
         while (iterator.hasNext()) {
-            TickingBlockEntity ticker = iterator.next();
-            if (ticker.isRemoved()) {
+            Entry entry = iterator.next();
+            if (entry.ticker().isRemoved()) {
                 iterator.remove();
-            } else if (runsNormally && tickable.test(ticker.getPos())) {
-                ticker.tick();
+            } else if (runsNormally && tickingChunk.test(entry.chunkKey())) {
+                entry.ticker().tick();
             }
         }
 
@@ -59,13 +67,13 @@ public final class RegionBlockEntityTickers {
 
     /** Activation variant of {@link #splitInto}: an unmatched ticker stays here instead of being dropped. */
     void migrateInto(int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection) {
-        List<TickingBlockEntity> kept = new ArrayList<>();
-        for (TickingBlockEntity ticker : tickers) {
-            RegionBlockEntityTickers child = childBySection.apply(CoordinateKey.pack(ticker.getPos().getX() >> (4 + sectionShift), ticker.getPos().getZ() >> (4 + sectionShift)));
+        List<Entry> kept = new ArrayList<>();
+        for (Entry entry : tickers) {
+            RegionBlockEntityTickers child = childBySection.apply(sectionKeyOf(entry, sectionShift));
             if (child != null) {
-                child.tickers.add(ticker);
+                child.tickers.add(entry);
             } else {
-                kept.add(ticker);
+                kept.add(entry);
             }
         }
 
@@ -73,14 +81,18 @@ public final class RegionBlockEntityTickers {
         tickers.addAll(kept);
     }
 
-    private static void rebucket(List<TickingBlockEntity> source, int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection) {
-        for (TickingBlockEntity ticker : source) {
-            RegionBlockEntityTickers child = childBySection.apply(CoordinateKey.pack(ticker.getPos().getX() >> (4 + sectionShift), ticker.getPos().getZ() >> (4 + sectionShift)));
+    private static void rebucket(List<Entry> source, int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection) {
+        for (Entry entry : source) {
+            RegionBlockEntityTickers child = childBySection.apply(sectionKeyOf(entry, sectionShift));
             if (child != null) {
-                child.tickers.add(ticker);
+                child.tickers.add(entry);
             }
         }
 
         source.clear();
+    }
+
+    private static long sectionKeyOf(Entry entry, int sectionShift) {
+        return CoordinateKey.pack(ChunkPos.getX(entry.chunkKey()) >> sectionShift, ChunkPos.getZ(entry.chunkKey()) >> sectionShift);
     }
 }
