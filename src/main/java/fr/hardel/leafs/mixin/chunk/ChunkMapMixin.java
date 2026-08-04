@@ -2,13 +2,18 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.entity.ConcurrentOrderedLongSet;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 import org.objectweb.asm.Opcodes;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,6 +29,21 @@ import java.util.function.BooleanSupplier;
  */
 @Mixin(ChunkMap.class)
 public abstract class ChunkMapMixin {
+
+    @Mutable
+    @Shadow
+    @Final
+    private LongSet chunksToEagerlySave;
+
+    /**
+     * Every region marks its chunks unsaved concurrently with the serial phase (light, pump); the
+     * vanilla linked hash set corrupts under two writers (the 150-bot rehash AIOOBE). The scan order
+     * becomes positional instead of insertion-aged, which only reorders the 20-per-tick eager-save budget.
+     */
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$concurrentEagerSaves(CallbackInfo callbackInfo) {
+        this.chunksToEagerlySave = new ConcurrentOrderedLongSet(32);
+    }
 
     @Inject(method = "updateChunkScheduling",
         at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;modified:Z", opcode = Opcodes.PUTFIELD, shift = At.Shift.AFTER),

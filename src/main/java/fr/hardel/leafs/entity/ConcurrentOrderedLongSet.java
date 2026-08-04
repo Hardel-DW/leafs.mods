@@ -115,7 +115,7 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     @Override
     public LongBidirectionalIterator iterator(long fromElement) {
         long[] merged = collectRange(false, 0L, false, 0L);
-        return new SnapshotIterator(merged, 0, merged.length, upperBound(merged, fromElement));
+        return new SnapshotIterator(ConcurrentOrderedLongSet.this, merged, 0, merged.length, upperBound(merged, fromElement));
     }
 
     @Override
@@ -162,17 +162,17 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
 
     private LongBidirectionalIterator rangeIterator(boolean hasFrom, long from, boolean hasTo, long to) {
         if (hasFrom && hasTo && from >= to) {
-            return new SnapshotIterator(EMPTY, 0, 0, 0);
+            return new SnapshotIterator(this, EMPTY, 0, 0, 0);
         }
 
         if (singleGroup(hasFrom, from, hasTo, to)) {
             long[] snapshot = bucketOf(from).elements;
             int lower = lowerBound(snapshot, from);
-            return new SnapshotIterator(snapshot, lower, lowerBound(snapshot, to), lower);
+            return new SnapshotIterator(this, snapshot, lower, lowerBound(snapshot, to), lower);
         }
 
         long[] merged = collectRange(hasFrom, from, hasTo, to);
-        return new SnapshotIterator(merged, 0, merged.length, 0);
+        return new SnapshotIterator(this, merged, 0, merged.length, 0);
     }
 
     private int rangeCount(boolean hasFrom, long from, boolean hasTo, long to) {
@@ -275,12 +275,16 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     }
 
     private static final class SnapshotIterator implements LongBidirectionalIterator {
+        private final ConcurrentOrderedLongSet owner;
         private final long[] elements;
         private final int lower;
         private final int upper;
         private int cursor;
+        private boolean hasLastReturned;
+        private long lastReturned;
 
-        SnapshotIterator(long[] elements, int lower, int upper, int cursor) {
+        SnapshotIterator(ConcurrentOrderedLongSet owner, long[] elements, int lower, int upper, int cursor) {
+            this.owner = owner;
             this.elements = elements;
             this.lower = lower;
             this.upper = upper;
@@ -298,7 +302,10 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
                 throw new NoSuchElementException();
             }
 
-            return elements[cursor++];
+            lastReturned = elements[cursor++];
+            hasLastReturned = true;
+
+            return lastReturned;
         }
 
         @Override
@@ -312,7 +319,21 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
                 throw new NoSuchElementException();
             }
 
-            return elements[--cursor];
+            lastReturned = elements[--cursor];
+            hasLastReturned = true;
+
+            return lastReturned;
+        }
+
+        /** Removes from the live set, not the snapshot: the concurrent-iteration contract callers already have. */
+        @Override
+        public void remove() {
+            if (!hasLastReturned) {
+                throw new IllegalStateException("No element to remove");
+            }
+
+            owner.remove(lastReturned);
+            hasLastReturned = false;
         }
     }
 
@@ -370,7 +391,7 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
         @Override
         public LongBidirectionalIterator iterator(long fromElement) {
             long[] merged = collectRange(hasFrom, from, hasTo, to);
-            return new SnapshotIterator(merged, 0, merged.length, upperBound(merged, fromElement));
+            return new SnapshotIterator(ConcurrentOrderedLongSet.this, merged, 0, merged.length, upperBound(merged, fromElement));
         }
 
         @Override
