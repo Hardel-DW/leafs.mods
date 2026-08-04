@@ -31,6 +31,11 @@ public final class RegionNetworkPhases implements LevelTickPhases {
         forEachPlayerOf(level, player -> tickPlayConnection(server, player.connection.connection));
     }
 
+    @Override
+    public boolean runsWhilePaused() {
+        return true;
+    }
+
     private void forEachPlayerOf(ServerLevel level, Consumer<ServerPlayer> action) {
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (player.level() == level) {

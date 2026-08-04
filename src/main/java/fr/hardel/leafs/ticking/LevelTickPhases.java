@@ -8,4 +8,9 @@ public interface LevelTickPhases {
     void beforeLevelTick(ServerLevel level);
 
     void afterLevelTick(ServerLevel level);
+
+    /** Vanilla drains packets every loop iteration even paused; network phases must too, gameplay phases freeze with the world. */
+    default boolean runsWhilePaused() {
+        return false;
+    }
 }

@@ -35,6 +35,14 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         leafs$ticking.tickLevel(level, () -> original.call(level, haveTime));
     }
 
+    /** Vanilla drains its packet queue here every loop iteration, paused included; the stolen per-player queues must too. */
+    @Inject(method = "processPacketsAndTick", at = @At("HEAD"))
+    private void leafs$drainPlayerQueuesWhilePaused(boolean sprinting, CallbackInfo callbackInfo) {
+        if (((MinecraftServer) (Object) this).isPaused()) {
+            leafs$ticking.tickPausedNetwork();
+        }
+    }
+
     /** The idle pump TRIES the level's exclusion: a level whose regions are mid-tick is skipped this round. */
     @WrapOperation(method = "pollTaskInternal", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;pollTask()Z"))
     private boolean leafs$pumpOnlyWhenLevelSerial(ServerChunkCache chunkSource, Operation<Boolean> original) {
