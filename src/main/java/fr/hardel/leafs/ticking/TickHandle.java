@@ -5,18 +5,18 @@ import fr.hardel.leafs.ownership.RegionCrashReport;
 
 /** One schedulable tick unit, subclassed by the whole-level attached tick and by a real region. */
 public abstract class TickHandle {
-    private final RegionContext.Region context;
+    private final RegionContext.UnitTick context;
     private final TickTimings timings = new TickTimings();
     private volatile boolean cancelled;
     private volatile long currentTick;
     private volatile long scheduledStartNanos;
 
-    protected TickHandle(long id, String dimension) {
-        this.context = new RegionContext.Region(id, dimension);
+    protected TickHandle(RegionContext.UnitTick context) {
+        this.context = context;
     }
 
     public long id() {
-        return context.regionId();
+        return context.id();
     }
 
     public String dimension() {
@@ -39,7 +39,7 @@ public abstract class TickHandle {
         return cancelled;
     }
 
-    RegionContext.Region context() {
+    RegionContext.UnitTick context() {
         return context;
     }
 

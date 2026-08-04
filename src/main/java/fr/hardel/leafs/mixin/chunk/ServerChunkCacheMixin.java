@@ -48,6 +48,15 @@ public abstract class ServerChunkCacheMixin {
         }
     }
 
+    /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree or a correct hasChunk-then-read sequence crashes. */
+    @Inject(method = "hasChunk(II)Z", at = @At("HEAD"), cancellable = true)
+    private void leafs$regionHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
+        if (leafs$regionWorkerHoldsLevel()) {
+            ServerChunkCache self = (ServerChunkCache) (Object) this;
+            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
+        }
+    }
+
     @Unique
     private boolean leafs$regionWorkerHoldsLevel() {
         if (Thread.currentThread() == this.mainThread) {

@@ -15,10 +15,24 @@ public sealed interface RegionContext {
         }
     }
 
-    record Region(long regionId, String dimension) implements RegionContext {
+    /** Mid-tick of one tick unit: it owns its slice of one level and reaches everything else through the schedulers. */
+    sealed interface UnitTick extends RegionContext {
+        long id();
+
+        String dimension();
+    }
+
+    record Region(long id, String dimension) implements UnitTick {
         @Override
         public String describe() {
-            return "region #" + regionId + " in " + dimension;
+            return "region #" + id + " in " + dimension;
+        }
+    }
+
+    record LevelSerial(long id, String dimension) implements UnitTick {
+        @Override
+        public String describe() {
+            return "level-serial unit #" + id + " in " + dimension;
         }
     }
 

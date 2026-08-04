@@ -95,6 +95,6 @@ public final class RegionScheduler<R extends RegionTaskHost> {
 
         Region<R> owner = regionizer.regionAtUnsynchronised(chunkX, chunkZ);
 
-        return owner != null && owner.id() == context.regionId();
+        return owner != null && owner.id() == context.id();
     }
 }
