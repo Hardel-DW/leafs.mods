@@ -40,7 +40,7 @@ public abstract class EntityMixin {
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffOwnerTeleport(TeleportTransition transition, CallbackInfoReturnable<Entity> callbackInfo) {
         Entity self = (Entity) (Object) this;
-        if (self instanceof ServerPlayer || !(RegionContext.current() instanceof RegionContext.Region)) {
+        if (self instanceof ServerPlayer || !(RegionContext.current() instanceof RegionContext.UnitTick)) {
             return;
         }
 
@@ -53,7 +53,7 @@ public abstract class EntityMixin {
     /** The destination search sync-loads foreign chunks; off the serial side it defers whole (#18's verdict). */
     @WrapOperation(method = "handlePortal", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/PortalProcessor;getPortalDestination(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;"))
     private TeleportTransition leafs$deferPortalSearchOffOwner(PortalProcessor processor, ServerLevel level, Entity entity, Operation<TeleportTransition> original) {
-        if (!(RegionContext.current() instanceof RegionContext.Region)) {
+        if (!(RegionContext.current() instanceof RegionContext.UnitTick)) {
             return original.call(processor, level, entity);
         }
 
