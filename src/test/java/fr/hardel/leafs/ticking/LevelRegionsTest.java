@@ -5,17 +5,31 @@ import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.RegionizerAssertions;
+import fr.hardel.leafs.scheduler.ChunkHoldController;
+import fr.hardel.leafs.scheduler.RegionScheduler;
+import fr.hardel.leafs.scheduler.SharedChunkHolds;
+import fr.hardel.leafs.world.RegionClock;
+import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.pathfinder.PathTypeCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.HashSet;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -98,7 +112,7 @@ class LevelRegionsTest {
         assertEquals(2, regionCount());
         assertEquals(1, regions.split());
         assertEquals(0, regions.deferredHandshakes());
-        for (Region<Void> region : regions.regionizer().regionsView()) {
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             assertEquals(RegionState.READY, region.state());
         }
         assertNotSame(regions.regionizer().regionAt(0, 0), regions.regionizer().regionAt(96, 0));
@@ -142,6 +156,100 @@ class LevelRegionsTest {
 
         regions.settle();
         assertEquals(1, regionCount());
+    }
+
+    @Test
+    void activationBindsHandlesAndRegionDeathCancelsThem() {
+        regions.chunkHolderCreated(0, 0);
+        regions.chunkHolderCreated(200, 200);
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+            assertNull(region.data().handle(), "no handle may exist before the pool binds");
+        }
+
+        activateRegions();
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+            assertNotNull(region.data().handle(), "activation must bind every live region");
+            assertNotNull(region.data().worldData(), "activation must attach the world payload to every region");
+        }
+
+        RegionTickHandle doomed = regions.regionizer().regionAt(200, 200).data().handle();
+        regions.chunkHolderDestroyed(200, 200);
+        regions.settle();
+        assertTrue(doomed.isCancelled());
+        assertEquals(1, regionCount());
+    }
+
+    @Test
+    void aHandleTickSplitsAndItsChildrenCarryFreshHandles() {
+        activateRegions();
+        regions.chunkHolderCreated(0, 0);
+        regions.chunkHolderCreated(32, 0);
+        regions.chunkHolderCreated(64, 0);
+        regions.chunkHolderCreated(96, 0);
+        RegionTickHandle parentHandle = regions.regionizer().regionAt(0, 0).data().handle();
+
+        regions.chunkHolderDestroyed(32, 0);
+        regions.chunkHolderDestroyed(64, 0);
+
+        regions.ownership().enterLevelSerial();
+        parentHandle.tick(1);
+        regions.ownership().exitLevelSerial();
+        assertEquals(1, regionCount(), "a handle must skip while the level-serial side is held");
+        assertEquals(0, regions.split());
+
+        parentHandle.tick(1);
+        assertEquals(2, regionCount(), "the handle's own release is what splits");
+        assertEquals(1, regions.split());
+        assertTrue(parentHandle.isCancelled());
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+            assertNotNull(region.data().handle());
+            assertFalse(region.data().handle().isCancelled());
+        }
+    }
+
+    @Test
+    void mergeAndSplitFoldTheWorldPayloadThroughTheRegionizer() {
+        activateRegions();
+        regions.chunkHolderCreated(0, 0);
+        regions.chunkHolderCreated(96, 0);
+        regions.settle();
+        assertEquals(2, regionCount());
+        RegionWorldData west = regions.regionizer().regionAt(0, 0).data().worldData();
+        west.nextSubTick();
+        west.nextSubTick();
+        west.nextSubTick();
+
+        regions.chunkHolderCreated(32, 0);
+        regions.chunkHolderCreated(64, 0);
+        regions.settle();
+        assertEquals(1, regionCount());
+        assertEquals(3, regions.regionizer().regionAt(0, 0).data().worldData().nextSubTick(), "the merge folds the sub-tick counter into the survivor");
+
+        regions.chunkHolderDestroyed(32, 0);
+        regions.chunkHolderDestroyed(64, 0);
+        regions.settle();
+        assertEquals(2, regionCount());
+        assertEquals(4, regions.regionizer().regionAt(0, 0).data().worldData().nextSubTick(), "split children inherit the parent's counters");
+        assertEquals(4, regions.regionizer().regionAt(96, 0).data().worldData().nextSubTick(), "split children inherit the parent's counters");
+    }
+
+    private void activateRegions() {
+        LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60), _ -> {
+        });
+        RegionTickScheduler scheduler = new RegionTickScheduler(1, false, new TickBarrier(), watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports")), (_, _) -> {
+        });
+        SharedChunkHolds holds = new SharedChunkHolds(new ChunkHoldController() {
+            @Override
+            public void addHold(int chunkX, int chunkZ) {
+            }
+
+            @Override
+            public void removeHold(int chunkX, int chunkZ) {
+            }
+        }, regions.ownership()::isLevelSerialHeldByCurrentThread);
+        regions.activate("leafs:test", scheduler, holds, new RegionScheduler<>(regions.regionizer(), holds),
+            () -> new RegionWorldData(new RegionClock(0L), _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache()), null, () -> {
+            });
     }
 
     private int regionCount() {

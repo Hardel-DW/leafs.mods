@@ -5,10 +5,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Per-tick-unit deadlines with a stack dump of the stuck thread only. Detection and reporting,
- * never recovery: while attached, the vanilla {@code ServerWatchdog} is still the one that kills a
- * hung server, and it only sees the server thread (mixin #2 replaces it at M11). Reports must
- * therefore land BEFORE {@code max-tick-time}, which is what bounds the poll interval below.
+ * Per-tick-unit deadlines with a stack dump of the stuck thread only. Detection and reporting, never
+ * recovery: the vanilla {@code ServerWatchdog} is neutralized by mixin, so this is the only watchdog left.
  */
 public final class LeafsWatchdog {
     private final long warnNanos;

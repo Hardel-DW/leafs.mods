@@ -8,14 +8,9 @@ import net.minecraft.world.level.block.CommandBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Commands reach arbitrary chunks, entities and dimensions, so command blocks execute in the barrier
- * window (Compromise #4). What moves is the whole vanilla execution unit, never the command alone:
- * the chain walk, its {@code lastExecution} loop break, the comparator refresh and the minecart
- * activation cooldown then run unchanged and in vanilla order inside the window, with no state of
- * theirs mirrored on our side.
- *
- * <p>A deferred unit re-enters the same hook when the window replays it; {@link
- * BarrierWindow#isDraining()} is what tells the hook the window's guarantees already hold.
+ * Commands can reach arbitrary chunks, entities and dimensions, so command blocks execute as one
+ * unmodified vanilla unit inside the barrier window (Compromise #4). A deferred unit re-enters the
+ * same hook when the window replays it; {@link BarrierWindow#isDraining()} tells the hook the window's guarantees already hold.
  */
 public final class CommandBlockWindow {
 
@@ -23,9 +18,8 @@ public final class CommandBlockWindow {
     }
 
     /**
-     * The block can be broken, replaced or rotated before the window runs, so its state is re-read
-     * there - and only if its chunk is still loaded, because a chunk that went away took its tick
-     * container with it in vanilla too, and the window must never trigger a synchronous load.
+     * The block can change before the window runs, so its state is re-read there, and only if its
+     * chunk is still loaded: the window must never trigger a synchronous load.
      */
     public static boolean deferBlockTick(ServerLevel level, BlockPos pos) {
         BlockPos target = pos.immutable();

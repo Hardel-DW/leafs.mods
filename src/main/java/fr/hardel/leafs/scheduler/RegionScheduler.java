@@ -4,6 +4,8 @@ import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.Regionizer;
 
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 /**
  * Position-keyed task routing, one instance per level. Queued tasks hold their target chunk until
  * they run; a failing task is a region crash, not a log line.
@@ -11,13 +13,13 @@ import fr.hardel.leafs.region.Regionizer;
 public final class RegionScheduler<R extends RegionTaskHost> {
     private final Regionizer<R> regionizer;
     private final SharedChunkHolds holds;
+    private final ConcurrentLinkedQueue<QueuedTask> pending = new ConcurrentLinkedQueue<>();
 
     public RegionScheduler(Regionizer<R> regionizer, SharedChunkHolds holds) {
         this.regionizer = regionizer;
         this.holds = holds;
     }
 
-    /** Inline when the calling thread already ticks the owner, queued otherwise. */
     public void run(int chunkX, int chunkZ, Runnable task) {
         if (isOnOwningRegion(chunkX, chunkZ)) {
             task.run();
@@ -27,33 +29,27 @@ public final class RegionScheduler<R extends RegionTaskHost> {
         queue(chunkX, chunkZ, task);
     }
 
-    /**
-     * A closed queue means a merge or split re-homed the position while we were looking; re-resolving
-     * under the regionizer's read lock always observes the newer owner, so the retry terminates.
-     */
+    /** No region yet means the hold is still a deferred ticket op; the offer completes after the quiesce applies it. */
     public void queue(int chunkX, int chunkZ, Runnable task) {
         holds.acquire(chunkX, chunkZ);
         QueuedTask queuedTask = new QueuedTask(chunkX, chunkZ, task);
-        while (true) {
-            Region<R> region = regionizer.regionAt(chunkX, chunkZ);
-            if (region == null) {
-                holds.release(chunkX, chunkZ);
-                throw new IllegalStateException("Chunk hold did not materialise a region at [" + chunkX + ", " + chunkZ + "]");
-            }
-
-            if (region.data().taskQueues().offer(queuedTask)) {
-                return;
-            }
-
-            Thread.onSpinWait();
+        if (!tryOffer(queuedTask)) {
+            pending.add(queuedTask);
         }
     }
 
-    /**
-     * Runs the tasks queued when the drain started. Tasks are popped one by one, so a throwing task -
-     * a region crash by policy - leaves the ones behind it queued with their holds intact instead of
-     * discarding them.
-     */
+    public void completePending() {
+        int budget = pending.size();
+        QueuedTask task;
+        while (budget-- > 0 && (task = pending.poll()) != null) {
+            if (!tryOffer(task)) {
+                holds.release(task.chunkX(), task.chunkZ());
+                throw new IllegalStateException("Chunk hold did not materialise a region at [" + task.chunkX() + ", " + task.chunkZ() + "]");
+            }
+        }
+    }
+
+    /** Tasks are popped one by one: a throw leaves the ones behind it queued with their holds intact. */
     public int drain(Region<R> region) {
         RegionTaskQueues queues = region.data().taskQueues();
         int budget = queues.size();
@@ -75,11 +71,23 @@ public final class RegionScheduler<R extends RegionTaskHost> {
         return executed;
     }
 
-    /**
-     * The unsynchronised lookup is safe here: it only runs on a thread that is ticking a region, and a
-     * ticking region's sections cannot be re-homed (merges into it are deferred, splits need it idle).
-     * Any other answer than "mine" ends in {@link #queue}, which resolves the owner properly.
-     */
+    /** A closed queue means a merge or split re-homed the position mid-offer; re-resolving observes the newer owner. */
+    private boolean tryOffer(QueuedTask task) {
+        while (true) {
+            Region<R> region = regionizer.regionAt(task.chunkX(), task.chunkZ());
+            if (region == null) {
+                return false;
+            }
+
+            if (region.data().taskQueues().offer(task)) {
+                return true;
+            }
+
+            Thread.onSpinWait();
+        }
+    }
+
+    /** Safe unsynchronised lookup: a ticking region's sections cannot be re-homed under it. */
     private boolean isOnOwningRegion(int chunkX, int chunkZ) {
         if (!(RegionContext.current() instanceof RegionContext.Region context)) {
             return false;

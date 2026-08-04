@@ -1,9 +1,13 @@
 package fr.hardel.leafs.mixin.network;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.Connection;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.players.PlayerList;
@@ -47,7 +51,7 @@ public abstract class PlayerListMixin {
         this.playersByUUID = new ConcurrentHashMap<>();
     }
 
-    /** Attached mode: the server thread owns every level between unit ticks (the integrated server pauses while empty, so a deferred placement would never run - M11 revisits with real region ownership). */
+    /** Server-thread placement runs inline; the level mutation inside takes the exclusion at {@code ServerLevel.addPlayer}. */
     @Inject(method = "placeNewPlayer", at = @At("HEAD"), cancellable = true)
     private void leafs$placeOnOwningUnit(Connection connection, ServerPlayer player, CommonListenerCookie cookie, CallbackInfo callbackInfo) {
         TickingManager ticking = ((LeafsServerAccess) this.getServer()).leafs$ticking();
@@ -57,5 +61,15 @@ public abstract class PlayerListMixin {
 
         ticking.submitToLevel(player.level(), () -> ((PlayerList) (Object) this).placeNewPlayer(connection, player, cookie));
         callbackInfo.cancel();
+    }
+
+    /** Autosave snapshots a live player from the global thread; the owning level's exclusion orders it against region ticks. */
+    @WrapMethod(method = "save")
+    private void leafs$savePlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
+        if (player.level() instanceof ServerLevel level) {
+            ((ServerLevelRegionAccess) level).leafs$regions().ownership().runExclusive(() -> original.call(player));
+        } else {
+            original.call(player);
+        }
     }
 }
