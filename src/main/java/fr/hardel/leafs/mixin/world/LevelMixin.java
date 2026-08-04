@@ -1,13 +1,17 @@
 package fr.hardel.leafs.mixin.world;
 
+import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import fr.hardel.leafs.world.WorldTickContext;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -47,6 +51,19 @@ public abstract class LevelMixin {
         if (this instanceof ServerLevelWorldAccess) {
             this.random = new RoutingRandomSource(this, this.random);
             this.neighborUpdater = new RoutingNeighborUpdater((Level) (Object) this, this.neighborUpdater);
+        }
+    }
+
+    /**
+     * Vanilla's second thread-identity guard (the first is ServerChunkCache, #20c): off the server
+     * thread {@code getBlockEntity} answers null SILENTLY, which read as "the chest vanished" from
+     * every region tick. A region worker mid-tick is a game thread for its level.
+     */
+    @Inject(method = "getBlockEntity(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/entity/BlockEntity;", at = @At("HEAD"), cancellable = true)
+    private void leafs$regionBlockEntityPath(BlockPos pos, CallbackInfoReturnable<BlockEntity> callbackInfo) {
+        Level self = (Level) (Object) this;
+        if (self.isInValidBounds(pos) && this instanceof ServerLevelRegionAccess access && access.leafs$regions().ownership().isRegionTickHeldByCurrentThread()) {
+            callbackInfo.setReturnValue(self.getChunkAt(pos).getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE));
         }
     }
 

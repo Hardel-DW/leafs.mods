@@ -19,12 +19,12 @@ public final class RegionChunkAccess {
     }
 
     public static LevelChunk fullChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
-        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
-        if (holder == null) {
-            return null;
-        }
+        return fullChunkOrNull(chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ)));
+    }
 
-        return holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
+    /** Presence, never the ticket level: a ticket only says the chunk is DUE, which is vanilla hasChunk's lie. */
+    public static LevelChunk fullChunkOrNull(ChunkHolder holder) {
+        return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
     public static ChunkAccess presentChunkOrThrow(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {

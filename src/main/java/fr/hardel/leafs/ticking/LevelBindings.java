@@ -35,7 +35,7 @@ public final class LevelBindings {
 
                 Region<RegionTickData> owner = regionsOf(level).regionizer().regionAtUnsynchronised(chunkX, chunkZ);
 
-                return owner != null && owner.id() == context.regionId();
+                return owner != null && owner.id() == context.id();
             }
 
             @Override
