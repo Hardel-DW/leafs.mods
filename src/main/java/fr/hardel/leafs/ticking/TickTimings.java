@@ -3,9 +3,8 @@ package fr.hardel.leafs.ticking;
 import java.util.Arrays;
 
 /**
- * Ring of recent tick durations for one tick unit, written by its tick loop and read by debug/ -
- * writes are single-threaded (the owning tick), reads tolerate a torn sample, so a sampler thread
- * may call {@link #sample} without touching the tick path.
+ * Ring of recent tick durations, written single-threaded by the owning tick loop. Reads tolerate a
+ * torn sample, so {@link #sample} needs no lock and never touches the tick path.
  */
 public final class TickTimings {
     private static final int CAPACITY = 256;

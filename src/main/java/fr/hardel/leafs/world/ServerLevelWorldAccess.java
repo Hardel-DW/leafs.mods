@@ -4,4 +4,6 @@ package fr.hardel.leafs.world;
 public interface ServerLevelWorldAccess {
 
     RegionWorldData leafs$worldData();
+
+    WorldDataRouter leafs$worldRouter();
 }

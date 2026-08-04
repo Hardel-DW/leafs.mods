@@ -9,14 +9,8 @@ import net.minecraft.network.protocol.PacketUtils;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * One player's inbound packets, drained by the unit owning the player. Handling replicates vanilla
- * {@code PacketProcessor.ListenerAndPacket} exactly: disconnected-listener drop, per-packet error
- * recovery, OOM escalation.
- *
- * <p>The drain also PUBLISHES the answer both routing hooks need: while a queue drains, the draining
- * thread is the packet-handling thread of that listener. That is the only durable ownership signal -
- * {@code ServerGamePacketListenerImpl.player} is reassigned mid-drain by respawn, so anything derived
- * from the player (its level, its region) flips between two packets of the same drain.
+ * One player's inbound packets, drained by the unit owning the player. While a queue drains, the
+ * draining thread is the packet-handling thread for that listener: the only durable ownership signal, since {@code ServerGamePacketListenerImpl.player} is reassigned mid-drain by respawn.
  */
 public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();

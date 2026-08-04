@@ -12,11 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SharedChunkHoldsTest {
     private FakeChunkHolds tickets;
     private SharedChunkHolds holds;
+    private boolean levelSerial;
 
     @BeforeEach
     void createHolds() {
         tickets = new FakeChunkHolds(new Regionizer<>(4, 1, 1, new TestRegionCallbacks(4)));
-        holds = new SharedChunkHolds(tickets);
+        levelSerial = true;
+        holds = new SharedChunkHolds(tickets, () -> levelSerial);
     }
 
     @Test
@@ -64,5 +66,43 @@ class SharedChunkHoldsTest {
         holds.release(1, 1);
 
         assertThrows(IllegalStateException.class, () -> holds.release(1, 1));
+    }
+
+    @Test
+    void aForeignThreadDefersTicketOpsToTheQuiesce() {
+        levelSerial = false;
+        holds.acquire(3, 7);
+
+        assertEquals(0, tickets.addCalls, "the raw ticket op may only run level-serial");
+        assertEquals(1, holds.heldChunks());
+        assertEquals(1, holds.pendingOpCount());
+
+        levelSerial = true;
+        holds.applyPendingOps();
+
+        assertEquals(1, tickets.addCalls);
+        assertEquals(0, holds.pendingOpCount());
+    }
+
+    @Test
+    void anInlineCallerDrainsTheBacklogInTransitionOrder() {
+        levelSerial = false;
+        holds.acquire(3, 7);
+
+        levelSerial = true;
+        holds.release(3, 7);
+
+        assertEquals(1, tickets.addCalls, "the deferred add must run before the inline remove");
+        assertEquals(1, tickets.removeCalls);
+        assertFalse(tickets.hasActiveHolds());
+        assertEquals(0, holds.pendingOpCount());
+    }
+
+    @Test
+    void applyingOpsOffTheSerialSideIsRejected() {
+        levelSerial = false;
+        holds.acquire(3, 7);
+
+        assertThrows(IllegalStateException.class, holds::applyPendingOps);
     }
 }

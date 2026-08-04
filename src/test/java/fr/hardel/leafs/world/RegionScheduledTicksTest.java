@@ -56,6 +56,21 @@ class RegionScheduledTicksTest {
     }
 
     @Test
+    void drainCapLeavesOverflowForTheNextDrain() {
+        newContainer(0, 0);
+        ticks.schedule(new ScheduledTick<>("first", blockIn(0, 0, 0), 10, TickPriority.NORMAL, 0));
+        ticks.schedule(new ScheduledTick<>("second", blockIn(0, 0, 1), 10, TickPriority.NORMAL, 1));
+        ticks.schedule(new ScheduledTick<>("third", blockIn(0, 0, 2), 10, TickPriority.NORMAL, 2));
+
+        ticks.tick(10, 2, (pos, type) -> drained.add(type));
+        assertEquals(List.of("first", "second"), drained);
+
+        drained.clear();
+        ticks.tick(10, 2, (pos, type) -> drained.add(type));
+        assertEquals(List.of("third"), drained);
+    }
+
+    @Test
     void mergeRebasesAbsoluteTriggerTicksByTheClockOffset() {
         newContainer(0, 0);
         ticks.schedule(new ScheduledTick<>("moved", blockIn(0, 0, 0), 105, TickPriority.NORMAL, 0));

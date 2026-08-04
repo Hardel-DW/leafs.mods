@@ -26,7 +26,7 @@ public final class Leafs implements ModInitializer {
         TickingManager.installPhases(new EntityTickPhases());
 
         LeafsConfig config = LeafsConfig.get();
-        LOGGER.info("Leafs initialised - {} region threads configured (the pool starts at M11), {}x{}-chunk sections, ownership checks {}",
+        LOGGER.info("Leafs initialised - {} region workers, {}x{}-chunk sections, ownership checks {}",
             config.effectiveRegionThreads(), config.sectionChunkSize(), config.sectionChunkSize(),
             Ownership.CHECKS_ENABLED ? "on" : "off");
     }

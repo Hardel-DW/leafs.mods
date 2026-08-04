@@ -66,6 +66,15 @@ public final class Region<R> {
         return regionizer.deadSectionCountOf(this);
     }
 
+    public interface ChunkConsumer {
+        void accept(int chunkX, int chunkZ);
+    }
+
+    /** Legal only while TICKING on the owner (sections frozen) or under the regionizer's write lock. */
+    public void forEachChunk(ChunkConsumer consumer) {
+        regionizer.forEachChunkOf(this, consumer);
+    }
+
     void setState(RegionState state) {
         this.state = state;
     }

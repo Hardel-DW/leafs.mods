@@ -15,13 +15,8 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.function.Consumer;
 
 /**
- * The region-side halves of the network split: inbound packets drained before the level tick, play
- * connections ticked after it (vanilla order inside a tick), replicating the global loop's error
- * handling. Closed connections are left to the global loop, which keeps the disconnection path.
- *
- * <p>Membership comes from the server roster, not from {@code ServerLevel.players()}: the latter is
- * an entity-TRACKING list a player can legitimately leave while still connected and still playing
- * (end credits), and it is a plain {@code ArrayList} mutated by the very packets we drain.
+ * Membership comes from the server roster, not {@code ServerLevel.players()}: the latter is an
+ * entity-tracking list a player can leave while still connected (end credits), and it's an {@code ArrayList} mutated by the packets we drain.
  */
 public final class RegionNetworkPhases implements LevelTickPhases {
 

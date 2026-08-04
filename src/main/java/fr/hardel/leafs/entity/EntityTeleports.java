@@ -1,0 +1,204 @@
+package fr.hardel.leafs.entity;
+
+import fr.hardel.leafs.scheduler.SharedChunkHolds;
+import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.PortalProcessor;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.portal.TeleportTransition;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+
+/**
+ * One per level: routes teleports that a region worker may not run in place. Same-level moves out of
+ * the owning region and every player move defer to the level-serial side, which runs the vanilla code
+ * under the exclusions; a non-player cross-dimension move with a computed transition detaches on the
+ * owning region and arrives through the pending-teleport pipeline as a region task at the destination.
+ */
+public final class EntityTeleports {
+
+    /** Wiring to the ticking surfaces of this level, provided at construction so this module stays free of ticking/ types. */
+    public interface LevelBinding {
+
+        SharedChunkHolds holds();
+
+        boolean currentRegionOwns(int chunkX, int chunkZ);
+
+        void submitSerial(Runnable task);
+
+        void submitPlacement(int chunkX, int chunkZ, Runnable placement);
+    }
+
+    private record TeleportedNode(Entity entity, PositionMoveRotation currentValues, TeleportTransition transition, int parentIndex) {
+    }
+
+    private final ServerLevel level;
+    private final LevelBinding binding;
+    private final Function<ServerLevel, EntityTeleports> byLevel;
+    private final PendingTeleports<List<TeleportedNode>> pending;
+
+    public EntityTeleports(ServerLevel level, LevelBinding binding, Function<ServerLevel, EntityTeleports> byLevel) {
+        this.level = level;
+        this.binding = binding;
+        this.byLevel = byLevel;
+        this.pending = new PendingTeleports<>(binding::submitPlacement);
+    }
+
+    /** Shutdown path: places everything still in flight toward this level, before the worlds save. */
+    public void completeAll() {
+        pending.completeAll();
+    }
+
+    public int pendingCount() {
+        return pending.pendingCount();
+    }
+
+    /**
+     * Called from a region worker owning {@code entity}. Returns false when the vanilla sync path is
+     * safe (same level, destination owned by the current region); otherwise the move has been routed
+     * and the caller must return null to its own caller (Compromise #7's null-style result).
+     */
+    public boolean divertFromRegion(Entity entity, TeleportTransition transition) {
+        ServerLevel target = transition.newLevel();
+        int destinationX = SectionPos.posToSectionCoord(transition.position().x());
+        int destinationZ = SectionPos.posToSectionCoord(transition.position().z());
+        if (target == level && binding.currentRegionOwns(destinationX, destinationZ)) {
+            return false;
+        }
+
+        if (target == level) {
+            binding.submitSerial(() -> {
+                if (!entity.isRemoved() && entity.level() == level) {
+                    entity.teleport(transition);
+                }
+            });
+
+            return true;
+        }
+
+        beginCrossDimension(entity, transition);
+
+        return true;
+    }
+
+    /**
+     * A player move stays vanilla-sync when the current region owns both the player and the
+     * destination; anything else defers to the serial side, which runs vanilla's same-instance move
+     * under the exclusions.
+     */
+    public boolean divertPlayerFromRegion(ServerPlayer player, TeleportTransition transition) {
+        if (transition.newLevel() == level
+            && binding.currentRegionOwns(player.chunkPosition().x(), player.chunkPosition().z())
+            && binding.currentRegionOwns(SectionPos.posToSectionCoord(transition.position().x()), SectionPos.posToSectionCoord(transition.position().z()))) {
+            return false;
+        }
+
+        binding.submitSerial(() -> {
+            if (!player.hasDisconnected() && !player.isRemoved() && player.level() == level) {
+                player.teleport(transition);
+            }
+        });
+
+        return true;
+    }
+
+    /**
+     * Portal completion off a region worker: the destination search sync-loads foreign chunks, so the
+     * whole tail of {@code handlePortal} re-runs on the serial side. The portal cooldown vanilla set
+     * before the search keeps the entity from re-triggering while this waits.
+     */
+    public void deferPortal(Entity entity) {
+        binding.submitSerial(() -> {
+            if (entity.isRemoved() || entity.level() != level) {
+                return;
+            }
+
+            PortalProcessor process = entity.portalProcess;
+            if (process == null) {
+                return;
+            }
+
+            TeleportTransition transition = process.getPortalDestination(level, entity);
+            if (transition == null) {
+                return;
+            }
+
+            ServerLevel target = transition.newLevel();
+            if (level.isAllowedToEnterPortal(target) && (target.dimension() == level.dimension() || entity.canTeleport(level, target))) {
+                entity.teleport(transition);
+            }
+        });
+    }
+
+    /** Vanilla {@code teleportCrossDimension}'s origin half on the owning region, arrival as a pipeline placement. */
+    private void beginCrossDimension(Entity entity, TeleportTransition transition) {
+        ServerLevel target = transition.newLevel();
+        List<TeleportedNode> nodes = new ArrayList<>();
+        copyTree(entity, transition, -1, target, nodes);
+        teleportSpectators(entity, transition);
+        if (nodes.isEmpty()) {
+            return;
+        }
+
+        EntityTeleports arrivals = byLevel.apply(target);
+        ChunkPos originChunk = entity.chunkPosition();
+        int destinationX = SectionPos.posToSectionCoord(transition.position().x());
+        int destinationZ = SectionPos.posToSectionCoord(transition.position().z());
+        arrivals.pending.begin(binding.holds(), originChunk.x(), originChunk.z(), destinationX, destinationZ, nodes, arrivals::place);
+    }
+
+    private void copyTree(Entity entity, TeleportTransition transition, int parentIndex, ServerLevel target, List<TeleportedNode> nodes) {
+        List<Entity> passengers = entity.getPassengers();
+        entity.ejectPassengers();
+        Entity created = entity.getType().create(target, EntitySpawnReason.DIMENSION_TRAVEL);
+        int myIndex = -1;
+        if (created != null) {
+            created.restoreFrom(entity);
+            entity.removeAfterChangingDimensions();
+            myIndex = nodes.size();
+            nodes.add(new TeleportedNode(created, PositionMoveRotation.of(entity), transition, parentIndex));
+        }
+
+        for (Entity passenger : passengers) {
+            copyTree(passenger, entity.calculatePassengerTransition(transition, passenger), myIndex, target, nodes);
+        }
+    }
+
+    private void teleportSpectators(Entity entity, TeleportTransition transition) {
+        for (ServerPlayer player : List.copyOf(level.players())) {
+            if (player.getCamera() == entity) {
+                binding.submitSerial(() -> {
+                    if (!player.hasDisconnected() && !player.isRemoved() && player.level() == level) {
+                        player.teleport(transition);
+                        player.setCamera(null);
+                    }
+                });
+            }
+        }
+    }
+
+    /** Runs on the destination: the region task's hold has the target chunk loaded, so no sync load happens here. */
+    private void place(List<TeleportedNode> nodes) {
+        for (TeleportedNode node : nodes) {
+            node.entity().teleportSetPosition(node.currentValues(), PositionMoveRotation.of(node.transition()), node.transition().relatives());
+            level.addDuringTeleport(node.entity());
+        }
+
+        for (TeleportedNode node : nodes) {
+            if (node.parentIndex() >= 0) {
+                node.entity().startRiding(nodes.get(node.parentIndex()).entity(), true, false);
+            }
+        }
+
+        level.resetEmptyTime();
+        for (TeleportedNode node : nodes) {
+            node.transition().postTeleportTransition().onTransition(node.entity());
+        }
+    }
+}

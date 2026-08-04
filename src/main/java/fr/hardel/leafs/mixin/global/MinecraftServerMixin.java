@@ -1,9 +1,12 @@
 package fr.hardel.leafs.mixin.global;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.global.BarrierWindow;
 import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.ServerFunctionManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -36,7 +39,15 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
 
     @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
     private void leafs$runBarrierWindow(CallbackInfo callbackInfo) {
+        // Diverted execute tasks drain before the window raises: a submitter must never block behind the barrier it feeds.
+        ((LeafsServerAccess) this).leafs$ticking().globalScheduler().drain();
         leafs$barrierWindow.runGlobalPhase();
+    }
+
+    /** The #24 wrap: {@code #tick} functions execute in this tick's window instead of before the level ticks (Compromise #4). */
+    @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/ServerFunctionManager;tick()V"))
+    private void leafs$functionsIntoWindow(ServerFunctionManager manager, Operation<Void> original) {
+        leafs$barrierWindow.enqueue(manager::tick);
     }
 
     @Inject(method = "stopServer", at = @At("HEAD"))
