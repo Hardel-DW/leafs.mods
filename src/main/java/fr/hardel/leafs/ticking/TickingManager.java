@@ -96,6 +96,12 @@ public final class TickingManager {
         unitFor(level).submit(task);
     }
 
+    public void tickPausedNetwork() {
+        for (LevelTickUnit unit : levelUnits.values()) {
+            unit.tickPausedNetwork();
+        }
+    }
+
     public boolean currentThreadOwns(ServerLevel level) {
         return RegionContext.current() instanceof RegionContext.LevelSerial context && context.id() == unitFor(level).id();
     }
