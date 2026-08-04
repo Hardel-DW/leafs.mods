@@ -43,10 +43,11 @@ public abstract class ServerPlayerMixin {
         this.enderPearls = ConcurrentHashMap.newKeySet();
     }
 
+    /** Region workers only: the serial side runs vanilla inline, a wider gate would re-divert its own deferred tasks forever. */
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/server/level/ServerPlayer;", at = @At("HEAD"), cancellable = true)
     private void leafs$deferOffOwnerPlayerMove(TeleportTransition transition, CallbackInfoReturnable<ServerPlayer> callbackInfo) {
         ServerPlayer self = (ServerPlayer) (Object) this;
-        if (!(RegionContext.current() instanceof RegionContext.UnitTick) || !(self.level() instanceof ServerLevel origin)) {
+        if (!(RegionContext.current() instanceof RegionContext.Region) || !(self.level() instanceof ServerLevel origin)) {
             return;
         }
 

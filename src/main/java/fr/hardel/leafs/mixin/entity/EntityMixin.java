@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Entity-side hooks: scheduler retirement (entity/EntitySchedulerRegistry), the #16 teleport
- * diversion off the owning region, the portal-search deferral to the level-serial side, and the
+ * diversion off the owning region, the portal-search deferral to the barrier window, and the
  * portal ticket that must reach the level's single ticket mutator.
  */
 @Mixin(Entity.class)
@@ -36,11 +36,11 @@ public abstract class EntityMixin {
         }
     }
 
-    /** Sync teleports stay valid inside the owning region; everything else routes (Compromise #7). */
+    /** Region workers only: the serial side runs vanilla inline, a wider gate re-diverts its own deferred tasks forever (Compromise #7). */
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffOwnerTeleport(TeleportTransition transition, CallbackInfoReturnable<Entity> callbackInfo) {
         Entity self = (Entity) (Object) this;
-        if (self instanceof ServerPlayer || !(RegionContext.current() instanceof RegionContext.UnitTick)) {
+        if (self instanceof ServerPlayer || !(RegionContext.current() instanceof RegionContext.Region)) {
             return;
         }
 
@@ -50,10 +50,10 @@ public abstract class EntityMixin {
         }
     }
 
-    /** The destination search sync-loads foreign chunks; off the serial side it defers whole (#18's verdict). */
+    /** The search writes foreign-dimension blocks; off a region worker the whole tail defers to the barrier window. */
     @WrapOperation(method = "handlePortal", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/PortalProcessor;getPortalDestination(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;"))
     private TeleportTransition leafs$deferPortalSearchOffOwner(PortalProcessor processor, ServerLevel level, Entity entity, Operation<TeleportTransition> original) {
-        if (!(RegionContext.current() instanceof RegionContext.UnitTick)) {
+        if (!(RegionContext.current() instanceof RegionContext.Region)) {
             return original.call(processor, level, entity);
         }
 
