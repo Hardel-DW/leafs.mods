@@ -2,11 +2,16 @@ package fr.hardel.leafs.debug;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelTickUnit;
+import fr.hardel.leafs.ticking.RegionTickData;
+import fr.hardel.leafs.ticking.RegionTickHandle;
+import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickTimings;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -19,6 +24,7 @@ import java.util.Locale;
  * Appends one CSV row per tick unit on a fixed period, from its own thread - the tick path pays
  * nothing. Only the timing rings and the published census are read, both of which tolerate an
  * off-thread reader; nothing here touches world state. Off unless {@code metricsLogSeconds > 0}.
+ * Unit ids are prefixed: {@code L} for the level-serial units, {@code R} for live regions.
  */
 public final class TickMetricsRecorder {
     private static final Path FILE = Path.of("logs", "leafs-metrics.csv");
@@ -82,10 +88,25 @@ public final class TickMetricsRecorder {
         long epochMillis = System.currentTimeMillis();
         long nowNanos = System.nanoTime();
         for (LevelTickUnit unit : ((LeafsServerAccess) server).leafs$ticking().units()) {
-            TickTimings.Snapshot timings = unit.timings().sample(nowNanos);
-            writer.write(String.format(Locale.ROOT, "%d,%d,%s,%d,%.2f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d%n",
-                epochMillis, unit.id(), unit.dimension(), unit.currentTick(), timings.tps(), timings.msptAverage(),
-                timings.mspt50(), timings.mspt95(), timings.mspt99(), timings.msptMax(), unit.chunkCount(), unit.entityCount()));
+            writeRow(writer, epochMillis, nowNanos, "L" + unit.id(), unit.dimension(), unit.currentTick(),
+                unit.timings(), unit.chunkCount(), unit.entityCount());
         }
+
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Region<RegionTickData> region : ((ServerLevelRegionAccess) level).leafs$regions().regionizer().regionsView()) {
+                RegionTickHandle handle = region.data().handle();
+                if (handle != null && !handle.isCancelled()) {
+                    writeRow(writer, epochMillis, nowNanos, "R" + handle.id(), handle.dimension(), handle.currentTick(),
+                        handle.timings(), handle.chunkCount(), handle.entityCount());
+                }
+            }
+        }
+    }
+
+    private static void writeRow(Writer writer, long epochMillis, long nowNanos, String unitId, String dimension, long tick, TickTimings timings, int chunks, int entities) throws IOException {
+        TickTimings.Snapshot snapshot = timings.sample(nowNanos);
+        writer.write(String.format(Locale.ROOT, "%d,%s,%s,%d,%.2f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d%n",
+            epochMillis, unitId, dimension, tick, snapshot.tps(), snapshot.msptAverage(),
+            snapshot.mspt50(), snapshot.mspt95(), snapshot.mspt99(), snapshot.msptMax(), chunks, entities));
     }
 }

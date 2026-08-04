@@ -18,12 +18,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 
 /**
- * Groups loaded chunks into independently tickable {@link Region}s, one instance per level. Every
- * non-empty section is surrounded by owned buffer sections, so two regions are always separated by at
- * least one full section - that spatial invariant, not locks, is what lets a region touch chunks
- * slightly beyond the ones it owns. Merges touching a ticking region are deferred to its release;
- * splits and dead-section cleanup only happen at release. Pure data structure, no threads, no
- * Minecraft classes. Design reference: {@code docs/sources/folia/Regionizer.md}.
+ * Groups loaded chunks into independently tickable {@link Region}s, one per level. Non-empty sections
+ * are always surrounded by owned buffer sections, so two regions stay at least one full section apart:
+ * that spatial invariant, not locks, is what lets a region touch chunks slightly beyond its own.
  */
 public final class Regionizer<R> {
     private static final int DEAD_SECTION_DIVISOR = 6;
@@ -94,7 +91,7 @@ public final class Regionizer<R> {
         }
     }
 
-    /** Owner of the given chunk, or null. Waits out concurrent structural changes. */
+    /** Falls back to a full read lock if a concurrent structural change invalidates the optimistic read. */
     public Region<R> regionAt(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         long stamp = lock.tryOptimisticRead();
@@ -325,8 +322,7 @@ public final class Regionizer<R> {
 
     /**
      * Executes every pending merge around {@code region} whose two sides are not ticking, following
-     * the surviving region as merges chain. Without this, link forwarding could leave two non-ticking
-     * regions owing each other a merge that the ticking gate would then block forever.
+     * the surviving region as merges chain. Without this, two non-ticking regions could be left owing each other a merge that the ticking gate would block forever.
      */
     private Region<R> resolvePendingMerges(Region<R> region) {
         boolean progress = true;
@@ -547,6 +543,12 @@ public final class Regionizer<R> {
         }
 
         owner.deadSectionKeys.add(section.key());
+    }
+
+    void forEachChunkOf(Region<R> region, Region.ChunkConsumer consumer) {
+        for (LongIterator iterator = region.sectionKeys.iterator(); iterator.hasNext(); ) {
+            sections.get(iterator.nextLong()).forEachChunk(consumer);
+        }
     }
 
     private int sumChunkCounts(Region<R> region) {

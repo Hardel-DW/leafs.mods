@@ -5,6 +5,8 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.LevelTickUnit;
+import fr.hardel.leafs.ticking.RegionTickData;
+import fr.hardel.leafs.ticking.RegionTickHandle;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickTimings;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -38,11 +40,11 @@ public final class RegionsCommand {
         long now = System.nanoTime();
 
         double tickRate = units.isEmpty() ? 0 : units.getFirst().timings().sample(now).tps();
-        String header = String.format(Locale.ROOT, "Leafs - attached mode (1 game thread, ticks units in sequence), %.1f TPS, %d tick unit%s", tickRate, units.size(), units.size() == 1 ? "" : "s");
+        String header = String.format(Locale.ROOT, "Leafs - level ticks on the server thread, region handles on the pool, %.1f TPS, %d tick unit%s", tickRate, units.size(), units.size() == 1 ? "" : "s");
         source.sendSuccess(() -> Component.literal(header), false);
 
         ServerPlayer player = source.getPlayer();
-        Region<Void> playerRegion = player == null ? null : ((ServerLevelRegionAccess) player.level()).leafs$regions().regionizer().regionAt(player.chunkPosition().x(), player.chunkPosition().z());
+        Region<RegionTickData> playerRegion = player == null ? null : ((ServerLevelRegionAccess) player.level()).leafs$regions().regionizer().regionAt(player.chunkPosition().x(), player.chunkPosition().z());
 
         for (LevelTickUnit unit : units) {
             TickTimings.Snapshot timings = unit.timings().sample(now);
@@ -57,10 +59,11 @@ public final class RegionsCommand {
         return units.size();
     }
 
-    private static void reportRegions(CommandSourceStack source, LevelTickUnit unit, Region<Void> playerRegion) {
+    private static void reportRegions(CommandSourceStack source, LevelTickUnit unit, Region<RegionTickData> playerRegion) {
         LevelRegions regions = unit.regions();
-        List<Region<Void>> live = new ArrayList<>(regions.regionizer().regionsView());
+        List<Region<RegionTickData>> live = new ArrayList<>(regions.regionizer().regionsView());
         live.sort(Comparator.comparingLong(Region::id));
+        long now = System.nanoTime();
 
         String summary = String.format(Locale.ROOT, "  regions %d | sections %d (%d dead) | chunks %d tracked / %d loaded (census) | created %d, merged %d, split %d, deferred %d",
             live.size(), regions.sections(), regions.deadSections(), unit.trackedChunks(), unit.chunkCount(),
@@ -68,8 +71,11 @@ public final class RegionsCommand {
 
         source.sendSuccess(() -> Component.literal(summary), false);
 
-        for (Region<Void> region : live) {
-            String line = String.format(Locale.ROOT, "    R#%d %s  %d sections, %d chunks%s", region.id(), region.state(), region.sectionCount(), region.chunkCount(), region == playerRegion ? "  <- you" : "");
+        for (Region<RegionTickData> region : live) {
+            RegionTickHandle handle = region.data().handle();
+            TickTimings.Snapshot handleTimings = handle == null ? null : handle.timings().sample(now);
+            String pace = handleTimings == null ? "" : String.format(Locale.ROOT, ", %.1f TPS avg %.2fms", handleTimings.tps(), handleTimings.msptAverage());
+            String line = String.format(Locale.ROOT, "    R#%d %s  %d sections, %d chunks%s%s", region.id(), region.state(), region.sectionCount(), region.chunkCount(), pace, region == playerRegion ? "  <- you" : "");
             source.sendSuccess(() -> Component.literal(line), false);
         }
     }

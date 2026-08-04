@@ -10,11 +10,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 /**
- * The region thread pool. Free-running handles are paced at 20 TPS with Folia's catch-up model: a
- * late handle ticks once but advances its clocks by the missed periods, and a chronically late one
- * never outranks healthy ones. Until M11 the runtime drives ticks through {@link #runAttached}
- * instead - same context, crash capture and watchdog, executed on the calling thread - and {@link
- * #start()} is never called, so no worker thread and no queue entry exist at runtime.
+ * Region thread pool at 20 TPS: a late handle advances its clock by the missed periods instead of
+ * catching up tick by tick. {@link #runAttached} runs the same tick path on the calling thread.
  */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
@@ -22,21 +19,23 @@ public final class RegionTickScheduler {
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final int threadCount;
+    private final boolean regionThreadNames;
     private final TickBarrier barrier;
     private final LeafsWatchdog watchdog;
     private final RegionCrashWriter crashWriter;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
+    private volatile long periodNanos = TICK_PERIOD_NANOS;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(int threadCount, TickBarrier barrier, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(int threadCount, boolean regionThreadNames, TickBarrier barrier, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.threadCount = threadCount;
+        this.regionThreadNames = regionThreadNames;
         this.barrier = barrier;
         this.watchdog = watchdog;
         this.crashWriter = crashWriter;
         this.failurePolicy = failurePolicy;
     }
 
-    /** Nothing exists before this call: attached mode holds no worker thread at all. */
     public void start() {
         for (int index = 1; index <= threadCount; index++) {
             Thread worker = new Thread(this::workerLoop, "Leafs Region Worker #" + index);
@@ -46,22 +45,40 @@ public final class RegionTickScheduler {
         }
     }
 
+    /** Waits the workers out so a mid-flight tick can finish releasing its region before the drain runs. Idempotent. */
     public void shutdown() {
+        if (!running) {
+            return;
+        }
+
         running = false;
         workers.forEach(Thread::interrupt);
+        for (Thread worker : workers) {
+            try {
+                worker.join(5_000);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     public void schedule(TickHandle handle) {
-        handle.setScheduledStartNanos(System.nanoTime() + TICK_PERIOD_NANOS);
+        handle.setScheduledStartNanos(System.nanoTime() + periodNanos);
         queue.add(new ScheduledTick(handle));
+    }
+
+    /** From the tick-rate manager; handles pick the new period up at their next scheduling. */
+    public void setPeriodNanos(long periodNanos) {
+        this.periodNanos = Math.max(1, periodNanos);
     }
 
     public void runAttached(TickHandle handle) {
         executeTick(handle, 1);
     }
 
-    static long computeTickCount(long idealStartNanos, long nowNanos) {
-        return Math.max(1, 1 + (nowNanos - idealStartNanos) / TICK_PERIOD_NANOS);
+    static long computeTickCount(long idealStartNanos, long nowNanos, long periodNanos) {
+        return Math.max(1, 1 + (nowNanos - idealStartNanos) / periodNanos);
     }
 
     private void workerLoop() {
@@ -79,17 +96,28 @@ public final class RegionTickScheduler {
             }
 
             TickHandle handle = next.handle;
+            long period = periodNanos;
             long now = System.nanoTime();
-            long tickCount = computeTickCount(handle.scheduledStartNanos(), now);
+            long tickCount = computeTickCount(handle.scheduledStartNanos(), now, period);
+            Thread worker = Thread.currentThread();
+            String workerName = worker.getName();
+            if (regionThreadNames) {
+                worker.setName("R#" + handle.id() + " " + handle.dimension());
+            }
+
             try {
                 executeTick(handle, tickCount);
             } catch (Throwable throwable) {
                 failurePolicy.accept(handle, throwable);
                 continue;
+            } finally {
+                if (regionThreadNames) {
+                    worker.setName(workerName);
+                }
             }
 
             if (!handle.isCancelled()) {
-                long idealNext = handle.scheduledStartNanos() + tickCount * TICK_PERIOD_NANOS;
+                long idealNext = handle.scheduledStartNanos() + tickCount * period;
                 handle.setScheduledStartNanos(Math.max(System.nanoTime(), idealNext));
                 queue.add(next);
             }
@@ -97,11 +125,8 @@ public final class RegionTickScheduler {
     }
 
     /**
-     * Every acquisition is paired with its own {@code finally}: a failure to enter the region
-     * context or to name the tick can no longer strand a phantom active tick, which would block
-     * every later barrier raise. The crash report is built while the context is still entered -
-     * counting the region's entities is only legal on its owner - and a failing report is attached
-     * to the original throwable rather than replacing it.
+     * Each acquisition is paired with its own {@code finally} so a failed entry can never strand an
+     * active tick and block a later barrier raise. The crash report is built before the context exits.
      */
     private void executeTick(TickHandle handle, long tickCount) {
         barrier.enterTick();

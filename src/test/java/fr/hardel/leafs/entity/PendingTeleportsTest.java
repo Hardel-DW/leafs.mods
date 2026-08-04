@@ -16,8 +16,8 @@ class PendingTeleportsTest {
     private final List<Runnable> submitted = new ArrayList<>();
     private final List<String> placed = new ArrayList<>();
 
-    private final SharedChunkHolds originHolds = new SharedChunkHolds(new CountingHolds(originTickets));
-    private final SharedChunkHolds destinationHolds = new SharedChunkHolds(new CountingHolds(destinationTickets));
+    private final SharedChunkHolds originHolds = new SharedChunkHolds(new CountingHolds(originTickets), () -> true);
+    private final SharedChunkHolds destinationHolds = new SharedChunkHolds(new CountingHolds(destinationTickets), () -> true);
 
     /** Stands in for the destination's RegionScheduler: a queued region task holds its target until it runs. */
     private final PendingTeleports<String> teleports = new PendingTeleports<>((chunkX, chunkZ, placement) -> {

@@ -6,19 +6,8 @@ import java.util.List;
 
 /**
  * Hooks other modules implement to follow the region lifecycle and partition their state on merge
- * and split. Every callback runs under the regionizer's critical lock: implementations must be
- * non-blocking, must not touch world state and must never call back into the regionizer.
- *
- * <p>Lifecycle order guarantees:
- * <ul>
- *   <li>Creation: {@code createData} → {@code onRegionCreate} → {@code onRegionActive}.</li>
- *   <li>Merge (the losing region): {@code onRegionInactive} (only if it was {@link RegionState#READY})
- *       → {@code merge} → {@code onRegionDestroy}.</li>
- *   <li>Split: {@code onRegionInactive(parent)} → per child {@code createData} + {@code onRegionCreate}
- *       → {@code split} → {@code onRegionDestroy(parent)} → per child {@code onRegionActive}.</li>
- *   <li>A region released with a pending merge whose target is ticking goes
- *       {@link RegionState#TRANSIENT} and fires {@code onRegionInactive} once.</li>
- * </ul>
+ * and split; lifecycle order is documented in Modules.md. Every callback runs under the regionizer's
+ * write lock: implementations must be non-blocking, must not touch world state and must never call back into the regionizer.
  */
 public interface RegionCallbacks<R> {
 
@@ -29,10 +18,8 @@ public interface RegionCallbacks<R> {
 
     void onRegionDestroy(Region<R> region);
 
-    /** The tick scheduler should start attempting to tick this region. */
     void onRegionActive(Region<R> region);
 
-    /** The tick scheduler must forget this region's handle. */
     void onRegionInactive(Region<R> region);
 
     /**
