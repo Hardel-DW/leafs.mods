@@ -11,10 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * The overstress crash of 2026-08-04 (region #21): a villager's {@code AcquirePoi} validated a bed
- * several chunks away, the read refused itself with an {@code OwnershipViolationException} on a
- * chunk not yet FULL, and the whole region died for one transient streaming gap. Compromise #19:
- * that one entity skips its tick; every other failure keeps the vanilla crash path.
+ * The 2026-08-04 overstress crash: a villager's bed search read a chunk not yet FULL and the whole
+ * region died for one transient streaming gap (Compromise #19).
  */
 class EntityTickGuardTest {
 

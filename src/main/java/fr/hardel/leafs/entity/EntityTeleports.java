@@ -32,6 +32,9 @@ public final class EntityTeleports {
 
         void submitSerial(Runnable task);
 
+        /** The barrier window: all regions paused, full world access, for work whose reach is not known in advance. */
+        void submitWindow(Runnable task);
+
         void submitPlacement(int chunkX, int chunkZ, Runnable placement);
     }
 
@@ -109,12 +112,11 @@ public final class EntityTeleports {
     }
 
     /**
-     * Portal completion off a region worker: the destination search sync-loads foreign chunks, so the
-     * whole tail of {@code handlePortal} re-runs on the serial side. The portal cooldown vanilla set
-     * before the search keeps the entity from re-triggering while this waits.
+     * The search writes blocks in a dimension unknown until it runs, so {@code handlePortal}'s tail
+     * re-runs in the barrier window; the cooldown vanilla set before the search prevents re-triggering.
      */
     public void deferPortal(Entity entity) {
-        binding.submitSerial(() -> {
+        binding.submitWindow(() -> {
             if (entity.isRemoved() || entity.level() != level) {
                 return;
             }
