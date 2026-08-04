@@ -12,9 +12,7 @@ import java.util.function.LongPredicate;
 
 /**
  * Vanilla {@code Level.tickBlockEntities} semantics, one instance per region. The chunk key is
- * captured at registration and never re-read from the ticker: a live ticker's position is not
- * stable - Lithium's sleeping system rebinds it to a placeholder answering null - while the block
- * entity itself never moves.
+ * captured at registration and never re-read: a ticker's position is not stable (Lithium sleeping answers null).
  */
 public final class RegionBlockEntityTickers {
     private record Entry(TickingBlockEntity ticker, long chunkKey) {

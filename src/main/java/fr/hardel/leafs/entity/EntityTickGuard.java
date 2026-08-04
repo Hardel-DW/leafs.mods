@@ -6,9 +6,8 @@ import fr.hardel.leafs.ownership.OwnershipViolationException;
 import java.util.function.Consumer;
 
 /**
- * Compromise #19: an entity tick that reaches past the region's loaded chunks refuses itself with an
- * {@code OwnershipViolationException} before mutating anything; the guard skips that entity for the
- * tick instead of crashing the region. Every other failure keeps vanilla's crash path.
+ * Compromise #19: a tick refusing itself past the region's loaded chunks skips that entity for the
+ * tick instead of crashing the region; every other failure keeps vanilla's crash path.
  */
 public final class EntityTickGuard {
 

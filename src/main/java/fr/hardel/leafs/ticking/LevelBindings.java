@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.scheduler.RegionScheduler;
@@ -41,6 +42,11 @@ public final class LevelBindings {
             @Override
             public void submitSerial(Runnable task) {
                 server.leafs$ticking().submitToLevel(level, task);
+            }
+
+            @Override
+            public void submitWindow(Runnable task) {
+                ((GlobalServerAccess) level.getServer()).leafs$barrierWindow().enqueue(task);
             }
 
             @Override
