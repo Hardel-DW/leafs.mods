@@ -8,6 +8,7 @@ import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
@@ -74,12 +75,18 @@ public abstract class LevelMixin {
             return;
         }
 
-        RegionWorldData data = host.leafs$worldRouter().at(ticker.getPos());
+        BlockPos pos = ticker.getPos();
+        if (pos == null) {
+            return;
+        }
+
+        long chunkKey = ChunkPos.pack(pos);
+        RegionWorldData data = host.leafs$worldRouter().at(chunkKey);
         if (data == host.leafs$worldRouter().attached()) {
             return;
         }
 
-        data.blockEntityTickers().add(ticker);
+        data.blockEntityTickers().add(ticker, chunkKey);
         callbackInfo.cancel();
     }
 }

@@ -35,6 +35,10 @@ class RegionWorldDataTest {
         return new BlockEventData(new BlockPos(chunkX << 4, 64, chunkZ << 4), null, 0, 0);
     }
 
+    private static long keyOf(FakeTicker ticker) {
+        return ChunkPos.pack(ticker.pos);
+    }
+
     @Test
     void clockModes() {
         assertEquals(7, new RegionClock(() -> 7L).currentTick());
@@ -165,13 +169,13 @@ class RegionWorldDataTest {
         FakeTicker removed = new FakeTicker(new BlockPos(16, 64, 0));
         FakeTicker untickable = new FakeTicker(new BlockPos(32, 64, 0));
         removed.removed = true;
-        data.blockEntityTickers().add(healthy);
-        data.blockEntityTickers().add(removed);
-        data.blockEntityTickers().add(untickable);
+        data.blockEntityTickers().add(healthy, keyOf(healthy));
+        data.blockEntityTickers().add(removed, keyOf(removed));
+        data.blockEntityTickers().add(untickable, keyOf(untickable));
         FakeTicker addedMidTick = new FakeTicker(new BlockPos(48, 64, 0));
-        healthy.onTick = () -> data.blockEntityTickers().add(addedMidTick);
+        healthy.onTick = () -> data.blockEntityTickers().add(addedMidTick, keyOf(addedMidTick));
 
-        data.blockEntityTickers().tickAll(true, pos -> pos.getX() != 32);
+        data.blockEntityTickers().tickAll(true, chunkKey -> ChunkPos.getX(chunkKey) != 2);
 
         assertEquals(1, healthy.ticks);
         assertEquals(0, removed.ticks);
@@ -192,9 +196,9 @@ class RegionWorldDataTest {
         FakeTicker west = new FakeTicker(new BlockPos(0, 64, 0));
         FakeTicker east = new FakeTicker(new BlockPos(17 << 4, 64, 0));
         FakeTicker orphan = new FakeTicker(new BlockPos(40 << 4, 64, 0));
-        from.blockEntityTickers().add(west);
-        from.blockEntityTickers().add(east);
-        from.blockEntityTickers().add(orphan);
+        from.blockEntityTickers().add(west, keyOf(west));
+        from.blockEntityTickers().add(east, keyOf(east));
+        from.blockEntityTickers().add(orphan, keyOf(orphan));
 
         from.mergeInto(into);
         assertEquals(0, from.blockEntityTickers().size());
