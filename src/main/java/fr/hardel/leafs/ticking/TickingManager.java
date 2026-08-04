@@ -97,7 +97,7 @@ public final class TickingManager {
     }
 
     public boolean currentThreadOwns(ServerLevel level) {
-        return RegionContext.current() instanceof RegionContext.Region context && context.regionId() == unitFor(level).id();
+        return RegionContext.current() instanceof RegionContext.LevelSerial context && context.id() == unitFor(level).id();
     }
 
     /** Ticket ops first, then bookkeeping (which runs the distance updates that materialise holders), then offers. */

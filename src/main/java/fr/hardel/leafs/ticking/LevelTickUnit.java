@@ -4,6 +4,7 @@ import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
@@ -49,7 +50,7 @@ public final class LevelTickUnit extends TickHandle {
     private volatile int lastEntityCount;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
-        super(id, level.dimension().identifier().toString());
+        super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()));
         this.level = level;
         this.regions = ((ServerLevelRegionAccess) level).leafs$regions();
         this.scheduler = scheduler;

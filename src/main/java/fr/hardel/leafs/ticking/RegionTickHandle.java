@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.world.RegionTickBody;
@@ -17,7 +18,7 @@ public final class RegionTickHandle extends TickHandle {
     private volatile int entityCensus;
 
     RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions) {
-        super(region.id(), dimension);
+        super(new RegionContext.Region(region.id(), dimension));
         this.region = region;
         this.regions = regions;
     }
