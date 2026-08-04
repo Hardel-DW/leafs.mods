@@ -9,10 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * The village-teleport crash of 2026-08-05: Lithium's sleeping system rebinds a block entity's
- * ticker to a placeholder that answers {@code getPos() = null} while staying non-removed, and the
- * region tick died packing that null. A ticker's position is only reliable at registration, so the
- * region list carries the chunk key captured there and never asks the ticker again.
+ * The 2026-08-05 village crash: a Lithium-sleeping ticker answers a null position while staying
+ * non-removed, so the region list keys on the chunk captured at registration.
  */
 class RegionBlockEntityTickersTest {
 
