@@ -6,14 +6,8 @@ import fr.hardel.leafs.ticking.TickBarrier;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * The once-per-global-tick window where single-threaded work runs with full world access (command
- * blocks now; functions and Fabric tick events join at M11). Empty queue = the barrier is never
- * raised and regions never pause - the no-op path that keeps scaling intact.
- *
- * <p>One drain consumes the tasks queued before it and no more, so a task that re-queues itself
- * cannot hold the barrier up forever; it lands in the next window instead. A throwing task
- * propagates (vanilla crash semantics) and the barrier still drops, on that path and on the path
- * where raising it fails.
+ * The once-per-global-tick window where single-threaded work runs with full world access. An empty
+ * queue never raises the barrier, so regions keep ticking; one drain consumes only what was queued before it starts, so a re-queuing task lands in the next window instead of stalling this one.
  */
 public final class BarrierWindow {
     private final TickBarrier barrier;
@@ -55,10 +49,8 @@ public final class BarrierWindow {
     }
 
     /**
-     * The last window, run before the worlds are saved so nothing queued by the final tick is lost.
-     * Nothing escapes it: a failure here would abort {@code stopServer} and take the world save with
-     * it, which is worse than any command left unrun. Whatever the drain queues in turn is dropped -
-     * the server is closing.
+     * Run before the worlds are saved so nothing queued by the final tick is lost. A failure here is
+     * caught rather than propagated, since aborting {@code stopServer} would take the world save down with it.
      */
     public void runShutdownPhase() {
         try {

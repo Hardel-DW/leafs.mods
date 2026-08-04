@@ -33,16 +33,43 @@ class RegionTickSchedulerTest {
     }
 
     private RegionTickScheduler createScheduler(int threads, Path crashDirectory) {
-        scheduler = new RegionTickScheduler(threads, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(threads, false, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
         return scheduler;
     }
 
     @Test
     void catchUpAdvancesClocksByMissedPeriods() {
-        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000));
-        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS - 1));
-        assertEquals(2, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS));
-        assertEquals(3, RegionTickScheduler.computeTickCount(1_000, 1_000 + 2 * RegionTickScheduler.TICK_PERIOD_NANOS));
+        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000, RegionTickScheduler.TICK_PERIOD_NANOS));
+        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS - 1, RegionTickScheduler.TICK_PERIOD_NANOS));
+        assertEquals(2, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS, RegionTickScheduler.TICK_PERIOD_NANOS));
+        assertEquals(3, RegionTickScheduler.computeTickCount(1_000, 1_000 + 2 * RegionTickScheduler.TICK_PERIOD_NANOS, RegionTickScheduler.TICK_PERIOD_NANOS));
+        assertEquals(2, RegionTickScheduler.computeTickCount(1_000, 1_000 + 25_000_000L, 25_000_000L));
+    }
+
+    @Test
+    void regionThreadNamesScopeTheWorkerDuringItsTick(@TempDir Path crashDirectory) throws InterruptedException {
+        scheduler = new RegionTickScheduler(1, true, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
+        scheduler.start();
+        CountDownLatch ticked = new CountDownLatch(1);
+        AtomicReference<String> nameDuringTick = new AtomicReference<>();
+        AtomicReference<Thread> worker = new AtomicReference<>();
+        TestTickHandle handle = new TestTickHandle(4, tickCount -> {
+            worker.set(Thread.currentThread());
+            nameDuringTick.set(Thread.currentThread().getName());
+            ticked.countDown();
+        });
+
+        scheduler.schedule(handle);
+
+        assertTrue(ticked.await(5, TimeUnit.SECONDS));
+        handle.cancel();
+        assertEquals("R#4 test:world", nameDuringTick.get());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!worker.get().getName().startsWith("Leafs Region Worker") && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+
+        assertTrue(worker.get().getName().startsWith("Leafs Region Worker"));
     }
 
     @Test
@@ -96,7 +123,7 @@ class RegionTickSchedulerTest {
     @Test
     void aFailedTickReleasesItsBarrierEntry(@TempDir Path crashDirectory) throws InterruptedException {
         TickBarrier barrier = new TickBarrier();
-        scheduler = new RegionTickScheduler(1, barrier, new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(1, false, barrier, new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
         TestTickHandle handle = new TestTickHandle(12, tickCount -> {
             throw new IllegalStateException("boom");
         }, true);
@@ -139,7 +166,7 @@ class RegionTickSchedulerTest {
     void poolTickFailureInvokesThePolicyAndStopsRescheduling(@TempDir Path crashDirectory) throws InterruptedException {
         CountDownLatch failed = new CountDownLatch(1);
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        scheduler = new RegionTickScheduler(1, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> {
+        scheduler = new RegionTickScheduler(1, false, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), message -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> {
             failures.add(throwable);
             failed.countDown();
         });

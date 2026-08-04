@@ -1,6 +1,7 @@
 package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import net.minecraft.server.level.ChunkHolder;
@@ -40,6 +41,17 @@ public abstract class ChunkMapMixin {
         require = 1, allow = 1)
     private void leafs$onChunkHolderDestroyed(BooleanSupplier haveTime, CallbackInfo callbackInfo, @Local(ordinal = 0) long pos) {
         leafs$regions().chunkHolderDestroyed(ChunkPos.getX(pos), ChunkPos.getZ(pos));
+    }
+
+    /** The #20b tracking split: the per-entity pass moved to the region bodies, the serial call keeps the player view diffs. */
+    @Inject(method = "tick()V", at = @At("HEAD"), cancellable = true)
+    private void leafs$serialTrackingHalf(CallbackInfo callbackInfo) {
+        if (leafs$regions().body() == null) {
+            return;
+        }
+
+        RegionEntityTracking.tickSerial((ChunkMap) (Object) this);
+        callbackInfo.cancel();
     }
 
     @Unique

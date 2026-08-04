@@ -3,7 +3,7 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 
-/** One schedulable tick unit: a whole level until M7, a real region from M11. */
+/** One schedulable tick unit, subclassed by the whole-level attached tick and by a real region. */
 public abstract class TickHandle {
     private final RegionContext.Region context;
     private final TickTimings timings = new TickTimings();

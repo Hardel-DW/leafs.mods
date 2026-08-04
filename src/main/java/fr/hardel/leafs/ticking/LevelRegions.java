@@ -2,31 +2,36 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
+import fr.hardel.leafs.scheduler.RegionScheduler;
+import fr.hardel.leafs.scheduler.SharedChunkHolds;
+import fr.hardel.leafs.world.RegionTickBody;
+import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 /**
- * One per {@code ServerLevel}: owns the level's regionizer, follows its lifecycle and drives the tick
- * handshake once per level tick. The chunk-holder feed ({@link #chunkHolderCreated} / {@link
- * #chunkHolderDestroyed}) is the ONLY mutator of the regionizer - everything else reads it.
- *
- * <p>There is no per-region payload at M11a: {@code createData} returns {@code null}, so
- * {@link Region#data()} is null on every region of this level and must never be read. The payload
- * arrives with the first module that actually owns per-region state under the free-running pool.
- *
- * <p>RegionCallbacks implementations may touch only Leafs-owned in-memory state - never add or remove
- * a ticket, never call {@code ServerChunkCache}, never call back into the regionizer. The feed runs
- * inside {@code DynamicGraphMinFixedPoint.runUpdates}, so a callback adding a ticket would re-enter
- * the tracker queue being iterated, and the regionizer write lock throws on re-entry.
+ * One per {@code ServerLevel}, owning the regionizer and the region tick handle lifecycle. Callback
+ * methods may never add or remove a ticket or call back into the regionizer: the feed already holds its write lock, and re-entering it throws.
  */
-public final class LevelRegions implements RegionCallbacks<Void> {
-    private final Regionizer<Void> regionizer;
+public final class LevelRegions implements RegionCallbacks<RegionTickData> {
+    /** Mutated only by {@link #chunkHolderCreated} / {@link #chunkHolderDestroyed}; every other method just reads it. */
+    private final Regionizer<RegionTickData> regionizer;
+    private final LevelOwnership ownership = new LevelOwnership();
+
+    private volatile String dimension;
+    private volatile SharedChunkHolds holds;
+    private volatile RegionScheduler<RegionTickData> taskScheduler;
+    private volatile Supplier<RegionWorldData> worldDataFactory;
+    private volatile RegionTickBody body;
+    private volatile RegionTickScheduler scheduler;
 
     /** Written only from the callbacks, which run under the regionizer write lock - hence plain increments. */
     private volatile long created;
@@ -39,8 +44,55 @@ public final class LevelRegions implements RegionCallbacks<Void> {
         this.regionizer = new Regionizer<>(config.gridSectionShift(), config.mergeRadius(), config.bufferRadius(), this);
     }
 
-    public Regionizer<Void> regionizer() {
+    public Regionizer<RegionTickData> regionizer() {
         return regionizer;
+    }
+
+    public LevelOwnership ownership() {
+        return ownership;
+    }
+
+    /**
+     * Runs once on the server thread, under the level exclusion, before the level's first tick.
+     * Regions are equipped first, the caller's migration then re-buckets the attached payloads, and
+     * only then are the handles scheduled, so no region can tick against a half-migrated level.
+     */
+    public void activate(String dimension, RegionTickScheduler scheduler, SharedChunkHolds holds, RegionScheduler<RegionTickData> taskScheduler, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
+        if (this.scheduler != null) {
+            return;
+        }
+
+        this.dimension = dimension;
+        this.holds = holds;
+        this.taskScheduler = taskScheduler;
+        this.worldDataFactory = worldDataFactory;
+        this.body = body;
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            if (region.data().worldData() == null) {
+                region.data().attachWorldData(worldDataFactory.get());
+            }
+        }
+
+        beforeScheduling.run();
+        this.scheduler = scheduler;
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            if (region.data().handle() == null && (region.state() == RegionState.READY || region.state() == RegionState.TICKING)) {
+                region.data().attachHandle(new RegionTickHandle(region, dimension, this));
+                scheduler.schedule(region.data().handle());
+            }
+        }
+    }
+
+    public RegionTickBody body() {
+        return body;
+    }
+
+    public SharedChunkHolds holds() {
+        return holds;
+    }
+
+    public RegionScheduler<RegionTickData> taskScheduler() {
+        return taskScheduler;
     }
 
     /** A chunk holder now exists at this position: the ticket level dropped to at most {@code ChunkLevel.MAX_LEVEL}. */
@@ -61,16 +113,14 @@ public final class LevelRegions implements RegionCallbacks<Void> {
     }
 
     /**
-     * The M11a tick handshake: every region is marked ticking and released with an empty body. It
-     * touches zero game state and exists for one reason - {@code releaseFromTicking} is the only path
-     * that splits regions, destroys emptied ones and reclaims dead sections, so without it an
-     * exploration trail welds the world into one region that never shrinks again.
+     * Marks every region ticking then releases it with an empty body, which is what triggers splits,
+     * destroys and reclaims. Regions normally handshake through their own tick handle; this covers the shutdown drain and levels whose pool never bound.
      */
     public void settle() {
-        rethrowRecordedFailure();
+        rethrowFeedFailure();
 
         int deferred = 0;
-        for (Region<Void> region : regionizer.regionsView()) {
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.tryMarkTicking()) {
                 region.markNotTicking();
             } else if (region.state() != RegionState.DEAD) {
@@ -112,40 +162,88 @@ public final class LevelRegions implements RegionCallbacks<Void> {
     }
 
     @Override
-    public Void createData(Region<Void> region) {
-        return null;
+    public RegionTickData createData(Region<RegionTickData> region) {
+        RegionTickData data = new RegionTickData();
+        data.attachEntityData(new RegionEntityData());
+        Supplier<RegionWorldData> factory = worldDataFactory;
+        if (factory != null) {
+            data.attachWorldData(factory.get());
+        }
+        if (scheduler != null) {
+            data.attachHandle(new RegionTickHandle(region, dimension, this));
+        }
+
+        return data;
     }
 
     @Override
-    public void onRegionCreate(Region<Void> region) {
+    public void onRegionCreate(Region<RegionTickData> region) {
         created++;
     }
 
     @Override
-    public void onRegionDestroy(Region<Void> region) {
+    public void onRegionDestroy(Region<RegionTickData> region) {
     }
 
     @Override
-    public void onRegionActive(Region<Void> region) {
+    public void onRegionActive(Region<RegionTickData> region) {
+        RegionTickHandle handle = region.data().handle();
+        if (handle != null) {
+            scheduler.schedule(handle);
+        }
     }
 
     @Override
-    public void onRegionInactive(Region<Void> region) {
+    public void onRegionInactive(Region<RegionTickData> region) {
+        RegionTickHandle handle = region.data().handle();
+        if (handle != null) {
+            handle.cancel();
+        }
     }
 
     @Override
-    public void merge(Region<Void> from, Region<Void> into) {
+    public void merge(Region<RegionTickData> from, Region<RegionTickData> into) {
+        from.data().taskQueues().closeInto(into.data().taskQueues());
+        RegionWorldData fromWorld = from.data().worldData();
+        RegionWorldData intoWorld = into.data().worldData();
+        if (fromWorld != null && intoWorld != null) {
+            fromWorld.mergeInto(intoWorld);
+        }
+
+        from.data().entityData().mergeInto(into.data().entityData());
         merged++;
     }
 
     @Override
-    public void split(Region<Void> parent, Long2ObjectMap<Region<Void>> sectionToChild, List<Region<Void>> children) {
+    public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
+        parent.data().taskQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
+            Region<RegionTickData> child = sectionToChild.get(sectionKey);
+
+            return child == null ? null : child.data().taskQueues();
+        });
+        RegionWorldData parentWorld = parent.data().worldData();
+        if (parentWorld != null) {
+            for (Region<RegionTickData> child : children) {
+                child.data().worldData().inheritTimeFrom(parentWorld);
+            }
+            parentWorld.splitInto(regionizer.sectionShift(), sectionKey -> {
+                Region<RegionTickData> child = sectionToChild.get(sectionKey);
+
+                return child == null ? null : child.data().worldData();
+            });
+        }
+
+        parent.data().entityData().splitInto(regionizer.sectionShift(), sectionKey -> {
+            Region<RegionTickData> child = sectionToChild.get(sectionKey);
+
+            return child == null ? null : child.data().entityData();
+        });
         split++;
     }
 
-    private int sumOverRegions(ToIntFunction<Region<Void>> value) {
+    private int sumOverRegions(ToIntFunction<Region<RegionTickData>> value) {
         int total = 0;
-        for (Region<Void> region : regionizer.regionsView()) {
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
             total += value.applyAsInt(region);
         }
 
@@ -153,9 +251,8 @@ public final class LevelRegions implements RegionCallbacks<Void> {
     }
 
     /**
-     * The feed also runs from threads that swallow what they are handed - {@code
-     * ServerChunkCache.getChunkFuture} drops an off-thread failure silently - so the first failure is
-     * kept and rethrown by the next {@link #settle()}, on the thread that owns the level tick.
+     * The feed can run on a thread that swallows exceptions ({@code ServerChunkCache.getChunkFuture}
+     * drops them silently), so the first failure is kept here and rethrown later by quiesce or settle, on a thread that owns the level.
      */
     private RuntimeException recordFeedFailure(String operation, int chunkX, int chunkZ, RuntimeException exception) {
         Leafs.LOGGER.error("Leafs region feed failed to {} chunk [{}, {}]", operation, chunkX, chunkZ, exception);
@@ -166,7 +263,7 @@ public final class LevelRegions implements RegionCallbacks<Void> {
         return exception;
     }
 
-    private void rethrowRecordedFailure() {
+    public void rethrowFeedFailure() {
         Throwable failure = feedFailure;
         if (failure == null) {
             return;

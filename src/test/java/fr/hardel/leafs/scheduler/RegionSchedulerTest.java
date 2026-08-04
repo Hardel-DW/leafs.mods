@@ -25,11 +25,14 @@ class RegionSchedulerTest {
     private RegionScheduler<TestRegionData> scheduler;
     private List<String> executed;
 
+    private boolean levelSerial;
+
     @BeforeEach
     void createScheduler() {
         regionizer = new Regionizer<>(SECTION_SHIFT, 1, 1, new TestRegionCallbacks(SECTION_SHIFT));
         tickets = new FakeChunkHolds(regionizer);
-        holds = new SharedChunkHolds(tickets);
+        levelSerial = true;
+        holds = new SharedChunkHolds(tickets, () -> levelSerial);
         scheduler = new RegionScheduler<>(regionizer, holds);
         executed = new ArrayList<>();
     }
@@ -161,6 +164,25 @@ class RegionSchedulerTest {
     }
 
     @Test
+    void aForeignQueueParksUntilTheQuiesceCompletesIt() {
+        levelSerial = false;
+        scheduler.queue(0, 0, () -> executed.add("task"));
+
+        assertEquals(0, tickets.addCalls, "no ticket op may run off the serial side");
+        assertTrue(regionizer.regionsView().isEmpty(), "no region may exist before the hold applied");
+
+        levelSerial = true;
+        holds.applyPendingOps();
+        scheduler.completePending();
+
+        Region<TestRegionData> region = regionizer.regionAt(0, 0);
+        assertNotNull(region);
+        assertEquals(1, scheduler.drain(region));
+        assertEquals(List.of("task"), executed);
+        assertFalse(tickets.hasActiveHolds());
+    }
+
+    @Test
     void aHoldThatMaterialisesNoRegionFailsLoudlyWithoutLeaking() {
         SharedChunkHolds inertHolds = new SharedChunkHolds(new ChunkHoldController() {
             @Override
@@ -170,11 +192,12 @@ class RegionSchedulerTest {
             @Override
             public void removeHold(int chunkX, int chunkZ) {
             }
-        });
+        }, () -> true);
         RegionScheduler<TestRegionData> inert = new RegionScheduler<>(regionizer, inertHolds);
+        inert.queue(0, 0, () -> executed.add("never"));
 
-        assertThrows(IllegalStateException.class, () -> inert.queue(0, 0, () -> executed.add("never")));
-        assertEquals(0, inertHolds.heldChunks(), "the failed queue must not keep its hold");
+        assertThrows(IllegalStateException.class, inert::completePending);
+        assertEquals(0, inertHolds.heldChunks(), "the failed completion must not keep its hold");
     }
 
     @Test
