@@ -211,14 +211,16 @@ public final class RegionTickBody {
     }
 
     private void tickEntities(TickRateManager tickRateManager, RegionEntityData entityData) {
-        DistanceManager distanceManager = level.getChunkSource().chunkMap.getDistanceManager();
+        ServerChunkCache chunkSource = level.getChunkSource();
+        DistanceManager distanceManager = chunkSource.chunkMap.getDistanceManager();
         entityData.tickList().forEach(entity -> {
             if (entity.isRemoved() || tickRateManager.isEntityFrozen(entity)) {
                 return;
             }
 
             entity.checkDespawn();
-            if (entity instanceof ServerPlayer || distanceManager.inEntityTickingRange(entity.chunkPosition().pack())) {
+            // A player in a still-loading chunk waits for the 1-radius FULL completion (Compromise #18): vanilla would sync-load under it, a worker cannot.
+            if (entity instanceof ServerPlayer ? chunkSource.isPositionTicking(entity.chunkPosition().pack()) : distanceManager.inEntityTickingRange(entity.chunkPosition().pack())) {
                 Entity vehicle = entity.getVehicle();
                 if (vehicle != null) {
                     if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
