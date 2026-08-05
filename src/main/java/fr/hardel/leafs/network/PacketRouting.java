@@ -1,11 +1,12 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.ownership.RegionContext;
-import net.minecraft.network.Connection;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+
+import java.util.concurrent.Executor;
 
 /**
  * Routes play packets to their player's queue, handled where that queue drains; login/config/handshake
@@ -48,16 +49,20 @@ public final class PacketRouting {
     }
 
     /**
-     * Play connections are ticked by the unit owning their player, i.e. every player the server still
-     * lists. A listener whose player already left the list (reconfiguration, awaiting the client ack) stays with the global loop instead.
+     * Vanilla's disconnect joins on the teardown; off the server thread that join deadlocks a region
+     * worker against the global drain, so the teardown queues fire-and-forget instead.
      */
-    public static boolean ticksOnRegion(Connection connection) {
-        if (!(connection.getPacketListener() instanceof ServerGamePacketListenerImpl game)) {
-            return false;
+    public static void runTeardown(MinecraftServer server, Runnable teardown, Runnable vanillaBlocking) {
+        if (server.isSameThread()) {
+            vanillaBlocking.run();
+        } else {
+            server.execute(teardown);
         }
+    }
 
-        ServerPlayer player = game.player;
-        return player.level().getServer().getPlayerList().getPlayer(player.getUUID()) != null;
+    /** Executor view of the player's queue: continuations completed on any thread run on the player's owner, in packet order. */
+    public static Executor playerTaskExecutor(ServerGamePacketListenerImpl listener) {
+        return task -> queueOf(listener).addTask(task);
     }
 
     static PlayerPacketQueue queueOf(ServerGamePacketListenerImpl listener) {

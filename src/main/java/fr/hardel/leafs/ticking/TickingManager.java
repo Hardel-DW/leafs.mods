@@ -4,7 +4,6 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.config.LeafsConfig;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.ownership.Ownership;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
@@ -58,21 +57,27 @@ public final class TickingManager {
         return barrier;
     }
 
+    /** Rare global-phase work reaching entities regions own (player teardown): runs with every region paused. */
+    public void runWithRegionsPaused(Runnable action) {
+        barrier.raise();
+        try {
+            action.run();
+        } finally {
+            barrier.drop();
+        }
+    }
+
     public GlobalScheduler globalScheduler() {
         return globalScheduler;
     }
 
     /**
      * Compromise #6: once regions may be live, an off-thread {@code MinecraftServer.execute} lands in
-     * the global phase. Before the first level tick vanilla's own single-thread drain is still correct.
+     * the global phase. A designed hot path since the listener-tick move (chunk acks, teardown, handler continuations), so it logs nothing.
      */
     public boolean divertExecute(Runnable task) {
         if (!globalTicking || server.isSameThread() || server.isStopped()) {
             return false;
-        }
-
-        if (Ownership.CHECKS_ENABLED && RegionContext.current() instanceof RegionContext.Region region) {
-            Leafs.LOGGER.warn("MinecraftServer.execute from {} diverted to the global phase - a join on that task would deadlock", region.describe());
         }
 
         globalScheduler.run(task);

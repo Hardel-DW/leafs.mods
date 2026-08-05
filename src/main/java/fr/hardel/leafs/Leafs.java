@@ -5,7 +5,6 @@ import fr.hardel.leafs.config.LeafsConfig;
 import fr.hardel.leafs.debug.RegionsCommand;
 import fr.hardel.leafs.debug.TickMetricsRecorder;
 import fr.hardel.leafs.entity.EntityTickPhases;
-import fr.hardel.leafs.network.RegionNetworkPhases;
 import fr.hardel.leafs.ownership.Ownership;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.fabricmc.api.ModInitializer;
@@ -22,7 +21,6 @@ public final class Leafs implements ModInitializer {
         LeafsTicketTypes.register();
         RegionsCommand.register();
         TickMetricsRecorder.register();
-        TickingManager.installPhases(new RegionNetworkPhases());
         TickingManager.installPhases(new EntityTickPhases());
 
         LeafsConfig config = LeafsConfig.get();

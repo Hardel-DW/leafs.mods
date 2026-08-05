@@ -1,0 +1,109 @@
+package fr.hardel.leafs.network;
+
+import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.global.GlobalServerAccess;
+import fr.hardel.leafs.ownership.RegionContext;
+import net.minecraft.CrashReport;
+import net.minecraft.ReportedException;
+import net.minecraft.network.Connection;
+import net.minecraft.network.PacketSendListener;
+import net.minecraft.network.TickablePacketListener;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
+import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * The player's network lifecycle, split at the listener-tick boundary: the owning region drains the
+ * inbound queue and runs the full vanilla listener tick (one thread per player, vanilla's contract);
+ * the global loop keeps the transport half and adopts any listener no region has stamped recently.
+ */
+public final class RegionNetworkTick {
+    private static final long OWNER_STALE_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
+
+    private RegionNetworkTick() {
+    }
+
+    /** Region tick start: the owned player's packets, stopped if a handler moves the player off-level. */
+    public static void drainOnRegion(ServerPlayer player, ServerLevel level) {
+        ServerGamePacketListenerImpl listener = player.connection;
+        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
+        queue.stampRegionOwner();
+        queue.drain(() -> listener.player.level() == level);
+    }
+
+    /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch. */
+    public static void tickListenerOnRegion(ServerPlayer player, MinecraftServer server) {
+        ServerGamePacketListenerImpl listener = player.connection;
+        PacketRouting.queueOf(listener).stampRegionOwner();
+        Connection connection = listener.connection;
+        if (connection.isConnecting() || !connection.isConnected()) {
+            return;
+        }
+
+        try {
+            listener.tick();
+        } catch (Exception exception) {
+            if (connection.isMemoryConnection()) {
+                throw new ReportedException(CrashReport.forThrowable(exception, "Ticking memory connection"));
+            }
+
+            Leafs.LOGGER.warn("Failed to handle packet for {}", connection.getLoggableAddress(server.logIPs()), exception);
+            Component reason = Component.literal("Internal server error");
+            connection.send(new ClientboundDisconnectPacket(reason), PacketSendListener.thenRun(() -> connection.disconnect(reason)));
+            connection.setReadOnly();
+        }
+    }
+
+    /** {@code Connection.tick}'s listener half: skipped while a region owns it, vanilla-complete otherwise (credits, login gap). */
+    public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
+        if (!(listener instanceof ServerGamePacketListenerImpl game)) {
+            original.run();
+            return;
+        }
+
+        PlayerPacketQueue queue = PacketRouting.queueOf(game);
+        if (queue.regionOwnerFresh(OWNER_STALE_NANOS)) {
+            return;
+        }
+
+        queue.drain();
+        original.run();
+    }
+
+    /**
+     * A respawn moves the player across levels and the handler's tail reads the new instance, so the
+     * whole vanilla branch replays in the barrier window; the window runs on the server thread, where
+     * the re-entered thread guard passes.
+     */
+    public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
+        if (packet.getAction() != ServerboundClientCommandPacket.Action.PERFORM_RESPAWN
+            || !(RegionContext.current() instanceof RegionContext.Region)) {
+            return false;
+        }
+
+        MinecraftServer server = listener.player.level().getServer();
+        ((GlobalServerAccess) server).leafs$barrierWindow().enqueue(() -> {
+            if (listener.connection.isConnected()) {
+                listener.handleClientCommand(packet);
+            }
+        });
+
+        return true;
+    }
+
+    /** Paused integrated server: vanilla only drains while paused, no listener tick (solo keepalive is exempt anyway). */
+    public static void drainPaused(ServerLevel level) {
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            if (player.level() == level) {
+                ServerGamePacketListenerImpl listener = player.connection;
+                PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
+            }
+        }
+    }
+}

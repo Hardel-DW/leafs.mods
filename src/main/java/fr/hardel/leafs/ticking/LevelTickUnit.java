@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.entity.LevelEntityLists;
+import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.ownership.RegionContext;
@@ -162,22 +163,13 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** The pause-exempt phase pass, same framing as {@link #tick}: vanilla drains packets while paused, so the per-player queues must too. */
+    /** The pause-exempt pass, same framing as {@link #tick}: vanilla drains packets while paused, so the per-player queues must too - drain only, no listener tick. */
     void tickPausedNetwork() {
         regions.ownership().enterLevelSerial();
         RegionContext.enter(context());
         WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData());
         try {
-            for (LevelTickPhases phases : TickingManager.phases()) {
-                if (phases.runsWhilePaused()) {
-                    phases.beforeLevelTick(level);
-                }
-            }
-            for (LevelTickPhases phases : TickingManager.phases()) {
-                if (phases.runsWhilePaused()) {
-                    phases.afterLevelTick(level);
-                }
-            }
+            RegionNetworkTick.drainPaused(level);
         } finally {
             WorldTickContext.exit();
             RegionContext.exit();
