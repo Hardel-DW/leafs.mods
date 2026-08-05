@@ -115,6 +115,23 @@ class PlayerPacketQueueTest {
         assertFalse(queue.handledByCurrentThread(), "the scope is thread-local to the drain");
     }
 
+    /** A handler that moves the player mid-drain ends the drain; the rest waits for the new owner. */
+    @Test
+    void aDrainStopsWhenOwnershipMovesMidDrain() {
+        FakeListener listener = new FakeListener(true);
+        queue.add(listener, new FakePacket("teleport", _ -> {
+            handled.add("teleport");
+            listener.player = "moved to the nether";
+        }));
+        queue.add(listener, new FakePacket("stays_queued", handled::add));
+
+        queue.drain(() -> listener.player.equals("initial level"));
+        assertEquals(List.of("teleport"), handled);
+
+        queue.drain(() -> listener.player.equals("moved to the nether"));
+        assertEquals(List.of("teleport", "stays_queued"), handled);
+    }
+
     /** Why the gate must never re-queue mid-drain: the stackless rethrow becomes a reported crash. */
     @Test
     void aRethrowInsideTheDrainEscalatesToACrash() {
@@ -127,6 +144,42 @@ class PlayerPacketQueueTest {
 
         assertInstanceOf(RunningOnDifferentThreadException.class, crash.getCause());
         assertEquals(1, listener.errors.size());
+    }
+
+    /** Two units racing a handover must never run handlers concurrently: the loser skips, the queue survives. */
+    @Test
+    void aClaimedQueueRefusesASecondDrainer() throws InterruptedException {
+        FakeListener listener = new FakeListener(true);
+        CountDownLatch insideDrain = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        queue.add(listener, new FakePacket("blocker", _ -> {
+            insideDrain.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+
+        Thread regionDrainer = new Thread(() -> queue.drain());
+        regionDrainer.start();
+        assertTrue(insideDrain.await(5, TimeUnit.SECONDS));
+
+        assertFalse(queue.drain(() -> true), "the global loop must back off while the region drains");
+        release.countDown();
+        regionDrainer.join();
+
+        assertTrue(queue.drain(() -> true), "the claim releases with the drain");
+    }
+
+    /** The global loop adopts a listener only when no region has stamped it recently. */
+    @Test
+    void regionOwnerStampStartsStaleAndFreshens() {
+        assertFalse(queue.regionOwnerFresh(TimeUnit.MILLISECONDS.toNanos(250)), "never stamped = global-owned");
+
+        queue.stampRegionOwner();
+        assertTrue(queue.regionOwnerFresh(TimeUnit.MILLISECONDS.toNanos(250)));
+        assertFalse(queue.regionOwnerFresh(-1), "an already-expired horizon reads stale");
     }
 
     @Test
