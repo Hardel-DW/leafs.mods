@@ -1,8 +1,9 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.RegionEntityTracking;
-import fr.hardel.leafs.entity.EntityTickGuard;
 import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.network.RegionNetworkTick;
+import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import net.minecraft.core.BlockPos;
@@ -55,6 +56,11 @@ public final class RegionTickBody {
         worldData.clock().advance(tickCount);
         entityData.tickList().beginTick();
         entityData.navigatingMobs().beginTick();
+        entityData.tickList().forEach(entity -> {
+            if (entity instanceof ServerPlayer player) {
+                RegionNetworkTick.drainOnRegion(player, level);
+            }
+        });
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         boolean debug = level.isDebug();
@@ -79,6 +85,12 @@ public final class RegionTickBody {
             tickEntities(tickRateManager, entityData);
             worldData.blockEntityTickers().tickAll(runs, tickingChunk);
         }
+
+        entityData.tickList().forEach(entity -> {
+            if (entity instanceof ServerPlayer player) {
+                RegionNetworkTick.tickListenerOnRegion(player, level.getServer());
+            }
+        });
     }
 
     /** What is left of the serial {@code tickChunks} pass: the custom spawners, decided level-serial. */
@@ -114,6 +126,8 @@ public final class RegionTickBody {
         }
 
         Util.shuffle(spawningChunks, level.getRandom());
+        NaturalSpawner.SpawnState state = spawnState;
+        List<MobCategory> categories = spawningCategories;
         for (LevelChunk chunk : spawningChunks) {
             ChunkPos chunkPos = chunk.getPos();
             chunk.incrementInhabitedTime(timeDiff);
@@ -121,8 +135,9 @@ public final class RegionTickBody {
                 level.tickThunder(chunk);
             }
 
-            if (!spawningCategories.isEmpty() && level.canSpawnEntitiesInChunk(chunkPos)) {
-                NaturalSpawner.spawnForChunk(level, chunk, spawnState, spawningCategories);
+            if (!categories.isEmpty() && level.canSpawnEntitiesInChunk(chunkPos)) {
+                // A spawn inside a structure's bounds may need a start chunk never loaded (Compromise #19): skip the chunk this tick.
+                TickGuard.tickOrSkip(spawning -> NaturalSpawner.spawnForChunk(level, spawning, state, categories), chunk);
             }
         }
 
@@ -239,7 +254,7 @@ public final class RegionTickBody {
                     entity.stopRiding();
                 }
 
-                level.guardEntityTick(guarded -> EntityTickGuard.tickOrSkip(level::tickNonPassenger, guarded), entity);
+                level.guardEntityTick(guarded -> TickGuard.tickOrSkip(level::tickNonPassenger, guarded), entity);
             }
         });
     }

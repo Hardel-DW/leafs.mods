@@ -72,4 +72,10 @@ public abstract class PlayerListMixin {
             original.call(player);
         }
     }
+
+    /** Teardown reaches entities other regions own (unRide, the pearl sweep, cross-level); it runs with every region paused. */
+    @WrapMethod(method = "remove")
+    private void leafs$teardownWithRegionsPaused(ServerPlayer player, Operation<Void> original) {
+        ((LeafsServerAccess) this.getServer()).leafs$ticking().runWithRegionsPaused(() -> original.call(player));
+    }
 }
