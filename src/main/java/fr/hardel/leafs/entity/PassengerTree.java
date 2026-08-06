@@ -3,13 +3,7 @@ package fr.hardel.leafs.entity;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A vehicle's full passenger hierarchy, captured before a teleport and re-mounted after placement.
- * Detach flattens depth-first and clears every riding link, so each node travels as a free entity.
- *
- * @param root  the tree's vehicle
- * @param mounts every (passenger, vehicle) pair in mount order, parents before their riders
- */
+/** Vehicle passenger hierarchy: detach flattens depth-first, restore re-mounts in order. */
 public record PassengerTree<E>(E root, List<Mount<E>> mounts) {
 
     public record Mount<E>(E passenger, E vehicle) {

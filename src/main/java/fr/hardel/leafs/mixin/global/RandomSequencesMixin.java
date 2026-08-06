@@ -12,11 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.function.BiConsumer;
 
-/**
- * The #26c lock: loot rolls reach shared sequence sources from any region, and a shared vanilla
- * RandomSource crashes on its ThreadingDetector. One monitor per instance rather than per sequence:
- * it must also order every roll against the save encode, which iterates all sequences at once.
- */
+/** Per-instance lock: loot rolls from any region share sequence sources; one monitor orders rolls against save encode. */
 @Mixin(RandomSequences.class)
 public abstract class RandomSequencesMixin {
 

@@ -7,13 +7,7 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 
-/**
- * The per-level front of the per-region entity lists: every vanilla mutation of the level-wide
- * entity tick list and navigating-mob set resolves here to the owning unit's lists. Attached-constant
- * until {@link #route} is called at activation; the migration then re-buckets what accumulated.
- * Mutators are the owning region mid-tick or the level-serial side, which the ownership surface
- * already orders, so the lists themselves stay unsynchronized.
- */
+/** Unsynchronized: ownership already orders all mutators (region mid-tick or level-serial). */
 public final class LevelEntityLists {
     private final RegionEntityData attached = new RegionEntityData();
     private volatile LongFunction<RegionEntityData> resolver = chunkKey -> attached;
@@ -60,11 +54,7 @@ public final class LevelEntityLists {
         resolver.apply(mob.chunkPosition().pack()).navigatingMobs().remove(mob.getId());
     }
 
-    /**
-     * Section crossing: same unit updates in place, a cross-unit move buffers at the target until its
-     * next pass so the entity is never ticked twice in one pass. Only entries the source actually
-     * holds move, because this also fires for entities that are not ticking.
-     */
+    /** Cross-unit moves buffer at the target so an entity is never ticked twice in one pass. */
     public void sectionMoved(Entity entity, int oldChunkX, int oldChunkZ) {
         long oldChunkKey = ChunkPos.pack(oldChunkX, oldChunkZ);
         long newChunkKey = entity.chunkPosition().pack();
@@ -81,7 +71,7 @@ public final class LevelEntityLists {
         }
     }
 
-    /** The navigating mobs that can hold a path near this position: the owning unit's, plus attached strays. */
+    /** The owning unit's navigating mobs plus attached strays. */
     public void forEachNavigatingMobAt(long chunkKey, Consumer<Mob> action) {
         RegionEntityData owner = resolver.apply(chunkKey);
         owner.navigatingMobs().forEach(action);

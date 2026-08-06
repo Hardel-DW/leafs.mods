@@ -1,6 +1,6 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;

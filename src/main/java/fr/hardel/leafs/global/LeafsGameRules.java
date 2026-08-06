@@ -12,11 +12,7 @@ import net.minecraft.world.level.gamerules.GameRuleCategory;
 import net.minecraft.world.level.gamerules.GameRuleType;
 import net.minecraft.world.level.gamerules.GameRuleTypeVisitor;
 
-/**
- * The two levers over per-tick barrier-window content, named after vanilla's own
- * {@code command_blocks_work} family. Both default to true, full vanilla behaviour; turning one off
- * trades that content for regions that never pause. {@code /leafs recommendation} points at them.
- */
+/** Gamerules that cut per-tick barrier-window content. Both default to true (full vanilla behaviour). */
 public final class LeafsGameRules {
     public static final GameRule<Boolean> tickFunctionsWork = createBoolean();
     public static final GameRule<Boolean> repeatingCommandBlocksWork = createBoolean();

@@ -12,12 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * The two halves of vanilla {@code ChunkMap.tick()} under regions: the player chunk-view diff stays
- * level-serial, the per-entity tracking pass runs on the entity's owning region. Section-crossing
- * pairing against players of other regions is covered by the level-serial {@code ChunkMap.move} pass,
- * the same trigger vanilla uses.
- */
+/** Section-crossing pairing against players of other regions is covered by the level-serial {@code ChunkMap.move} pass. */
 public final class RegionEntityTracking {
 
     private RegionEntityTracking() {

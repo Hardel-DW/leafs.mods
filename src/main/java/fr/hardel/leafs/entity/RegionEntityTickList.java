@@ -9,11 +9,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 
-/**
- * Vanilla EntityTickList semantics per region (in-iteration add/remove safe), plus what re-homing
- * needs: chunk keys for split re-bucketing, and cross-region arrivals buffered to the next pass so
- * an entity crossing regions mid-tick is never ticked twice in one pass.
- */
+/** Cross-region arrivals buffer to the next pass so an entity is never ticked twice in one tick. */
 public final class RegionEntityTickList<E> {
     private Int2ObjectMap<E> active = new Int2ObjectLinkedOpenHashMap<>();
     private Int2ObjectMap<E> passive = new Int2ObjectLinkedOpenHashMap<>();

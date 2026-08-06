@@ -55,11 +55,7 @@ public abstract class LevelMixin {
         }
     }
 
-    /**
-     * Vanilla's second thread-identity guard (the first is ServerChunkCache, #20c): off the server
-     * thread {@code getBlockEntity} answers null SILENTLY, which read as "the chest vanished" from
-     * every region tick. A region worker mid-tick is a game thread for its level.
-     */
+    /** Off the server thread vanilla silently returns null; a region worker mid-tick is a game thread for its level. */
     @Inject(method = "getBlockEntity(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/entity/BlockEntity;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionBlockEntityPath(BlockPos pos, CallbackInfoReturnable<BlockEntity> callbackInfo) {
         Level self = (Level) (Object) this;

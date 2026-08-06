@@ -21,7 +21,6 @@ public final class AsyncScheduler {
         });
     }
 
-    /** A failing async task never takes a worker down with it - the pool has no world state to protect. */
     public void run(Runnable task) {
         pool.execute(() -> {
             try {
@@ -32,7 +31,6 @@ public final class AsyncScheduler {
         });
     }
 
-    /** Interrupts whatever is still running when the timeout expires: daemon workers must not outlive the server. */
     public boolean shutdown(Duration timeout) {
         pool.shutdown();
         try {

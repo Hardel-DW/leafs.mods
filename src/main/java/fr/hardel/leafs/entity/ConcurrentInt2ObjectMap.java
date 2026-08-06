@@ -13,10 +13,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * ConcurrentHashMap-backed Int2ObjectMap facade: point operations are atomic, iteration is weakly
- * consistent, null values are rejected. Iteration order is hash order, not insertion order.
- */
+/** ConcurrentHashMap-backed Int2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     private final ConcurrentHashMap<Integer, V> map = new ConcurrentHashMap<>();
 

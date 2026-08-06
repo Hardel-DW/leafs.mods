@@ -9,11 +9,7 @@ import net.minecraft.world.level.timers.TimerQueue;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/**
- * The {@code /schedule} TimerQueue fires datapack functions with arbitrary world reach, so its drain
- * moves from the overworld's serial tick into this tick's barrier window (Compromise #4). Fourth
- * mixin of this name (#3b ticking/, #9 world/, #38 entity/): different package, different concern.
- */
+/** TimerQueue drain moves into the barrier window (Compromise #4) because scheduled functions reach arbitrary state. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 

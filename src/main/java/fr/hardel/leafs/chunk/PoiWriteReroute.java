@@ -12,11 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-/**
- * Vanilla {@code updatePOIOnBlockStateChange} with the {@code server.execute} hops replaced by the
- * level-serial submit (#22b write half): the POI write belongs to the level's single mutator, and the
- * global queue would run it concurrently with this level's regions.
- */
+/** The POI write belongs to the level's single mutator; the global queue would run it concurrently with this level's regions. */
 public final class PoiWriteReroute {
 
     private PoiWriteReroute() {

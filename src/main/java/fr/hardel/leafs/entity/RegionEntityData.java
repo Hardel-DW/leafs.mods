@@ -5,10 +5,7 @@ import net.minecraft.world.entity.Mob;
 
 import java.util.function.LongFunction;
 
-/**
- * One tick unit's entity-side payload: the entity tick list and the navigating-mob list, both
- * per-region homes of level-wide vanilla state. Folded on merge/split like the world payload.
- */
+/** Per-region entity tick list and navigating-mob list, folded on merge/split. */
 public final class RegionEntityData {
     private final RegionEntityTickList<Entity> tickList = new RegionEntityTickList<>();
     private final RegionEntityTickList<Mob> navigatingMobs = new RegionEntityTickList<>();

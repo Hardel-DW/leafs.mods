@@ -13,11 +13,7 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.Map;
 
-/**
- * The #26 lock: the cache's read-through population and the dirty sweep serialize on the storage,
- * and each encode serializes on its data instance - the same monitor the region-side mutators of
- * that instance take (#26b/#26c) - so a save never encodes state a region is mid-writing.
- */
+/** Serializes SavedData cache population and dirty sweeps; encodes lock per instance to order against region writes. */
 @Mixin(SavedDataStorage.class)
 public abstract class SavedDataStorageMixin {
 

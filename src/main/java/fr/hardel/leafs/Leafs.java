@@ -1,7 +1,6 @@
 package fr.hardel.leafs;
 
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
-import fr.hardel.leafs.config.LeafsConfig;
 import fr.hardel.leafs.debug.LeafsCommand;
 import fr.hardel.leafs.debug.TickMetricsRecorder;
 import fr.hardel.leafs.entity.EntityTickPhases;
