@@ -17,7 +17,7 @@ public abstract class CommandBlockMixin {
 
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void leafs$deferToBarrierWindow(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo callbackInfo) {
-        if (CommandBlockWindow.deferBlockTick(level, pos)) {
+        if (CommandBlockWindow.deferBlockTick(level, pos, state)) {
             callbackInfo.cancel();
         }
     }

@@ -2,9 +2,10 @@ package fr.hardel.leafs;
 
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.config.LeafsConfig;
-import fr.hardel.leafs.debug.RegionsCommand;
+import fr.hardel.leafs.debug.LeafsCommand;
 import fr.hardel.leafs.debug.TickMetricsRecorder;
 import fr.hardel.leafs.entity.EntityTickPhases;
+import fr.hardel.leafs.global.LeafsGameRules;
 import fr.hardel.leafs.ownership.Ownership;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.fabricmc.api.ModInitializer;
@@ -19,7 +20,8 @@ public final class Leafs implements ModInitializer {
     public void onInitialize() {
         LeafsConfig.load();
         LeafsTicketTypes.register();
-        RegionsCommand.register();
+        LeafsGameRules.register();
+        LeafsCommand.register();
         TickMetricsRecorder.register();
         TickingManager.installPhases(new EntityTickPhases());
 

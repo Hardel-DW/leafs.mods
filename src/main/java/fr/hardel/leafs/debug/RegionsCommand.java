@@ -1,6 +1,6 @@
 package fr.hardel.leafs.debug;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import fr.hardel.leafs.config.LeafsConfig;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
@@ -11,7 +11,6 @@ import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.RegionTickHandle;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickTimings;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -33,15 +32,11 @@ public final class RegionsCommand {
     private RegionsCommand() {
     }
 
-    public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> registerTree(dispatcher));
-    }
-
-    private static void registerTree(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("regions").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+    static LiteralArgumentBuilder<CommandSourceStack> tree() {
+        return Commands.literal("regions")
             .executes(context -> overview(context.getSource()))
             .then(Commands.argument("dimension", DimensionArgument.dimension())
-                .executes(context -> detail(context.getSource(), DimensionArgument.getDimension(context, "dimension")))));
+                .executes(context -> detail(context.getSource(), DimensionArgument.getDimension(context, "dimension"))));
     }
 
     private static int overview(CommandSourceStack source) {
@@ -58,7 +53,7 @@ public final class RegionsCommand {
         }
 
         playerLine(source, now);
-        source.sendSuccess(() -> Component.literal("/regions <dimension> shows each region").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC), false);
+        source.sendSuccess(() -> Component.literal("/leafs regions <dimension> shows each region").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC), false);
 
         return units.size();
     }
