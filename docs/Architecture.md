@@ -1,0 +1,35 @@
+# Architecture
+Ce document décrit le modèle d'exécution. Tout ce qui est écrit ici est en place dans le code.
+
+## Les régions
+Le monde est découpé en sections de 16 par 16 chunks. Les sections actives proches les unes des autres se regroupent en régions, avec toujours au moins une section vide entre deux régions. Cette marge vide est ce qui rend le système sûr. Une région a le droit de lire et d'écrire jusqu'à 8 chunks au-delà de sa bordure, ce qui couvre tout ce qu'un tick vanilla peut atteindre, un piston, une explosion, l'IA d'un mob. Comme deux régions sont toujours séparées par plus que cette distance, elles ne peuvent jamais toucher le même chunk en même temps. La sûreté vient de la géométrie, pas de verrous.
+
+Deux régions qui se rapprochent fusionnent. Une région dont les chunks ne se touchent plus se scinde. Ces opérations se font entre deux ticks de région, jamais pendant. Le code est dans `region/`, la classe centrale est le `Regionizer`.
+
+Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les files de paquets de ses joueurs, ses évènements de blocs et son générateur aléatoire. Pendant son tick, elle joue le rôle que le thread serveur joue en vanilla, et rien d'autre ne touche à son contenu.
+
+## Les trois familles de threads
+1. Le thread global. C'est le thread serveur de vanilla, conservé. Il exécute une fois par tick ce qui est global par nature : les horloges du monde, la météo, les fonctions de datapacks, la liste des joueurs, l'autosave, le transport réseau, l'envoi des chunks aux clients, et la fenêtre barrière décrite plus bas.
+2. Les workers de régions. Un worker est un thread dont le seul travail est d'exécuter des ticks de régions. Ils sont en nombre fixe, réglé par `region_threads` dans la config. Une région n'est pas un thread, c'est une tâche. Quand un worker est libre, il prend la prochaine région dont le tick est dû dans une file commune. La charge s'équilibre toute seule et une région calme ne monopolise rien.
+3. Les pools de vanilla, intouchés. La génération de monde et la lumière tournent déjà en parallèle chez Mojang. Leafs ne les modifie pas.
+
+## Le verrou par dimension
+Chaque dimension a un verrou en lecture écriture, la classe `ticking/LevelOwnership`. Quand une région tique, elle tient le verrou en lecture, que toutes les régions de la dimension partagent. Quand la partie encore sérielle du tick de la dimension tourne, la météo ou le système de chunks par exemple, elle tient le verrou en écriture, exclusif. Il en découle que la phase sérielle d'une dimension et les ticks de ses régions ne tournent jamais en même temps. Un worker n'attend jamais ce verrou. Si la prise échoue, la région saute son tour et réessaie au tick suivant.
+
+## Les deux horloges
+Le temps du jeu reste global, avancé par le thread global, comme en vanilla. Mais tout ce qui mesure une durée relative, le temps de cuisson d'un four, le délai d'un tick programmé de redstone, compte en temps de région, un simple compteur qui augmente de un à chaque tick de la région. Ce doublon existe parce que deux régions n'ont pas vécu le même nombre de ticks. Sans lui, un four qui compterait en temps global sauterait ou perdrait des ticks de cuisson à la première fusion. À la fusion, les échéances de la région absorbée sont recalées sur le compteur de la région qui reste.
+
+## La fenêtre barrière
+Certaines actions ont besoin du monde entier, comme un command block qui exécute une commande, un respawn de joueur ou la fin d'une traversée de portail. Pour elles, le thread global met toutes les régions en pause, exécute ces actions une par une avec un accès complet au monde, puis relâche tout. Ça s'appelle la fenêtre barrière, et elle s'ouvre au plus une fois par tick global. Si aucune action n'attend, la fenêtre ne s'ouvre pas et les régions ne s'arrêtent jamais. Un serveur sans command block actif ne paie donc rien. À l'inverse, un command block en repeat ou une fonction de datapack dans `#minecraft:tick` ouvrent la fenêtre à chaque tick, et le serveur repasse alors par un moment sériel à chaque tick, dont la durée dépend de la région la plus lente à finir son tick en cours. Deux gamerules permettent de couper ce contenu, [Fonctionnement.md](Fonctionnement.md) les décrit. Le code est dans `global/BarrierWindow`.
+
+## Les flux de données
+Quand un joueur bouge, clique ou écrit, son jeu envoie un paquet au serveur. Leafs range chaque paquet dans la file du joueur qui l'a envoyé. La région qui possède ce joueur vide sa file au début de son tick et traite les paquets. Dans l'autre sens, le serveur envoie en permanence des paquets aux joueurs, les mouvements des entités, les blocs qui changent, les messages du chat. Ces envois partent directement, sans file, parce que la méthode d'envoi de vanilla est thread safe. Une région envoie donc depuis son propre thread, et Leafs groupe les envois d'un même tick de région pour qu'ils partent ensemble.
+
+Une action qui vise une autre région ou une autre dimension, une téléportation par exemple, ne s'exécute jamais directement. Elle est mise en file chez le destinataire, qui l'exécute pendant son propre tick. Les game rules, les registres et les autres données globales sont en lecture seule pendant le jeu, chaque région les lit sans précaution. Les rares écritures passent par le thread global.
+
+## Qui a le droit de toucher quoi
+Une donnée du jeu n'est jamais touchée par deux threads en même temps. C'est la règle que tout le mod protège. Concrètement, un mob qui vit dans une région n'est modifié que par le worker de cette région, pendant son tick. La météo ou le système de chunks d'une dimension ne sont modifiés que quand aucune région de cette dimension ne tique, grâce au verrou décrit plus haut. Le scoreboard, la liste des joueurs et le reste de l'état global ne sont modifiés que depuis le thread global.
+
+En dev, cette règle est vérifiée en permanence. Les runs de dev lancent Java avec le flag `-ea`, qui active les vérifications. Si un thread modifie une donnée qui ne lui revient pas, le serveur crash immédiatement. On préfère un crash franc pendant le dev à une sauvegarde corrompue en silence. En production les vérifications sont désactivées et ne coûtent rien.
+
+Quand une région crash, elle écrit un crash report qui la décrit : son id, sa dimension, son tick, ses chunks, ses entités. On peut comprendre le crash sans fouiller les logs du serveur entier. Ensuite le serveur s'arrête proprement.
