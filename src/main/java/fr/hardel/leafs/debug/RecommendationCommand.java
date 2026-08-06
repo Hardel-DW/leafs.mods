@@ -16,11 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-/**
- * {@code /leafs recommendation} reads runtime signals and suggests the action that wins
- * parallelism back, today the two barrier-window gamerules. Each analysis stays cheap enough to
- * run on a live server.
- */
+/** {@code /leafs recommendation}: suggests gamerule changes that improve parallelism. */
 public final class RecommendationCommand {
 
     private static final long RECENT_PRESSURE_NANOS = TimeUnit.SECONDS.toNanos(10);

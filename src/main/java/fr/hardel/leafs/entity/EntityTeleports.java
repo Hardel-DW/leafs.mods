@@ -15,12 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * One per level: routes teleports that a region worker may not run in place. Same-level moves out of
- * the owning region and every player move defer to the level-serial side, which runs the vanilla code
- * under the exclusions; a non-player cross-dimension move with a computed transition detaches on the
- * owning region and arrives through the pending-teleport pipeline as a region task at the destination.
- */
+/** Routes teleports a region worker may not run in place: serial for same-level out-of-region, pipeline for cross-dimension. */
 public final class EntityTeleports {
 
     /** Wiring to the ticking surfaces of this level, provided at construction so this module stays free of ticking/ types. */
@@ -62,11 +57,7 @@ public final class EntityTeleports {
         return pending.pendingCount();
     }
 
-    /**
-     * Called from a region worker owning {@code entity}. Returns false when the vanilla sync path is
-     * safe (same level, destination owned by the current region); otherwise the move has been routed
-     * and the caller must return null to its own caller (Compromise #7's null-style result).
-     */
+    /** Returns false when the vanilla path is safe; otherwise the move has been routed (Compromise #7). */
     public boolean divertFromRegion(Entity entity, TeleportTransition transition) {
         ServerLevel target = transition.newLevel();
         int destinationX = SectionPos.posToSectionCoord(transition.position().x());
@@ -90,11 +81,7 @@ public final class EntityTeleports {
         return true;
     }
 
-    /**
-     * A player move stays vanilla-sync when the current region owns both the player and the
-     * destination; anything else defers to the serial side, which runs vanilla's same-instance move
-     * under the exclusions.
-     */
+    /** Defers to serial unless the current region owns both the player and the destination. */
     public boolean divertPlayerFromRegion(ServerPlayer player, TeleportTransition transition) {
         if (transition.newLevel() == level
             && binding.currentRegionOwns(player.chunkPosition().x(), player.chunkPosition().z())
@@ -111,10 +98,7 @@ public final class EntityTeleports {
         return true;
     }
 
-    /**
-     * The search writes blocks in a dimension unknown until it runs, so {@code handlePortal}'s tail
-     * re-runs in the barrier window; the cooldown vanilla set before the search prevents re-triggering.
-     */
+    /** Re-runs in the barrier window because the portal search writes blocks in an unknown dimension. */
     public void deferPortal(Entity entity) {
         binding.submitWindow(() -> {
             if (entity.isRemoved() || entity.level() != level) {
@@ -138,7 +122,6 @@ public final class EntityTeleports {
         });
     }
 
-    /** Vanilla {@code teleportCrossDimension}'s origin half on the owning region, arrival as a pipeline placement. */
     private void beginCrossDimension(Entity entity, TeleportTransition transition) {
         ServerLevel target = transition.newLevel();
         List<TeleportedNode> nodes = new ArrayList<>();
@@ -185,7 +168,7 @@ public final class EntityTeleports {
         }
     }
 
-    /** Runs on the destination: the region task's hold has the target chunk loaded, so no sync load happens here. */
+    /** The region task's hold has the target chunk loaded, so no sync load happens here. */
     private void place(List<TeleportedNode> nodes) {
         for (TeleportedNode node : nodes) {
             node.entity().teleportSetPosition(node.currentValues(), PositionMoveRotation.of(node.transition()), node.transition().relatives());

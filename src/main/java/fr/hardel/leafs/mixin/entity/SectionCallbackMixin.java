@@ -13,11 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Section crossings re-home the entity between the owning units' lists. The old section is captured
- * at the head because {@code onMove} overwrites it before the status callbacks run; the instance is
- * per entity, so the scratch field cannot be re-entered.
- */
+/** Section crossings re-home entities between owning units. Old section captured before {@code onMove} overwrites it. */
 @Mixin(targets = "net.minecraft.world.level.entity.PersistentEntitySectionManager$Callback")
 public abstract class SectionCallbackMixin {
 

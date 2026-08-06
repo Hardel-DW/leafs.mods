@@ -10,12 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * {@code hasPlayersNearby} is reached from region spawn logic (LocalMobCapCalculator), but vanilla's
- * version drains the tracker queue, a graph mutation only the serial side may run. The read becomes
- * pure; the pending queue drains in the serial {@code runAllUpdates} every tick, so the answer is at
- * most one tick stale, which is vanilla's own cross-tick staleness.
- */
+/** Pure read of spawn distance: vanilla's version drains the tracker queue, which only the serial side may run. */
 @Mixin(DistanceManager.class)
 public abstract class DistanceManagerMixin {
 

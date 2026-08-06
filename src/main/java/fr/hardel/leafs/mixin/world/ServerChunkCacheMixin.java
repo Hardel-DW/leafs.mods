@@ -23,11 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
 
-/**
- * The #15 tick split: the per-chunk work of {@code tickChunks} moved to the region bodies, the serial
- * call keeps only the custom spawners; broadcast marks route to the owning unit's set; player moves
- * defer to the level's serial side (they mutate the distance trackers and the waypoint manager).
- */
+/** Per-chunk tick work moved to region bodies; broadcast marks route to the owning unit; player moves defer to serial. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin {
 

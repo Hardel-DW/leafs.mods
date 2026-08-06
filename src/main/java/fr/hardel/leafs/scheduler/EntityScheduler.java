@@ -7,11 +7,8 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Per-entity task queue, ticked by the owning region. Tasks receive the CURRENT entity instance
- * (teleports recreate the object); once retired, pending tasks fire their retired callback instead -
- * exactly one of the two callbacks always runs. Retirement can come from another thread mid-tick
- * (a player disconnecting while their region ticks), so the due tasks stay visible to {@link #retire()}
- * and the run loop re-checks retirement before every task.
+ * Exactly one of the two callbacks always runs. Retirement can come from another thread mid-tick,
+ * so the run loop re-checks retirement before every task.
  */
 public final class EntityScheduler<E> {
     private final List<ScheduledTask<E>> scheduled = new ArrayList<>();
@@ -28,7 +25,6 @@ public final class EntityScheduler<E> {
         return true;
     }
 
-    /** No-op once retired: the registry hands out schedulers concurrently with removals. */
     public void tick(E entity) {
         synchronized (this) {
             if (retired) {
@@ -88,7 +84,6 @@ public final class EntityScheduler<E> {
         return retired;
     }
 
-    /** Lets the registry skip idle schedulers instead of looking their entity up every tick. */
     public synchronized boolean hasPendingTasks() {
         return !scheduled.isEmpty() || !due.isEmpty();
     }

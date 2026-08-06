@@ -25,10 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Player lists become safe for cross-region reads (broadcasts, PlayerLookup); placement runs on the
- * unit owning the player's spawn level - global builds the player, the region places it.
- */
+/** Concurrent player lists for cross-region reads; placement runs on the owning unit. */
 @Mixin(PlayerList.class)
 public abstract class PlayerListMixin {
 

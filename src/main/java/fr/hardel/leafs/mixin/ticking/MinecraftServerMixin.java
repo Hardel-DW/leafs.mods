@@ -2,7 +2,7 @@ package fr.hardel.leafs.mixin.ticking;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelOwnership;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;

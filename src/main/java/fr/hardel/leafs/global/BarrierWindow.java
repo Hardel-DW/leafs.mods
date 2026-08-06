@@ -5,10 +5,7 @@ import fr.hardel.leafs.ticking.TickBarrier;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/**
- * The once-per-global-tick window where single-threaded work runs with full world access. An empty
- * queue never raises the barrier, so regions keep ticking; one drain consumes only what was queued before it starts, so a re-queuing task lands in the next window instead of stalling this one.
- */
+/** Once-per-global-tick window: single-threaded work with full world access. An empty queue never raises the barrier. */
 public final class BarrierWindow {
     private final TickBarrier barrier;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();

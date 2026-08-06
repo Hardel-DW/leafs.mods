@@ -10,12 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-/**
- * Server-scoped entity schedulers, keyed by UUID so they survive the entity recreation of
- * cross-dimension teleports and player respawns. A scheduler ticks once per server tick, with the
- * level that currently holds its entity; while the entity is gone for good the scheduler is retired,
- * so every scheduled task ends in exactly one of its two callbacks.
- */
+/** Keyed by UUID so schedulers survive entity recreation across dimensions and respawns. */
 public final class EntitySchedulerRegistry {
     private final Map<UUID, EntityScheduler<Entity>> schedulers = new ConcurrentHashMap<>();
 
@@ -39,7 +34,6 @@ public final class EntitySchedulerRegistry {
         }
     }
 
-    /** Called by the owning unit before its level tick: ticks the schedulers of entities this level holds. */
     public void tickLevel(ServerLevel level) {
         for (Map.Entry<UUID, EntityScheduler<Entity>> entry : schedulers.entrySet()) {
             EntityScheduler<Entity> scheduler = entry.getValue();

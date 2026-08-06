@@ -1,7 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.ownership.RegionContext;

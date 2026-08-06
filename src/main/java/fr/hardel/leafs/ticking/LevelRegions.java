@@ -1,7 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
