@@ -39,5 +39,5 @@ replay_*.log
 *.hprof
 *.jfr
 .claude
-docs/
 logs/
+roadmap
