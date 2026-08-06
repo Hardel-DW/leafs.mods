@@ -4,4 +4,6 @@ package fr.hardel.leafs.global;
 public interface GlobalServerAccess {
 
     BarrierWindow leafs$barrierWindow();
+
+    WindowPressure leafs$windowPressure();
 }

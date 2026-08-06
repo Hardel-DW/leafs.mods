@@ -34,3 +34,5 @@ accessible field net/minecraft/server/level/DistanceManager$FixedPlayerDistanceC
 accessible field net/minecraft/world/level/entity/PersistentEntitySectionManager sectionStorage Lnet/minecraft/world/level/entity/EntitySectionStorage;
 accessible method net/minecraft/world/entity/Entity removeAfterChangingDimensions ()V
 accessible method net/minecraft/world/entity/Entity calculatePassengerTransition (Lnet/minecraft/world/level/portal/TeleportTransition;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;
+accessible field net/minecraft/server/ServerFunctionManager ticking Ljava/util/List;
+accessible field net/minecraft/server/ServerFunctionManager postReload Z
