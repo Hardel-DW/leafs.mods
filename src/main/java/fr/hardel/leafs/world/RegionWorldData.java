@@ -25,11 +25,7 @@ import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 import java.util.function.Predicate;
 
-/**
- * One tick unit's world state: clock, scheduled-tick indexes, sub-tick counter, block events,
- * random, neighbor updater, broadcast set. Merge and split only run between region ticks, under the
- * regionizer's write lock.
- */
+/** Merge and split only run between region ticks, under the regionizer's write lock. */
 public final class RegionWorldData {
     private static final int MAX_SCHEDULED_TICKS_PER_DRAIN = 65536;
 

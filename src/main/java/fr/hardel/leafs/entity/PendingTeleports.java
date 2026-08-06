@@ -8,14 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-/**
- * In-flight teleports arriving in one level. The origin chunk is held on ITS OWN level's table -
- * passed per teleport, which is what makes the cross-dimension case correct - from initiation until
- * the placement ran; the destination needs no hold of its own because the placement travels as a
- * region task, and a queued region task already holds its target chunk. Shutdown completes everything
- * still pending, so an entity mid-teleport is never lost, and each teleport places exactly once even
- * when shutdown races the scheduled task.
- */
+/** The origin chunk is held on ITS OWN level's table, not the destination's, which is what makes cross-dimension correct. */
 public final class PendingTeleports<E> {
 
     public interface PlacementSubmitter {

@@ -10,11 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.Set;
 
-/**
- * The #26d lock: tracking callbacks mutate the waypoint tables from region threads while the
- * game-rule handler and the deferred player-move pass mutate them globally. {@code transmitters()}
- * returns a snapshot so its caller iterates outside the monitor.
- */
+/** Serializes waypoint table mutations from region threads and the global phase. {@code transmitters()} returns a snapshot. */
 @Mixin(ServerWaypointManager.class)
 public abstract class ServerWaypointManagerMixin {
 

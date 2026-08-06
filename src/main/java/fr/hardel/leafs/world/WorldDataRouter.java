@@ -5,11 +5,7 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.function.LongFunction;
 
-/**
- * Position-keyed resolution to the owning unit's world payload. Attached-constant until
- * {@link #route} is called at activation; afterwards a position with no owning region still resolves
- * to the attached payload, whose structures the level-serial remainder keeps draining.
- */
+/** Unresolved positions fall back to the attached payload, which the level-serial remainder drains. */
 public final class WorldDataRouter {
     private final RegionWorldData attached;
     private volatile LongFunction<RegionWorldData> resolver;

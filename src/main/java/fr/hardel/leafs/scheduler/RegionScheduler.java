@@ -6,10 +6,7 @@ import fr.hardel.leafs.region.Regionizer;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/**
- * Position-keyed task routing, one instance per level. Queued tasks hold their target chunk until
- * they run; a failing task is a region crash, not a log line.
- */
+/** Queued tasks hold their target chunk until they run; a failing task is a region crash. */
 public final class RegionScheduler<R extends RegionTaskHost> {
     private final Regionizer<R> regionizer;
     private final SharedChunkHolds holds;

@@ -15,14 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * The barrier window fires once per global tick, after the level ticks and before connections, plus
- * one last time before the worlds are saved. It is built at the tail of the constructor rather than
- * from a field initialiser: initialisers of sibling mixins are merged right after {@code super()} in
- * an order we do not control, and this one needs ticking/'s barrier to exist already. Written once
- * on the constructing thread, before {@code spin} starts the server thread - every later reader is
- * behind that happens-before edge.
- */
+/** Barrier window: once per global tick after level ticks. Built at constructor tail because it needs ticking/'s barrier. */
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin implements GlobalServerAccess {
 
@@ -48,20 +41,14 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
         leafs$windowPressure = new WindowPressure();
     }
     
-    // Diverted execute tasks drain before the window raises: a submitter must never block behind the barrier it feeds.
+    /** A submitter must never block behind the barrier it feeds. */
     @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
     private void leafs$runBarrierWindow(CallbackInfo callbackInfo) {
         ((LeafsServerAccess) this).leafs$ticking().globalScheduler().drain();
         leafs$barrierWindow.runGlobalPhase();
     }
 
-    /**
-     * The #24 wrap: {@code #tick} functions execute in this tick's window instead of before the
-     * level ticks (Compromise #4). An idle manager, nothing in {@code #tick} and no reload to
-     * drain, enqueues nothing, so a server without per-tick functions never raises the barrier.
-     * The {@code leafs:tick_functions_work} rule cuts the {@code #tick} loop the same way; the
-     * reload drain stays, so {@code #load} always runs and one vanilla tick unit rides with it.
-     */
+    /** Tick functions execute in the barrier window (Compromise #4). The tick_functions_work rule cuts the loop; reload stays. */
     @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/ServerFunctionManager;tick()V"))
     private void leafs$functionsIntoWindow(ServerFunctionManager manager, Operation<Void> original) {
         boolean tickFunctionsDue = !manager.ticking.isEmpty() && ((MinecraftServer) (Object) this).getGameRules().get(LeafsGameRules.tickFunctionsWork);

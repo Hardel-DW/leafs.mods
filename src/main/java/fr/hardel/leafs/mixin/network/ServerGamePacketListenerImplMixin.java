@@ -59,7 +59,7 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
     }
 
-    /** Sends run on the global loop; the ack joins them there so the chunk sender stays single-threaded. */
+    /** Chunk ack routes to the global loop so the chunk sender stays single-threaded. */
     @WrapOperation(method = "handleChunkBatchReceived", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/PlayerChunkSender;onChunkBatchReceivedByClient(F)V"))
     private void leafs$chunkAckOnTheSenderThread(PlayerChunkSender sender, float desiredBatches, Operation<Void> original) {
         MinecraftServer server = ((ServerGamePacketListenerImpl) (Object) this).player.level().getServer();

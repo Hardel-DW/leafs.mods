@@ -15,10 +15,7 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.List;
 
-/**
- * The #23 lock, server half: the dirty flag, tracked-objective set, packet builds and the save pack
- * share the base half's monitor, so a region-side score change and the global save never interleave.
- */
+/** Server-side scoreboard lock: dirty flag, tracked objectives, packet builds and save serialized with the base half. */
 @Mixin(ServerScoreboard.class)
 public abstract class ServerScoreboardMixin {
 

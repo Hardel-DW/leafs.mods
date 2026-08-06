@@ -7,11 +7,7 @@ import fr.hardel.leafs.ticking.LevelOwnership;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-/**
- * The pump gate: every poll of a level's chunk bookkeeping runs under that level's serial side, so
- * promotion callbacks can never race a region tick. Covers every vanilla pump path (managedBlock
- * loops, sync loads, the idle pump) because they all funnel through this one override.
- */
+/** Pump gate: chunk bookkeeping polls run under the level's serial side, so promotions never race a region tick. */
 @Mixin(targets = "net.minecraft.server.level.ServerChunkCache$MainThreadExecutor")
 public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
 

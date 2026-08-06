@@ -19,11 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/**
- * Facade swap #22c (PoiManager's own loadedChunks, the ensureLoadedAndValid dedupe reached by region
- * AI) plus the #22b residue: every touch of the village {@code DistanceTracker} and the dirty marks
- * runs under one lock - a graph fixpoint cannot be made concurrent by facades.
- */
+/** Concurrent loadedChunks facade plus village lock: the distance tracker graph cannot be made concurrent by facades. */
 @Mixin(PoiManager.class)
 public abstract class PoiManagerMixin {
 

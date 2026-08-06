@@ -20,13 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import java.util.Collection;
 import java.util.function.Consumer;
 
-/**
- * The #23 lock, base half: structural mutators and iterating readers serialize on the scoreboard
- * instance (kills and stats reach it from region workers). Per-key getters stay lock-free: fastutil
- * open-hash reads on a stale array terminate, so mutual exclusion of writers is the safety line.
- * {@code ScoreAccess} value writes stay outside the lock (one owning region per holder); their
- * dirty/broadcast tail re-enters it through {@code onScoreChanged}.
- */
+/** Serializes scoreboard structural mutations and iterating readers. Per-key getters stay lock-free. */
 @Mixin(Scoreboard.class)
 public abstract class ScoreboardMixin {
 

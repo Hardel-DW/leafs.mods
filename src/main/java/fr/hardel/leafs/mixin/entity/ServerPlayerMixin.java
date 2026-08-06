@@ -24,12 +24,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * The #17 player-move gate: a player move initiated on a region worker (pearls, spectator follows,
- * mod calls) defers to the level-serial side, which runs vanilla's same-instance move under the
- * exclusions. The pearl ticket joins the portal ticket on the level's single ticket mutator, and the
- * pearl set goes concurrent because the pearl's region registers into a player another region owns.
- */
+/** Player moves from region workers defer to the level-serial side. Pearl set goes concurrent for cross-region registration. */
 @Mixin(ServerPlayer.class)
 public abstract class ServerPlayerMixin {
 

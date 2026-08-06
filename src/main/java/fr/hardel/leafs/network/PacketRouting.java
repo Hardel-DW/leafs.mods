@@ -40,18 +40,12 @@ public final class PacketRouting {
         return PlayerPacketQueue.handlingPackets();
     }
 
-    /**
-     * The #8 flush scope: a send mid-region-tick never flushes per packet; the global loop's
-     * unconditional per-player {@code resumeFlushing} is the flush pump, vanilla's own cadence.
-     */
+    /** Region-tick sends batch on the channel; flushing happens on the global loop's cadence. */
     public static boolean scopedFlush(boolean vanillaFlush) {
         return vanillaFlush && !(RegionContext.current() instanceof RegionContext.Region);
     }
 
-    /**
-     * Vanilla's disconnect joins on the teardown; off the server thread that join deadlocks a region
-     * worker against the global drain, so the teardown queues fire-and-forget instead.
-     */
+    /** Off the server thread the blocking teardown deadlocks; it queues fire-and-forget instead. */
     public static void runTeardown(MinecraftServer server, Runnable teardown, Runnable vanillaBlocking) {
         if (server.isSameThread()) {
             vanillaBlocking.run();

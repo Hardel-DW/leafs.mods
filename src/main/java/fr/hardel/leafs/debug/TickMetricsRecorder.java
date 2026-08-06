@@ -1,7 +1,7 @@
 package fr.hardel.leafs.debug;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelTickUnit;
@@ -20,12 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 
-/**
- * Appends one CSV row per tick unit on a fixed period, from its own thread - the tick path pays
- * nothing. Only the timing rings and the published census are read, both of which tolerate an
- * off-thread reader; nothing here touches world state. Off unless {@code metricsLogSeconds > 0}.
- * Unit ids are prefixed: {@code L} for the level-serial units, {@code R} for live regions.
- */
+/** CSV metrics recorder: one row per tick unit on a fixed period. Off unless {@code metricsLogSeconds > 0}. */
 public final class TickMetricsRecorder {
     private static final Path FILE = Path.of("logs", "leafs-metrics.csv");
     private static final String HEADER = "epochMillis,unitId,dimension,tick,tps,msptAvg,mspt50,mspt95,mspt99,msptMax,chunks,entities";

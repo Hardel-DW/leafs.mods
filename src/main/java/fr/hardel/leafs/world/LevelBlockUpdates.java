@@ -13,12 +13,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.List;
 
-/**
- * Vanilla {@code ServerLevel.sendBlockUpdated} with the two level-wide structures resolved to the
- * position's owner: the path-type cache and the navigating-mob set. Only the owning unit's mobs
- * repath (drop-not-crash); vanilla's {@code isUpdatingNavigations} re-entry warning is dropped, the
- * collected snapshot makes mutation during recompute safe by construction.
- */
+/** The path-type cache and navigating-mob set resolve to the position's owner; the collected snapshot removes vanilla's re-entry guard. */
 public final class LevelBlockUpdates {
 
     private LevelBlockUpdates() {

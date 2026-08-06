@@ -15,11 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
 
-/**
- * Binds the section callbacks to the per-region lists: the level-wide entity tick list and
- * navigating-mob set stay empty from tick zero, which is what shrinks the serial remainder's loops
- * to no-ops without touching the tick body.
- */
+/** Binds section callbacks to per-region lists; the level-wide tick list and mob set stay empty by routing. */
 @Mixin(targets = "net.minecraft.server.level.ServerLevel$EntityCallbacks")
 public abstract class EntityCallbacksMixin {
 

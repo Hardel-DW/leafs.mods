@@ -9,12 +9,7 @@ import it.unimi.dsi.fastutil.longs.LongSortedSet;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-/**
- * Unboxed ordered concurrent long set, signed natural order like LongAVLTreeSet. Buckets are
- * striped by {@code key >> groupShift} and hold immutable sorted arrays republished copy-on-write,
- * so a subSet range within one group iterates a single atomic snapshot lock-free; ranges spanning
- * groups merge all bucket snapshots (atomic per bucket, weakly consistent across them).
- */
+/** Striped by {@code key >> groupShift}, copy-on-write sorted arrays per bucket: single-group subSet iterates one lock-free snapshot. */
 public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     private static final long[] EMPTY = new long[0];
     private static final int BUCKET_COUNT = 128;
