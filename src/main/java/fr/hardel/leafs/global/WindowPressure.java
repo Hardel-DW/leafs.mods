@@ -2,11 +2,7 @@ package fr.hardel.leafs.global;
 
 import java.util.concurrent.atomic.LongAdder;
 
-/**
- * Runtime signal for {@code /leafs recommendation}: repeating command blocks that keep opening the
- * barrier window. A striped counter and one volatile write per deferral, nothing a region worker
- * can contend on.
- */
+/** Runtime signal for {@code /leafs recommendation}: counts repeating command block deferrals. */
 public final class WindowPressure {
     private final LongAdder repeatingDeferrals = new LongAdder();
     private volatile long lastRepeatingDeferralNanos;

@@ -1,7 +1,7 @@
 package fr.hardel.leafs.debug;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import fr.hardel.leafs.config.LeafsConfig;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.ticking.LeafsServerAccess;

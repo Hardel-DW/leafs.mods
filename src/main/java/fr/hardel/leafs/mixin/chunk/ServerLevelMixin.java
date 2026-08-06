@@ -15,11 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Save coordination and the #22b write hop. Saves snapshot chunk and entity state, so they take the
- * level's exclusion; POI writes belong to the level's single mutator, never the global queue. Fifth
- * mixin of this name: different package, different concern.
- */
+/** Save takes the level's exclusion; POI writes hop to the level's single mutator. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 

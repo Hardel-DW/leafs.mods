@@ -28,11 +28,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Facade swap #38 (dragonParts, players COW) plus the carriers of the per-region entity lists and the
- * teleport routing; player add/remove entries take this level's exclusion at the mutation boundary
- * (the decided player-scoped gate). Not #3b (ticking/) or #9 (world/) on the same target.
- */
+/** Facade swap (dragonParts, players COW), per-region entity lists, teleport routing. Player mutations take the exclusion. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 

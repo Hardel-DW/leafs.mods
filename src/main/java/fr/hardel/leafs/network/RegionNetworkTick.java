@@ -18,11 +18,7 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 import java.util.concurrent.TimeUnit;
 
-/**
- * The player's network lifecycle, split at the listener-tick boundary: the owning region drains the
- * inbound queue and runs the full vanilla listener tick (one thread per player, vanilla's contract);
- * the global loop keeps the transport half and adopts any listener no region has stamped recently.
- */
+/** Player network split: owning region drains packets and runs the listener tick; global loop keeps transport. */
 public final class RegionNetworkTick {
     private static final long OWNER_STALE_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
 

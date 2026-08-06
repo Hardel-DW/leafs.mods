@@ -10,10 +10,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
-/**
- * One player's inbound packets, drained by the unit owning the player. While a queue drains, the
- * draining thread is the packet-handling thread for that listener: the only durable ownership signal, since {@code ServerGamePacketListenerImpl.player} is reassigned mid-drain by respawn.
- */
+/** One player's inbound packets, drained by the owning unit. The draining thread is the packet-handling thread for that listener. */
 public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();
 

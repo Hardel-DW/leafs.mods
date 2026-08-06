@@ -1,4 +1,4 @@
-package fr.hardel.leafs.config;
+package fr.hardel.leafs;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -11,7 +11,6 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import fr.hardel.leafs.Leafs;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;

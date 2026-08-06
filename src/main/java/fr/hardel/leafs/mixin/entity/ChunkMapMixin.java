@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Facade swap #36 (entityMap) - justifications in Modules.md entity/. The regionizer feed on this target is chunk/'s #20a. */
+/** Regionizer feed: chunk holder creation and destruction. Mutations alternate strictly per position. */
 @Mixin(ChunkMap.class)
 public abstract class ChunkMapMixin {
 

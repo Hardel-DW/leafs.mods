@@ -8,11 +8,7 @@ import net.minecraft.world.level.block.CommandBlock;
 import net.minecraft.world.level.block.entity.CommandBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * Commands can reach arbitrary chunks, entities and dimensions, so command blocks execute as one
- * unmodified vanilla unit inside the barrier window (Compromise #4). A deferred unit re-enters the
- * same hook when the window replays it; {@link BarrierWindow#isDraining()} tells the hook the window's guarantees already hold.
- */
+/** Command blocks execute inside the barrier window (Compromise #4) because commands reach arbitrary state. */
 public final class CommandBlockWindow {
 
     private CommandBlockWindow() {
@@ -50,12 +46,7 @@ public final class CommandBlockWindow {
         return deferred;
     }
 
-    /**
-     * The {@code leafs:repeating_command_blocks_work} cut: execution is skipped without the window,
-     * but the reschedule mirrors vanilla's AUTO branch, so flipping the rule back on resumes every
-     * loop without touching a block. Checked before the drain marker on purpose, a flip silences
-     * even the units already queued.
-     */
+    /** Skips execution but mirrors vanilla's AUTO reschedule, so flipping the rule back on resumes every loop. */
     private static void skipButKeepArmed(ServerLevel level, BlockPos pos, BlockState state, CommandBlockEntity commandBlock) {
         if (commandBlock.isPowered() || commandBlock.isAutomatic()) {
             level.scheduleTick(pos, state.getBlock(), 1);
@@ -71,7 +62,6 @@ public final class CommandBlockWindow {
         });
     }
 
-    /** @return true when the caller must cancel because the execution was queued for this tick's window. */
     private static boolean defer(ServerLevel level, Runnable execution) {
         BarrierWindow window = ((GlobalServerAccess) level.getServer()).leafs$barrierWindow();
         if (window.isDraining()) {

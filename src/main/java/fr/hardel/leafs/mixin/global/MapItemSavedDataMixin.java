@@ -14,11 +14,7 @@ import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.spongepowered.asm.mixin.Mixin;
 
-/**
- * The #26b lock: one map is legitimately carried by players in different regions, so carried ticks,
- * color/decoration writes and the update-packet build serialize per instance; the save encode takes
- * the same monitor through #26's {@code encodeUnchecked} wrap.
- */
+/** Per-instance lock: maps carried by players in different regions serialize their ticks and writes. */
 @Mixin(MapItemSavedData.class)
 public abstract class MapItemSavedDataMixin {
 

@@ -15,11 +15,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongFunction;
 
-/**
- * ConcurrentHashMap-backed Long2ObjectMap facade: point operations and computeIfAbsent are atomic
- * (the mapping function runs at most once per key), iteration is weakly consistent, null values are
- * rejected. Iteration order is hash order.
- */
+/** ConcurrentHashMap-backed Long2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
     private final ConcurrentHashMap<Long, V> map = new ConcurrentHashMap<>();
 

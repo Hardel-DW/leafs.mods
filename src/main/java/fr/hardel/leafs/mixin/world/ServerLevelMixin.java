@@ -39,12 +39,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * The #9 tick diversion, position-keyed: world data and router construction, scheduled-tick and
- * block-event routing, region-time deadlines, the region path cache, and the per-region navigation
- * rebuild of {@code sendBlockUpdated}. The tick body itself needs no hook: routing leaves the vanilla
- * loops with empty level-wide structures, so the remainder shrinks by construction.
- */
+/** Position-keyed tick diversion: world data routing, scheduled ticks, block events, region clocks, path cache. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
 
@@ -128,7 +123,7 @@ public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
         return leafs$worldRouter.at(pos).createTick(pos, type, delay);
     }
 
-    /** Eye of ender, treasure maps, dolphins, mods: a region-side search whose validation needs an unloaded chunk degrades onto vanilla's not-found result. */
+    /** Region-side structure searches degrade to not-found instead of crashing on unloaded chunks. */
     @WrapMethod(method = "findNearestMapStructure")
     private BlockPos leafs$structureSearchRefusesOverCrashing(TagKey<Structure> structureTag, BlockPos origin, int maxSearchRadius, boolean createReference, Operation<BlockPos> original) {
         if (!(RegionContext.current() instanceof RegionContext.Region)) {

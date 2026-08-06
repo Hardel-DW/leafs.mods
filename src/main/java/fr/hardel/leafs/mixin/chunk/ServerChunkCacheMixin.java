@@ -16,11 +16,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * The mainThread identity checks answer through the ownership surface instead of thread identity: a
- * region worker mid-tick is a game thread for its level, reads through the visible map, and never
- * touches the main-thread cache or the sync-load path (crash-early, Architecture data flow 4).
- */
+/** Region workers answer thread-identity checks through ownership: mid-tick is a game thread for its level. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin {
 

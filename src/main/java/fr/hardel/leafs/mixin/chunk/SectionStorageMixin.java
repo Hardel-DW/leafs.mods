@@ -18,11 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Optional;
 
-/**
- * Facade swap #22c (storage): region POI reads load sections off the serial side - justifications in
- * Modules.md entity/. Also carries the #22b village lock, shared with the POI subclass, and holds it
- * over the dirty-set save iteration this class owns.
- */
+/** Concurrent storage facade. Carries the village lock shared with the POI subclass; held over the dirty-set save. */
 @Mixin(SectionStorage.class)
 public abstract class SectionStorageMixin<R, P> implements PoiLockAccess {
 

@@ -20,11 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Entity-side hooks: scheduler retirement (entity/EntitySchedulerRegistry), the #16 teleport
- * diversion off the owning region, the portal-search deferral to the barrier window, and the
- * portal ticket that must reach the level's single ticket mutator.
- */
+/** Entity hooks: scheduler retirement, teleport diversion off the owning region, portal-search deferral. */
 @Mixin(Entity.class)
 public abstract class EntityMixin {
 
