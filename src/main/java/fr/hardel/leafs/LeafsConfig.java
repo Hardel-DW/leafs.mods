@@ -19,7 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadius, int bufferRadius, int watchdogWarnSeconds, int metricsLogSeconds, boolean compatBarrier, boolean perRegionLogs) {
+public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadius, int bufferRadius, int watchdogWarnSeconds, int metricsLogSeconds, boolean compatBarrier, boolean perRegionLogs, boolean ownPropagator) {
     public static final int AUTO_THREADS = 0;
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -38,7 +38,8 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
         Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(LeafsConfig::watchdogWarnSeconds),
         Codec.intRange(0, 3600).optionalFieldOf("metrics_log_seconds", 0).forGetter(LeafsConfig::metricsLogSeconds),
         Codec.BOOL.optionalFieldOf("compat_barrier", true).forGetter(LeafsConfig::compatBarrier),
-        Codec.BOOL.optionalFieldOf("per_region_logs", true).forGetter(LeafsConfig::perRegionLogs)
+        Codec.BOOL.optionalFieldOf("per_region_logs", true).forGetter(LeafsConfig::perRegionLogs),
+        Codec.BOOL.optionalFieldOf("own_propagator", false).forGetter(LeafsConfig::ownPropagator)
     ).apply(builder, LeafsConfig::new));
 
     public static final Codec<LeafsConfig> CODEC = MAP_CODEC.codec();
