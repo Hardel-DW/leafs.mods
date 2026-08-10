@@ -20,7 +20,7 @@ Les commandes tapées dans la console passent par la barrier window, parce qu'un
 
 ### `ServerLevel`
 - Le mixin `ticking/` porte le `LevelRegions`, qui contient le `Regionizer` et le verrou de la dimension. Le champ s'initialise avant le premier chunk holder.
-- Le mixin `chunk/` fait passer la sauvegarde du niveau sous le verrou exclusif de `LevelOwnership` et redirige les écritures de points d'intérêt vers la phase sérielle du niveau.
+- Le mixin `chunk/` fait passer la sauvegarde du niveau sous le verrou exclusif de `LevelOwnership` et redirige les écritures de points d'intérêt vers la phase sérielle du niveau. Il fait aussi tiquer chaque spawner custom sous la portée de lecture dégradée : un spawner qui sonde un terrain jamais généré refuse et saute son passage au lieu de bloquer le thread sériel sur la génération, ce qui gelait toute la dimension.
 - Le mixin `entity/` remplace `dragonParts` par une map concurrente et `players` par une `CopyOnWriteArrayList`. Il crée les listes d'entités par région et le routeur de téléportation. Les ajouts et retraits de joueurs prennent le verrou exclusif.
 - Le mixin `global/` déplace l'exécution de la `TimerQueue` dans la barrier window, parce que les fonctions programmées peuvent toucher n'importe quel état du monde.
 - Le mixin `world/` redirige les ticks programmés, les block events, l'horloge de région, le générateur aléatoire, les mises à jour de voisinage et le cache de path types vers la région propriétaire. Les recherches de structures depuis une région renvoient un résultat vide au lieu de crasher quand un chunk n'est pas chargé.
