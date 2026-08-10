@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.network;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -60,6 +61,17 @@ public abstract class PlayerListMixin {
         callbackInfo.cancel();
     }
 
+    /** Roadmap 22 instrumentation: a placement that stalls the level thread must name itself. */
+    @WrapMethod(method = "placeNewPlayer")
+    private void leafs$timedPlacement(Connection connection, ServerPlayer player, CommonListenerCookie cookie, Operation<Void> original) {
+        long start = System.nanoTime();
+        original.call(connection, player, cookie);
+        long millis = (System.nanoTime() - start) / 1_000_000L;
+        if (millis > 100) {
+            Leafs.LOGGER.warn("Placing {} took {} ms on the level thread", player.getPlainTextName(), millis);
+        }
+    }
+
     /** Autosave snapshots a live player from the global thread; the owning level's exclusion orders it against region ticks. */
     @WrapMethod(method = "save")
     private void leafs$savePlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
@@ -73,6 +85,11 @@ public abstract class PlayerListMixin {
     /** Teardown reaches entities other regions own (unRide, the pearl sweep, cross-level); it runs with every region paused. */
     @WrapMethod(method = "remove")
     private void leafs$teardownWithRegionsPaused(ServerPlayer player, Operation<Void> original) {
+        long start = System.nanoTime();
         ((LeafsServerAccess) this.getServer()).leafs$ticking().runWithRegionsPaused(() -> original.call(player));
+        long millis = (System.nanoTime() - start) / 1_000_000L;
+        if (millis > 50) {
+            Leafs.LOGGER.warn("Teardown of {} held every region paused for {} ms", player.getPlainTextName(), millis);
+        }
     }
 }
