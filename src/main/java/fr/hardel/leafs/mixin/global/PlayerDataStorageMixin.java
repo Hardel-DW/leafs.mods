@@ -1,11 +1,11 @@
-package fr.hardel.leafs.mixin.io;
+package fr.hardel.leafs.mixin.global;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
-import fr.hardel.leafs.io.DeferredFileWrites;
+import fr.hardel.leafs.global.DeferredFileWrites;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.players.NameAndId;
 import net.minecraft.world.level.storage.PlayerDataStorage;

@@ -12,9 +12,8 @@ Un dossier égale une responsabilité. Le code vit dans `src/main/java/fr/hardel
 | `entity/` | Les entités : listes de tick par région, index concurrents, téléportations et pipeline inter dimensions, schedulers d'entités, primitives concurrentes maison. |
 | `chunk/` | L'accès des régions aux chunks : lectures par la carte visible, tickets, tracking, verrou des villages. |
 | `network/` | Le réseau : files de paquets par joueur, routage, le tick réseau par région, le filet global. |
-| `io/` | Les écritures de fichiers différées : playerdata, stats et advancements partent sur un thread d'écriture unique, les lectures voient les écritures en attente, l'extinction attend tout. |
 | `scheduler/` | Les schedulers publics : par région, global, asynchrone, avec les tickets de rétention de chunks. |
-| `global/` | La phase globale : la fenêtre barrière, le moniteur d'état partagé, les command blocks, les gamerules du mod. |
+| `global/` | La phase globale : la fenêtre barrière, le moniteur d'état partagé, les command blocks, les gamerules du mod, les écritures différées des fichiers de joueurs. |
 | `compat/` | Les adaptations d'autres mods, aujourd'hui deux shims Fabric API. |
 | `debug/` | Les commandes `/leafs regions` et `/leafs recommendation`, et l'enregistreur de métriques CSV. |
 | `mixin/` | Les points d'accroche, un sous dossier par module servi. Aucune logique. |

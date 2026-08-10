@@ -1,9 +1,9 @@
-package fr.hardel.leafs.mixin.io;
+package fr.hardel.leafs.mixin.global;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.io.DeferredFileWrites;
-import net.minecraft.stats.ServerStatsCounter;
+import fr.hardel.leafs.global.DeferredFileWrites;
+import net.minecraft.server.PlayerAdvancements;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -16,9 +16,9 @@ import java.nio.file.LinkOption;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 
-/** The stats JSON serializes on the caller into the IO writer; the login read sees pending writes first. */
-@Mixin(ServerStatsCounter.class)
-public abstract class ServerStatsCounterMixin {
+/** The advancements JSON serializes on the caller into the IO writer; the login read sees pending writes first. */
+@Mixin(PlayerAdvancements.class)
+public abstract class PlayerAdvancementsMixin {
 
     @WrapOperation(method = "save", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;newBufferedWriter(Ljava/nio/file/Path;Ljava/nio/charset/Charset;[Ljava/nio/file/OpenOption;)Ljava/io/BufferedWriter;"))
     private BufferedWriter leafs$deferredWriter(Path file, Charset charset, OpenOption[] options, Operation<BufferedWriter> original) throws IOException {
@@ -30,13 +30,13 @@ public abstract class ServerStatsCounterMixin {
         return new BufferedWriter(writes.textWriter(file));
     }
 
-    @WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;isRegularFile(Ljava/nio/file/Path;[Ljava/nio/file/LinkOption;)Z"))
+    @WrapOperation(method = "load(Lnet/minecraft/server/ServerAdvancementManager;)V", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;isRegularFile(Ljava/nio/file/Path;[Ljava/nio/file/LinkOption;)Z"))
     private boolean leafs$pendingCountsAsFile(Path file, LinkOption[] options, Operation<Boolean> original) {
         DeferredFileWrites writes = DeferredFileWrites.active();
         return (writes != null && writes.pendingText(file) != null) || original.call(file, options);
     }
 
-    @WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;newBufferedReader(Ljava/nio/file/Path;Ljava/nio/charset/Charset;)Ljava/io/BufferedReader;"))
+    @WrapOperation(method = "load(Lnet/minecraft/server/ServerAdvancementManager;)V", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;newBufferedReader(Ljava/nio/file/Path;Ljava/nio/charset/Charset;)Ljava/io/BufferedReader;"))
     private BufferedReader leafs$pendingAwareReader(Path file, Charset charset, Operation<BufferedReader> original) throws IOException {
         DeferredFileWrites writes = DeferredFileWrites.active();
         String pending = writes == null ? null : writes.pendingText(file);
