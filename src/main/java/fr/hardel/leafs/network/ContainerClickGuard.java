@@ -2,6 +2,7 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.server.RunningOnDifferentThreadException;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
@@ -19,19 +20,22 @@ public final class ContainerClickGuard {
 
     public static void handleGuarded(ServerPlayer player, ServerboundContainerClickPacket packet, Runnable original) {
         AbstractContainerMenu menu = player.containerMenu;
-        if (menu.containerId == packet.containerId() && packet.stateId() != menu.getStateId()) {
-            Leafs.LOGGER.warn("Container click of {} arrived desynced: menu {} slot {} client state {} server state {}",
-                player.getPlainTextName(), packet.containerId(), packet.slotNum(), packet.stateId(), menu.getStateId());
-        }
-
+        boolean desynced = menu.containerId == packet.containerId() && packet.stateId() != menu.getStateId();
         try {
             original.run();
         } catch (RuntimeException | Error exception) {
-            menu.resumeRemoteUpdates();
-            menu.broadcastFullState();
-            Leafs.LOGGER.warn("Container click of {} crashed on menu {} slot {} button {}; sync restored, full resync sent",
-                player.getPlainTextName(), packet.containerId(), packet.slotNum(), packet.buttonNum(), exception);
+            if (!(exception instanceof RunningOnDifferentThreadException)) {
+                menu.resumeRemoteUpdates();
+                menu.broadcastFullState();
+                Leafs.LOGGER.warn("Container click of {} crashed on menu {} slot {} button {}; sync restored, full resync sent", player.getPlainTextName(), packet.containerId(), packet.slotNum(), packet.buttonNum(), exception);
+            }
+
             throw exception;
+        }
+
+        if (desynced) {
+            Leafs.LOGGER.warn("Container click of {} arrived desynced: menu {} slot {} client state {} server state {}",
+                player.getPlainTextName(), packet.containerId(), packet.slotNum(), packet.stateId(), menu.getStateId());
         }
     }
 }
