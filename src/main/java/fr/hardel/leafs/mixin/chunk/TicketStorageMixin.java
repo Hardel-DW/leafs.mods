@@ -9,16 +9,20 @@ import fr.hardel.leafs.ticking.LeafsServerAccess;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * Chantier propagateur, S1: the ticket table takes writers from any thread under one monitor, and the
  * tracker listeners route themselves, inline on the level-serial side, queued to it from anywhere
- * else, because the propagation graph they feed stays single-threaded until S4.
+ * else, because the propagation graph they feed stays single-threaded until S4. The serial side reads
+ * the table bare, so every read entry point takes the same monitor against off-level writers.
  */
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
@@ -52,21 +56,79 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         }
     }
 
-    /** The loading listener also feeds the Leafs propagator, and skips vanilla's graph when it drives (S4). */
+    @WrapMethod(method = "replaceTicketLevelOfType")
+    private void leafs$monitoredReplace(int newLevel, TicketType ticketType, Operation<Void> original) {
+        synchronized (this) {
+            original.call(newLevel, ticketType);
+        }
+    }
+
+    @WrapMethod(method = "activateAllDeactivatedTickets")
+    private void leafs$monitoredActivate(Operation<Void> original) {
+        synchronized (this) {
+            original.call();
+        }
+    }
+
+    @WrapMethod(method = "getTicketLevelAt(JZ)I")
+    private int leafs$monitoredLevelRead(long key, boolean simulation, Operation<Integer> original) {
+        synchronized (this) {
+            return original.call(key, simulation);
+        }
+    }
+
+    /** The copy is what makes the read safe: vanilla iterates the returned list outside any monitor. */
+    @WrapMethod(method = "getTickets")
+    private List<Ticket> leafs$monitoredTicketsRead(long key, Operation<List<Ticket>> original) {
+        synchronized (this) {
+            return List.copyOf(original.call(key));
+        }
+    }
+
+    @WrapMethod(method = "forEachTicket(Ljava/util/function/BiConsumer;)V")
+    private void leafs$monitoredIteration(BiConsumer<ChunkPos, Ticket> output, Operation<Void> original) {
+        synchronized (this) {
+            original.call(output);
+        }
+    }
+
+    @WrapMethod(method = "shouldKeepDimensionActive")
+    private boolean leafs$monitoredActivityRead(Operation<Boolean> original) {
+        synchronized (this) {
+            return original.call();
+        }
+    }
+
+    @WrapMethod(method = "hasTickets")
+    private boolean leafs$monitoredEmptinessRead(Operation<Boolean> original) {
+        synchronized (this) {
+            return original.call();
+        }
+    }
+
+    /**
+     * Driving (S4): the propagator is fed inline under the monitor and vanilla's graph is skipped.
+     * Shadow (S5): the feed rides the routed listener task, so both propagators see the exact same
+     * update order on the serial thread and the comparison is never ahead of vanilla.
+     */
     @WrapMethod(method = "setLoadingChunkUpdatedListener")
     private void leafs$routeLoadingListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        TicketStorage.ChunkUpdated routed = leafs$routed(listener);
-        TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
-            ServerLevel owner = leafs$level;
-            LevelTicketPropagator propagator = owner == null ? null : ((PropagatorAccess) owner.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator();
+        TicketStorage.ChunkUpdated shadowPair = leafs$routed((key, level, onlyDecreased) -> {
+            LevelTicketPropagator propagator = leafs$propagator();
             if (propagator != null) {
-                propagator.feed(key);
-                if (!propagator.shadow()) {
-                    return;
-                }
+                propagator.feed(key, level);
             }
 
-            routed.update(key, level, onlyDecreased);
+            listener.update(key, level, onlyDecreased);
+        });
+        TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
+            LevelTicketPropagator propagator = leafs$propagator();
+            if (propagator != null && !propagator.shadow()) {
+                propagator.feed(key, level);
+                return;
+            }
+
+            shadowPair.update(key, level, onlyDecreased);
         };
         original.call(shim);
     }
@@ -74,6 +136,12 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
     @WrapMethod(method = "setSimulationChunkUpdatedListener")
     private void leafs$routeSimulationListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
         original.call(leafs$routed(listener));
+    }
+
+    @Unique
+    private LevelTicketPropagator leafs$propagator() {
+        ServerLevel owner = leafs$level;
+        return owner == null ? null : ((PropagatorAccess) owner.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator();
     }
 
     @Unique
