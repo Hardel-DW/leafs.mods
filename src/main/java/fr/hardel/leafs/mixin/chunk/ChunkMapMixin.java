@@ -1,14 +1,25 @@
 package fr.hardel.leafs.mixin.chunk;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.entity.ConcurrentOrderedLongSet;
+import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.network.RegionNetworkTick;
+import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.ServerLevelWorldAccess;
+import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LevelChunk;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -72,6 +83,36 @@ public abstract class ChunkMapMixin {
 
         RegionEntityTracking.tickSerial((ChunkMap) (Object) this);
         callbackInfo.cancel();
+    }
+
+    /** View diffs run on the player's owner: the region for its own players, the serial pass only for players no region ticks. */
+    @WrapMethod(method = "updateChunkTracking")
+    private void leafs$viewDiffsOnTheOwner(ServerPlayer player, Operation<Void> original) {
+        if (RegionContext.current() instanceof RegionContext.Region) {
+            if (((ServerLevelEntityAccess) ((ChunkMap) (Object) this).level).leafs$entityLists().owns(player)) {
+                original.call(player);
+            }
+
+            return;
+        }
+
+        if (!RegionNetworkTick.ownedByRegion(player.connection)) {
+            original.call(player);
+        }
+    }
+
+    /** A region serializes only chunks it owns; a foreign pending chunk stays pending and converges with ownership. */
+    @WrapMethod(method = "getChunkToSend")
+    private LevelChunk leafs$sendOnlyOwnedChunks(long pos, Operation<LevelChunk> original) {
+        LevelChunk chunk = original.call(pos);
+        if (chunk == null || !(RegionContext.current() instanceof RegionContext.Region)) {
+            return chunk;
+        }
+
+        ServerLevel level = ((ChunkMap) (Object) this).level;
+        RegionWorldData active = WorldTickContext.activeFor(level);
+
+        return active != null && ((ServerLevelWorldAccess) level).leafs$worldRouter().atChunk(ChunkPos.getX(pos), ChunkPos.getZ(pos)) == active ? chunk : null;
     }
 
     @Unique

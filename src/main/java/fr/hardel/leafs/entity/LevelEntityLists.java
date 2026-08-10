@@ -1,5 +1,6 @@
 package fr.hardel.leafs.entity;
 
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
@@ -43,6 +44,11 @@ public final class LevelEntityLists {
 
     public boolean containsTicking(Entity entity) {
         return resolver.apply(entity.chunkPosition().pack()).tickList().contains(entity.getId());
+    }
+
+    /** Whether the tick unit running on this thread owns the entity's lists. */
+    public boolean owns(Entity entity) {
+        return WorldTickContext.ownsEntityData(resolver.apply(entity.chunkPosition().pack()));
     }
 
     public void navigationStarted(Mob mob) {
