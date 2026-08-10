@@ -59,5 +59,11 @@ public final class RegionEntityTracking {
                 }
             });
         }
+
+        entities.forEach(entity -> {
+            if (entity instanceof ServerPlayer player) {
+                chunkMap.updateChunkTracking(player);
+            }
+        });
     }
 }
