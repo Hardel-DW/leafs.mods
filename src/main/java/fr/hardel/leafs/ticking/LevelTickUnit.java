@@ -56,7 +56,7 @@ public final class LevelTickUnit extends TickHandle {
         this.level = level;
         this.regions = ((ServerLevelRegionAccess) level).leafs$regions();
         this.scheduler = scheduler;
-        this.holds = new SharedChunkHolds(new ChunkTicketHolds(level), regions.ownership()::isLevelSerialHeldByCurrentThread);
+        this.holds = new SharedChunkHolds(new ChunkTicketHolds(level));
         this.taskScheduler = new RegionScheduler<>(regions.regionizer(), holds);
     }
 

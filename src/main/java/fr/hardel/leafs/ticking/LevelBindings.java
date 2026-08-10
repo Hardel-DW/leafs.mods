@@ -12,7 +12,6 @@ import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
-import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
@@ -67,24 +66,7 @@ public final class LevelBindings {
 
     /** A region's refused chunk read files a short-lived load ticket, so the serial side loads the chunk and the retry finds it. */
     public static Runnable chunkDemand(ServerChunkCache chunkSource, int chunkX, int chunkZ, ChunkStatus status) {
-        return () -> {
-            ServerLevel level = chunkSource.level;
-            Ticket ticket = new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status));
-            ((LeafsServerAccess) level.getServer()).leafs$ticking().submitToLevel(level, () -> chunkSource.ticketStorage.addTicket(ticket, new ChunkPos(chunkX, chunkZ)));
-        };
-    }
-
-    /** Vanilla ticket adds reached from region ticks defer to the level's single ticket mutator. */
-    public static void addTicketWithRadius(ServerChunkCache chunkSource, TicketType type, ChunkPos pos, int radius) {
-        ServerLevel level = chunkSource.level;
-        LevelRegions regions = regionsOf(level);
-        if (regions.ownership().isLevelSerialHeldByCurrentThread() || regions.body() == null) {
-            chunkSource.addTicketWithRadius(type, pos, radius);
-
-            return;
-        }
-
-        ((LeafsServerAccess) level.getServer()).leafs$ticking().submitToLevel(level, () -> chunkSource.addTicketWithRadius(type, pos, radius));
+        return () -> chunkSource.ticketStorage.addTicket(new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status)), new ChunkPos(chunkX, chunkZ));
     }
 
     private static LevelRegions regionsOf(ServerLevel level) {

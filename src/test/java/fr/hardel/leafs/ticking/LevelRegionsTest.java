@@ -246,7 +246,7 @@ class LevelRegionsTest {
             @Override
             public void removeHold(int chunkX, int chunkZ) {
             }
-        }, regions.ownership()::isLevelSerialHeldByCurrentThread);
+        });
         regions.activate("leafs:test", scheduler, holds, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run,
             () -> new RegionWorldData(new RegionClock(0L), _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache()), null, () -> {
             });
