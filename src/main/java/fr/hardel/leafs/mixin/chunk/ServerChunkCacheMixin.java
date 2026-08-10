@@ -1,5 +1,6 @@
 package fr.hardel.leafs.mixin.chunk;
 
+import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.ticking.LevelBindings;
@@ -39,7 +40,7 @@ public abstract class ServerChunkCacheMixin {
 
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
-        if (leafs$regionWorkerHoldsLevel()) {
+        if (leafs$degradedReadPath()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
             callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z));
         }
@@ -47,7 +48,7 @@ public abstract class ServerChunkCacheMixin {
 
     @Inject(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionGetChunkPath(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
-        if (leafs$regionWorkerHoldsLevel()) {
+        if (leafs$degradedReadPath()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
             callbackInfo.setReturnValue(RegionChunkAccess.presentChunkOrThrow(self.chunkMap, x, z, targetStatus, loadOrGenerate, LevelBindings.chunkDemand(self, x, z, targetStatus)));
         }
@@ -56,14 +57,19 @@ public abstract class ServerChunkCacheMixin {
     /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree or a correct hasChunk-then-read sequence crashes. */
     @Inject(method = "hasChunk(II)Z", at = @At("HEAD"), cancellable = true)
     private void leafs$regionHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
-        if (leafs$regionWorkerHoldsLevel()) {
+        if (leafs$degradedReadPath()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
             callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
         }
     }
 
+    /** A region worker mid-tick, or a serial scope that opted into region-like reads (custom spawners). */
     @Unique
-    private boolean leafs$regionWorkerHoldsLevel() {
+    private boolean leafs$degradedReadPath() {
+        if (DegradedChunkReads.active()) {
+            return true;
+        }
+
         if (Thread.currentThread() == this.mainThread) {
             return false;
         }
