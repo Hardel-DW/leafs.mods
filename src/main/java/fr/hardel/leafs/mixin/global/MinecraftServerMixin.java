@@ -41,8 +41,12 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
         leafs$windowPressure = new WindowPressure();
     }
     
-    /** A submitter must never block behind the barrier it feeds. */
-    @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
+    /**
+     * A submitter must never block behind the barrier it feeds. Also hooked into {@code tickServer}:
+     * its pause-when-empty branch skips {@code tickChildren}, yet a joining player's placement and other
+     * diverted {@code MinecraftServer.execute} tasks land in the global phase and must still drain there.
+     */
+    @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
     private void leafs$runBarrierWindow(CallbackInfo callbackInfo) {
         ((LeafsServerAccess) this).leafs$ticking().globalScheduler().drain();
         leafs$barrierWindow.runGlobalPhase();

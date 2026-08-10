@@ -76,9 +76,10 @@ public final class RegionScheduledTicks<T> extends LevelTicks<T> {
         }
 
         List<ScheduledTick<T>> drained = new ArrayList<>();
-        for (ScheduledTick<T> tick = container.poll(); tick != null; tick = container.poll()) {
-            drained.add(tick);
+        while (container.peek() != null) {
+            drained.add(container.poll());
         }
+        
         for (ScheduledTick<T> tick : drained) {
             container.schedule(new ScheduledTick<>(tick.type(), tick.pos(), tick.triggerTick() + tickOffset, tick.priority(), tick.subTickOrder()));
         }
