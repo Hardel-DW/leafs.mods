@@ -4,7 +4,7 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.io.DeferredFileWrites;
+import fr.hardel.leafs.global.DeferredFileWrites;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
