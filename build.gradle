@@ -25,9 +25,16 @@ loom {
 	runs {
 		configureEach {
 			vmArg "-ea"
-			vmArg "-Xms16G"
-			vmArg "-Xmx16G"
 			vmArg "-XX:+UseZGC"
+		}
+
+		client {
+			vmArg "-Xmx4G"
+		}
+
+		server {
+			vmArg "-Xms12G"
+			vmArg "-Xmx12G"
 			vmArg "-XX:+AlwaysPreTouch"
 		}
 	}
