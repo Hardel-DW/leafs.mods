@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.global.GlobalServerAccess;
@@ -7,10 +8,13 @@ import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 /** Wiring factories: they hand ticking/'s per-level surfaces to modules that must not import ticking/. */
 public final class LevelBindings {
@@ -59,6 +63,15 @@ public final class LevelBindings {
                 }
             }
         }, target -> ((ServerLevelEntityAccess) target).leafs$entityTeleports());
+    }
+
+    /** A region's refused chunk read files a short-lived load ticket, so the serial side loads the chunk and the retry finds it. */
+    public static Runnable chunkDemand(ServerChunkCache chunkSource, int chunkX, int chunkZ, ChunkStatus status) {
+        return () -> {
+            ServerLevel level = chunkSource.level;
+            Ticket ticket = new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status));
+            ((LeafsServerAccess) level.getServer()).leafs$ticking().submitToLevel(level, () -> chunkSource.ticketStorage.addTicket(ticket, new ChunkPos(chunkX, chunkZ)));
+        };
     }
 
     /** Vanilla ticket adds reached from region ticks defer to the level's single ticket mutator. */
