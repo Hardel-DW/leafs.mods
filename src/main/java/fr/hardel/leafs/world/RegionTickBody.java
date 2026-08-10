@@ -90,6 +90,7 @@ public final class RegionTickBody {
             if (entity instanceof ServerPlayer player) {
                 RegionNetworkTick.tickListenerOnRegion(player, level.getServer());
                 player.connection.chunkSender.sendNextChunks(player);
+                player.connection.connection.flushChannel();
             }
         });
     }
