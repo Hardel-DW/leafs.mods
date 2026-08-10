@@ -1,4 +1,4 @@
-package fr.hardel.leafs.config;
+package fr.hardel.leafs;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
