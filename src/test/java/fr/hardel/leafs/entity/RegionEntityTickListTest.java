@@ -1,6 +1,8 @@
 package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.region.CoordinateKey;
+import fr.hardel.leafs.world.WorldTickContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -11,92 +13,119 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionEntityTickListTest {
-    private final RegionEntityTickList<String> list = new RegionEntityTickList<>();
+    private final RegionEntityData westHome = new RegionEntityData();
+    private final RegionEntityData eastHome = new RegionEntityData();
+    private final RegionEntityTickList<String> west = new RegionEntityTickList<>(westHome);
+    private final RegionEntityTickList<String> east = new RegionEntityTickList<>(eastHome);
     private final List<String> visited = new ArrayList<>();
 
+    @AfterEach
+    void leaveContext() {
+        WorldTickContext.exit();
+    }
+
+    private void own(RegionEntityData home) {
+        WorldTickContext.exit();
+        WorldTickContext.enter(new Object(), null, home);
+    }
+
     @Test
-    void addIsVisibleToForEach() {
-        list.add(1, "a", CoordinateKey.pack(0, 0));
+    void ownerMutationsAreImmediate() {
+        own(westHome);
+        west.add(1, "a", CoordinateKey.pack(-5, 0));
 
-        list.forEach(visited::add);
-
+        assertTrue(west.contains(1));
+        west.forEach(visited::add);
         assertEquals(List.of("a"), visited);
+
+        west.remove(1);
+        assertFalse(west.contains(1));
     }
 
     @Test
-    void removeDuringIterationKeepsTheCurrentPassIntact() {
-        list.add(1, "a", CoordinateKey.pack(0, 0));
-        list.add(2, "b", CoordinateKey.pack(0, 0));
+    void queuedArrivalBuffersToTheNextPass() {
+        own(eastHome);
+        east.queueAdd(1, "a", CoordinateKey.pack(5, 0));
 
-        list.forEach(entity -> {
-            visited.add(entity);
-            if (entity.equals("a")) {
-                list.remove(2);
-            }
-        });
-
-        assertEquals(List.of("a", "b"), visited);
-        assertFalse(list.contains(2));
-    }
-
-    @Test
-    void addDuringIterationWaitsForTheNextPass() {
-        list.add(1, "a", CoordinateKey.pack(0, 0));
-
-        list.forEach(entity -> {
-            visited.add(entity);
-            list.add(2, "b", CoordinateKey.pack(0, 0));
-        });
-
-        assertEquals(List.of("a"), visited);
-        visited.clear();
-        list.forEach(visited::add);
-        assertEquals(List.of("a", "b"), visited);
-    }
-
-    @Test
-    void queuedAddIsInvisibleUntilBeginTick() {
-        list.queueAdd(1, "a", CoordinateKey.pack(0, 0));
-
-        list.forEach(visited::add);
+        assertTrue(east.contains(1));
+        east.forEach(visited::add);
         assertEquals(List.of(), visited);
-        assertTrue(list.contains(1));
 
-        list.beginTick();
-        list.forEach(visited::add);
+        east.beginTick();
+        east.forEach(visited::add);
         assertEquals(List.of("a"), visited);
     }
 
     @Test
-    void splitRebucketsBySectionAndDropsOrphans() {
-        RegionEntityTickList<String> child = new RegionEntityTickList<>();
-        list.add(1, "kept", CoordinateKey.pack(0, 0));
-        list.add(2, "dropped", CoordinateKey.pack(3, 0));
-        list.queueAdd(3, "pending", CoordinateKey.pack(1, 1));
+    void foreignMutationWaitsForTheOwnerTick() {
+        west.add(1, "a", CoordinateKey.pack(-5, 0));
 
-        list.splitInto(1, section -> section == CoordinateKey.pack(0, 0) ? child : null);
+        assertTrue(west.contains(1));
+        west.forEach(visited::add);
+        assertEquals(List.of(), visited);
 
-        assertEquals(0, list.size());
-        assertTrue(child.contains(1));
-        assertFalse(child.contains(2));
-        assertTrue(child.contains(3));
-        child.forEach(visited::add);
-        assertEquals(List.of("kept"), visited);
+        own(westHome);
+        west.beginTick();
+        west.forEach(visited::add);
+        assertEquals(List.of("a"), visited);
     }
 
     @Test
-    void mergeMovesEverythingIncludingPending() {
-        RegionEntityTickList<String> target = new RegionEntityTickList<>();
-        list.add(1, "a", CoordinateKey.pack(0, 0));
-        list.queueAdd(2, "b", CoordinateKey.pack(1, 0));
+    void foreignRemoveOverridesAQueuedAdd() {
+        west.queueAdd(1, "a", CoordinateKey.pack(-5, 0));
+        west.remove(1);
 
-        list.mergeInto(target);
+        assertFalse(west.contains(1));
 
-        assertEquals(0, list.size());
-        assertTrue(target.contains(1));
-        assertTrue(target.contains(2));
-        target.beginTick();
-        target.forEach(visited::add);
-        assertEquals(List.of("a", "b"), visited);
+        own(westHome);
+        west.beginTick();
+        west.forEach(visited::add);
+        assertEquals(List.of(), visited);
+    }
+
+    @Test
+    void foreignRemoveReachesAnActiveEntity() {
+        own(westHome);
+        west.add(1, "a", CoordinateKey.pack(-5, 0));
+
+        own(eastHome);
+        west.remove(1);
+        assertFalse(west.contains(1));
+
+        own(westHome);
+        west.beginTick();
+        west.forEach(visited::add);
+        assertEquals(List.of(), visited);
+    }
+
+    @Test
+    void mergeFoldsThePendingMailboxFirst() {
+        west.queueAdd(1, "a", CoordinateKey.pack(-5, 0));
+
+        west.mergeInto(east);
+
+        assertFalse(west.contains(1));
+        assertTrue(east.contains(1));
+        own(eastHome);
+        east.forEach(visited::add);
+        assertEquals(List.of("a"), visited);
+    }
+
+    @Test
+    void foreignMoveRebucketsOnSplit() {
+        own(westHome);
+        west.add(1, "a", CoordinateKey.pack(-5, 0));
+
+        own(eastHome);
+        west.move(1, CoordinateKey.pack(-40, 0));
+
+        own(westHome);
+        west.beginTick();
+        RegionEntityData farHome = new RegionEntityData();
+        RegionEntityTickList<String> far = new RegionEntityTickList<>(farHome);
+        west.splitInto(4, section -> CoordinateKey.x(section) <= -3 ? far : west);
+
+        assertTrue(far.contains(1));
+        assertFalse(west.contains(1));
     }
 }

@@ -7,8 +7,8 @@ import java.util.function.LongFunction;
 
 /** Per-region entity tick list and navigating-mob list, folded on merge/split. */
 public final class RegionEntityData {
-    private final RegionEntityTickList<Entity> tickList = new RegionEntityTickList<>();
-    private final RegionEntityTickList<Mob> navigatingMobs = new RegionEntityTickList<>();
+    private final RegionEntityTickList<Entity> tickList = new RegionEntityTickList<>(this);
+    private final RegionEntityTickList<Mob> navigatingMobs = new RegionEntityTickList<>(this);
 
     public RegionEntityTickList<Entity> tickList() {
         return tickList;

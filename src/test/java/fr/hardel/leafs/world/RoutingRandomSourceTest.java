@@ -31,14 +31,14 @@ class RoutingRandomSourceTest {
 
     @Test
     void contextForAnotherScopeResolvesVanilla() {
-        WorldTickContext.enter(new Object(), worldData);
+        WorldTickContext.enter(new Object(), worldData, null);
 
         assertEquals(1, routing.nextInt());
     }
 
     @Test
     void contextForTheScopeResolvesTheUnitRandom() {
-        WorldTickContext.enter(scope, worldData);
+        WorldTickContext.enter(scope, worldData, null);
 
         assertEquals(2, routing.nextInt());
         WorldTickContext.exit();
