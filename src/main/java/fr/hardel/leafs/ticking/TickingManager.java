@@ -106,11 +106,6 @@ public final class TickingManager {
             LevelOwnership ownership = regions.ownership();
             ownership.enterLevelSerial();
             try {
-                SharedChunkHolds holds = regions.holds();
-                if (holds != null) {
-                    holds.applyPendingOps();
-                }
-
                 drainChunkBookkeeping(level);
                 RegionScheduler<RegionTickData> taskScheduler = regions.taskScheduler();
                 if (taskScheduler != null) {

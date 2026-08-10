@@ -50,9 +50,4 @@ public abstract class ServerPlayerMixin {
             callbackInfo.setReturnValue(null);
         }
     }
-
-    @WrapOperation(method = "placeEnderPearlTicket", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;addTicketWithRadius(Lnet/minecraft/server/level/TicketType;Lnet/minecraft/world/level/ChunkPos;I)V"))
-    private static void leafs$deferPearlTicket(ServerChunkCache chunkSource, TicketType type, ChunkPos pos, int radius, Operation<Void> original) {
-        LevelBindings.addTicketWithRadius(chunkSource, type, pos, radius);
-    }
 }
