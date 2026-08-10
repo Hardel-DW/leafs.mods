@@ -9,7 +9,6 @@ import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.PlayerChunkSender;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -59,14 +58,4 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
     }
 
-    /** Chunk ack routes to the global loop so the chunk sender stays single-threaded. */
-    @WrapOperation(method = "handleChunkBatchReceived", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/PlayerChunkSender;onChunkBatchReceivedByClient(F)V"))
-    private void leafs$chunkAckOnTheSenderThread(PlayerChunkSender sender, float desiredBatches, Operation<Void> original) {
-        MinecraftServer server = ((ServerGamePacketListenerImpl) (Object) this).player.level().getServer();
-        if (server.isSameThread()) {
-            original.call(sender, desiredBatches);
-        } else {
-            server.execute(() -> original.call(sender, desiredBatches));
-        }
-    }
 }

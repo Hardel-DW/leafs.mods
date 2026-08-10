@@ -56,6 +56,11 @@ public final class RegionNetworkTick {
         }
     }
 
+    /** Whether a region ticked this player recently enough that the global loop must keep its hands off. */
+    public static boolean ownedByRegion(ServerGamePacketListenerImpl listener) {
+        return PacketRouting.queueOf(listener).regionOwnerFresh(OWNER_STALE_NANOS);
+    }
+
     /** {@code Connection.tick}'s listener half: skipped while a region owns it, vanilla-complete otherwise (credits, login gap). */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
         if (!(listener instanceof ServerGamePacketListenerImpl game)) {
@@ -63,12 +68,11 @@ public final class RegionNetworkTick {
             return;
         }
 
-        PlayerPacketQueue queue = PacketRouting.queueOf(game);
-        if (queue.regionOwnerFresh(OWNER_STALE_NANOS)) {
+        if (ownedByRegion(game)) {
             return;
         }
 
-        queue.drain();
+        PacketRouting.queueOf(game).drain();
         original.run();
     }
 

@@ -9,7 +9,7 @@ Deux régions qui se rapprochent fusionnent. Une région dont les chunks ne se t
 Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les files de paquets de ses joueurs, ses évènements de blocs et son générateur aléatoire. Pendant son tick, elle joue le rôle que le thread serveur joue en vanilla, et rien d'autre ne touche à son contenu.
 
 ## Les trois familles de threads
-1. Le thread global. C'est le thread serveur de vanilla, conservé. Il exécute une fois par tick ce qui est global par nature : les horloges du monde, la météo, les fonctions de datapacks, la liste des joueurs, l'autosave, le transport réseau, l'envoi des chunks aux clients, et la fenêtre barrière décrite plus bas.
+1. Le thread global. C'est le thread serveur de vanilla, conservé. Il exécute une fois par tick ce qui est global par nature : les horloges du monde, la météo, les fonctions de datapacks, la liste des joueurs, l'autosave, le transport réseau, et la fenêtre barrière décrite plus bas.
 2. Les workers de régions. Un worker est un thread dont le seul travail est d'exécuter des ticks de régions. Ils sont en nombre fixe, réglé par `region_threads` dans la config. Une région n'est pas un thread, c'est une tâche. Quand un worker est libre, il prend la prochaine région dont le tick est dû dans une file commune. La charge s'équilibre toute seule et une région calme ne monopolise rien.
 3. Les pools de vanilla, intouchés. La génération de monde et la lumière tournent déjà en parallèle chez Mojang. Leafs ne les modifie pas.
 
