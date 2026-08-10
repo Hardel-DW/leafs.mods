@@ -4,6 +4,7 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.io.DeferredFileWrites;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
@@ -35,6 +36,7 @@ public final class TickingManager {
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.watchdogWarnSeconds()), Leafs.LOGGER::error);
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
+        DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveRegionThreads());
@@ -148,9 +150,11 @@ public final class TickingManager {
         }
     }
 
+    /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. */
     public void shutdown(MinecraftServer server) {
         scheduler.shutdown();
         watchdog.stop();
+        DeferredFileWrites.stopAndFlush();
         drainRegions(server);
     }
 

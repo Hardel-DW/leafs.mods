@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.network.RegionNetworkTick;
@@ -185,11 +186,17 @@ public final class LevelTickUnit extends TickHandle {
         lastEntityCount = entities;
     }
 
+    /** Roadmap 22 instrumentation: a queued task that stalls the serial tick logs its origin, readable in the lambda class name. */
     private void runQueuedTasks() {
         int budget = tasks.size();
         Runnable task;
         while (budget-- > 0 && (task = tasks.poll()) != null) {
+            long start = System.nanoTime();
             task.run();
+            long millis = (System.nanoTime() - start) / 1_000_000L;
+            if (millis > 50) {
+                Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
+            }
         }
     }
 
