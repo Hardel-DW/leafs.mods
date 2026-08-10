@@ -1,16 +1,21 @@
 package fr.hardel.leafs.mixin.network;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.network.ContainerClickGuard;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -22,6 +27,9 @@ import java.util.concurrent.Executor;
 /** Carries the player's inbound queue; handler continuations route back to it, respawn replays in the window. */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class ServerGamePacketListenerImplMixin implements GameListenerNetworkAccess {
+
+    @Shadow
+    public ServerPlayer player;
 
     @Unique
     private final PlayerPacketQueue leafs$inboundQueue = new PlayerPacketQueue();
@@ -56,6 +64,11 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         if (RegionNetworkTick.divertRespawn((ServerGamePacketListenerImpl) (Object) this, packet)) {
             callbackInfo.cancel();
         }
+    }
+
+    @WrapMethod(method = "handleContainerClick")
+    private void leafs$guardedContainerClick(ServerboundContainerClickPacket packet, Operation<Void> original) {
+        ContainerClickGuard.handleGuarded(this.player, packet, () -> original.call(packet));
     }
 
 }
