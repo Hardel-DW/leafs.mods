@@ -13,6 +13,7 @@ Chaque entrée groupe tous les mixins qui ciblent la même classe vanilla. Quand
 - Le mixin `ticking/` porte le `TickingManager` et fait passer chaque tick de niveau par son unité de région. Le `MainThreadExecutor` des chunks ne traite ses tâches que quand aucune région ne tique, Leafs vide les files des joueurs quand le serveur est en pause, et le pool de workers s'arrête proprement à l'extinction.
 - Le mixin `global/` porte la `BarrierWindow`. À chaque tick global, il vide la file de tâches globales puis ouvre la barrier window. Les fonctions de datapacks y sont envoyées quand la gamerule le permet.
 - Le mixin `entity/` porte le registre des schedulers d'entités, le `EntitySchedulerRegistry`.
+- Le mixin `network/` fait sauter à la boucle d'envoi de chunks les joueurs qu'une région tique, leur région envoie pour eux. Pour les joueurs du filet global, l'envoi prend le verrou exclusif du niveau, parce que les chunks sérialisés appartiennent à des régions qui écrivent dedans.
 
 ### `DedicatedServer`
 Les commandes tapées dans la console passent par la barrier window, parce qu'une commande op peut toucher n'importe quel état du monde.
@@ -28,7 +29,7 @@ Les commandes tapées dans la console passent par la barrier window, parce qu'un
 Le compteur de sub-tick, le générateur aléatoire et le neighbor updater deviennent dépendants de la région qui tique. L'appel à `getBlockEntity` répond correctement depuis un worker de région au lieu de renvoyer null. L'enregistrement d'un block entity ticker va dans la région propriétaire du chunk si elle existe, pour que la région tique ses propres block entities.
 
 ### `ChunkMap`
-- Le mixin `chunk/` remplace `chunksToEagerlySave` par un set concurrent, signale au `Regionizer` quand un chunk holder est créé ou détruit, et découpe le tracking en deux. La passe par entité va dans le corps de région, le calcul des vues des joueurs reste sur la phase sérielle.
+- Le mixin `chunk/` remplace `chunksToEagerlySave` par un set concurrent, signale au `Regionizer` quand un chunk holder est créé ou détruit, et découpe le tracking en deux. La passe par entité et le calcul des vues des joueurs vont dans le corps de région, la phase sérielle ne calcule les vues que des joueurs qu'aucune région ne tique. Le mixin route aussi `getChunkToSend` pour qu'une région ne sérialise que les chunks qu'elle possède.
 - Le mixin `entity/` remplace `entityMap` par une map concurrente.
 
 ### `ServerChunkCache`
@@ -87,7 +88,10 @@ Les paquets de jeu sont routés vers la file du joueur au lieu de la file global
 La vérification de thread vanilla est remplacée. Le thread autorisé à traiter un paquet est celui qui vide la file du joueur, pas nécessairement le thread serveur.
 
 ### `ServerGamePacketListenerImpl`
-Le mixin porte la `PlayerPacketQueue` du joueur. La chaîne du chat signé, le filtrage des livres et pancartes, et le chat s'exécutent dans la file du joueur. Les commandes restent sur la phase globale parce qu'elles peuvent charger des chunks arbitraires. Le respawn passe par la barrier window parce qu'il replace le joueur dans une dimension potentiellement différente. L'ack de batch de chunks est renvoyé au thread serveur pour garder le chunk sender single-threaded.
+Le mixin porte la `PlayerPacketQueue` du joueur. La chaîne du chat signé, le filtrage des livres et pancartes, et le chat s'exécutent dans la file du joueur. Les commandes restent sur la phase globale parce qu'elles peuvent charger des chunks arbitraires. Le respawn passe par la barrier window parce qu'il replace le joueur dans une dimension potentiellement différente. L'ack de batch de chunks se traite dans la file du joueur, sur le même thread que celui qui envoie ses chunks.
+
+### `PlayerChunkSender`
+Le mixin remplace le set des chunks en attente d'envoi par un set concurrent, parce que la phase sérielle y marque les chunks fraîchement prêts pendant que la région du joueur collecte et envoie. Les quotas et les compteurs de batch restent sur le thread propriétaire du joueur.
 
 ### `Connection`
 Le tick de connexion est coupé en deux. Le flush et la détection de déconnexion restent sur le thread global. La physique du joueur, les menus et le keepalive s'exécutent sur la région propriétaire.

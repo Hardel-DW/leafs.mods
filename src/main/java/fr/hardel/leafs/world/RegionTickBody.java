@@ -89,6 +89,7 @@ public final class RegionTickBody {
         entityData.tickList().forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 RegionNetworkTick.tickListenerOnRegion(player, level.getServer());
+                player.connection.chunkSender.sendNextChunks(player);
             }
         });
     }
