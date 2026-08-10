@@ -40,7 +40,10 @@ Le compteur de sub-tick, le générateur aléatoire et le neighbor updater devie
 Le `MainThreadExecutor` ne tourne que sous le verrou exclusif du niveau. Un worker de région qui tenterait de le déclencher lève une exception, parce que le traitement des chunks ne doit jamais tourner en même temps qu'un tick de région.
 
 ### `DistanceManager`
-Le mixin lit la distance de spawn directement dans le compteur sans vider la file du tracker, que seule la phase sérielle a le droit de toucher.
+Le mixin lit la distance de spawn directement dans le compteur sans vider la file du tracker, que seule la phase sérielle a le droit de toucher. Il porte aussi le propagateur de tickets de Leafs, `LevelTicketPropagator` : quand la config `own_propagator` est vraie, son drain remplace celui du graphe vanilla au même point d'injection, et quand les assertions de dev sont actives sans le drapeau, il tourne en ombre et compare ses niveaux à ceux de vanilla, chaque désaccord se logge. La propagation vanilla seule garde son budget de 4096 mises à jour par tick.
+
+### `TicketStorage`
+Le mixin met la table de tickets sous un moniteur, pour qu'une région pose ses tickets elle-même, et route les deux listeners des trackers : en ligne sur le thread serveur, en file vers la phase sérielle depuis tout autre thread, parce que le graphe de propagation vanilla reste mono thread. Le listener de chargement nourrit aussi le propagateur de Leafs et saute le graphe vanilla quand le propagateur commande.
 
 ### `SectionStorage`
 Le mixin remplace `storage` par une map concurrente et porte le `PoiVillageLock`. Le flush de sauvegarde passe sous ce verrou.
