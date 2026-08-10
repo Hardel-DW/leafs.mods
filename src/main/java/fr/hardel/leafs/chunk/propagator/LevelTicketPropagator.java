@@ -20,6 +20,7 @@ public final class LevelTicketPropagator extends LeafsTicketPropagator {
     private final DistanceManager distanceManager;
     private final AreaLock ticketLock = new AreaLock(SECTION_SHIFT);
     private final boolean shadow;
+    private boolean shadowComparable;
 
     public LevelTicketPropagator(DistanceManager distanceManager, boolean shadow) {
         this.distanceManager = distanceManager;
@@ -42,6 +43,12 @@ public final class LevelTicketPropagator extends LeafsTicketPropagator {
         performUpdates(ticketLock);
     }
 
+    /** A comparison is only honest once vanilla's budgeted graph emptied its queue this tick. */
+    public void drainShadow(boolean vanillaConverged) {
+        shadowComparable = vanillaConverged;
+        performUpdates(ticketLock);
+    }
+
     public boolean shadow() {
         return shadow;
     }
@@ -54,7 +61,7 @@ public final class LevelTicketPropagator extends LeafsTicketPropagator {
             ChunkHolder chunk = distanceManager.getChunk(pos);
             int holderLevel = chunk == null ? UNLOADED : chunk.getTicketLevel();
             if (shadow) {
-                if (holderLevel != level) {
+                if (shadowComparable && holderLevel != level) {
                     Leafs.LOGGER.error("Propagator shadow disagreement at {}: vanilla {} leafs {}", ChunkPos.unpack(pos), holderLevel, level);
                 }
 
