@@ -27,10 +27,12 @@ public final class RegionChunkAccess {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
-    public static ChunkAccess presentChunkOrThrow(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {
+    /** A refused required read runs {@code demand} first, so the load gets filed and the vanilla retry converges. */
+    public static ChunkAccess presentChunkOrThrow(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required, Runnable demand) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);
         if (chunk == null && required) {
+            demand.run();
             throw new OwnershipViolationException("Chunk [" + chunkX + ", " + chunkZ + "] not present at " + status + " in the visible map: a region worker cannot sync-load it");
         }
 
