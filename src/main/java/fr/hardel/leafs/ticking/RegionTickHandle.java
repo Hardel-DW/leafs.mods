@@ -60,7 +60,7 @@ public final class RegionTickHandle extends TickHandle {
                     return;
                 }
 
-                WorldTickContext.enter(body.level(), worldData);
+                WorldTickContext.enter(body.level(), worldData, data.entityData());
                 try {
                     regions.taskScheduler().drain(region);
                     body.tick(region, worldData, data.entityData(), tickCount);
