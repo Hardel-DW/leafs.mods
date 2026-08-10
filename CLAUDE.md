@@ -12,6 +12,8 @@ Decompiled and reference sources are in the "repository" folder outside the work
 
 # Global Rules
 - Avoid Memory, use docs or roadmap folder.
+- Never commit without explicit authorization.
+- No folder containing a single file.
 - No em-dash use ponctuations. Complete sentence
 - No redundancy, we must avoid duplicating truth sources.
 - No function/variable with a single line/reference. Except Getter/Setter...

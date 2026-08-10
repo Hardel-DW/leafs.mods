@@ -1,4 +1,4 @@
-package fr.hardel.leafs.io;
+package fr.hardel.leafs.global;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
