@@ -37,3 +37,7 @@ accessible method net/minecraft/world/entity/Entity calculatePassengerTransition
 accessible field net/minecraft/server/ServerFunctionManager ticking Ljava/util/List;
 accessible field net/minecraft/server/ServerFunctionManager postReload Z
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
+accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
+accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
+accessible field net/minecraft/server/level/DistanceManager chunksToUpdateFutures Ljava/util/Set;
+accessible field net/minecraft/server/level/DistanceManager ticketStorage Lnet/minecraft/world/level/TicketStorage;

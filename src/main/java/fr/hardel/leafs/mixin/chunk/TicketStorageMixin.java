@@ -2,7 +2,9 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
+import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.server.level.ServerLevel;
@@ -50,9 +52,23 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         }
     }
 
+    /** The loading listener also feeds the Leafs propagator, and skips vanilla's graph when it drives (S4). */
     @WrapMethod(method = "setLoadingChunkUpdatedListener")
     private void leafs$routeLoadingListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        original.call(leafs$routed(listener));
+        TicketStorage.ChunkUpdated routed = leafs$routed(listener);
+        TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
+            ServerLevel owner = leafs$level;
+            LevelTicketPropagator propagator = owner == null ? null : ((PropagatorAccess) owner.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator();
+            if (propagator != null) {
+                propagator.feed(key);
+                if (!propagator.shadow()) {
+                    return;
+                }
+            }
+
+            routed.update(key, level, onlyDecreased);
+        };
+        original.call(shim);
     }
 
     @WrapMethod(method = "setSimulationChunkUpdatedListener")
