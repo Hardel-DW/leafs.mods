@@ -2,17 +2,25 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.chunk.PendingUnloadClaims;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.entity.ConcurrentOrderedLongSet;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import fr.hardel.leafs.world.WorldTickContext;
+import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMaps;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -31,6 +39,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -46,14 +56,27 @@ public abstract class ChunkMapMixin {
     @Final
     private LongSet chunksToEagerlySave;
 
+    @Mutable
+    @Shadow
+    @Final
+    private Long2ObjectLinkedOpenHashMap<ChunkHolder> pendingUnloads;
+
+    @Mutable
+    @Shadow
+    @Final
+    private Long2LongMap nextChunkSaveTime;
+
     /**
      * Every region marks its chunks unsaved concurrently with the serial phase (light, pump); the
      * vanilla linked hash set corrupts under two writers (the 150-bot rehash AIOOBE). The scan order
      * becomes positional instead of insertion-aged, which only reorders the 20-per-tick eager-save budget.
+     * The unload claims and save clocks cross threads too, now that regions tear down their own chunks.
      */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$concurrentEagerSaves(CallbackInfo callbackInfo) {
         this.chunksToEagerlySave = new ConcurrentOrderedLongSet(32);
+        this.pendingUnloads = new PendingUnloadClaims();
+        this.nextChunkSaveTime = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
     }
 
     @Inject(method = "updateChunkScheduling",
@@ -83,6 +106,30 @@ public abstract class ChunkMapMixin {
 
         RegionEntityTracking.tickSerial((ChunkMap) (Object) this);
         callbackInfo.cancel();
+    }
+
+    /** The teardown runs on the region that owned the chunk at the unload decision; chunks nobody owned keep vanilla's serial queue. */
+    @WrapOperation(method = "scheduleUnload", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenRunAsync(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
+    private CompletableFuture<Void> leafs$teardownOnTheOwner(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original, @Local(argsOnly = true, ordinal = 0) long pos) {
+        Executor owner = task -> {
+            if (!leafs$regions().unloads().offerToOwner(pos, ChunkPos.getX(pos), ChunkPos.getZ(pos), task)) {
+                serialQueue.execute(task);
+            }
+        };
+
+        return original.call(future, body, owner);
+    }
+
+    /** The autosave sweep offers each chunk to its owner, which snapshots it on its own thread through the budgeted lane. */
+    @WrapOperation(method = "saveAllChunks", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;saveChunkIfNeeded(Lnet/minecraft/server/level/ChunkHolder;J)Z"))
+    private boolean leafs$autosaveOnTheOwner(ChunkMap map, ChunkHolder holder, long now, Operation<Boolean> original) {
+        ChunkPos pos = holder.getPos();
+        Region<RegionTickData> owner = leafs$regions().regionizer().regionAt(pos.x(), pos.z());
+        if (leafs$regions().unloads().offer(owner, pos.x(), pos.z(), () -> map.saveChunkIfNeeded(holder, now))) {
+            return false;
+        }
+
+        return original.call(map, holder, now);
     }
 
     /** View diffs run on the player's owner: the region for its own players, the serial pass only for players no region ticks. */

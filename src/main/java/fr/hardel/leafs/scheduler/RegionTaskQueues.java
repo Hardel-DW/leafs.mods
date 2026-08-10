@@ -4,6 +4,7 @@ import fr.hardel.leafs.region.CoordinateKey;
 
 import java.util.ArrayDeque;
 import java.util.Iterator;
+import java.util.function.Consumer;
 import java.util.function.LongFunction;
 
 /**
@@ -55,6 +56,17 @@ public final class RegionTaskQueues {
                 synchronized (target) {
                     target.tasks.addLast(task);
                 }
+            }
+            tasks.clear();
+        }
+    }
+
+    /** Death without a merge target: the remaining tasks drain to the caller's sink, serially. */
+    public void closeDraining(Consumer<Runnable> sink) {
+        synchronized (this) {
+            closed = true;
+            for (QueuedTask task : tasks) {
+                sink.accept(task.action());
             }
             tasks.clear();
         }

@@ -80,7 +80,7 @@ public final class LevelTickUnit extends TickHandle {
             LevelEntityLists entityLists = ((ServerLevelEntityAccess) level).leafs$entityLists();
             LongFunction<RegionWorldData> regionWorldData = chunkKey -> resolve(regionizer, chunkKey, data -> data.worldData());
             LongFunction<RegionEntityData> regionEntityData = chunkKey -> resolve(regionizer, chunkKey, data -> data.entityData());
-            regions.activate(dimension(), scheduler, holds, taskScheduler, () -> RegionWorldData.regional(level), body, () -> {
+            regions.activate(dimension(), scheduler, holds, taskScheduler, this::submit, () -> RegionWorldData.regional(level), body, () -> {
                 router.route(chunkKey -> orAttached(regionWorldData.apply(chunkKey), router.attached()));
                 entityLists.route(chunkKey -> orAttached(regionEntityData.apply(chunkKey), entityLists.attached()));
                 routeScheduledTicks(router, regionizer);

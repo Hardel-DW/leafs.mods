@@ -63,6 +63,7 @@ public final class RegionTickHandle extends TickHandle {
                 WorldTickContext.enter(body.level(), worldData, data.entityData());
                 try {
                     regions.taskScheduler().drain(region);
+                    regions.unloads().drain(region);
                     body.tick(region, worldData, data.entityData(), tickCount);
                     chunkCensus = region.chunkCount();
                     entityCensus = data.entityData().tickList().size();
