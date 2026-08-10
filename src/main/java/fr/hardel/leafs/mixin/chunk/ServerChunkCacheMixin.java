@@ -1,6 +1,7 @@
 package fr.hardel.leafs.mixin.chunk;
 
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.ticking.LevelBindings;
 import fr.hardel.leafs.ticking.LevelOwnership;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
@@ -15,6 +16,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Region workers answer thread-identity checks through ownership: mid-tick is a game thread for its level. */
@@ -28,6 +30,12 @@ public abstract class ServerChunkCacheMixin {
     @Shadow
     @Final
     private Thread mainThread;
+
+    /** The storage is constructed level-blind as saved data; the routing shim needs its level (S1). */
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$bindTicketStorage(CallbackInfo callbackInfo) {
+        ((TicketStorageAccess) ((ServerChunkCache) (Object) this).ticketStorage).leafs$bindLevel(this.level);
+    }
 
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
