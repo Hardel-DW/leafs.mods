@@ -1,6 +1,7 @@
 package fr.hardel.leafs.mixin.chunk;
 
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.ticking.LevelBindings;
 import fr.hardel.leafs.ticking.LevelOwnership;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import net.minecraft.server.level.ServerChunkCache;
@@ -40,7 +41,7 @@ public abstract class ServerChunkCacheMixin {
     private void leafs$regionGetChunkPath(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
         if (leafs$regionWorkerHoldsLevel()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.presentChunkOrThrow(self.chunkMap, x, z, targetStatus, loadOrGenerate));
+            callbackInfo.setReturnValue(RegionChunkAccess.presentChunkOrThrow(self.chunkMap, x, z, targetStatus, loadOrGenerate, LevelBindings.chunkDemand(self, x, z, targetStatus)));
         }
     }
 
