@@ -8,12 +8,15 @@ import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.scheduler.RegionScheduler;
+import fr.hardel.leafs.scheduler.RegionUnloads;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
@@ -25,9 +28,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     /** Mutated only by {@link #chunkHolderCreated} / {@link #chunkHolderDestroyed}; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
     private final LevelOwnership ownership = new LevelOwnership();
+    private final RegionUnloads<RegionTickData> unloads = new RegionUnloads<>();
 
     private volatile String dimension;
     private volatile SharedChunkHolds holds;
+    private volatile Consumer<Runnable> serialUnloadSink;
     private volatile RegionScheduler<RegionTickData> taskScheduler;
     private volatile Supplier<RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
@@ -57,13 +62,14 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
      * Regions are equipped first, the caller's migration then re-buckets the attached payloads, and
      * only then are the handles scheduled, so no region can tick against a half-migrated level.
      */
-    public void activate(String dimension, RegionTickScheduler scheduler, SharedChunkHolds holds, RegionScheduler<RegionTickData> taskScheduler, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
+    public void activate(String dimension, RegionTickScheduler scheduler, SharedChunkHolds holds, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
         if (this.scheduler != null) {
             return;
         }
 
         this.dimension = dimension;
         this.holds = holds;
+        this.serialUnloadSink = serialUnloadSink;
         this.taskScheduler = taskScheduler;
         this.worldDataFactory = worldDataFactory;
         this.body = body;
@@ -95,6 +101,17 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return taskScheduler;
     }
 
+    public RegionUnloads<RegionTickData> unloads() {
+        return unloads;
+    }
+
+    /** Shutdown path, pool already stopped: every queued teardown runs inline so the final save misses nothing. */
+    public void drainUnloadsForShutdown() {
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            region.data().unloadQueues().closeDraining(Runnable::run);
+        }
+    }
+
     /** A chunk holder now exists at this position: the ticket level dropped to at most {@code ChunkLevel.MAX_LEVEL}. */
     public void chunkHolderCreated(int chunkX, int chunkZ) {
         try {
@@ -104,8 +121,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
     }
 
+    /** The owner is captured before the removal, because after it the chunk belongs to nobody (see {@link RegionUnloads}). */
     public void chunkHolderDestroyed(int chunkX, int chunkZ) {
         try {
+            unloads.noteOwner(ChunkPos.pack(chunkX, chunkZ), regionizer.regionAt(chunkX, chunkZ));
             regionizer.removeChunk(chunkX, chunkZ);
         } catch (RuntimeException exception) {
             throw recordFeedFailure("destroy", chunkX, chunkZ, exception);
@@ -183,6 +202,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     @Override
     public void onRegionDestroy(Region<RegionTickData> region) {
+        Consumer<Runnable> sink = serialUnloadSink;
+        if (sink != null) {
+            region.data().unloadQueues().closeDraining(sink);
+        }
     }
 
     @Override
@@ -204,6 +227,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     @Override
     public void merge(Region<RegionTickData> from, Region<RegionTickData> into) {
         from.data().taskQueues().closeInto(into.data().taskQueues());
+        from.data().unloadQueues().closeInto(into.data().unloadQueues());
         RegionWorldData fromWorld = from.data().worldData();
         RegionWorldData intoWorld = into.data().worldData();
         if (fromWorld != null && intoWorld != null) {
@@ -220,6 +244,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
 
             return child == null ? null : child.data().taskQueues();
+        });
+        parent.data().unloadQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
+            Region<RegionTickData> child = sectionToChild.get(sectionKey);
+
+            return child == null ? null : child.data().unloadQueues();
         });
         RegionWorldData parentWorld = parent.data().worldData();
         if (parentWorld != null) {

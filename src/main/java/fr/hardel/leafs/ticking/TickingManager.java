@@ -143,6 +143,7 @@ public final class TickingManager {
         scheduler.shutdown();
         globalScheduler.drain();
         for (ServerLevel level : server.getAllLevels()) {
+            ((ServerLevelRegionAccess) level).leafs$regions().drainUnloadsForShutdown();
             EntityTeleports teleports = ((ServerLevelEntityAccess) level).leafs$entityTeleports();
             try {
                 teleports.completeAll();

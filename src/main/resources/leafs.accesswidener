@@ -36,3 +36,4 @@ accessible method net/minecraft/world/entity/Entity removeAfterChangingDimension
 accessible method net/minecraft/world/entity/Entity calculatePassengerTransition (Lnet/minecraft/world/level/portal/TeleportTransition;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;
 accessible field net/minecraft/server/ServerFunctionManager ticking Ljava/util/List;
 accessible field net/minecraft/server/ServerFunctionManager postReload Z
+accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z

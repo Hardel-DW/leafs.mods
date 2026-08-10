@@ -29,7 +29,7 @@ Les commandes tapées dans la console passent par la barrier window, parce qu'un
 Le compteur de sub-tick, le générateur aléatoire et le neighbor updater deviennent dépendants de la région qui tique. L'appel à `getBlockEntity` répond correctement depuis un worker de région au lieu de renvoyer null. L'enregistrement d'un block entity ticker va dans la région propriétaire du chunk si elle existe, pour que la région tique ses propres block entities.
 
 ### `ChunkMap`
-- Le mixin `chunk/` remplace `chunksToEagerlySave` par un set concurrent, signale au `Regionizer` quand un chunk holder est créé ou détruit, et découpe le tracking en deux. La passe par entité et le calcul des vues des joueurs vont dans le corps de région, la phase sérielle ne calcule les vues que des joueurs qu'aucune région ne tique. Le mixin route aussi `getChunkToSend` pour qu'une région ne sérialise que les chunks qu'elle possède.
+- Le mixin `chunk/` remplace `chunksToEagerlySave` par un set concurrent, signale au `Regionizer` quand un chunk holder est créé ou détruit, et découpe le tracking en deux. La passe par entité et le calcul des vues des joueurs vont dans le corps de région, la phase sérielle ne calcule les vues que des joueurs qu'aucune région ne tique. Le mixin route aussi `getChunkToSend` pour qu'une région ne sérialise que les chunks qu'elle possède, et il détourne l'exécuteur du démontage de `scheduleUnload` vers la région qui possédait le chunk à la décision, avec la file sérielle vanilla en secours. `pendingUnloads` et `nextChunkSaveTime` deviennent atomiques parce que la revendication du démontage traverse les threads.
 - Le mixin `entity/` remplace `entityMap` par une map concurrente.
 
 ### `ServerChunkCache`
