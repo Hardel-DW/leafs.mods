@@ -27,10 +27,12 @@ public final class TickTimings {
         long[] window = new long[CAPACITY];
         int ticks = 0;
         long total = 0;
+        long oldestEnd = nowNanos;
         for (int index = 0; index < CAPACITY; index++) {
             if (endNanos[index] >= cutoff && durationNanos[index] > 0) {
                 window[ticks++] = durationNanos[index];
                 total += durationNanos[index];
+                oldestEnd = Math.min(oldestEnd, endNanos[index]);
             }
         }
         if (ticks == 0) {
@@ -38,7 +40,9 @@ public final class TickTimings {
         }
 
         Arrays.sort(window, 0, ticks);
-        double tps = Math.min(ticks / (WINDOW_NANOS / 1_000_000_000.0), 20.0);
+        // Divided by the span actually covered, not the fixed window: a young unit reports its true rate, not a ramp from zero.
+        double spanSeconds = Math.max((nowNanos - oldestEnd) / 1_000_000_000.0, 1.0 / 20.0);
+        double tps = Math.min(ticks / spanSeconds, 20.0);
 
         return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50),
             percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
