@@ -43,7 +43,7 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
 
     public static final Codec<LeafsConfig> CODEC = MAP_CODEC.codec();
 
-    public static void load() {
+    public static void register() {
         instance = load(FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json"));
     }
 

@@ -14,16 +14,12 @@ import net.minecraft.server.level.ServerLevel;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Server-scoped orchestrator of the region tick machinery, reached through {@link LeafsServerAccess}. */
 public final class TickingManager {
-    private static final List<LevelTickPhases> installedPhases = new CopyOnWriteArrayList<>();
 
     private final MinecraftServer server;
     private final TickBarrier barrier = new TickBarrier();
@@ -44,14 +40,6 @@ public final class TickingManager {
         Leafs.LOGGER.info("Leafs ticking live - {} region workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveRegionThreads());
     }
 
-    /** Installed at bootstrap, before any server exists; before-hooks run in install order. */
-    public static void installPhases(LevelTickPhases phases) {
-        installedPhases.add(Objects.requireNonNull(phases));
-    }
-
-    static List<LevelTickPhases> phases() {
-        return installedPhases;
-    }
 
     public TickBarrier barrier() {
         return barrier;

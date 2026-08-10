@@ -76,7 +76,7 @@ class RoutingNeighborUpdaterTest {
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback);
-        WorldTickContext.enter(null, dataWith(regional));
+        WorldTickContext.enter(null, dataWith(regional), null);
         try {
             callAll(router);
         } finally {
@@ -92,7 +92,7 @@ class RoutingNeighborUpdaterTest {
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback);
-        WorldTickContext.enter(new Object(), dataWith(regional));
+        WorldTickContext.enter(new Object(), dataWith(regional), null);
         try {
             router.neighborChanged(new BlockPos(0, 64, 0), null, null);
         } finally {
