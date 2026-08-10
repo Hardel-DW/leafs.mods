@@ -9,10 +9,12 @@ import net.minecraft.server.level.DistanceManager;
 import net.minecraft.world.level.ChunkPos;
 
 /**
- * The loading tracker's replacement (S4). Sources re-read the authoritative ticket table, updates
- * land on vanilla's own holder path, whose two update passes run right after the drain point. In
- * shadow mode (S5) the callback only compares against the holder levels vanilla computed and logs
- * every disagreement; nothing is written until the shadow has vouched for the algorithm.
+ * The loading tracker's replacement (S4). Sources arrive through the ticket listener, whose level
+ * argument is the new absolute loading level computed under the table monitor; staging takes the
+ * chunk's ticket area cell, the propagator's contract against a concurrent drain. Updates land on
+ * vanilla's own holder path, whose two update passes run right after the drain point. In shadow
+ * mode (S5) the callback only compares against the holder levels vanilla computed and logs every
+ * disagreement; nothing is written until the shadow has vouched for the algorithm.
  */
 public final class LevelTicketPropagator extends LeafsTicketPropagator {
     private static final int UNLOADED = ChunkLevel.MAX_LEVEL + 1;
@@ -27,15 +29,20 @@ public final class LevelTicketPropagator extends LeafsTicketPropagator {
         this.shadow = shadow;
     }
 
-    /** The listener is only a wake-up: the source level is re-read from the table, like vanilla's recompute does. */
-    public void feed(long pos) {
-        int inverted = convertBetweenTicketLevels(distanceManager.ticketStorage.getTicketLevelAt(pos, false));
+    /** No table read in here: the level rides the listener call, so this never waits on the table monitor. */
+    public void feed(long pos, int newLevel) {
+        int inverted = convertBetweenTicketLevels(newLevel);
         int chunkX = ChunkPos.getX(pos);
         int chunkZ = ChunkPos.getZ(pos);
-        if (inverted <= 0) {
-            removeSource(chunkX, chunkZ);
-        } else {
-            setSource(chunkX, chunkZ, Math.min(inverted, MAX_SOURCE_LEVEL));
+        AreaLock.Node node = ticketLock.lock(chunkX, chunkZ, 0);
+        try {
+            if (inverted <= 0) {
+                removeSource(chunkX, chunkZ);
+            } else {
+                setSource(chunkX, chunkZ, Math.min(inverted, MAX_SOURCE_LEVEL));
+            }
+        } finally {
+            ticketLock.unlock(node);
         }
     }
 
