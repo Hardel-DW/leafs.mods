@@ -4,6 +4,7 @@ import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.entity.ServerEntityAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
@@ -143,16 +144,11 @@ public final class LevelTickUnit extends TickHandle {
 
         pendingWork = null;
         regions.ownership().enterLevelSerial();
-        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData());
+        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), ((ServerLevelEntityAccess) level).leafs$entityLists().attached());
         try {
             runQueuedTasks();
-            for (LevelTickPhases phases : TickingManager.phases()) {
-                phases.beforeLevelTick(level);
-            }
+            ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickLevel(level);
             work.run();
-            for (LevelTickPhases phases : TickingManager.phases()) {
-                phases.afterLevelTick(level);
-            }
 
             if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
                 takeCensus();
@@ -167,7 +163,7 @@ public final class LevelTickUnit extends TickHandle {
     void tickPausedNetwork() {
         regions.ownership().enterLevelSerial();
         RegionContext.enter(context());
-        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData());
+        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), ((ServerLevelEntityAccess) level).leafs$entityLists().attached());
         try {
             RegionNetworkTick.drainPaused(level);
         } finally {
