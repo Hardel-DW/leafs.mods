@@ -4,4 +4,7 @@ package fr.hardel.leafs.scheduler;
 public interface RegionTaskHost {
 
     RegionTaskQueues taskQueues();
+
+    /** Hold-free lane for chunk unload teardown, drained with its own budget. */
+    RegionTaskQueues unloadQueues();
 }

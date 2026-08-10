@@ -8,6 +8,7 @@ import fr.hardel.leafs.world.RegionWorldData;
 /** The per-region composite: task queues always, tick handle and the world/entity payloads once the level activated. */
 public final class RegionTickData implements RegionTaskHost {
     private final RegionTaskQueues taskQueues = new RegionTaskQueues();
+    private final RegionTaskQueues unloadQueues = new RegionTaskQueues();
     private volatile RegionTickHandle handle;
     private volatile RegionWorldData worldData;
     private volatile RegionEntityData entityData;
@@ -15,6 +16,11 @@ public final class RegionTickData implements RegionTaskHost {
     @Override
     public RegionTaskQueues taskQueues() {
         return taskQueues;
+    }
+
+    @Override
+    public RegionTaskQueues unloadQueues() {
+        return unloadQueues;
     }
 
     public RegionTickHandle handle() {
