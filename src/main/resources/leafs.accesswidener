@@ -40,4 +40,3 @@ accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/mi
 accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
 accessible field net/minecraft/server/level/DistanceManager chunksToUpdateFutures Ljava/util/Set;
-accessible field net/minecraft/server/level/DistanceManager ticketStorage Lnet/minecraft/world/level/TicketStorage;
