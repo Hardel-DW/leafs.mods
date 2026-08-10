@@ -57,9 +57,4 @@ public abstract class EntityMixin {
 
         return null;
     }
-
-    @WrapOperation(method = "placePortalTicket", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;addTicketWithRadius(Lnet/minecraft/server/level/TicketType;Lnet/minecraft/world/level/ChunkPos;I)V"))
-    private void leafs$deferPortalTicket(ServerChunkCache chunkSource, TicketType type, ChunkPos pos, int radius, Operation<Void> original) {
-        LevelBindings.addTicketWithRadius(chunkSource, type, pos, radius);
-    }
 }

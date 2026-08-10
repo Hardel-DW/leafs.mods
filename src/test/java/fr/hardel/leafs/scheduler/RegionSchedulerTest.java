@@ -25,14 +25,12 @@ class RegionSchedulerTest {
     private RegionScheduler<TestRegionData> scheduler;
     private List<String> executed;
 
-    private boolean levelSerial;
 
     @BeforeEach
     void createScheduler() {
         regionizer = new Regionizer<>(SECTION_SHIFT, 1, 1, new TestRegionCallbacks(SECTION_SHIFT));
         tickets = new FakeChunkHolds(regionizer);
-        levelSerial = true;
-        holds = new SharedChunkHolds(tickets, () -> levelSerial);
+        holds = new SharedChunkHolds(tickets);
         scheduler = new RegionScheduler<>(regionizer, holds);
         executed = new ArrayList<>();
     }
@@ -164,15 +162,10 @@ class RegionSchedulerTest {
     }
 
     @Test
-    void aForeignQueueParksUntilTheQuiesceCompletesIt() {
-        levelSerial = false;
+    void aQueueAppliesItsHoldInlineFromAnyThread() {
         scheduler.queue(0, 0, () -> executed.add("task"));
 
-        assertEquals(0, tickets.addCalls, "no ticket op may run off the serial side");
-        assertTrue(regionizer.regionsView().isEmpty(), "no region may exist before the hold applied");
-
-        levelSerial = true;
-        holds.applyPendingOps();
+        assertEquals(1, tickets.addCalls, "the hold ticket applies inline since the funnel became thread-safe");
         scheduler.completePending();
 
         Region<TestRegionData> region = regionizer.regionAt(0, 0);
@@ -192,7 +185,7 @@ class RegionSchedulerTest {
             @Override
             public void removeHold(int chunkX, int chunkZ) {
             }
-        }, () -> true);
+        });
         RegionScheduler<TestRegionData> inert = new RegionScheduler<>(regionizer, inertHolds);
         inert.queue(0, 0, () -> executed.add("never"));
 
