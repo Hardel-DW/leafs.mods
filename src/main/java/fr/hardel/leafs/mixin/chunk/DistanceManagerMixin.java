@@ -5,11 +5,13 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.PropagatorAccess;
+import fr.hardel.leafs.chunk.ViewAdmissionAccess;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
 import fr.hardel.leafs.ownership.Ownership;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.LoadingChunkTracker;
+import net.minecraft.server.level.ThrottlingChunkTaskDispatcher;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.NaturalSpawner;
 import org.spongepowered.asm.mixin.Final;
@@ -29,8 +31,18 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
     @Final
     private DistanceManager.FixedPlayerDistanceChunkTracker naturalSpawnChunkCounter;
 
+    @Shadow
+    @Final
+    private ThrottlingChunkTaskDispatcher ticketDispatcher;
+
     @Unique
     private volatile LevelTicketPropagator leafs$propagator;
+
+    /** One view-ticket admission per connected player, vanilla floor of 4; see ThrottlingChunkTaskDispatcherMixin. */
+    @Inject(method = "runAllUpdates", at = @At("HEAD"))
+    private void leafs$scaleViewAdmission(ChunkMap chunkMap, CallbackInfoReturnable<Boolean> callbackInfo) {
+        ((ViewAdmissionAccess) ticketDispatcher).leafs$admissionCap(chunkMap.level.getServer().getPlayerCount());
+    }
 
     @Override
     public LevelTicketPropagator leafs$propagator() {
