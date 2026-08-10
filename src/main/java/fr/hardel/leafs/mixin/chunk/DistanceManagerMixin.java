@@ -60,12 +60,12 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
         }
 
         int budget = chunkMap.level.getServer().isStopped() ? toProcess : 4096;
-        int remaining = toProcess - budget + original.call(tracker, budget);
+        int unusedBudget = original.call(tracker, budget);
         if (propagator != null) {
-            propagator.drain();
+            propagator.drainShadow(unusedBudget > 0);
         }
 
-        return remaining;
+        return toProcess - budget + unusedBudget;
     }
 
     @Inject(method = "hasPlayersNearby", at = @At("HEAD"), cancellable = true)
