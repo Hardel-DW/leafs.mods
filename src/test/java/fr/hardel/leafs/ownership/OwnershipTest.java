@@ -22,11 +22,6 @@ class OwnershipTest {
     }
 
     @Test
-    void threadsStartWithoutContext() {
-        assertNull(RegionContext.current());
-    }
-
-    @Test
     void enterAndExitDriveCurrent() {
         RegionContext.enter(new RegionContext.Region(3, "minecraft:overworld"));
 

@@ -52,7 +52,7 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
         leafs$barrierWindow.runGlobalPhase();
     }
 
-    /** Tick functions execute in the barrier window (Compromise #4). The tick_functions_work rule cuts the loop; reload stays. */
+    /** Tick functions execute in the barrier window. The tick_functions_work rule cuts the loop; reload stays. */
     @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/ServerFunctionManager;tick()V"))
     private void leafs$functionsIntoWindow(ServerFunctionManager manager, Operation<Void> original) {
         boolean tickFunctionsDue = !manager.ticking.isEmpty() && ((MinecraftServer) (Object) this).getGameRules().get(LeafsGameRules.tickFunctionsWork);

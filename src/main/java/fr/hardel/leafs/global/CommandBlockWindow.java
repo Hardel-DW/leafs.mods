@@ -8,7 +8,7 @@ import net.minecraft.world.level.block.CommandBlock;
 import net.minecraft.world.level.block.entity.CommandBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Command blocks execute inside the barrier window (Compromise #4) because commands reach arbitrary state. */
+/** Command blocks execute inside the barrier window because commands reach arbitrary state. */
 public final class CommandBlockWindow {
 
     private CommandBlockWindow() {

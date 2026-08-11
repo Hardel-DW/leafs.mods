@@ -2,12 +2,9 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
-import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.ViewAdmissionAccess;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
-import fr.hardel.leafs.ownership.Ownership;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.LoadingChunkTracker;
@@ -49,35 +46,17 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
         return leafs$propagator;
     }
 
-    /** Driving or shadowing exist from the first boot; a plain vanilla run keeps the field null and pays nothing. */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createPropagator(CallbackInfo callbackInfo) {
-        boolean driving = LeafsConfig.get().ownPropagator();
-        if (driving || Ownership.CHECKS_ENABLED) {
-            leafs$propagator = new LevelTicketPropagator((DistanceManager) (Object) this, !driving);
-        }
+        leafs$propagator = new LevelTicketPropagator((DistanceManager) (Object) this);
     }
 
-    /**
-     * The drain point of the loading graph. Driving: the Leafs propagator replaces it and vanilla's
-     * two update passes follow on its holders. Shadow: vanilla drains first, the Leafs drain compares.
-     * Vanilla alone keeps the budget that caps the measured multi-second backlog spike.
-     */
+    /** The Leafs propagator replaces vanilla's budgeted graph; vanilla's drain stays as the net for pre-binding strays and runs empty. */
     @WrapOperation(method = "runAllUpdates", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/LoadingChunkTracker;runDistanceUpdates(I)I"))
-    private int leafs$budgetDistanceUpdates(LoadingChunkTracker tracker, int toProcess, Operation<Integer> original, @Local(argsOnly = true) ChunkMap chunkMap) {
-        LevelTicketPropagator propagator = leafs$propagator;
-        if (propagator != null && !propagator.shadow()) {
-            propagator.drain();
-            return toProcess;
-        }
+    private int leafs$drainPropagator(LoadingChunkTracker tracker, int toProcess, Operation<Integer> original) {
+        leafs$propagator.drain();
 
-        int budget = chunkMap.level.getServer().isStopped() ? toProcess : 4096;
-        int unusedBudget = original.call(tracker, budget);
-        if (propagator != null) {
-            propagator.drainShadow(unusedBudget > 0);
-        }
-
-        return toProcess - budget + unusedBudget;
+        return original.call(tracker, toProcess);
     }
 
     @Inject(method = "hasPlayersNearby", at = @At("HEAD"), cancellable = true)

@@ -45,7 +45,7 @@ public final class RegionsCommand {
         double serverTps = units.isEmpty() ? 0 : units.getFirst().timings().sample(now).tps();
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("Leafs ").withStyle(ChatFormatting.GREEN))
-            .append(gray(LeafsConfig.get().effectiveRegionThreads() + " workers, server thread "))
+            .append(gray(LeafsConfig.get().effectiveThreads() + " workers, server thread "))
             .append(tps(serverTps)), false);
 
         for (LevelTickUnit unit : units) {
@@ -60,12 +60,14 @@ public final class RegionsCommand {
 
     private static Component overviewLine(LevelTickUnit unit, long now) {
         List<Region<RegionTickData>> live = liveRegions(unit.regions());
+        TickTimings.Snapshot serial = unit.timings().sample(now);
         MutableComponent line = Component.empty()
             .append(Component.literal(shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
             .append(gray("  regions ")).append(white(live.size()))
             .append(gray("  chunks ")).append(white(unit.chunkCount()))
             .append(gray("  entities ")).append(white(unit.entityCount()))
-            .append(gray("  serial ")).append(white(String.format(Locale.ROOT, "%.2fms", unit.timings().sample(now).msptAverage())));
+            .append(gray("  serial ")).append(tps(serial.tps()))
+            .append(gray(" avg ")).append(white(String.format(Locale.ROOT, "%.2fms", serial.msptAverage())));
 
         RegionTickHandle slowest = null;
         double slowestTps = Double.MAX_VALUE;

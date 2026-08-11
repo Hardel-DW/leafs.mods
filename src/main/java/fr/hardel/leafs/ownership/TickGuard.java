@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Compromise #19: a tick unit that reaches past the region's loaded chunks refuses itself before
+ * A tick unit that reaches past the region's loaded chunks refuses itself before
  * mutating anything; the guard skips that one unit for the tick instead of crashing the region.
  * Every other failure keeps vanilla's crash path.
  */

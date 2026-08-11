@@ -57,7 +57,7 @@ public final class EntityTeleports {
         return pending.pendingCount();
     }
 
-    /** Returns false when the vanilla path is safe; otherwise the move has been routed (Compromise #7). */
+    /** Returns false when the vanilla path is safe; otherwise the move has been routed. */
     public boolean divertFromRegion(Entity entity, TeleportTransition transition) {
         ServerLevel target = transition.newLevel();
         int destinationX = SectionPos.posToSectionCoord(transition.position().x());

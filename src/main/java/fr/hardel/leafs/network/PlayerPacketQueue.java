@@ -13,6 +13,7 @@ import java.util.function.BooleanSupplier;
 /** One player's inbound packets, drained by the owning unit. The draining thread is the packet-handling thread for that listener. */
 public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();
+    private static final long QUEUE_AGE_WARN_NANOS = 250_000_000L;
 
     private final ConcurrentLinkedQueue<Entry> packets = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean claimed = new AtomicBoolean();
@@ -34,12 +35,12 @@ public final class PlayerPacketQueue {
     }
 
     public <T extends PacketListener> void add(T listener, Packet<T> packet) {
-        packets.add(new QueuedPacket<>(listener, packet));
+        packets.add(new QueuedPacket<>(listener, packet, System.nanoTime()));
     }
 
     /** Handler continuations (chat chain, text filtering) run in packet order on the player's owner. */
     public void addTask(Runnable task) {
-        packets.add(task::run);
+        packets.add(new QueuedContinuation(task, System.nanoTime()));
     }
 
     public boolean handledByCurrentThread() {
@@ -83,18 +84,52 @@ public final class PlayerPacketQueue {
         return true;
     }
 
+    /** The queue-age tracer measures the latency a player feels between sending an action and its handling. */
     private void drainLoop(BooleanSupplier ownerHolds) {
+        long slowestAge = 0;
+        String slowestEntry = null;
         Entry next;
         while (ownerHolds.getAsBoolean() && (next = packets.poll()) != null) {
+            long age = System.nanoTime() - next.enqueuedNanos();
+            if (age > slowestAge) {
+                slowestAge = age;
+                slowestEntry = next.describe();
+            }
+
             next.handle();
+        }
+
+        if (slowestAge > QUEUE_AGE_WARN_NANOS) {
+            Leafs.LOGGER.warn("{} waited {} ms in a player's packet queue before handling", slowestEntry, slowestAge / 1_000_000L);
         }
     }
 
     private interface Entry {
         void handle();
+
+        long enqueuedNanos();
+
+        String describe();
     }
 
-    private record QueuedPacket<T extends PacketListener>(T listener, Packet<T> packet) implements Entry {
+    private record QueuedContinuation(Runnable task, long enqueuedNanos) implements Entry {
+        @Override
+        public void handle() {
+            task.run();
+        }
+
+        @Override
+        public String describe() {
+            return "Handler continuation";
+        }
+    }
+
+    private record QueuedPacket<T extends PacketListener>(T listener, Packet<T> packet, long enqueuedNanos) implements Entry {
+        @Override
+        public String describe() {
+            return packet.getClass().getSimpleName();
+        }
+
         @Override
         public void handle() {
             if (!listener.shouldHandleMessage(packet)) {

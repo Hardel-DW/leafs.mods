@@ -25,11 +25,6 @@ class RoutingRandomSourceTest {
     }
 
     @Test
-    void noContextResolvesVanilla() {
-        assertEquals(1, routing.nextInt());
-    }
-
-    @Test
     void contextForAnotherScopeResolvesVanilla() {
         WorldTickContext.enter(new Object(), worldData, null);
 

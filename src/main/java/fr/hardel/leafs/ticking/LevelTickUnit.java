@@ -22,7 +22,6 @@ import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import fr.hardel.leafs.world.WorldDataRouter;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
@@ -39,6 +38,7 @@ import java.util.function.LongFunction;
  */
 public final class LevelTickUnit extends TickHandle {
     private static final int CENSUS_INTERVAL_TICKS = 100;
+    private static final long TASK_DRAIN_BUDGET_NANOS = 10_000_000L;
 
     private final ServerLevel level;
     private final LevelRegions regions;
@@ -50,7 +50,6 @@ public final class LevelTickUnit extends TickHandle {
     private boolean activated;
     private volatile int lastChunkCount;
     private volatile int lastTrackedChunks;
-    private volatile int lastEntityCount;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()));
@@ -174,28 +173,27 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** Counting entities walks every section, so it runs on the owner at a low rate and publishes for off-thread readers. */
+    /** Chunk counts live in serial-owned structures, so they sample on the owner and publish for off-thread readers. */
     private void takeCensus() {
         lastChunkCount = level.getChunkSource().getLoadedChunksCount();
         lastTrackedChunks = regions.trackedChunks();
-        int entities = 0;
-        for (Entity _ : level.getAllEntities()) {
-            entities++;
-        }
-
-        lastEntityCount = entities;
     }
 
-    /** Roadmap 22 instrumentation: a queued task that stalls the serial tick logs its origin, readable in the lambda class name. */
+    /** Time-boxed: a mass unload dump spreads over ticks instead of freezing the dimension in one. A slow task logs its origin. */
     private void runQueuedTasks() {
-        int budget = tasks.size();
+        long deadline = System.nanoTime() + TASK_DRAIN_BUDGET_NANOS;
         Runnable task;
-        while (budget-- > 0 && (task = tasks.poll()) != null) {
+        while ((task = tasks.poll()) != null) {
             long start = System.nanoTime();
             task.run();
-            long millis = (System.nanoTime() - start) / 1_000_000L;
+            long end = System.nanoTime();
+            long millis = (end - start) / 1_000_000L;
             if (millis > 50) {
                 Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
+            }
+
+            if (end >= deadline) {
+                break;
             }
         }
     }
@@ -210,8 +208,17 @@ public final class LevelTickUnit extends TickHandle {
         return lastTrackedChunks;
     }
 
+    /** Derived from the sizes of the owned tick lists instead of walking every entity, O(regions), any thread (Roadmap 10). */
     public int entityCount() {
-        return lastEntityCount;
+        int entities = ((ServerLevelEntityAccess) level).leafs$entityLists().attached().tickList().size();
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+            RegionTickHandle handle = region.data().handle();
+            if (handle != null && !handle.isCancelled()) {
+                entities += handle.entityCount();
+            }
+        }
+
+        return entities;
     }
 
     @Override

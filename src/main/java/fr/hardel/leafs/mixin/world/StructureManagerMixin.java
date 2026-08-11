@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 /**
  * Every structure query funnels through startsForStructure, and the advancement location predicate
  * runs it every 20 ticks per player. From a region worker the chunk read can refuse, so the query
- * degrades to not-found (Compromise #6) instead of crashing the region.
+ * degrades to not-found instead of crashing the region.
  */
 @Mixin(StructureManager.class)
 public abstract class StructureManagerMixin {

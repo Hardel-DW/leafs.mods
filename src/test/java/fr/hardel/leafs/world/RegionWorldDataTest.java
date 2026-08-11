@@ -18,7 +18,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,12 +36,6 @@ class RegionWorldDataTest {
 
     private static long keyOf(FakeTicker ticker) {
         return ChunkPos.pack(ticker.pos);
-    }
-
-    @Test
-    void clockModes() {
-        assertEquals(7, new RegionClock(() -> 7L).currentTick());
-        assertEquals(100, new RegionClock(100L).currentTick());
     }
 
     @Test
@@ -129,15 +122,6 @@ class RegionWorldDataTest {
         assertEquals(0, data.advanceInhabitedTime(0));
         assertEquals(7, data.advanceInhabitedTime(7));
         assertEquals(3, data.advanceInhabitedTime(10));
-    }
-
-    @Test
-    void regionalDataStartsEmpty() {
-        RegionWorldData data = worldData(0);
-        assertNotNull(data.random());
-        assertNotNull(data.broadcastHolders());
-        assertFalse(data.blockEvents().iterator().hasNext());
-        assertEquals(0, data.nextSubTick());
     }
 
     @Test

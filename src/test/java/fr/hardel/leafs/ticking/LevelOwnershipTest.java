@@ -62,6 +62,42 @@ class LevelOwnershipTest {
         assertFalse(region.isAlive());
     }
 
+    /** 11 août 2026: two region workers share the read side, so player roster mutations need the serialized variant. */
+    @Test
+    void exclusiveSerializedNeverInterleavesTwoReadHolders() throws InterruptedException {
+        LevelOwnership ownership = new LevelOwnership();
+        int workers = 4;
+        int increments = 500;
+        int[] unguardedCounter = new int[1];
+        CountDownLatch done = new CountDownLatch(workers);
+        for (int i = 0; i < workers; i++) {
+            new Thread(() -> {
+                assertTrue(ownership.tryEnterRegionTick());
+                try {
+                    for (int step = 0; step < increments; step++) {
+                        ownership.runExclusiveSerialized(() -> unguardedCounter[0]++);
+                    }
+                } finally {
+                    ownership.exitRegionTick();
+                    done.countDown();
+                }
+            }).start();
+        }
+
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertTrue(workers * increments == unguardedCounter[0], "read holders interleaved a serialized mutation");
+    }
+
+    @Test
+    void exclusiveSerializedTakesTheExclusionForForeignThreads() {
+        LevelOwnership ownership = new LevelOwnership();
+        boolean[] ranExclusive = new boolean[1];
+        ownership.runExclusiveSerialized(() -> ranExclusive[0] = ownership.isLevelSerialHeldByCurrentThread());
+        assertTrue(ranExclusive[0]);
+        assertTrue(ownership.tryEnterRegionTick(), "the exclusion must be released afterwards");
+        ownership.exitRegionTick();
+    }
+
     @Test
     void aQueuedSerialTakerStopsNewRegionTicks() throws InterruptedException {
         LevelOwnership ownership = new LevelOwnership();
