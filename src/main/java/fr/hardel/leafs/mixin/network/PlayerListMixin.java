@@ -4,12 +4,13 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.chunk.PropagatorAccess;
+import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.network.PlayerListFileAccess;
 import fr.hardel.leafs.network.PlayerTeardown;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
-import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.Connection;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerAdvancements;
 import net.minecraft.server.level.ServerLevel;
@@ -77,26 +78,36 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         this.advancements = new ConcurrentHashMap<>();
     }
 
-    /** Server-thread placement runs inline; the level mutation inside takes the exclusion at {@code ServerLevel.addPlayer}. */
+    /**
+     * The placement runs on the region that owns the spawn chunk, which the queue materialises if
+     * needed: sixty joins land on their sixty spawn regions instead of serialising on the server
+     * thread under the level exclusion. The concurrent player maps, the routed entity structures and
+     * the serialized {@code ServerLevel.addPlayer} are what make the body safe on a region thread.
+     */
     @Inject(method = "placeNewPlayer", at = @At("HEAD"), cancellable = true)
-    private void leafs$placeOnOwningUnit(Connection connection, ServerPlayer player, CommonListenerCookie cookie, CallbackInfo callbackInfo) {
-        TickingManager ticking = ((LeafsServerAccess) this.getServer()).leafs$ticking();
-        if (ticking.currentThreadOwns(player.level()) || this.getServer().isSameThread()) {
+    private void leafs$placeOnSpawnOwner(Connection connection, ServerPlayer player, CommonListenerCookie cookie, CallbackInfo callbackInfo) {
+        if (!(player.level() instanceof ServerLevel level)) {
             return;
         }
 
-        ticking.submitToLevel(player.level(), () -> ((PlayerList) (Object) this).placeNewPlayer(connection, player, cookie));
+        ChunkPos spawnChunk = player.chunkPosition();
+        ChunkScheduling scheduling = ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
+        if (scheduling.isOwner(spawnChunk.x(), spawnChunk.z())) {
+            return;
+        }
+
+        scheduling.runOnOwner(spawnChunk.x(), spawnChunk.z(), () -> ((PlayerList) (Object) this).placeNewPlayer(connection, player, cookie));
         callbackInfo.cancel();
     }
 
-    /** Roadmap 22 instrumentation: a placement that stalls the level thread must name itself. */
+    /** A placement that stalls its owning thread must name itself; the queueing half never crosses the threshold. */
     @WrapMethod(method = "placeNewPlayer")
     private void leafs$timedPlacement(Connection connection, ServerPlayer player, CommonListenerCookie cookie, Operation<Void> original) {
         long start = System.nanoTime();
         original.call(connection, player, cookie);
         long millis = (System.nanoTime() - start) / 1_000_000L;
         if (millis > 100) {
-            Leafs.LOGGER.warn("Placing {} took {} ms on the level thread", player.getPlainTextName(), millis);
+            Leafs.LOGGER.warn("Placing {} took {} ms on its owner", player.getPlainTextName(), millis);
         }
     }
 

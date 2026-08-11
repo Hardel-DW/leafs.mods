@@ -1,5 +1,7 @@
 package fr.hardel.leafs.entity;
 
+import fr.hardel.leafs.chunk.DegradedChunkReads;
+import fr.hardel.leafs.ownership.OwnershipViolationException;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -98,8 +100,19 @@ public final class EntityTeleports {
         return true;
     }
 
-    /** Re-runs in the barrier window because the portal search writes blocks in an unknown dimension. */
+    /**
+     * Runs in the barrier window because the search writes blocks in an unknown dimension, but the
+     * window never generates: the search runs in degraded reads, an absent chunk files a demand
+     * ticket and aborts the attempt, and the retry finds the chunk once the pool generated it. Past
+     * the retry budget, one vanilla attempt loads synchronously under the window as a last resort.
+     */
     public void deferPortal(Entity entity) {
+        deferPortal(entity, 0);
+    }
+
+    private static final int PORTAL_SEARCH_WINDOW_BUDGET = 100;
+
+    private void deferPortal(Entity entity, int attempts) {
         binding.submitWindow(() -> {
             if (entity.isRemoved() || entity.level() != level) {
                 return;
@@ -110,7 +123,18 @@ public final class EntityTeleports {
                 return;
             }
 
-            TeleportTransition transition = process.getPortalDestination(level, entity);
+            TeleportTransition transition;
+            if (attempts < PORTAL_SEARCH_WINDOW_BUDGET) {
+                try {
+                    transition = DegradedChunkReads.call(() -> process.getPortalDestination(level, entity));
+                } catch (OwnershipViolationException absentChunk) {
+                    deferPortal(entity, attempts + 1);
+                    return;
+                }
+            } else {
+                transition = process.getPortalDestination(level, entity);
+            }
+
             if (transition == null) {
                 return;
             }

@@ -1,7 +1,9 @@
 package fr.hardel.leafs.ticking;
 
-/** Implemented onto {@code ServerChunkCache.MainThreadExecutor} by mixin: binds the level's ownership to the pump. */
+import net.minecraft.server.level.ServerLevel;
+
+/** Implemented onto {@code ServerChunkCache.MainThreadExecutor} by mixin: gives the pump its level for the universal-owner drain. */
 public interface ChunkPumpAccess {
 
-    void leafs$bindOwnership(LevelOwnership ownership);
+    void leafs$bindLevel(ServerLevel level);
 }

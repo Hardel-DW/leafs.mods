@@ -65,6 +65,7 @@ public final class RegionsCommand {
             .append(Component.literal(shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
             .append(gray("  regions ")).append(white(live.size()))
             .append(gray("  chunks ")).append(white(unit.chunkCount()))
+            .append(gray("  view ")).append(white(unit.viewChunks()))
             .append(gray("  entities ")).append(white(unit.entityCount()))
             .append(gray("  serial ")).append(tps(serial.tps()))
             .append(gray(" avg ")).append(white(String.format(Locale.ROOT, "%.2fms", serial.msptAverage())));

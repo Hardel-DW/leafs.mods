@@ -3,14 +3,14 @@ package fr.hardel.leafs.mixin.chunk;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.PropagatorAccess;
-import fr.hardel.leafs.chunk.ViewAdmissionAccess;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
-import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.LoadingChunkTracker;
-import net.minecraft.server.level.ThrottlingChunkTaskDispatcher;
+import net.minecraft.server.level.Ticket;
 import net.minecraft.util.TriState;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
+import net.minecraft.world.level.TicketStorage;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -28,27 +28,34 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
     @Final
     private DistanceManager.FixedPlayerDistanceChunkTracker naturalSpawnChunkCounter;
 
-    @Shadow
-    @Final
-    private ThrottlingChunkTaskDispatcher ticketDispatcher;
-
     @Unique
     private volatile LevelTicketPropagator leafs$propagator;
-
-    /** One view-ticket admission per connected player, vanilla floor of 4; see ThrottlingChunkTaskDispatcherMixin. */
-    @Inject(method = "runAllUpdates", at = @At("HEAD"))
-    private void leafs$scaleViewAdmission(ChunkMap chunkMap, CallbackInfoReturnable<Boolean> callbackInfo) {
-        ((ViewAdmissionAccess) ticketDispatcher).leafs$admissionCap(chunkMap.level.getServer().getPlayerCount());
-    }
 
     @Override
     public LevelTicketPropagator leafs$propagator() {
         return leafs$propagator;
     }
 
+    /** The per-player loader owns the view and simulation tickets; the vanilla per-player halves disconnect here. */
+    @WrapOperation(method = "addPlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/TicketStorage;addTicket(Lnet/minecraft/server/level/Ticket;Lnet/minecraft/world/level/ChunkPos;)V"))
+    private void leafs$noVanillaSimulationTicket(TicketStorage storage, Ticket ticket, ChunkPos pos, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "removePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/TicketStorage;removeTicket(Lnet/minecraft/server/level/Ticket;Lnet/minecraft/world/level/ChunkPos;)V"))
+    private void leafs$noVanillaSimulationTicketRemoval(TicketStorage storage, Ticket ticket, ChunkPos pos, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = {"addPlayer", "removePlayer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/DistanceManager$PlayerTicketTracker;update(JIZ)V"))
+    private void leafs$noVanillaViewTracker(DistanceManager.PlayerTicketTracker tracker, long pos, int level, boolean added, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "updatePlayerTickets", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/DistanceManager$PlayerTicketTracker;updateViewDistance(I)V"))
+    private void leafs$noVanillaViewDistanceSweep(DistanceManager.PlayerTicketTracker tracker, int viewDistance, Operation<Void> original) {
+    }
+
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createPropagator(CallbackInfo callbackInfo) {
-        leafs$propagator = new LevelTicketPropagator((DistanceManager) (Object) this);
+        leafs$propagator = new LevelTicketPropagator();
     }
 
     /** The Leafs propagator replaces vanilla's budgeted graph; vanilla's drain stays as the net for pre-binding strays and runs empty. */

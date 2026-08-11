@@ -65,6 +65,10 @@ public final class TickBarrier {
         }
     }
 
+    public synchronized boolean isHeldByCurrentThread() {
+        return holder == Thread.currentThread();
+    }
+
     public synchronized void drop() {
         if (holder == null) {
             throw new IllegalStateException("Tick barrier dropped without being raised");

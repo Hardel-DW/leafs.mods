@@ -57,6 +57,11 @@ public final class ConcurrentLongSet extends AbstractLongSet {
             public long nextLong() {
                 return backing.next();
             }
+
+            @Override
+            public void remove() {
+                backing.remove();
+            }
         };
     }
 }

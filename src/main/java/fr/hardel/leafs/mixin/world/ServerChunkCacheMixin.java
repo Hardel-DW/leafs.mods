@@ -35,9 +35,9 @@ public abstract class ServerChunkCacheMixin {
     private boolean spawnEnemies;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void leafs$bindPumpOwnership(CallbackInfo callbackInfo) {
+    private void leafs$bindPumpLevel(CallbackInfo callbackInfo) {
         ServerChunkCache self = (ServerChunkCache) (Object) this;
-        ((ChunkPumpAccess) (Object) self.mainThreadProcessor).leafs$bindOwnership(((ServerLevelRegionAccess) this.level).leafs$regions().ownership());
+        ((ChunkPumpAccess) (Object) self.mainThreadProcessor).leafs$bindLevel(this.level);
     }
 
     @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;tickChunks(Lnet/minecraft/util/profiling/ProfilerFiller;J)V"))
@@ -52,7 +52,7 @@ public abstract class ServerChunkCacheMixin {
         body.tickSerialRemainder(this.spawnEnemies);
     }
 
-    @WrapOperation(method = "blockChanged", at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))
+    @WrapOperation(method = {"blockChanged", "onChunkReadyToSend"}, at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))
     private boolean leafs$markOwnedBroadcastSet(Set<ChunkHolder> instance, Object holder, Operation<Boolean> original) {
         RegionWorldData data = WorldTickContext.activeFor(this.level);
         if (data == null) {

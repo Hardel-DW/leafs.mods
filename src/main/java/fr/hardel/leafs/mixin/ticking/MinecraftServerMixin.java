@@ -4,11 +4,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
-import fr.hardel.leafs.ticking.LevelOwnership;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -40,21 +37,6 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     private void leafs$drainPlayerQueuesWhilePaused(boolean sprinting, CallbackInfo callbackInfo) {
         if (((MinecraftServer) (Object) this).isPaused()) {
             leafs$ticking.tickPausedNetwork();
-        }
-    }
-
-    /** The idle pump TRIES the level's exclusion: a level whose regions are mid-tick is skipped this round. */
-    @WrapOperation(method = "pollTaskInternal", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;pollTask()Z"))
-    private boolean leafs$pumpOnlyWhenLevelSerial(ServerChunkCache chunkSource, Operation<Boolean> original) {
-        LevelOwnership ownership = ((ServerLevelRegionAccess) chunkSource.level).leafs$regions().ownership();
-        if (!ownership.tryEnterLevelSerial()) {
-            return false;
-        }
-
-        try {
-            return original.call(chunkSource);
-        } finally {
-            ownership.exitLevelSerial();
         }
     }
 
