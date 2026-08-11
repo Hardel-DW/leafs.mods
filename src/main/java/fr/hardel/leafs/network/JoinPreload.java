@@ -1,0 +1,94 @@
+package fr.hardel.leafs.network;
+
+import com.mojang.authlib.GameProfile;
+import fr.hardel.leafs.global.DeferredFileWrites;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.util.Util;
+import net.minecraft.world.level.storage.LevelResource;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+
+/**
+ * The playerdata tag read once by {@code PrepareSpawnTask.start} is kept for {@code Ready.spawn},
+ * stats and advancements read off-thread during configuration: the flip into the game touches no
+ * disk. Reads consult the pending writes of {@link DeferredFileWrites} first, never a stale file.
+ */
+public final class JoinPreload {
+    private static final ConcurrentHashMap<UUID, Entry> ENTRIES = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Path, CompletableFuture<Optional<String>>> CONTENT_BY_FILE = new ConcurrentHashMap<>();
+
+    private record Entry(Optional<CompoundTag> playerData, Path statsFile, CompletableFuture<Optional<String>> stats, Path advancementsFile, CompletableFuture<Optional<String>> advancements) {
+    }
+
+    private JoinPreload() {
+    }
+
+    /** Wraps the first {@code loadPlayerData} of the join: keeps its tag and kicks the two JSON reads. */
+    public static Optional<CompoundTag> captureAndPreload(PlayerList playerList, NameAndId nameAndId, Optional<CompoundTag> loaded) {
+        discard(nameAndId);
+        Path statsFile = ((PlayerListFileAccess) playerList).leafs$statsFile(new GameProfile(nameAndId.id(), nameAndId.name()));
+        Path advancementsFile = playerList.getServer().getWorldPath(LevelResource.PLAYER_ADVANCEMENTS_DIR).resolve(nameAndId.id() + ".json");
+        Entry entry = new Entry(loaded, statsFile, readAsync(statsFile), advancementsFile, readAsync(advancementsFile));
+        ENTRIES.put(nameAndId.id(), entry);
+        CONTENT_BY_FILE.put(statsFile, entry.stats());
+        CONTENT_BY_FILE.put(advancementsFile, entry.advancements());
+        return loaded;
+    }
+
+    /** The second {@code loadPlayerData} of the join, on the flip: served from the kept tag, then the entry retires. */
+    public static Optional<CompoundTag> servePlayerData(NameAndId nameAndId, Supplier<Optional<CompoundTag>> fallback) {
+        Entry entry = ENTRIES.remove(nameAndId.id());
+        if (entry == null) {
+            return fallback.get();
+        }
+
+        CONTENT_BY_FILE.remove(entry.statsFile(), entry.stats());
+        CONTENT_BY_FILE.remove(entry.advancementsFile(), entry.advancements());
+        return entry.playerData();
+    }
+
+    /** Constructor-read hook: a done preload for this file replaces the disk read, once. */
+    public static Optional<String> consumeContent(Path file) {
+        CompletableFuture<Optional<String>> content = CONTENT_BY_FILE.remove(file);
+        if (content == null || !content.isDone() || content.isCompletedExceptionally()) {
+            return Optional.empty();
+        }
+
+        return content.join();
+    }
+
+    public static void discard(NameAndId nameAndId) {
+        Entry entry = ENTRIES.remove(nameAndId.id());
+        if (entry != null) {
+            CONTENT_BY_FILE.remove(entry.statsFile(), entry.stats());
+            CONTENT_BY_FILE.remove(entry.advancementsFile(), entry.advancements());
+        }
+    }
+
+    /** An unreadable file resolves empty: the constructor then reads the disk itself and applies vanilla's own error handling. */
+    private static CompletableFuture<Optional<String>> readAsync(Path file) {
+        DeferredFileWrites writes = DeferredFileWrites.active();
+        String pending = writes == null ? null : writes.pendingText(file);
+        if (pending != null) {
+            return CompletableFuture.completedFuture(Optional.of(pending));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return Files.isRegularFile(file) ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.<String>empty();
+            } catch (IOException exception) {
+                return Optional.<String>empty();
+            }
+        }, Util.ioPool());
+    }
+}

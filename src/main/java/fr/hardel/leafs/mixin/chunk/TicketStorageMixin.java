@@ -19,10 +19,9 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 /**
- * Chantier propagateur, S1: the ticket table takes writers from any thread under one monitor, and the
- * tracker listeners route themselves, inline on the level-serial side, queued to it from anywhere
- * else, because the propagation graph they feed stays single-threaded until S4. The serial side reads
- * the table bare, so every read entry point takes the same monitor against off-level writers.
+ * The ticket table takes writers from any thread under one monitor. The loading listener feeds the
+ * Leafs propagator inline, thread-safe by its area lock. The simulation listener still routes to the
+ * level-serial side, because vanilla's simulation graph stays single-threaded.
  */
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
@@ -106,29 +105,18 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         }
     }
 
-    /**
-     * Driving (S4): the propagator is fed inline under the monitor and vanilla's graph is skipped.
-     * Shadow (S5): the feed rides the routed listener task, so both propagators see the exact same
-     * update order on the serial thread and the comparison is never ahead of vanilla.
-     */
+    /** The loading listener feeds the propagator inline under the monitor; vanilla's graph only sees pre-binding strays. */
     @WrapMethod(method = "setLoadingChunkUpdatedListener")
     private void leafs$routeLoadingListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        TicketStorage.ChunkUpdated shadowPair = leafs$routed((key, level, onlyDecreased) -> {
-            LevelTicketPropagator propagator = leafs$propagator();
-            if (propagator != null) {
-                propagator.feed(key, level);
-            }
-
-            listener.update(key, level, onlyDecreased);
-        });
+        TicketStorage.ChunkUpdated strays = leafs$routed(listener);
         TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
             LevelTicketPropagator propagator = leafs$propagator();
-            if (propagator != null && !propagator.shadow()) {
-                propagator.feed(key, level);
+            if (propagator == null) {
+                strays.update(key, level, onlyDecreased);
                 return;
             }
 
-            shadowPair.update(key, level, onlyDecreased);
+            propagator.feed(key, level);
         };
         original.call(shim);
     }

@@ -32,7 +32,7 @@ public abstract class ServerChunkCacheMixin {
     @Final
     private Thread mainThread;
 
-    /** The storage is constructed level-blind as saved data; the routing shim needs its level (S1). */
+    /** The storage is constructed level-blind as saved data; the routing shim needs its level. */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$bindTicketStorage(CallbackInfo callbackInfo) {
         ((TicketStorageAccess) ((ServerChunkCache) (Object) this).ticketStorage).leafs$bindLevel(this.level);

@@ -215,7 +215,6 @@ public abstract class LeafsTicketPropagator {
             }
 
             if ((previousSource < currentLevel && newSource <= currentLevel) || newSource == currentLevel) {
-                // another source dominates this position, only the stored source changes
                 section.levels[localIndex] = (short) (currentLevel | (newSource << 8));
             } else {
                 section.levels[localIndex] = (short) (newSource | (newSource << 8));

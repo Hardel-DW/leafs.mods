@@ -4,13 +4,12 @@ import java.util.Arrays;
 
 /**
  * Ring of recent tick durations, written single-threaded by the owning tick loop. Reads tolerate a
- * torn sample, so {@link #sample} needs no lock and never touches the tick path.
+ * torn sample, so {@link #sample} needs no lock and never touches the tick path. 
  */
 public final class TickTimings {
     private static final int CAPACITY = 256;
     private static final long WINDOW_NANOS = 5_000_000_000L;
     private static final double NANOS_PER_MILLI = 1_000_000.0;
-
     private final long[] endNanos = new long[CAPACITY];
     private final long[] durationNanos = new long[CAPACITY];
     private volatile int cursor;
@@ -40,12 +39,9 @@ public final class TickTimings {
         }
 
         Arrays.sort(window, 0, ticks);
-        // Divided by the span actually covered, not the fixed window: a young unit reports its true rate, not a ramp from zero.
         double spanSeconds = Math.max((nowNanos - oldestEnd) / 1_000_000_000.0, 1.0 / 20.0);
         double tps = Math.min(ticks / spanSeconds, 20.0);
-
-        return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50),
-            percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
+        return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50), percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
     }
 
     /** Nearest-rank on the window: with ~100 samples per 5s window, interpolation would be false precision. */

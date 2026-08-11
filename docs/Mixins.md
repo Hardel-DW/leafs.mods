@@ -13,7 +13,8 @@ Chaque entrée groupe tous les mixins qui ciblent la même classe vanilla. Quand
 - Le mixin `ticking/` porte le `TickingManager` et fait passer chaque tick de niveau par son unité de région. Le `MainThreadExecutor` des chunks ne traite ses tâches que quand aucune région ne tique, Leafs vide les files des joueurs quand le serveur est en pause, et le pool de workers s'arrête proprement à l'extinction.
 - Le mixin `global/` porte la `BarrierWindow`. À chaque tick global, il vide la file de tâches globales puis ouvre la barrier window. Les fonctions de datapacks y sont envoyées quand la gamerule le permet.
 - Le mixin `entity/` porte le registre des schedulers d'entités, le `EntitySchedulerRegistry`.
-- Le mixin `network/` fait sauter à la boucle d'envoi de chunks les joueurs qu'une région tique, leur région envoie pour eux. Pour les joueurs du filet global, l'envoi prend le verrou exclusif du niveau, parce que les chunks sérialisés appartiennent à des régions qui écrivent dedans.
+- Le mixin `network/` fait sauter à la boucle d'envoi de chunks les joueurs qu'une région tique, leur région envoie pour eux. Pour les joueurs du filet global, l'envoi prend le verrou exclusif du niveau, parce que les chunks sérialisés appartiennent à des régions qui écrivent dedans. Il encadre aussi le tick de connexion avec le lot de pauses de `ticking/PauseBatch`, pour qu'une vague de déconnexions partage une seule pause de régions.
+- Le mixin `compat/` encadre les deux émissions d'évènements de tick serveur de la Fabric API dans `tickServer` avec la barrière, quand elles ont des abonnés. Les ancres sont les appels vanilla juste avant et juste après chaque point d'émission, pour que la pause couvre exactement les injections de fabric-lifecycle-events quelle que soit leur priorité.
 
 ### `DedicatedServer`
 Les commandes tapées dans la console passent par la barrier window, parce qu'une commande op peut toucher n'importe quel état du monde.
@@ -21,7 +22,7 @@ Les commandes tapées dans la console passent par la barrier window, parce qu'un
 ### `ServerLevel`
 - Le mixin `ticking/` porte le `LevelRegions`, qui contient le `Regionizer` et le verrou de la dimension. Le champ s'initialise avant le premier chunk holder.
 - Le mixin `chunk/` fait passer la sauvegarde du niveau sous le verrou exclusif de `LevelOwnership` et redirige les écritures de points d'intérêt vers la phase sérielle du niveau. Il fait aussi tiquer chaque spawner custom sous la portée de lecture dégradée : un spawner qui sonde un terrain jamais généré refuse et saute son passage au lieu de bloquer le thread sériel sur la génération, ce qui gelait toute la dimension.
-- Le mixin `entity/` remplace `dragonParts` par une map concurrente et `players` par une `CopyOnWriteArrayList`. Il crée les listes d'entités par région et le routeur de téléportation. Les ajouts et retraits de joueurs prennent le verrou exclusif.
+- Le mixin `entity/` remplace `dragonParts` par une map concurrente et `players` par une `CopyOnWriteArrayList`. Il crée les listes d'entités par région et le routeur de téléportation. Les ajouts et retraits de joueurs prennent le verrou exclusif et se sérialisent en plus entre régions, parce que deux régions partagent le côté lecture du verrou et toucheraient sinon les mêmes maps de joueurs du niveau en même temps.
 - Le mixin `global/` déplace l'exécution de la `TimerQueue` dans la barrier window, parce que les fonctions programmées peuvent toucher n'importe quel état du monde.
 - Le mixin `world/` redirige les ticks programmés, les block events, l'horloge de région, le générateur aléatoire, les mises à jour de voisinage et le cache de path types vers la région propriétaire. Les recherches de structures depuis une région renvoient un résultat vide au lieu de crasher quand un chunk n'est pas chargé.
 
@@ -40,10 +41,10 @@ Le compteur de sub-tick, le générateur aléatoire et le neighbor updater devie
 Le `MainThreadExecutor` ne tourne que sous le verrou exclusif du niveau. Un worker de région qui tenterait de le déclencher lève une exception, parce que le traitement des chunks ne doit jamais tourner en même temps qu'un tick de région.
 
 ### `DistanceManager`
-Le mixin lit la distance de spawn directement dans le compteur sans vider la file du tracker, que seule la phase sérielle a le droit de toucher. Il pousse le plafond d'admission des tickets de vue vers le guichet de `ThrottlingChunkTaskDispatcher` à chaque tick sériel, à partir du nombre de joueurs connectés. Il porte aussi le propagateur de tickets de Leafs, `LevelTicketPropagator` : quand la config `own_propagator` est vraie, son drain remplace celui du graphe vanilla au même point d'injection, et quand les assertions de dev sont actives sans le drapeau, il tourne en ombre et compare ses niveaux à ceux de vanilla, chaque désaccord se logge. La propagation vanilla seule garde son budget de 4096 mises à jour par tick.
+Le mixin lit la distance de spawn directement dans le compteur sans vider la file du tracker, que seule la phase sérielle a le droit de toucher. Il pousse le plafond d'admission des tickets de vue vers le guichet de `ThrottlingChunkTaskDispatcher` à chaque tick sériel, à partir du nombre de joueurs connectés. Il porte le propagateur de tickets de Leafs, `LevelTicketPropagator`, qui remplace le graphe de propagation vanilla : le drain sériel écrit les niveaux des holders depuis le propagateur, et le drain vanilla reste en filet pour les rares mises à jour d'avant le câblage, à vide en régime normal.
 
 ### `TicketStorage`
-Le mixin met la table de tickets sous un moniteur, pour qu'une région pose ses tickets elle-même. Les écritures et les lectures passent toutes par ce moniteur, parce qu'un scheduler peut poser un ticket depuis une autre dimension ou un pool async pendant que la phase sérielle parcourt la table, et que le verrou par dimension n'exclut pas ces threads. Le mixin route aussi les deux listeners des trackers, en ligne sur le thread serveur, en file vers la phase sérielle depuis tout autre thread, parce que le graphe de propagation vanilla reste mono thread. Quand le propagateur de Leafs commande, le listener de chargement le nourrit en ligne sous le moniteur et saute le graphe vanilla. En mode ombre, le listener envoie la mise à jour au propagateur dans la même tâche routée que celle du graphe vanilla, pour que les deux propagateurs voient les tickets dans le même ordre.
+Le mixin met la table de tickets sous un moniteur, pour qu'une région pose ses tickets elle-même. Les écritures et les lectures passent toutes par ce moniteur, parce qu'un scheduler peut poser un ticket depuis une autre dimension ou un pool async pendant que la phase sérielle parcourt la table, et que le verrou par dimension n'exclut pas ces threads. Le listener de chargement nourrit le propagateur de Leafs en ligne, sous le moniteur, depuis n'importe quel thread, son verrou de zone rend le feed sûr. Le listener de simulation reste routé vers la phase sérielle, parce que le graphe de simulation vanilla reste mono thread.
 
 ### `SectionStorage`
 Le mixin remplace `storage` par une map concurrente et porte le `PoiVillageLock`. Le flush de sauvegarde passe sous ce verrou.
@@ -64,7 +65,7 @@ Le mixin capture la section avant un `onMove` et rattache l'entité aux listes d
 Le mixin retire le scheduler d'une entité quand elle quitte le monde. Il intercepte `teleport` depuis un worker de région pour dévier le mouvement vers le routeur de téléportation au lieu de l'exécuter sur place. Il reporte la recherche de portail dans la barrier window, parce que la recherche peut créer des blocs dans une autre dimension, comme la plateforme d'obsidienne de l'End.
 
 ### `ServerPlayer`
-Le mixin remplace le set d'ender pearls par un set concurrent, parce qu'une perle lancée depuis une autre région s'inscrit depuis un autre thread. Il intercepte `teleport` depuis un worker de région pour dévier le mouvement. Le ticket de chunk de la perle est transmis au thread serveur.
+Le mixin remplace le set d'ender pearls par un set concurrent, parce qu'une perle lancée depuis une autre région s'inscrit depuis un autre thread. Il intercepte `teleport` depuis un worker de région pour dévier le mouvement vers le routeur de téléportation.
 
 ### `Scoreboard` et `ServerScoreboard`
 Toutes les mutations et les lectures qui parcourent le scoreboard passent sous le `SharedStateMonitor`. `ServerScoreboard` y ajoute le dirty flag, les tracked objectives, la construction des paquets et la sauvegarde.
@@ -103,10 +104,13 @@ Le tick de connexion est coupé en deux. Le flush et la détection de déconnexi
 Les envois de paquets sont groupés par tick de région pour qu'ils partent ensemble. La déconnexion depuis un thread autre que le thread serveur devient non bloquante pour éviter de bloquer un worker.
 
 ### `PlayerList`
-Le mixin remplace `players` et `playersByUUID` par des structures concurrentes. Le placement d'un nouveau joueur s'exécute sur le thread qui possède le niveau de destination. La sauvegarde prend le verrou exclusif du niveau. Le retrait met toutes les régions en pause parce que le teardown touche des entités d'autres régions, mais la pause ne contient plus que la sérialisation en mémoire, les écritures disque partent sur le thread d'écriture de `global/DeferredFileWrites`. Un placement ou un teardown qui dépasse son seuil de durée se logge avec le nom du joueur, pour attribuer les saccades de connexion.
+Le mixin remplace `players`, `playersByUUID` et les tables de stats et d'advancements par des structures concurrentes. Le placement d'un nouveau joueur s'exécute sur le thread qui possède le niveau de destination. La sauvegarde prend le verrou exclusif du niveau. Le retrait exécute le corps vanilla entier sous la pause de toutes les régions, par `network/PlayerTeardown`. Un placement ou un retrait qui dépasse son seuil de durée se logge avec le nom du joueur, pour attribuer les saccades de connexion.
+
+### `PrepareSpawnTask`
+Le mixin de la tâche garde le tag NBT que `start` lit et lance la lecture des stats et des advancements sur le pool d'entrées sorties, par `network/JoinPreload`. Le mixin de l'état interne `Preparing` retient la tâche tant que les entités du spawn ne sont pas chargées, quand des joueurs sont en jeu, par `network/SpawnEntityWait`. Le mixin de l'état interne `Ready` sert le tag gardé à la place de la deuxième lecture disque et saute l'attente bloquante des entités quand elle est déjà satisfaite.
 
 ### `PlayerDataStorage`, `ServerStatsCounter` et `PlayerAdvancements`
-Les trois fichiers d'un joueur, le NBT de playerdata, les stats et les advancements, se sérialisent sur le thread appelant, qui tient la pause ou l'exclusion stabilisant le joueur, et l'écriture disque part sur le thread d'écriture unique de `global/DeferredFileWrites`, dans l'ordre des sauvegardes. Les chemins de lecture consultent d'abord les écritures en attente, pour qu'un joueur qui se reconnecte immédiatement ne relise jamais un fichier périmé ou absent.
+Les trois fichiers d'un joueur, le NBT de playerdata, les stats et les advancements, se sérialisent sur le thread appelant, qui tient la pause ou l'exclusion stabilisant le joueur, et l'écriture disque part sur le thread d'écriture unique de `global/DeferredFileWrites`, dans l'ordre des sauvegardes. Les chemins de lecture consultent d'abord les écritures en attente, pour qu'un joueur qui se reconnecte immédiatement ne relise jamais un fichier périmé ou absent. Deux mixins de `network/` s'ajoutent sur les constructeurs de `ServerStatsCounter` et de `PlayerAdvancements` et servent le contenu que `network/JoinPreload` a lu pendant la configuration, pour que le basculement en jeu ne touche pas le disque.
 
 ### `ThrottlingChunkTaskDispatcher`
 Vanilla n'admet que 4 chunks de vue en pipeline pour le serveur entier, un guichet taillé pour une poignée de joueurs. Le mixin rend ce plafond dynamique, une admission par joueur connecté avec le plancher vanilla de 4, poussé à chaque tick sériel par le mixin de `DistanceManager`.
@@ -118,10 +122,10 @@ Un appel à `MinecraftServer.execute` depuis un worker de région est redirigé 
 Un changement de tick rate se propage à toutes les boucles de régions.
 
 ### `ServerWatchdog`
-Le mixin neutralise le watchdog vanilla, qui mesure un unique game thread qui n'existe plus. Leafs le remplace par un watchdog par région.
+Le mixin neutralise le watchdog vanilla, qui mesure un unique game thread qui n'existe plus. Leafs le remplace par le watchdog par unité de tick de `ticking/LeafsWatchdog`, qui alerte puis tue, et réutilise le format de crash report du watchdog vanilla pour le dump de tous les threads.
 
 ### `SerializableChunkData`
 Le mixin fait packer les ticks programmés par rapport à l'horloge de la région propriétaire du chunk, pas par rapport au game time global, parce que les régions n'ont pas toutes vécu le même nombre de ticks.
 
 ### Compatibilité Fabric API
-`FabricApiLookupCacheShim` cible `ServerLevel` et synchronise la map de cache de `fabric-api-lookup` sur le niveau. `FabricLoadedChunksShim` cible `Level` et remplace le `HashSet` de chunks chargés de `fabric-lifecycle-events` par un set concurrent. Les deux s'appliquent en priorité 1100 pour que les méthodes de la Fabric API existent au moment de l'injection.
+`FabricApiLookupCacheShim` cible `ServerLevel` et synchronise la map de cache de `fabric-api-lookup` sur le niveau. `FabricLoadedChunksShim` cible `Level` et remplace le `HashSet` de chunks chargés de `fabric-lifecycle-events` par un set concurrent. Les deux s'appliquent en priorité 1100 pour que les méthodes de la Fabric API existent au moment de l'injection. `ArrayBackedEventShim` cible l'implémentation d'évènement de fabric-api-base et expose si un évènement a au moins un abonné, ce que l'API publique ne dit pas. `ServerTickEventsShim` est décrit dans l'entrée `MinecraftServer`.

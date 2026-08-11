@@ -2,22 +2,37 @@ package fr.hardel.leafs.ticking;
 
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
- * Per-tick-unit deadlines with a stack dump of the stuck thread only. Detection and reporting, never
- * recovery: the vanilla {@code ServerWatchdog} is neutralized by mixin, so this is the only watchdog left.
+ * Per-tick-unit deadlines, the only watchdog left since the vanilla {@code ServerWatchdog} is
+ * neutralized by mixin. Past the warn threshold a stall is reported with the stuck thread's stack;
+ * past the kill threshold the killer runs once, and {@link #armShutdownDeadline} points the same
+ * killer at a shutdown that never finishes.
  */
 public final class LeafsWatchdog {
+    /** Generous next to the kill threshold: a legitimate final save of a large world must never be cut short. */
+    public static final Duration SHUTDOWN_DEADLINE = Duration.ofMinutes(5);
+
     private final long warnNanos;
+    private final long killNanos;
     private final Consumer<String> reporter;
+    private final Consumer<Stall> killer;
     private final ConcurrentHashMap<TickHandle, RunningTick> running = new ConcurrentHashMap<>();
+    private final AtomicReference<Thread> shutdownDeadline = new AtomicReference<>();
     private volatile boolean active;
     private Thread thread;
 
-    public LeafsWatchdog(Duration warnAfter, Consumer<String> reporter) {
+    /** A tick unit or a shutdown past the kill threshold; the thread is the stuck one, for the dump. */
+    public record Stall(String summary, Thread thread) {
+    }
+
+    public LeafsWatchdog(Duration warnAfter, Duration killAfter, Consumer<String> reporter, Consumer<Stall> killer) {
         this.warnNanos = warnAfter.toNanos();
+        this.killNanos = killAfter.toNanos();
         this.reporter = reporter;
+        this.killer = killer;
     }
 
     public void start() {
@@ -31,6 +46,31 @@ public final class LeafsWatchdog {
         active = false;
         if (thread != null) {
             thread.interrupt();
+        }
+    }
+
+    /**
+     * Armed when {@code stopServer} begins, on the stopping thread: a JVM still alive past the
+     * deadline gets the same dump and kill as a stuck tick. No-op when the kill threshold is disabled.
+     */
+    public void armShutdownDeadline(Duration deadline) {
+        if (killNanos == 0) {
+            return;
+        }
+
+        Thread stopping = Thread.currentThread();
+        Thread deadlineThread = new Thread(() -> awaitShutdown(deadline, stopping), "Leafs Shutdown Deadline");
+        deadlineThread.setDaemon(true);
+        if (shutdownDeadline.compareAndSet(null, deadlineThread)) {
+            deadlineThread.start();
+        }
+    }
+
+    /** In solo the JVM legitimately outlives the server, so a completed shutdown stands the deadline down. */
+    public void disarmShutdownDeadline() {
+        Thread deadlineThread = shutdownDeadline.get();
+        if (deadlineThread != null) {
+            deadlineThread.interrupt();
         }
     }
 
@@ -55,7 +95,10 @@ public final class LeafsWatchdog {
             long now = System.nanoTime();
             for (var entry : running.entrySet()) {
                 RunningTick tick = entry.getValue();
-                if (now - Math.max(tick.startNanos, tick.lastReportNanos) >= warnNanos) {
+                if (killNanos > 0 && now - tick.startNanos >= killNanos && !tick.killed) {
+                    tick.killed = true;
+                    killer.accept(new Stall(headerLine(entry.getKey(), tick, now), tick.thread));
+                } else if (now - Math.max(tick.startNanos, tick.lastReportNanos) >= warnNanos) {
                     tick.lastReportNanos = now;
                     reporter.accept(describeStall(entry.getKey(), tick, now));
                 }
@@ -63,9 +106,23 @@ public final class LeafsWatchdog {
         }
     }
 
+    private void awaitShutdown(Duration deadline, Thread stopping) {
+        try {
+            Thread.sleep(deadline);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        killer.accept(new Stall("Server shutdown still not finished after " + deadline.toSeconds() + "s, stopping thread '" + stopping.getName() + "'", stopping));
+    }
+
+    private String headerLine(TickHandle handle, RunningTick tick, long now) {
+        return "Region tick stalled for " + (now - tick.startNanos) / 1_000_000_000L + "s: region #" + handle.id() + " in " + handle.dimension() + ", tick " + handle.currentTick() + ", thread '" + tick.thread.getName() + "'";
+    }
+
     private String describeStall(TickHandle handle, RunningTick tick, long now) {
-        StringBuilder message = new StringBuilder();
-        message.append("Region tick stalled for ").append((now - tick.startNanos) / 1_000_000_000L).append("s: region #").append(handle.id()).append(" in ").append(handle.dimension()).append(", tick ").append(handle.currentTick()).append(", thread '").append(tick.thread.getName()).append("'");
+        StringBuilder message = new StringBuilder(headerLine(handle, tick, now));
         for (StackTraceElement element : tick.thread.getStackTrace()) {
             message.append(System.lineSeparator()).append("\tat ").append(element);
         }
@@ -77,6 +134,7 @@ public final class LeafsWatchdog {
         final Thread thread;
         final long startNanos;
         volatile long lastReportNanos;
+        volatile boolean killed;
 
         RunningTick(Thread thread, long startNanos) {
             this.thread = thread;

@@ -78,13 +78,14 @@ class BarrierWindowTest {
     }
 
     @Test
-    void throwingTaskPropagatesButTheBarrierDrops() {
+    void throwingTaskPropagatesButTheBarrierDropsAndTheMarkerClears() {
         window.enqueue(() -> {
             throw new IllegalStateException("command block crash");
         });
 
         assertThrows(IllegalStateException.class, window::runGlobalPhase);
 
+        assertFalse(window.isDraining());
         barrier.enterTick();
         barrier.exitTick();
     }
@@ -144,17 +145,6 @@ class BarrierWindowTest {
         assertEquals(1, executions.get());
         assertEquals(0, window.pendingCount());
         assertFalse(window.isDraining(), "the drain marker must not survive the window");
-    }
-
-    @Test
-    void theDrainMarkerIsClearedWhenATaskThrows() {
-        window.enqueue(() -> {
-            throw new IllegalStateException("command block crash");
-        });
-
-        assertThrows(IllegalStateException.class, window::runGlobalPhase);
-
-        assertFalse(window.isDraining());
     }
 
     @Test

@@ -2,16 +2,21 @@ package fr.hardel.leafs.mixin.network;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.network.PlayerListFileAccess;
+import fr.hardel.leafs.network.PlayerTeardown;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.Connection;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.PlayerAdvancements;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.players.PlayerList;
+import net.minecraft.stats.ServerStatsCounter;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -20,15 +25,16 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Concurrent player lists for cross-region reads; placement runs on the owning unit. */
+/** Concurrent player lists for cross-region reads; placement runs on the owning unit, removal on the unit that owns the player. */
 @Mixin(PlayerList.class)
-public abstract class PlayerListMixin {
+public abstract class PlayerListMixin implements PlayerListFileAccess {
 
     @Mutable
     @Shadow
@@ -40,13 +46,35 @@ public abstract class PlayerListMixin {
     @Final
     private Map<UUID, ServerPlayer> playersByUUID;
 
+    @Mutable
+    @Shadow
+    @Final
+    private Map<UUID, ServerStatsCounter> stats;
+
+    @Mutable
+    @Shadow
+    @Final
+    private Map<UUID, PlayerAdvancements> advancements;
+
     @Shadow
     public abstract MinecraftServer getServer();
+
+    @Shadow
+    private Path locateStatsFile(GameProfile gameProfile) {
+        throw new IllegalStateException("Shadowed method body");
+    }
+
+    @Override
+    public Path leafs$statsFile(GameProfile profile) {
+        return locateStatsFile(profile);
+    }
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$concurrentPlayerLists(CallbackInfo callbackInfo) {
         this.players = new CopyOnWriteArrayList<>();
         this.playersByUUID = new ConcurrentHashMap<>();
+        this.stats = new ConcurrentHashMap<>();
+        this.advancements = new ConcurrentHashMap<>();
     }
 
     /** Server-thread placement runs inline; the level mutation inside takes the exclusion at {@code ServerLevel.addPlayer}. */
@@ -82,14 +110,9 @@ public abstract class PlayerListMixin {
         }
     }
 
-    /** Teardown reaches entities other regions own (unRide, the pearl sweep, cross-level); it runs with every region paused. */
+    /** The vanilla removal body runs whole under the pause of every region; disk writes leave on the deferred thread. */
     @WrapMethod(method = "remove")
-    private void leafs$teardownWithRegionsPaused(ServerPlayer player, Operation<Void> original) {
-        long start = System.nanoTime();
-        ((LeafsServerAccess) this.getServer()).leafs$ticking().runWithRegionsPaused(() -> original.call(player));
-        long millis = (System.nanoTime() - start) / 1_000_000L;
-        if (millis > 50) {
-            Leafs.LOGGER.warn("Teardown of {} held every region paused for {} ms", player.getPlainTextName(), millis);
-        }
+    private void leafs$teardownUnderRegionPause(ServerPlayer player, Operation<Void> original) {
+        PlayerTeardown.remove((PlayerList) (Object) this, player, () -> original.call(player));
     }
 }

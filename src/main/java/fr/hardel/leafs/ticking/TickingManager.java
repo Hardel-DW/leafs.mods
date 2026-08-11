@@ -8,7 +8,6 @@ import fr.hardel.leafs.global.DeferredFileWrites;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
-import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
@@ -24,22 +23,24 @@ public final class TickingManager {
 
     private final MinecraftServer server;
     private final TickBarrier barrier = new TickBarrier();
+    private final PauseBatch pauseBatch = new PauseBatch(barrier);
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
+    private volatile boolean halted;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
-        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.watchdogWarnSeconds()), Leafs.LOGGER::error);
+        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), Duration.ofSeconds(config.debug().watchdogKillSeconds()), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
-        this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
+        this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
         DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
-        Leafs.LOGGER.info("Leafs ticking live - {} region workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveRegionThreads());
+        Leafs.LOGGER.info("Leafs ticking live - {} region workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads());
     }
 
 
@@ -49,12 +50,12 @@ public final class TickingManager {
 
     /** Rare global-phase work reaching entities regions own (player teardown): runs with every region paused. */
     public void runWithRegionsPaused(Runnable action) {
-        barrier.raise();
-        try {
-            action.run();
-        } finally {
-            barrier.drop();
-        }
+        pauseBatch.run(action);
+    }
+
+    /** The connection tick opens this so a disconnect wave shares one pause instead of one per player. */
+    public PauseBatch pauseBatch() {
+        return pauseBatch;
     }
 
     public GlobalScheduler globalScheduler() {
@@ -62,7 +63,7 @@ public final class TickingManager {
     }
 
     /**
-     * Compromise #6: once regions may be live, an off-thread {@code MinecraftServer.execute} lands in
+     * Once regions may be live, an off-thread {@code MinecraftServer.execute} lands in
      * the global phase. A designed hot path since the listener-tick move (chunk acks, teardown, handler continuations), so it logs nothing.
      */
     public boolean divertExecute(Runnable task) {
@@ -132,12 +133,32 @@ public final class TickingManager {
         scheduler.setPeriodNanos(periodNanos);
     }
 
+    /** True once the pool is stopping: late removals fall back to the inline path instead of queueing to dead regions. */
+    public boolean halted() {
+        return halted;
+    }
+
+    /** Queued region tasks run inline, looped because a draining task can queue a follow-up on another level (cross-dimension teleport). */
+    private void drainRegionTasks(MinecraftServer server) {
+        int drained;
+        do {
+            drained = 0;
+            for (ServerLevel level : server.getAllLevels()) {
+                drained += ((ServerLevelRegionAccess) level).leafs$regions().drainTasksForShutdown();
+            }
+        } while (drained > 0);
+    }
+
     /**
-     * Head of {@code stopServer}, before the worlds save: the pool must stop first so the saves read
-     * settled state, then every in-flight teleport places so no entity is lost to the shutdown.
+     * Head of {@code stopServer}, before the worlds save: the shutdown deadline arms first so a stop
+     * that wedges still dies, the pool stops so the saves read settled state, then every in-flight
+     * teleport places so no entity is lost to the shutdown.
      */
     public void haltTicking(MinecraftServer server) {
+        halted = true;
+        watchdog.armShutdownDeadline(LeafsWatchdog.SHUTDOWN_DEADLINE);
         scheduler.shutdown();
+        drainRegionTasks(server);
         globalScheduler.drain();
         for (ServerLevel level : server.getAllLevels()) {
             ((ServerLevelRegionAccess) level).leafs$regions().drainUnloadsForShutdown();
@@ -156,6 +177,10 @@ public final class TickingManager {
         watchdog.stop();
         DeferredFileWrites.stopAndFlush();
         drainRegions(server);
+        // A dedicated JVM must now die, so the deadline stays armed until the process exits; in solo the JVM lives on.
+        if (!server.isDedicatedServer()) {
+            watchdog.disarmShutdownDeadline();
+        }
     }
 
     /** Region crashes stop the whole server cleanly; the region-scoped report was already written by the tick loop. */

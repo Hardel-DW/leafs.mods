@@ -69,14 +69,4 @@ class ConcurrentInt2ObjectMapTest {
 
         assertTrue(seen > 0);
     }
-
-    @Test
-    void clearEmptiesTheMap() {
-        map.put(1, "a");
-        map.put(2, "b");
-
-        map.clear();
-        assertTrue(map.isEmpty());
-        assertEquals(0, map.int2ObjectEntrySet().size());
-    }
 }

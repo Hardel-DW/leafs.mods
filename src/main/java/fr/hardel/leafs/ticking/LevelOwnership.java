@@ -9,6 +9,7 @@ import java.util.function.Supplier;
  */
 public final class LevelOwnership {
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    private final Object inlineMonitor = new Object();
 
     public boolean tryEnterRegionTick() {
         if (lock.isWriteLocked() || lock.hasQueuedThreads()) {
@@ -66,5 +67,20 @@ public final class LevelOwnership {
         } finally {
             exitLevelSerial();
         }
+    }
+
+    /**
+     * Same as {@link #runExclusive}, plus a monitor around the inline branch: two region workers
+     * share the read side and would otherwise interleave on level-wide state their positions do not
+     * cover, like the player maps a join or a disconnect mutates.
+     */
+    public void runExclusiveSerialized(Runnable action) {
+        callExclusive(() -> {
+            synchronized (inlineMonitor) {
+                action.run();
+            }
+
+            return null;
+        });
     }
 }

@@ -75,7 +75,7 @@ public final class RegionTickBody {
         broadcastChangedChunks(worldData);
         RegionEntityTracking.tickRegion(level, entityData.tickList());
         ServerChunkCache chunkSource = level.getChunkSource();
-        // Ticket AND completed 1-radius FULL: vanilla bridges the streaming gap with a sync load a region worker cannot do (Compromise #18).
+        // Ticket AND completed 1-radius FULL: vanilla bridges the streaming gap with a sync load a region worker cannot do.
         LongPredicate tickingChunk = chunkSource::isPositionTicking;
         if (runs) {
             worldData.runBlockEvents(pos -> tickingChunk.test(ChunkPos.pack(pos)), this::runBlockEvent);
@@ -138,7 +138,6 @@ public final class RegionTickBody {
             }
 
             if (!categories.isEmpty() && level.canSpawnEntitiesInChunk(chunkPos)) {
-                // A spawn inside a structure's bounds may need a start chunk never loaded (Compromise #19): skip the chunk this tick.
                 TickGuard.tickOrSkip(spawning -> NaturalSpawner.spawnForChunk(level, spawning, state, categories), chunk);
             }
         }
@@ -245,7 +244,7 @@ public final class RegionTickBody {
             }
 
             entity.checkDespawn();
-            // A player in a still-loading chunk waits for the 1-radius FULL completion (Compromise #18): vanilla would sync-load under it, a worker cannot.
+            // A player in a still-loading chunk waits for the 1-radius FULL completion; vanilla would sync-load under it, a worker cannot.
             if (entity instanceof ServerPlayer ? chunkSource.isPositionTicking(entity.chunkPosition().pack()) : distanceManager.inEntityTickingRange(entity.chunkPosition().pack())) {
                 Entity vehicle = entity.getVehicle();
                 if (vehicle != null) {

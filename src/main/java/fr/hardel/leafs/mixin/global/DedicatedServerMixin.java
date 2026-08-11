@@ -9,7 +9,7 @@ import net.minecraft.server.dedicated.DedicatedServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** The console route: op commands have arbitrary world reach, so they execute in the next barrier window (Compromise #4). */
+/** The console route: op commands have arbitrary world reach, so they execute in the next barrier window. */
 @Mixin(DedicatedServer.class)
 public abstract class DedicatedServerMixin {
 
