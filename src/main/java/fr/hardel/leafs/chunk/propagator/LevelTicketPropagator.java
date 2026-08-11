@@ -1,25 +1,32 @@
 package fr.hardel.leafs.chunk.propagator;
 
+import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ByteMap;
-import net.minecraft.server.level.ChunkHolder;
-import net.minecraft.server.level.ChunkLevel;
-import net.minecraft.server.level.DistanceManager;
 import net.minecraft.world.level.ChunkPos;
 
 /**
  * The level authority for chunk tickets: fed inline by the ticket listener under the table monitor,
- * drained at the serial drain point where it writes the holder levels vanilla's graph used to
- * compute. Its shadow ran six hours at 550 players against vanilla without one disagreement.
+ * drained by any thread that staged work. Each drained section reports its level batch to the
+ * scheduling layer under the ticket area, and starts the generation tasks the batch built once the
+ * locks are released. Its shadow ran six hours at 550 players against vanilla without one disagreement.
  */
 public final class LevelTicketPropagator extends LeafsTicketPropagator {
-    private static final int UNLOADED = ChunkLevel.MAX_LEVEL + 1;
 
-    private final DistanceManager distanceManager;
     private final AreaLock ticketLock = new AreaLock(SECTION_SHIFT);
+    private volatile ChunkScheduling scheduling;
 
-    public LevelTicketPropagator(DistanceManager distanceManager) {
-        this.distanceManager = distanceManager;
+    /** Wired at ChunkMap construction, before the ticket storage binds its level and the first feed can arrive. */
+    public void bindScheduling(ChunkScheduling scheduling) {
+        this.scheduling = scheduling;
+    }
+
+    public ChunkScheduling scheduling() {
+        ChunkScheduling bound = scheduling;
+        if (bound == null) {
+            throw new IllegalStateException("Chunk scheduling requested before the level's ChunkMap bound it");
+        }
+
+        return bound;
     }
 
     /** No table read in here: the level rides the listener call, so this never waits on the table monitor. */
@@ -39,24 +46,18 @@ public final class LevelTicketPropagator extends LeafsTicketPropagator {
         }
     }
 
-    /** Serial drain point only: the holder scheduling written here stays single-threaded until the core chantier. */
+    /** Any thread may drain; far apart sections drain in parallel, neighbouring ones serialize on the ticket area. */
     public void drain() {
         performUpdates(ticketLock);
     }
 
     @Override
     protected void onLevelUpdates(Long2ByteLinkedOpenHashMap updates) {
-        for (Long2ByteMap.Entry entry : updates.long2ByteEntrySet()) {
-            long pos = entry.getLongKey();
-            int level = convertBetweenTicketLevels(entry.getByteValue());
-            ChunkHolder chunk = distanceManager.getChunk(pos);
-            int holderLevel = chunk == null ? UNLOADED : chunk.getTicketLevel();
-            if (holderLevel != level) {
-                chunk = distanceManager.updateChunkScheduling(pos, level, chunk, holderLevel);
-                if (chunk != null) {
-                    distanceManager.chunksToUpdateFutures.add(chunk);
-                }
-            }
-        }
+        scheduling().applyLevelUpdates(updates);
+    }
+
+    @Override
+    protected void onSectionDrained() {
+        scheduling().startCollectedTasks();
     }
 }

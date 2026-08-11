@@ -1,5 +1,10 @@
 package fr.hardel.leafs.mixin.entity;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import fr.hardel.leafs.entity.TrackedPairingRefresh;
+import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerPlayerConnection;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,5 +29,15 @@ public abstract class TrackedEntityMixin {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$swapForConcurrentFacade(CallbackInfo callbackInfo) {
         this.seenBy = ConcurrentHashMap.newKeySet();
+    }
+
+    /** A first watcher re-anchors the base: only then is there no delta stream the refresh could tear. */
+    @WrapOperation(method = "updatePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerEntity;addPairing(Lnet/minecraft/server/level/ServerPlayer;)V"))
+    private void leafs$freshBaseOnFirstPairing(ServerEntity serverEntity, ServerPlayer player, Operation<Void> original) {
+        if (this.seenBy.size() == 1) {
+            ((TrackedPairingRefresh) serverEntity).leafs$refreshPairingBase();
+        }
+
+        original.call(serverEntity, player);
     }
 }

@@ -1,6 +1,8 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.TickGuard;
@@ -86,8 +88,10 @@ public final class RegionTickBody {
             worldData.blockEntityTickers().tickAll(runs, tickingChunk);
         }
 
+        PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkSource.chunkMap).leafs$playerLoader();
         entityData.tickList().forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
+                loader.tick(player);
                 RegionNetworkTick.tickListenerOnRegion(player, level.getServer());
                 player.connection.chunkSender.sendNextChunks(player);
                 player.connection.connection.flushChannel();
@@ -95,8 +99,16 @@ public final class RegionTickBody {
         });
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the custom spawners, decided level-serial. */
+    /** What is left of the serial {@code tickChunks} pass: the loaders of players no region ticks, then the custom spawners. */
     public void tickSerialRemainder(boolean spawnEnemies) {
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkMap).leafs$playerLoader();
+        for (ServerPlayer player : chunkMap.playerMap.getAllPlayers()) {
+            if (!RegionNetworkTick.ownedByRegion(player.connection)) {
+                loader.tick(player);
+            }
+        }
+
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
         }

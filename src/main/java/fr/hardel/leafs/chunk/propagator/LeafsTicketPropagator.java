@@ -109,6 +109,10 @@ public abstract class LeafsTicketPropagator {
      */
     protected abstract void onLevelUpdates(Long2ByteLinkedOpenHashMap updates);
 
+    /** Called after each drained section released its locks: work built under them starts here. */
+    protected void onSectionDrained() {
+    }
+
     /**
      * Drains every update staged before this call, sharing the work with concurrent drainers.
      * The caller must not hold any cell of ticketLock, each drained section locks its own 3x3
@@ -142,6 +146,7 @@ public abstract class LeafsTicketPropagator {
         }
     }
 
+    /** The outer finally frees the node and fires the hook on every exit, or parked drainers never wake and work built under the locks never starts. */
     private boolean performUpdate(Section section, UpdateQueue.Node node, Wavefront wavefront, AreaLock ticketLock) {
         int sectionX = section.sectionX;
         int sectionZ = section.sectionZ;
@@ -149,49 +154,52 @@ public abstract class LeafsTicketPropagator {
         // encode offsets are needed to queue the seeds below, before the wavefronts run
         wavefront.setupEncodeOffset(sectionX, sectionZ);
 
-        AreaLock.Node areaNode = ticketLock == null
-            ? null
-            : ticketLock.lock(
-                (sectionX - 1) << SECTION_SHIFT, (sectionZ - 1) << SECTION_SHIFT,
-                ((sectionX + 1) << SECTION_SHIFT) | (SECTION_SIZE - 1), ((sectionZ + 1) << SECTION_SHIFT) | (SECTION_SIZE - 1));
-        boolean updated;
+        boolean updated = false;
         try {
-            if (section != sections.get(positionKey(sectionX, sectionZ))) {
-                // a neighbouring drain de-initialised this section, its replacement re-queued itself
-                updateQueue.remove(node);
-                return false;
-            }
+            AreaLock.Node areaNode = ticketLock == null
+                ? null
+                : ticketLock.lock(
+                    (sectionX - 1) << SECTION_SHIFT, (sectionZ - 1) << SECTION_SHIFT,
+                    ((sectionX + 1) << SECTION_SHIFT) | (SECTION_SIZE - 1), ((sectionZ + 1) << SECTION_SHIFT) | (SECTION_SIZE - 1));
+            try {
+                if (section != sections.get(positionKey(sectionX, sectionZ))) {
+                    // a neighbouring drain de-initialised this section, its replacement re-queued itself
+                    return false;
+                }
 
-            int oldSourceCount = section.sources.size();
-            applyQueuedSources(section, wavefront);
-            int newSourceCount = section.sources.size();
+                int oldSourceCount = section.sources.size();
+                applyQueuedSources(section, wavefront);
+                int newSourceCount = section.sources.size();
 
-            if (oldSourceCount == 0 && newSourceCount != 0) {
-                initialiseNeighbours(sectionX, sectionZ);
-            }
+                if (oldSourceCount == 0 && newSourceCount != 0) {
+                    initialiseNeighbours(sectionX, sectionZ);
+                }
 
-            if (wavefront.hasQueuedSeeds()) {
-                wavefront.setupCaches(this, sectionX, sectionZ);
-                wavefront.performDecrease();
-                wavefront.destroyCaches();
-            }
+                if (wavefront.hasQueuedSeeds()) {
+                    wavefront.setupCaches(this, sectionX, sectionZ);
+                    wavefront.performDecrease();
+                    wavefront.destroyCaches();
+                }
 
-            if (newSourceCount == 0) {
-                releaseNeighbours(sectionX, sectionZ, oldSourceCount != 0);
-            }
+                if (newSourceCount == 0) {
+                    releaseNeighbours(sectionX, sectionZ, oldSourceCount != 0);
+                }
 
-            updated = !wavefront.updatedPositions.isEmpty();
-            if (updated) {
-                onLevelUpdates(wavefront.updatedPositions);
-                wavefront.updatedPositions.clear();
+                updated = !wavefront.updatedPositions.isEmpty();
+                if (updated) {
+                    onLevelUpdates(wavefront.updatedPositions);
+                    wavefront.updatedPositions.clear();
+                }
+            } finally {
+                if (areaNode != null) {
+                    ticketLock.unlock(areaNode);
+                }
             }
         } finally {
-            if (areaNode != null) {
-                ticketLock.unlock(areaNode);
-            }
+            updateQueue.remove(node);
+            onSectionDrained();
         }
 
-        updateQueue.remove(node);
         return updated;
     }
 
