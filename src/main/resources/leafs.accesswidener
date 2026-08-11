@@ -40,3 +40,10 @@ accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/mi
 accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
 accessible field net/minecraft/server/level/DistanceManager chunksToUpdateFutures Ljava/util/Set;
+accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
+accessible method net/minecraft/server/level/ChunkHolder updateFutures (Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/Executor;)V
+accessible field net/minecraft/server/level/ChunkMap updatingChunkMap Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;
+accessible field net/minecraft/server/level/ChunkMap pendingUnloads Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;
+accessible field net/minecraft/server/level/ChunkMap serverViewDistance I
+accessible field net/minecraft/server/level/DistanceManager simulationDistance I
+accessible class net/minecraft/server/level/DistanceManager$PlayerTicketTracker

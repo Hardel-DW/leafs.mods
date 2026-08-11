@@ -1,6 +1,8 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
+import fr.hardel.leafs.chunk.PropagatorAccess;
+import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.global.GlobalServerAccess;
@@ -8,6 +10,7 @@ import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
+import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
@@ -64,9 +67,22 @@ public final class LevelBindings {
         }, target -> ((ServerLevelEntityAccess) target).leafs$entityTeleports());
     }
 
-    /** A region's refused chunk read files a short-lived load ticket, so the serial side loads the chunk and the retry finds it. */
+    /**
+     * A refused chunk read files a short-lived ticket, drains it and requests the status, so the
+     * chunk actually loads and the vanilla retry finds it. The ticket alone would only pin a holder:
+     * a level like 41 for STRUCTURE_STARTS triggers no promotion, which is what left structure
+     * spawn positions unloadable forever (roadmap 11).
+     */
     public static Runnable chunkDemand(ServerChunkCache chunkSource, int chunkX, int chunkZ, ChunkStatus status) {
-        return () -> chunkSource.ticketStorage.addTicket(new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status)), new ChunkPos(chunkX, chunkZ));
+        return () -> {
+            chunkSource.ticketStorage.addTicket(new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status)), new ChunkPos(chunkX, chunkZ));
+            LevelTicketPropagator propagator = ((PropagatorAccess) chunkSource.chunkMap.getDistanceManager()).leafs$propagator();
+            propagator.drain();
+            ChunkHolder holder = chunkSource.chunkMap.getUpdatingChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+            if (holder != null) {
+                propagator.scheduling().requestArea(chunkX, chunkZ, 0, () -> holder.scheduleChunkGenerationTask(status, chunkSource.chunkMap));
+            }
+        };
     }
 
     private static LevelRegions regionsOf(ServerLevel level) {
