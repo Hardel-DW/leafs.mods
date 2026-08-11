@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.ChunkTicketHolds;
+import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.entity.RegionEntityData;
@@ -50,6 +51,7 @@ public final class LevelTickUnit extends TickHandle {
     private boolean activated;
     private volatile int lastChunkCount;
     private volatile int lastTrackedChunks;
+    private volatile int lastViewChunks;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()));
@@ -177,6 +179,7 @@ public final class LevelTickUnit extends TickHandle {
     private void takeCensus() {
         lastChunkCount = level.getChunkSource().getLoadedChunksCount();
         lastTrackedChunks = regions.trackedChunks();
+        lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
     }
 
     /** Time-boxed: a mass unload dump spreads over ticks instead of freezing the dimension in one. A slow task logs its origin. */
@@ -206,6 +209,11 @@ public final class LevelTickUnit extends TickHandle {
     /** Region-side counterpart of {@link #chunkCount()}, sampled in the same census so the two are comparable. */
     public int trackedChunks() {
         return lastTrackedChunks;
+    }
+
+    /** Chunks the player view pipelines retain a ticket on; a count that never falls back after a wave names a leak. */
+    public int viewChunks() {
+        return lastViewChunks;
     }
 
     /** Derived from the sizes of the owned tick lists instead of walking every entity, O(regions), any thread (Roadmap 10). */

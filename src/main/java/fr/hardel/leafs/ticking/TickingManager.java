@@ -2,10 +2,10 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.global.DeferredFileWrites;
-import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import net.minecraft.server.MinecraftServer;
@@ -26,6 +26,7 @@ public final class TickingManager {
     private final PauseBatch pauseBatch = new PauseBatch(barrier);
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
+    private final ChunkWorkers chunkWorkers;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
@@ -37,10 +38,11 @@ public final class TickingManager {
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), Duration.ofSeconds(config.debug().watchdogKillSeconds()), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
+        this.chunkWorkers = new ChunkWorkers(config.effectiveChunkThreads());
         DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
-        Leafs.LOGGER.info("Leafs ticking live - {} region workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads());
+        Leafs.LOGGER.info("Leafs ticking live - {} region workers, {} chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads(), config.effectiveChunkThreads());
     }
 
 
@@ -60,6 +62,10 @@ public final class TickingManager {
 
     public GlobalScheduler globalScheduler() {
         return globalScheduler;
+    }
+
+    public ChunkWorkers chunkWorkers() {
+        return chunkWorkers;
     }
 
     /**
@@ -96,10 +102,6 @@ public final class TickingManager {
         for (LevelTickUnit unit : levelUnits.values()) {
             unit.tickPausedNetwork();
         }
-    }
-
-    public boolean currentThreadOwns(ServerLevel level) {
-        return RegionContext.current() instanceof RegionContext.LevelSerial context && context.id() == unitFor(level).id();
     }
 
     /** Ticket ops first, then bookkeeping (which runs the distance updates that materialise holders), then offers. */
@@ -144,7 +146,7 @@ public final class TickingManager {
         do {
             drained = 0;
             for (ServerLevel level : server.getAllLevels()) {
-                drained += ((ServerLevelRegionAccess) level).leafs$regions().drainTasksForShutdown();
+                drained += ((ServerLevelRegionAccess) level).leafs$regions().drainTasksInline();
             }
         } while (drained > 0);
     }
@@ -174,6 +176,7 @@ public final class TickingManager {
     /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. */
     public void shutdown(MinecraftServer server) {
         scheduler.shutdown();
+        chunkWorkers.shutdown();
         watchdog.stop();
         DeferredFileWrites.stopAndFlush();
         drainRegions(server);

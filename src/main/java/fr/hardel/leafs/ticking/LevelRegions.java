@@ -57,6 +57,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return ownership;
     }
 
+    /** Null until the level activates; region contexts only exist after activation. */
+    public String dimensionName() {
+        return dimension;
+    }
+
     /**
      * Runs once on the server thread, under the level exclusion, before the level's first tick.
      * Regions are equipped first, the caller's migration then re-buckets the attached payloads, and
@@ -105,8 +110,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return unloads;
     }
 
-    /** Shutdown path, pool already stopped: queued region tasks (player teardowns) run inline with their holds released. */
-    public int drainTasksForShutdown() {
+    /** Universal-owner drain: the shutdown path and the exclusion-held wait loops run every queued region task inline. */
+    public int drainTasksInline() {
         RegionScheduler<RegionTickData> scheduler = taskScheduler;
         if (scheduler == null) {
             return 0;

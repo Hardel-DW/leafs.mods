@@ -14,7 +14,7 @@ class LevelOwnershipTest {
     void levelSerialIsReentrant() {
         LevelOwnership ownership = new LevelOwnership();
         ownership.enterLevelSerial();
-        assertTrue(ownership.tryEnterLevelSerial());
+        ownership.enterLevelSerial();
         assertTrue(ownership.isLevelSerialHeldByCurrentThread());
         ownership.exitLevelSerial();
         ownership.exitLevelSerial();
@@ -22,13 +22,9 @@ class LevelOwnershipTest {
     }
 
     @Test
-    void aRegionTickBlocksTheSerialSideAndBack() {
+    void theSerialHolderBlocksRegionTicksAndBack() {
         LevelOwnership ownership = new LevelOwnership();
-        assertTrue(ownership.tryEnterRegionTick());
-        assertFalse(ownership.tryEnterLevelSerial());
-        ownership.exitRegionTick();
-
-        assertTrue(ownership.tryEnterLevelSerial());
+        ownership.enterLevelSerial();
         assertFalse(ownership.tryEnterRegionTick());
         ownership.exitLevelSerial();
         assertTrue(ownership.tryEnterRegionTick());
@@ -54,7 +50,6 @@ class LevelOwnershipTest {
         region.start();
         assertTrue(regionEntered.await(5, TimeUnit.SECONDS));
 
-        assertFalse(ownership.tryEnterLevelSerial());
         releaseRegion.countDown();
         ownership.enterLevelSerial();
         ownership.exitLevelSerial();

@@ -23,10 +23,6 @@ public final class LevelOwnership {
         lock.readLock().unlock();
     }
 
-    public boolean tryEnterLevelSerial() {
-        return lock.writeLock().tryLock();
-    }
-
     public void enterLevelSerial() {
         lock.writeLock().lock();
     }
