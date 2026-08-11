@@ -6,7 +6,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Neutralizes the vanilla watchdog: it measures one game thread that no longer exists as such (Compromise #15). */
+/** Neutralizes the vanilla watchdog: it measures one game thread that no longer exists as such. */
 @Mixin(ServerWatchdog.class)
 public abstract class ServerWatchdogMixin {
 

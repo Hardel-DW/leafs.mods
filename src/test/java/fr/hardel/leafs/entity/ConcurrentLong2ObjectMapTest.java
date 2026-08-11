@@ -30,7 +30,7 @@ class ConcurrentLong2ObjectMapTest {
     }
 
     @Test
-    void computeIfAbsentComputesOncePerKey() {
+    void computeIfAbsentComputesOncePerKeyThroughBothOverloads() {
         AtomicInteger invocations = new AtomicInteger();
         Long2ObjectFunction<String> factory = key -> {
             invocations.incrementAndGet();
@@ -40,6 +40,8 @@ class ConcurrentLong2ObjectMapTest {
         assertEquals("v7", map.computeIfAbsent(7L, factory));
         assertEquals("v7", map.computeIfAbsent(7L, factory));
         assertEquals(1, invocations.get());
+        assertEquals("v3", map.computeIfAbsent(3L, (java.util.function.LongFunction<String>) key -> "v" + key));
+        assertEquals("v3", map.get(3L));
     }
 
     @Test
@@ -70,12 +72,6 @@ class ConcurrentLong2ObjectMapTest {
 
         assertEquals(1, invocations.get());
         assertEquals("shared", map.get(42L));
-    }
-
-    @Test
-    void longFunctionOverloadAlsoComputes() {
-        assertEquals("v3", map.computeIfAbsent(3L, (java.util.function.LongFunction<String>) key -> "v" + key));
-        assertEquals("v3", map.get(3L));
     }
 
     @Test

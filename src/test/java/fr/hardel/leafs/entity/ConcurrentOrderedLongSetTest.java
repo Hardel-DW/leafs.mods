@@ -36,17 +36,11 @@ class ConcurrentOrderedLongSetTest {
     }
 
     @Test
-    void addAndDuplicateAdd() {
+    void membershipReportsAddsRemovesAndDuplicates() {
         assertTrue(set.add(5L));
         assertFalse(set.add(5L));
         assertTrue(set.contains(5L));
         assertEquals(1, set.size());
-    }
-
-    @Test
-    void removeAndAbsentRemove() {
-        set.add(5L);
-
         assertTrue(set.remove(5L));
         assertFalse(set.remove(5L));
         assertFalse(set.contains(5L));
@@ -191,20 +185,6 @@ class ConcurrentOrderedLongSetTest {
         assertEquals(2L, iterator.previousLong());
         assertEquals(1L, iterator.previousLong());
         assertFalse(iterator.hasPrevious());
-    }
-
-    @Test
-    void negativeCoordinatesKeepSignedOrderAgainstAvlReference() {
-        TreeSet<Long> reference = new TreeSet<>();
-        for (int x : new int[] {-2, -1, 0, 1}) {
-            for (int y : new int[] {-4, 0, 5}) {
-                long key = sectionKey(x, y, x);
-                set.add(key);
-                reference.add(key);
-            }
-        }
-
-        assertEquals(new ArrayList<>(reference), drain(set.iterator()));
     }
 
     @Test

@@ -23,7 +23,7 @@ public final class Leafs implements ModInitializer {
 
         LeafsConfig config = LeafsConfig.get();
         LOGGER.info("Leafs initialised - {} region workers, {}x{}-chunk sections, ownership checks {}",
-            config.effectiveRegionThreads(), config.sectionChunkSize(), config.sectionChunkSize(),
+            config.effectiveThreads(), config.sectionSize(), config.sectionSize(),
             Ownership.CHECKS_ENABLED ? "on" : "off");
     }
 }

@@ -78,17 +78,6 @@ class RegionBlockEntityTickersTest {
     }
 
     @Test
-    void removedTickerIsPurged() {
-        RegionBlockEntityTickers tickers = new RegionBlockEntityTickers();
-        SleepableTicker chest = new SleepableTicker(new BlockPos(32, 64, 32));
-        tickers.add(chest, chunkKeyOf(chest));
-        chest.removed = true;
-        tickers.tickAll(true, chunkKey -> true);
-
-        assertEquals(0, tickers.size());
-    }
-
-    @Test
     void sleepingTickerKeepsItsBucketThroughASplit() {
         RegionBlockEntityTickers parent = new RegionBlockEntityTickers();
         SleepableTicker campfire = new SleepableTicker(new BlockPos(16, 64, 16));

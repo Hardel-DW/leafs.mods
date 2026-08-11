@@ -72,9 +72,10 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return leafs$entityLists.containsTicking(entity);
     }
 
+    /** Serialized on top of the exclusion: two regions' read holds do not exclude each other on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
-        leafs$ownership().runExclusive(() -> original.call(player));
+        leafs$ownership().runExclusiveSerialized(() -> original.call(player));
     }
 
     @WrapMethod(method = "addEntity")
@@ -82,9 +83,10 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return leafs$ownership().callExclusive(() -> original.call(entity));
     }
 
+    /** Same serialization as {@code addPlayer}: a region-side teardown must not interleave with another region's. */
     @WrapMethod(method = "removePlayerImmediately")
     private void leafs$removePlayerUnderExclusion(ServerPlayer player, Entity.RemovalReason reason, Operation<Void> original) {
-        leafs$ownership().runExclusive(() -> original.call(player, reason));
+        leafs$ownership().runExclusiveSerialized(() -> original.call(player, reason));
     }
 
     @Unique

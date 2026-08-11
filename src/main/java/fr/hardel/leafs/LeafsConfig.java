@@ -19,30 +19,46 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadius, int bufferRadius, int watchdogWarnSeconds, int metricsLogSeconds, boolean compatBarrier, boolean perRegionLogs, boolean ownPropagator) {
-    public static final int AUTO_THREADS = 0;
+public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
 
-    private static final Codec<Integer> REGION_THREADS = Codec.intRange(ALL_CORES, 1024)
-        .validate(value -> value == AUTO_THREADS
-            ? DataResult.error(() -> "region_threads 0 is invalid: omit the key for auto, -1 for all cores")
+    /** Surveillance and diagnostics: the watchdog thresholds, the CSV metrics period and the per-region log files. */
+    public record Debug(int watchdogWarnSeconds, int watchdogKillSeconds, int metricsLogSeconds, boolean perRegionLogs) {
+    }
+
+    private static final Codec<Integer> MAX_THREADS = Codec.intRange(ALL_CORES, 1024)
+        .validate(value -> value == 0
+            ? DataResult.error(() -> "max_threads 0 is invalid: -1 uses all cores")
             : DataResult.success(value));
 
+    private static final Codec<Integer> SECTION_SIZE = Codec.intRange(2, 256)
+        .validate(value -> Integer.bitCount(value) == 1
+            ? DataResult.success(value)
+            : DataResult.error(() -> "section_size must be a power of two: 2, 4, 8, 16, 32, 64, 128 or 256"));
+
+    private static final MapCodec<Debug> DEBUG_MAP = RecordCodecBuilder.mapCodec(builder -> builder.group(
+        Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(Debug::watchdogWarnSeconds),
+        Codec.intRange(0, 3600).optionalFieldOf("watchdog_kill_seconds", 60).forGetter(Debug::watchdogKillSeconds),
+        Codec.intRange(0, 3600).optionalFieldOf("metrics_log_seconds", 0).forGetter(Debug::metricsLogSeconds),
+        Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs)
+    ).apply(builder, Debug::new));
+
+    private static final Codec<Debug> DEBUG = DEBUG_MAP.codec()
+        .validate(debug -> debug.watchdogKillSeconds() != 0 && debug.watchdogKillSeconds() <= debug.watchdogWarnSeconds()
+            ? DataResult.error(() -> "watchdog_kill_seconds must be 0 to disable the kill, or above watchdog_warn_seconds")
+            : DataResult.success(debug));
+
     private static final MapCodec<LeafsConfig> MAP_CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
-        REGION_THREADS.optionalFieldOf("region_threads", AUTO_THREADS).forGetter(LeafsConfig::regionThreads),
-        Codec.intRange(1, 8).optionalFieldOf("grid_section_shift", 4).forGetter(LeafsConfig::gridSectionShift),
-        Codec.intRange(1, 8).optionalFieldOf("merge_radius", 1).forGetter(LeafsConfig::mergeRadius),
-        Codec.intRange(1, 8).optionalFieldOf("buffer_radius", 1).forGetter(LeafsConfig::bufferRadius),
-        Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(LeafsConfig::watchdogWarnSeconds),
-        Codec.intRange(0, 3600).optionalFieldOf("metrics_log_seconds", 0).forGetter(LeafsConfig::metricsLogSeconds),
-        Codec.BOOL.optionalFieldOf("compat_barrier", true).forGetter(LeafsConfig::compatBarrier),
-        Codec.BOOL.optionalFieldOf("per_region_logs", true).forGetter(LeafsConfig::perRegionLogs),
-        Codec.BOOL.optionalFieldOf("own_propagator", false).forGetter(LeafsConfig::ownPropagator)
+        MAX_THREADS.optionalFieldOf("max_threads", ALL_CORES).forGetter(LeafsConfig::maxThreads),
+        SECTION_SIZE.optionalFieldOf("section_size", 16).forGetter(LeafsConfig::sectionSize),
+        Codec.intRange(1, 8).optionalFieldOf("region_merge_distance", 1).forGetter(LeafsConfig::regionMergeDistance),
+        Codec.intRange(1, 8).optionalFieldOf("region_buffer_distance", 1).forGetter(LeafsConfig::regionBufferDistance),
+        DEBUG.optionalFieldOf("debug", groupDefaults(DEBUG_MAP)).forGetter(LeafsConfig::debug)
     ).apply(builder, LeafsConfig::new));
 
-    public static final Codec<LeafsConfig> CODEC = MAP_CODEC.codec();
+    private static final Codec<LeafsConfig> CODEC = MAP_CODEC.codec();
 
     public static void register() {
         instance = load(FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json"));
@@ -57,7 +73,7 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
     }
 
     public static LeafsConfig defaults() {
-        return CODEC.parse(JsonOps.INSTANCE, new JsonObject()).getOrThrow();
+        return groupDefaults(MAP_CODEC);
     }
 
     static LeafsConfig load(Path file) {
@@ -72,12 +88,8 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
 
             JsonElement json = JsonParser.parseString(Files.readString(file));
             if (json instanceof JsonObject object) {
-                List<String> valid = MAP_CODEC.keys(JsonOps.INSTANCE).map(JsonElement::getAsString).toList();
-                for (String key : object.keySet()) {
-                    if (!valid.contains(key)) {
-                        throw new IllegalArgumentException("Config " + file + " has unknown key \"" + key + "\", valid keys: " + valid);
-                    }
-                }
+                requireKnownKeys(file, object, MAP_CODEC);
+                requireKnownGroup(file, object.get("debug"), DEBUG_MAP);
             }
 
             return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config " + file + " is invalid: " + error));
@@ -88,11 +100,30 @@ public record LeafsConfig(int regionThreads, int gridSectionShift, int mergeRadi
         }
     }
 
-    public int effectiveRegionThreads() {
-        return regionThreads > 0 ? regionThreads : Runtime.getRuntime().availableProcessors();
+    public int effectiveThreads() {
+        return maxThreads > 0 ? maxThreads : Runtime.getRuntime().availableProcessors();
     }
 
-    public int sectionChunkSize() {
-        return 1 << gridSectionShift;
+    public int sectionShift() {
+        return Integer.numberOfTrailingZeros(sectionSize);
+    }
+
+    private static <T> T groupDefaults(MapCodec<T> codec) {
+        return codec.codec().parse(JsonOps.INSTANCE, new JsonObject()).getOrThrow();
+    }
+
+    private static void requireKnownKeys(Path file, JsonObject object, MapCodec<?> codec) {
+        List<String> valid = codec.keys(JsonOps.INSTANCE).map(JsonElement::getAsString).distinct().toList();
+        for (String key : object.keySet()) {
+            if (!valid.contains(key)) {
+                throw new IllegalArgumentException("Config " + file + " has unknown key \"" + key + "\", valid keys: " + valid);
+            }
+        }
+    }
+
+    private static void requireKnownGroup(Path file, JsonElement group, MapCodec<?> codec) {
+        if (group instanceof JsonObject object) {
+            requireKnownKeys(file, object, codec);
+        }
     }
 }

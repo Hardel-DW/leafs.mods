@@ -32,7 +32,7 @@ public abstract class EntityMixin {
         }
     }
 
-    /** Region workers only: the serial side runs vanilla inline, a wider gate re-diverts its own deferred tasks forever (Compromise #7). */
+    /** Region workers only: the serial side runs vanilla inline, a wider gate re-diverts its own deferred tasks forever. */
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffOwnerTeleport(TeleportTransition transition, CallbackInfoReturnable<Entity> callbackInfo) {
         Entity self = (Entity) (Object) this;
