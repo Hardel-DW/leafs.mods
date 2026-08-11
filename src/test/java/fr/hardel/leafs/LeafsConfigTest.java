@@ -6,105 +6,88 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LeafsConfigTest {
 
     @Test
-    void missingFileWritesDefaultsAndReturnsThem(@TempDir Path directory) {
+    void missingFileWritesDefaultsThatReloadIdentically(@TempDir Path directory) {
         Path file = directory.resolve("leafs.json");
 
-        LeafsConfig config = LeafsConfig.load(file);
+        LeafsConfig written = LeafsConfig.load(file);
 
         assertTrue(Files.exists(file));
-        assertEquals(LeafsConfig.AUTO_THREADS, config.regionThreads());
-        assertEquals(4, config.gridSectionShift());
-        assertTrue(config.compatBarrier());
-
-        LeafsConfig reloaded = LeafsConfig.load(file);
-        assertEquals(config.regionThreads(), reloaded.regionThreads());
-        assertEquals(config.gridSectionShift(), reloaded.gridSectionShift());
+        assertEquals(written, LeafsConfig.load(file));
+        assertEquals(LeafsConfig.defaults(), written);
+        assertEquals(15, written.debug().watchdogWarnSeconds());
     }
 
     @Test
-    void existingFileOverridesDefaults(@TempDir Path directory) throws IOException {
+    void partialFileOverridesItsKeysAndKeepsTheRest(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");
         Files.writeString(file, """
-            {"region_threads": 8, "compat_barrier": false}
+            {"max_threads": 8, "section_size": 32, "debug": {"per_region_logs": true}}
             """);
 
         LeafsConfig config = LeafsConfig.load(file);
+        LeafsConfig defaults = LeafsConfig.defaults();
 
-        assertEquals(8, config.regionThreads());
-        assertEquals(8, config.effectiveRegionThreads());
-        assertFalse(config.compatBarrier());
-        assertEquals(4, config.gridSectionShift());
-        assertTrue(config.perRegionLogs());
+        assertEquals(8, config.effectiveThreads());
+        assertEquals(32, config.sectionSize());
+        assertEquals(5, config.sectionShift());
+        assertTrue(config.debug().perRegionLogs());
+        assertEquals(defaults.regionMergeDistance(), config.regionMergeDistance());
+        assertEquals(defaults.debug().watchdogKillSeconds(), config.debug().watchdogKillSeconds());
+        assertEquals(defaults.debug().metricsLogSeconds(), config.debug().metricsLogSeconds());
     }
 
     @Test
-    void autoThreadsResolvesToAvailableProcessors() {
-        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveRegionThreads());
+    void absentThreadsResolveToEveryProcessor() {
+        assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().maxThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveThreads());
     }
 
+    /** 0 sits below warn yet must boot: it is the disable escape hatch, not a threshold, and only this test guards it. */
     @Test
-    void allCoresResolvesToAvailableProcessors(@TempDir Path directory) throws IOException {
+    void zeroKillSecondsIsAcceptedAsTheDisableValue(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");
-        Files.writeString(file, "{\"region_threads\": -1}");
+        Files.writeString(file, "{\"debug\": {\"watchdog_kill_seconds\": 0}}");
 
-        LeafsConfig config = LeafsConfig.load(file);
-
-        assertEquals(LeafsConfig.ALL_CORES, config.regionThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors(), config.effectiveRegionThreads());
+        assertDoesNotThrow(() -> LeafsConfig.load(file));
     }
 
     @Test
-    void explicitZeroThreadsFailsTheBoot(@TempDir Path directory) throws IOException {
-        Path file = directory.resolve("leafs.json");
-        Files.writeString(file, "{\"region_threads\": 0}");
+    void invalidFilesFailTheBootNamingFileAndCause(@TempDir Path directory) throws IOException {
+        record Invalid(String json, String cause) {
+        }
 
-        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(file));
-    }
+        List<Invalid> cases = List.of(
+            new Invalid("{\"joins_per_tick\": 8}", "joins_per_tick"),
+            new Invalid("{\"debug\": {\"metrics\": 10}}", "metrics"),
+            new Invalid("{\"max_threads\": 0}", "max_threads"),
+            new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 30, \"watchdog_kill_seconds\": 30}}", "watchdog_kill_seconds"),
+            new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 0}}", null),
+            new Invalid("{\"section_size\": 20}", "section_size"),
+            new Invalid("{\"section_size\": 512}", null),
+            new Invalid("{\"max_threads\": \"lots\"}", null),
+            new Invalid("{oops", null),
+            new Invalid("", null)
+        );
 
-    @Test
-    void unknownKeyFailsTheBootNamingIt(@TempDir Path directory) throws IOException {
-        Path file = directory.resolve("leafs.json");
-        Files.writeString(file, "{\"metricsLogSeconds\": 10}");
+        for (Invalid invalid : cases) {
+            Path file = directory.resolve("leafs.json");
+            Files.writeString(file, invalid.json());
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(file));
-        assertTrue(exception.getMessage().contains("metricsLogSeconds"));
-        assertTrue(exception.getMessage().contains(file.toString()));
-    }
-
-    @Test
-    void sectionChunkSizeDerivesFromShift() {
-        assertEquals(16, LeafsConfig.defaults().sectionChunkSize());
-    }
-
-    @Test
-    void invalidValuesFailTheBoot(@TempDir Path directory) throws IOException {
-        Path malformed = directory.resolve("a.json");
-        Files.writeString(malformed, "{oops");
-        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(malformed));
-
-        Path wrongType = directory.resolve("b.json");
-        Files.writeString(wrongType, "{\"region_threads\": \"lots\"}");
-        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(wrongType));
-
-        Path outOfRange = directory.resolve("c.json");
-        Files.writeString(outOfRange, "{\"grid_section_shift\": 12}");
-        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(outOfRange));
-
-        Path zeroWatchdog = directory.resolve("e.json");
-        Files.writeString(zeroWatchdog, "{\"watchdog_warn_seconds\": 0}");
-        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(zeroWatchdog));
-
-        Path empty = directory.resolve("d.json");
-        Files.writeString(empty, "");
-        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(empty));
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(file), invalid.json());
+            assertTrue(exception.getMessage().contains(file.toString()), invalid.json());
+            if (invalid.cause() != null) {
+                assertTrue(exception.getMessage().contains(invalid.cause()), invalid.json());
+            }
+        }
     }
 }

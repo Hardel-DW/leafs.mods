@@ -4,9 +4,9 @@ import fr.hardel.leafs.region.CoordinateKey;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 
 /**
- * The one refcount table over a level's chunk holds. Since the ticket funnel became thread-safe
- * (chantier propagateur, S1), the 0-to-1 and 1-to-0 transitions apply their ticket inline from any
- * thread; the propagation reaction still lands on the serial side through the routed listener.
+ * The one refcount table over a level's chunk holds. The ticket funnel is thread-safe, so the 0-to-1
+ * and 1-to-0 transitions apply their ticket inline from any thread; the propagation reaction still
+ * lands on the serial side through the routed listener.
  */
 public final class SharedChunkHolds {
     private final ChunkHoldController controller;

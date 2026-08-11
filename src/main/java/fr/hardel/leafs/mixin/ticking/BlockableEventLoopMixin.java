@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Hook only - Compromise #6 lives in ticking/TickingManager: off-thread server executes land in the global phase. */
+/** Hook only - the logic lives in ticking/TickingManager: off-thread server executes land in the global phase. */
 @Mixin(BlockableEventLoop.class)
 public abstract class BlockableEventLoopMixin {
 

@@ -46,7 +46,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     private volatile Throwable feedFailure;
 
     public LevelRegions(LeafsConfig config) {
-        this.regionizer = new Regionizer<>(config.gridSectionShift(), config.mergeRadius(), config.bufferRadius(), this);
+        this.regionizer = new Regionizer<>(config.sectionShift(), config.regionMergeDistance(), config.regionBufferDistance(), this);
     }
 
     public Regionizer<RegionTickData> regionizer() {
@@ -103,6 +103,21 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public RegionUnloads<RegionTickData> unloads() {
         return unloads;
+    }
+
+    /** Shutdown path, pool already stopped: queued region tasks (player teardowns) run inline with their holds released. */
+    public int drainTasksForShutdown() {
+        RegionScheduler<RegionTickData> scheduler = taskScheduler;
+        if (scheduler == null) {
+            return 0;
+        }
+
+        int drained = scheduler.drainPendingInline();
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            drained += scheduler.drain(region);
+        }
+
+        return drained;
     }
 
     /** Shutdown path, pool already stopped: every queued teardown runs inline so the final save misses nothing. */
@@ -204,7 +219,15 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     public void onRegionDestroy(Region<RegionTickData> region) {
         Consumer<Runnable> sink = serialUnloadSink;
         if (sink != null) {
-            region.data().unloadQueues().closeDraining(sink);
+            region.data().unloadQueues().closeDraining(task -> sink.accept(new OrphanedUnload(task)));
+        }
+    }
+
+    /** Names the serial-fallback teardown of a dead region's chunk, so the slow-task tracer attributes it. */
+    private record OrphanedUnload(Runnable task) implements Runnable {
+        @Override
+        public void run() {
+            task.run();
         }
     }
 

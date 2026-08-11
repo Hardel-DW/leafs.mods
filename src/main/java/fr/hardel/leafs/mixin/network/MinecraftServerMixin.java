@@ -1,8 +1,11 @@
 package fr.hardel.leafs.mixin.network;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.network.RegionNetworkTick;
+import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.PauseBatch;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,5 +27,17 @@ public abstract class MinecraftServerMixin {
         }
 
         ((ServerLevelRegionAccess) player.level()).leafs$regions().ownership().runExclusive(() -> original.call(sender, player));
+    }
+
+    /** Disconnections are detected in this tick; the batch makes a whole wave share one region pause. */
+    @WrapMethod(method = "tickConnection")
+    private void leafs$batchTeardownPauses(Operation<Void> original) {
+        PauseBatch batch = ((LeafsServerAccess) this).leafs$ticking().pauseBatch();
+        batch.open();
+        try {
+            original.call();
+        } finally {
+            batch.close();
+        }
     }
 }

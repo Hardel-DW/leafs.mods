@@ -1,6 +1,5 @@
 package fr.hardel.leafs.scheduler;
 
-import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.Regionizer;
 
@@ -15,15 +14,6 @@ public final class RegionScheduler<R extends RegionTaskHost> {
     public RegionScheduler(Regionizer<R> regionizer, SharedChunkHolds holds) {
         this.regionizer = regionizer;
         this.holds = holds;
-    }
-
-    public void run(int chunkX, int chunkZ, Runnable task) {
-        if (isOnOwningRegion(chunkX, chunkZ)) {
-            task.run();
-            return;
-        }
-
-        queue(chunkX, chunkZ, task);
     }
 
     /** No region yet means the hold is still a deferred ticket op; the offer completes after the quiesce applies it. */
@@ -68,6 +58,22 @@ public final class RegionScheduler<R extends RegionTaskHost> {
         return executed;
     }
 
+    /** Shutdown drain for tasks whose region never materialised: they run inline on the caller, holds released. */
+    public int drainPendingInline() {
+        int executed = 0;
+        QueuedTask task;
+        while ((task = pending.poll()) != null) {
+            executed++;
+            try {
+                task.action().run();
+            } finally {
+                holds.release(task.chunkX(), task.chunkZ());
+            }
+        }
+
+        return executed;
+    }
+
     /** A closed queue means a merge or split re-homed the position mid-offer; re-resolving observes the newer owner. */
     private boolean tryOffer(QueuedTask task) {
         while (true) {
@@ -82,16 +88,5 @@ public final class RegionScheduler<R extends RegionTaskHost> {
 
             Thread.onSpinWait();
         }
-    }
-
-    /** Safe unsynchronised lookup: a ticking region's sections cannot be re-homed under it. */
-    private boolean isOnOwningRegion(int chunkX, int chunkZ) {
-        if (!(RegionContext.current() instanceof RegionContext.Region context)) {
-            return false;
-        }
-
-        Region<R> owner = regionizer.regionAtUnsynchronised(chunkX, chunkZ);
-
-        return owner != null && owner.id() == context.id();
     }
 }

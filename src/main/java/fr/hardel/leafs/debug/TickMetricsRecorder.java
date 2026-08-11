@@ -40,7 +40,7 @@ public final class TickMetricsRecorder {
     /** Bound to the server lifecycle from the entry point, so ticking/ never depends on debug/. */
     public static void register() {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            int periodSeconds = LeafsConfig.get().metricsLogSeconds();
+            int periodSeconds = LeafsConfig.get().debug().metricsLogSeconds();
             if (periodSeconds > 0) {
                 new TickMetricsRecorder(server, periodSeconds).start();
             }
