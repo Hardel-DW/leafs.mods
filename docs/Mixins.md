@@ -46,6 +46,9 @@ Le mixin lit la distance de spawn directement dans le compteur sans vider la fil
 ### `ChunkStatusTasks`
 Le pas FULL publie le chunk dans le monde vivant, la construction du `LevelChunk` et l'enregistrement des block entities et des conteneurs de ticks. Le mixin le route vers le propriétaire de la position au lieu de la pompe, et son corps prend l'exclusion spatiale du pas FULL pour qu'une FEATURES voisine n'écrive pas dans le proto chunk pendant la copie.
 
+### `ThreadedLevelLightEngine`
+Une tâche de lumière déposée dans la file n'atteint le moteur que si quelqu'un appelle `tryScheduleUpdate`, et en vanilla ce quelqu'un est toujours la pompe du chunk source sur le thread serveur. Les pas INITIALIZE_LIGHT et LIGHT s'attendent sous l'exclusion spatiale, donc un worker de chunks tient une zone pendant qu'il attend ce thread, qui attend lui-même les ticks de région chaque fois qu'il met un niveau au repos. Le mixin fait que la voie de lumière se pilote toute seule. Chaque tâche arme son propre drain depuis l'intérieur de la file, et un drain qui laisse du travail derrière lui arme le suivant.
+
 ### `TicketStorage`
 Le mixin met la table de tickets sous un moniteur, pour qu'une région pose ses tickets elle-même. Les écritures et les lectures passent toutes par ce moniteur, parce qu'un scheduler peut poser un ticket depuis une autre dimension ou un pool async pendant que la phase sérielle parcourt la table, et que le verrou par dimension n'exclut pas ces threads. Le listener de chargement nourrit le propagateur de Leafs en ligne, sous le moniteur, depuis n'importe quel thread, son verrou de zone rend le feed sûr. Le listener de simulation reste routé vers la phase sérielle, parce que le graphe de simulation vanilla reste mono thread.
 
