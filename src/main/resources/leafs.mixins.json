@@ -10,6 +10,7 @@
 		"chunk.SectionStorageMixin",
 		"chunk.ServerChunkCacheMixin",
 		"chunk.ServerLevelMixin",
+		"chunk.ThreadedLevelLightEngineMixin",
 		"chunk.TicketStorageMixin",
 		"compat.ArrayBackedEventShim",
 		"compat.FabricApiLookupCacheShim",
