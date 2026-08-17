@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * still apply at every pop through the vanilla queue.
  */
 public final class ParallelChunkTaskDispatcher extends ChunkTaskDispatcher {
-
     private final TaskScheduler<Runnable> workers;
     private final AtomicInteger inFlight = new AtomicInteger();
     private final int window;
@@ -36,9 +35,15 @@ public final class ParallelChunkTaskDispatcher extends ChunkTaskDispatcher {
     protected void scheduleForExecution(ChunkTaskPriorityQueue.TasksForChunk tasksForChunk) {
         inFlight.incrementAndGet();
         CompletableFuture.allOf(tasksForChunk.tasks().stream().map(task -> workers.<Unit>scheduleWithResult(future -> {
-            task.run();
+            try {
+                task.run();
+            } catch (Throwable failure) {
+                future.completeExceptionally(failure);
+                throw failure;
+            }
+
             future.complete(Unit.INSTANCE);
-        })).toArray(CompletableFuture[]::new)).thenRun(() -> {
+        })).toArray(CompletableFuture[]::new)).whenComplete((result, failure) -> {
             inFlight.decrementAndGet();
             pollTask();
         });
