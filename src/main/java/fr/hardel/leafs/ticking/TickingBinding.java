@@ -3,6 +3,7 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.global.BarrierWindow;
+import fr.hardel.leafs.metrics.WindowReason;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import net.minecraft.server.level.ServerLevel;
@@ -23,12 +24,14 @@ public record TickingBinding(ServerLevel level) implements EntityTeleports.Level
 
     @Override
     public void submitSerial(Runnable task) {
-        TickingManager.of(level.getServer()).submitToLevel(level, task);
+        TickingManager ticking = TickingManager.of(level.getServer());
+        ticking.metrics().serialTeleports().increment();
+        ticking.submitToLevel(level, task);
     }
 
     @Override
     public void submitWindow(Runnable task) {
-        BarrierWindow.of(level.getServer()).enqueue(task);
+        BarrierWindow.of(level.getServer()).enqueue(WindowReason.PORTAL, task);
     }
 
     @Override

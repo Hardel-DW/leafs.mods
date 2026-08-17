@@ -47,6 +47,11 @@ public final class PlayerPacketQueue {
         return DRAINING.get() == this;
     }
 
+    /** Debug sampling only: the concurrent queue counts its nodes, O(n) on a handful of waiting packets. */
+    public int pending() {
+        return packets.size();
+    }
+
     /** Vanilla {@code processQueuedPackets} semantics: everything queued, including what handlers queue back. */
     public void drain() {
         drain(() -> true);

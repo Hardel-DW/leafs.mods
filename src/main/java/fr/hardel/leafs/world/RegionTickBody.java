@@ -4,6 +4,8 @@ import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.metrics.RegionStage;
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.region.Region;
@@ -54,7 +56,7 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<?> region, RegionWorldData worldData, RegionEntityData entityData, long tickCount) {
+    public void tick(Region<?> region, RegionWorldData worldData, RegionEntityData entityData, long tickCount, StageTimings stages) {
         worldData.clock().advance(tickCount);
         entityData.tickList().beginTick();
         entityData.navigatingMobs().beginTick();
@@ -63,29 +65,35 @@ public final class RegionTickBody {
                 RegionNetworkTick.drainOnRegion(player, level);
             }
         });
+        stages.mark(RegionStage.PACKETS);
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         boolean debug = level.isDebug();
         if (runs && !debug) {
-            worldData.drainScheduledTicks(level::tickBlock, level::tickFluid);
-        }
-
-        if (runs && !debug) {
-            tickChunks(region, worldData);
+            worldData.drainBlockTicks(level::tickBlock);
+            stages.mark(RegionStage.BLOCK_TICKS);
+            worldData.drainFluidTicks(level::tickFluid);
+            stages.mark(RegionStage.FLUID_TICKS);
+            tickChunks(region, worldData, stages);
+            stages.mark(RegionStage.CHUNK_TICK);
         }
 
         broadcastChangedChunks(worldData);
+        stages.mark(RegionStage.BROADCAST);
         RegionEntityTracking.tickRegion(level, entityData.tickList());
+        stages.mark(RegionStage.TRACKING);
         ServerChunkCache chunkSource = level.getChunkSource();
-        // Ticket AND completed 1-radius FULL: vanilla bridges the streaming gap with a sync load a region worker cannot do.
         LongPredicate tickingChunk = chunkSource::isPositionTicking;
         if (runs) {
             worldData.runBlockEvents(pos -> tickingChunk.test(ChunkPos.pack(pos)), this::runBlockEvent);
         }
 
+        stages.mark(RegionStage.BLOCK_EVENTS);
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
             tickEntities(tickRateManager, entityData);
+            stages.mark(RegionStage.ENTITIES);
             worldData.blockEntityTickers().tickAll(runs, tickingChunk);
+            stages.mark(RegionStage.BLOCK_ENTITIES);
         }
 
         PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkSource.chunkMap).leafs$playerLoader();
@@ -97,6 +105,7 @@ public final class RegionTickBody {
                 player.connection.connection.flushChannel();
             }
         });
+        stages.mark(RegionStage.PLAYERS);
     }
 
     /** What is left of the serial {@code tickChunks} pass: the loaders of players no region ticks, then the custom spawners. */
@@ -114,7 +123,7 @@ public final class RegionTickBody {
         }
     }
 
-    private void tickChunks(Region<?> region, RegionWorldData worldData) {
+    private void tickChunks(Region<?> region, RegionWorldData worldData, StageTimings stages) {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
         DistanceManager distanceManager = chunkMap.getDistanceManager();
@@ -134,6 +143,7 @@ public final class RegionTickBody {
         List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
             ? List.of()
             : NaturalSpawner.getFilteredSpawningCategories(state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
+        stages.mark(RegionStage.SPAWN_CENSUS);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
             ChunkPos chunkPos = chunk.getPos();

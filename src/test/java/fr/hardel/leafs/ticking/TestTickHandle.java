@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.metrics.RegionStage;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 
@@ -14,7 +15,7 @@ final class TestTickHandle extends TickHandle {
     }
 
     TestTickHandle(long id, LongConsumer body, boolean crashReportFails) {
-        super(new RegionContext.Region(id, "test:world"));
+        super(new RegionContext.Region(id, "test:world"), RegionStage.values().length);
         this.body = body;
         this.crashReportFails = crashReportFails;
     }

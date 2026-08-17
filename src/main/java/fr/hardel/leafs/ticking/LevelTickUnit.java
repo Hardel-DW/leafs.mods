@@ -8,6 +8,8 @@ import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.entity.ServerEntityAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 import fr.hardel.leafs.region.CoordinateKey;
@@ -51,7 +53,7 @@ public final class LevelTickUnit extends TickHandle {
     private volatile int lastViewChunks;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
-        super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()));
+        super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), SerialStage.values().length);
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
@@ -145,14 +147,21 @@ public final class LevelTickUnit extends TickHandle {
         regions.ownership().enterLevelSerial();
         WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), ((ServerLevelEntityAccess) level).leafs$entityLists().attached());
         try {
+            StageTimings stages = stages();
+            stages.beginTick(System.nanoTime());
             runQueuedTasks();
+            stages.mark(SerialStage.TASKS);
             ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickLevel(level);
+            stages.mark(SerialStage.SCHEDULERS);
             work.run();
 
             if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
                 lastChunkCount = level.getChunkSource().getLoadedChunksCount();
                 lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
             }
+
+            stages.mark(SerialStage.MANAGEMENT);
+            stages.endTick();
         } finally {
             WorldTickContext.exit();
             regions.ownership().exitLevelSerial();

@@ -16,6 +16,7 @@ import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.chunk.loader.StageTickets;
 import fr.hardel.leafs.entity.ConcurrentLongSet;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.metrics.SerialStage;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
@@ -243,6 +244,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
             ChunkHolder holder = leafs$scheduling.claimUnload(pos);
             if (holder != null) {
                 leafs$regions().chunkHolderDestroyed(ChunkPos.getX(pos), ChunkPos.getZ(pos));
+                leafs$ticking().metrics().chunkUnloads().increment();
                 scheduleUnload(pos, holder);
             }
         }
@@ -266,7 +268,12 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
 
     @Unique
     private ChunkWorkers leafs$chunkWorkers() {
-        return TickingManager.of(((ChunkMap) (Object) this).level.getServer()).chunkWorkers();
+        return leafs$ticking().chunkWorkers();
+    }
+
+    @Unique
+    private TickingManager leafs$ticking() {
+        return TickingManager.of(((ChunkMap) (Object) this).level.getServer());
     }
 
     /** The double buffer is gone; the promotion step reduces to observing whether holders appeared or vanished. */
@@ -297,6 +304,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         require = 1, allow = 1)
     private void leafs$onChunkHolderCreated(long node, int level, ChunkHolder chunk, int oldLevel, CallbackInfoReturnable<ChunkHolder> callbackInfo) {
         leafs$regions().chunkHolderCreated(ChunkPos.getX(node), ChunkPos.getZ(node));
+        leafs$ticking().metrics().chunkLoads().increment();
     }
 
     /** The #20b tracking split: the per-entity pass moved to the region bodies, the serial call keeps the player view diffs. */
@@ -306,7 +314,9 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
             return;
         }
 
-        RegionEntityTracking.tickSerial((ChunkMap) (Object) this);
+        ChunkMap self = (ChunkMap) (Object) this;
+        RegionEntityTracking.tickSerial(self);
+        leafs$ticking().markSerial(self.level, SerialStage.TRACKING);
         callbackInfo.cancel();
     }
 

@@ -6,6 +6,9 @@ import fr.hardel.leafs.global.BarrierWindow;
 import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.global.LeafsGameRules;
 import fr.hardel.leafs.global.WindowPressure;
+import fr.hardel.leafs.metrics.GlobalStage;
+import fr.hardel.leafs.metrics.StageTimings;
+import fr.hardel.leafs.metrics.WindowReason;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerFunctionManager;
@@ -37,10 +40,11 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createBarrierWindow(CallbackInfo callbackInfo) {
-        leafs$barrierWindow = new BarrierWindow(TickingManager.of((MinecraftServer) (Object) this).barrier());
+        TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
+        leafs$barrierWindow = new BarrierWindow(ticking.barrier(), ticking.metrics().barrier());
         leafs$windowPressure = new WindowPressure();
     }
-    
+
     /**
      * A submitter must never block behind the barrier it feeds. Also hooked into {@code tickServer}:
      * its pause-when-empty branch skips {@code tickChildren}, yet a joining player's placement and other
@@ -48,8 +52,13 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
      */
     @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
     private void leafs$runBarrierWindow(CallbackInfo callbackInfo) {
-        TickingManager.of((MinecraftServer) (Object) this).globalScheduler().drain();
+        TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
+        StageTimings globalStages = ticking.metrics().globalStages();
+        globalStages.mark(GlobalStage.LEVELS);
+        ticking.globalScheduler().drain();
+        globalStages.mark(GlobalStage.GLOBAL_DRAIN);
         leafs$barrierWindow.runGlobalPhase();
+        globalStages.mark(GlobalStage.WINDOW);
     }
 
     /** Tick functions execute in the barrier window. The tick_functions_work rule cuts the loop; reload stays. */
@@ -57,7 +66,7 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
     private void leafs$functionsIntoWindow(ServerFunctionManager manager, Operation<Void> original) {
         boolean tickFunctionsDue = !manager.ticking.isEmpty() && ((MinecraftServer) (Object) this).getGameRules().get(LeafsGameRules.tickFunctionsWork);
         if (manager.postReload || tickFunctionsDue) {
-            leafs$barrierWindow.enqueue(manager::tick);
+            leafs$barrierWindow.enqueue(WindowReason.TICK_FUNCTIONS, manager::tick);
         }
     }
 
