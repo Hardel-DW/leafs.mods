@@ -15,15 +15,13 @@ import fr.hardel.leafs.chunk.core.ParallelChunkTaskDispatcher;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.chunk.loader.StageTickets;
 import fr.hardel.leafs.entity.ConcurrentLongSet;
-import fr.hardel.leafs.entity.ConcurrentOrderedLongSet;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -156,12 +154,12 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
     /**
      * Every region marks its chunks unsaved concurrently with the serial phase (light, pump); the
      * vanilla linked hash set corrupts under two writers (the 150-bot rehash AIOOBE). The scan order
-     * becomes positional instead of insertion-aged, which only reorders the 20-per-tick eager-save budget.
+     * stops being insertion-aged, which only reorders the 20-per-tick eager-save budget.
      * The unload claims and save clocks cross threads too, now that regions tear down their own chunks.
      */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$concurrentEagerSaves(CallbackInfo callbackInfo) {
-        this.chunksToEagerlySave = new ConcurrentOrderedLongSet(32);
+        this.chunksToEagerlySave = new ConcurrentLongSet();
         this.pendingUnloads = new PendingUnloadClaims();
         this.nextChunkSaveTime = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
         ConcurrentChunkTable table = new ConcurrentChunkTable();
@@ -171,7 +169,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
         ChunkMap self = (ChunkMap) (Object) this;
         this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(),
-            ((LeafsServerAccess) self.level.getServer()).leafs$ticking(), this.mainThreadExecutor);
+            TickingManager.of(self.level.getServer()), this.mainThreadExecutor);
         ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
         this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
     }
@@ -268,7 +266,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
 
     @Unique
     private ChunkWorkers leafs$chunkWorkers() {
-        return ((LeafsServerAccess) ((ChunkMap) (Object) this).level.getServer()).leafs$ticking().chunkWorkers();
+        return TickingManager.of(((ChunkMap) (Object) this).level.getServer()).chunkWorkers();
     }
 
     /** The double buffer is gone; the promotion step reduces to observing whether holders appeared or vanished. */
@@ -368,6 +366,6 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
 
     @Unique
     private LevelRegions leafs$regions() {
-        return ((ServerLevelRegionAccess) ((ChunkMap) (Object) this).level).leafs$regions();
+        return LevelRegions.of(((ChunkMap) (Object) this).level);
     }
 }

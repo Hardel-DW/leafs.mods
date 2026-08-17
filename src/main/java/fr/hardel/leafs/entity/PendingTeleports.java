@@ -27,13 +27,11 @@ public final class PendingTeleports<E> {
     }
 
     /** Registers and holds the origin BEFORE the caller removes the entity from it. */
-    public long begin(SharedChunkHolds originHolds, int originX, int originZ, int destinationX, int destinationZ, E payload, Consumer<E> placement) {
+    public void begin(SharedChunkHolds originHolds, int originX, int originZ, int destinationX, int destinationZ, E payload, Consumer<E> placement) {
         long id = nextId.getAndIncrement();
         originHolds.acquire(originX, originZ);
         pending.put(id, new Pending<>(originHolds, originX, originZ, payload, placement));
         submitter.submit(destinationX, destinationZ, () -> complete(id));
-
-        return id;
     }
 
     /** Runs every still-pending placement inline; the shutdown path that guarantees no entity loss. */

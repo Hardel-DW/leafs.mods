@@ -3,12 +3,12 @@ package fr.hardel.leafs.debug;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.Region;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.LevelTickUnit;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.RegionTickHandle;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickTimings;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -82,13 +82,13 @@ public final class TickMetricsRecorder {
     private void writeSample(Writer writer) throws IOException {
         long epochMillis = System.currentTimeMillis();
         long nowNanos = System.nanoTime();
-        for (LevelTickUnit unit : ((LeafsServerAccess) server).leafs$ticking().units()) {
+        for (LevelTickUnit unit : TickingManager.of(server).units()) {
             writeRow(writer, epochMillis, nowNanos, "L" + unit.id(), unit.dimension(), unit.currentTick(),
                 unit.timings(), unit.chunkCount(), unit.entityCount());
         }
 
         for (ServerLevel level : server.getAllLevels()) {
-            for (Region<RegionTickData> region : ((ServerLevelRegionAccess) level).leafs$regions().regionizer().regionsView()) {
+            for (Region<RegionTickData> region : LevelRegions.of(level).regionizer().regionsView()) {
                 RegionTickHandle handle = region.data().handle();
                 if (handle != null && !handle.isCancelled()) {
                     writeRow(writer, epochMillis, nowNanos, "R" + handle.id(), handle.dimension(), handle.currentTick(),

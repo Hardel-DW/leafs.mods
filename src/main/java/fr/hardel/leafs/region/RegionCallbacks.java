@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Hooks other modules implement to follow the region lifecycle and partition their state on merge
- * and split; lifecycle order is documented in Modules.md. Every callback runs under the regionizer's
+ * and split. Every callback runs under the regionizer's
  * write lock: implementations must be non-blocking, must not touch world state and must never call back into the regionizer.
  */
 public interface RegionCallbacks<R> {

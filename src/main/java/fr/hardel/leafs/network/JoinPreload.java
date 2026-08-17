@@ -8,7 +8,9 @@ import net.minecraft.server.players.PlayerList;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.storage.LevelResource;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,32 +49,42 @@ public final class JoinPreload {
 
     /** The second {@code loadPlayerData} of the join, on the flip: served from the kept tag, then the entry retires. */
     public static Optional<CompoundTag> servePlayerData(NameAndId nameAndId, Supplier<Optional<CompoundTag>> fallback) {
-        Entry entry = ENTRIES.remove(nameAndId.id());
-        if (entry == null) {
-            return fallback.get();
-        }
-
-        CONTENT_BY_FILE.remove(entry.statsFile(), entry.stats());
-        CONTENT_BY_FILE.remove(entry.advancementsFile(), entry.advancements());
-        return entry.playerData();
+        Entry entry = retire(nameAndId);
+        return entry == null ? fallback.get() : entry.playerData();
     }
 
-    /** Constructor-read hook: a done preload for this file replaces the disk read, once. */
-    public static Optional<String> consumeContent(Path file) {
+    /**
+     * The single read hook of the player JSON files. A pending deferred write wins, because it is
+     * newer than any preload; then a done preload for this file replaces the disk read, once; null
+     * lets vanilla read the disk itself.
+     */
+    public static BufferedReader playerFileReader(Path file) {
         CompletableFuture<Optional<String>> content = CONTENT_BY_FILE.remove(file);
-        if (content == null || !content.isDone() || content.isCompletedExceptionally()) {
-            return Optional.empty();
+        DeferredFileWrites writes = DeferredFileWrites.active();
+        String pending = writes == null ? null : writes.pendingText(file);
+        if (pending != null) {
+            return new BufferedReader(new StringReader(pending));
         }
 
-        return content.join();
+        if (content == null || !content.isDone() || content.isCompletedExceptionally()) {
+            return null;
+        }
+
+        return content.join().map(text -> new BufferedReader(new StringReader(text))).orElse(null);
     }
 
     public static void discard(NameAndId nameAndId) {
+        retire(nameAndId);
+    }
+
+    private static Entry retire(NameAndId nameAndId) {
         Entry entry = ENTRIES.remove(nameAndId.id());
         if (entry != null) {
             CONTENT_BY_FILE.remove(entry.statsFile(), entry.stats());
             CONTENT_BY_FILE.remove(entry.advancementsFile(), entry.advancements());
         }
+
+        return entry;
     }
 
     /** An unreadable file resolves empty: the constructor then reads the disk itself and applies vanilla's own error handling. */

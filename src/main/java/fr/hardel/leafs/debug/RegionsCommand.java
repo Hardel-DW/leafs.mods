@@ -4,13 +4,12 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.LevelTickUnit;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.RegionTickHandle;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickTimings;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -60,15 +59,13 @@ public final class RegionsCommand {
 
     private static Component overviewLine(LevelTickUnit unit, long now) {
         List<Region<RegionTickData>> live = liveRegions(unit.regions());
-        TickTimings.Snapshot serial = unit.timings().sample(now);
         MutableComponent line = Component.empty()
             .append(Component.literal(shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
             .append(gray("  regions ")).append(white(live.size()))
             .append(gray("  chunks ")).append(white(unit.chunkCount()))
             .append(gray("  view ")).append(white(unit.viewChunks()))
             .append(gray("  entities ")).append(white(unit.entityCount()))
-            .append(gray("  serial ")).append(tps(serial.tps()))
-            .append(gray(" avg ")).append(white(String.format(Locale.ROOT, "%.2fms", serial.msptAverage())));
+            .append(gray("  serial ")).append(rate(unit.timings().sample(now)));
 
         RegionTickHandle slowest = null;
         double slowestTps = Double.MAX_VALUE;
@@ -91,7 +88,7 @@ public final class RegionsCommand {
     }
 
     private static int detail(CommandSourceStack source, ServerLevel level) {
-        LevelRegions regions = ((ServerLevelRegionAccess) level).leafs$regions();
+        LevelRegions regions = LevelRegions.of(level);
         List<Region<RegionTickData>> live = liveRegions(regions);
         long now = System.nanoTime();
         source.sendSuccess(() -> Component.empty()
@@ -113,9 +110,7 @@ public final class RegionsCommand {
                 .append(white(" R#" + region.id() + " "))
                 .append(state(region.state()));
             if (handle != null && !handle.isCancelled()) {
-                TickTimings.Snapshot timings = handle.timings().sample(now);
-                line.append(gray("  ")).append(tps(timings.tps()))
-                    .append(gray("  avg ")).append(white(String.format(Locale.ROOT, "%.2fms", timings.msptAverage())))
+                line.append(gray("  ")).append(rate(handle.timings().sample(now)))
                     .append(gray("  chunks ")).append(white(handle.chunkCount()))
                     .append(gray("  entities ")).append(white(handle.entityCount()));
             } else {
@@ -138,24 +133,22 @@ public final class RegionsCommand {
             return;
         }
 
-        LevelRegions regions = ((ServerLevelRegionAccess) player.level()).leafs$regions();
+        LevelRegions regions = LevelRegions.of(player.level());
         Region<RegionTickData> region = regions.regionizer().regionAt(player.chunkPosition().x(), player.chunkPosition().z());
         RegionTickHandle handle = region == null ? null : region.data().handle();
         if (handle == null) {
             return;
         }
 
-        TickTimings.Snapshot timings = handle.timings().sample(now);
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("You ").withStyle(ChatFormatting.GOLD))
             .append(white("R#" + handle.id()))
             .append(gray(" in ")).append(Component.literal(shortDimension(handle.dimension())).withStyle(ChatFormatting.AQUA))
-            .append(gray("  ")).append(tps(timings.tps()))
-            .append(gray("  avg ")).append(white(String.format(Locale.ROOT, "%.2fms", timings.msptAverage()))), false);
+            .append(gray("  ")).append(rate(handle.timings().sample(now))), false);
     }
 
     private static List<LevelTickUnit> sortedUnits(CommandSourceStack source) {
-        List<LevelTickUnit> units = new ArrayList<>(((LeafsServerAccess) source.getServer()).leafs$ticking().units());
+        List<LevelTickUnit> units = new ArrayList<>(TickingManager.of(source.getServer()).units());
         units.sort(Comparator.comparingLong(LevelTickUnit::id));
 
         return units;
@@ -173,6 +166,11 @@ public final class RegionsCommand {
         Identifier location = Identifier.parse(dimension);
 
         return location.getNamespace().equals(Identifier.DEFAULT_NAMESPACE) ? location.getPath() : location.toString();
+    }
+
+    private static Component rate(TickTimings.Snapshot snapshot) {
+        return Component.empty().append(tps(snapshot.tps()))
+            .append(gray("  avg ")).append(white(String.format(Locale.ROOT, "%.2fms", snapshot.msptAverage())));
     }
 
     private static Component tps(double value) {

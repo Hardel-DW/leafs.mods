@@ -3,7 +3,7 @@ package fr.hardel.leafs.mixin.compat;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.global.FabricTickEventsBarrier;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTickRateManager;
 import net.minecraft.util.profiling.ProfilerFiller;
@@ -29,7 +29,7 @@ public abstract class ServerTickEventsShim {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createTickEventsBarrier(CallbackInfo callbackInfo) {
-        leafs$tickEvents = new FabricTickEventsBarrier(((LeafsServerAccess) this).leafs$ticking().barrier());
+        leafs$tickEvents = new FabricTickEventsBarrier(TickingManager.of((MinecraftServer) (Object) this).barrier());
     }
 
     /** {@code START_SERVER_TICK} fires between the tick-rate manager tick and the {@code tickChildren} call. */

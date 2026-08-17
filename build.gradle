@@ -42,7 +42,6 @@ loom {
 
 test {
 	useJUnitPlatform()
-	systemProperty "leafs.asserts", "true"
 }
 
 processResources {

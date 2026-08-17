@@ -15,7 +15,6 @@ import net.minecraft.world.level.portal.TeleportTransition;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
 /** Routes teleports a region worker may not run in place: serial for same-level out-of-region, pipeline for cross-dimension. */
 public final class EntityTeleports {
@@ -38,15 +37,15 @@ public final class EntityTeleports {
     private record TeleportedNode(Entity entity, PositionMoveRotation currentValues, TeleportTransition transition, int parentIndex) {
     }
 
+    private static final int PORTAL_SEARCH_WINDOW_BUDGET = 100;
+
     private final ServerLevel level;
     private final LevelBinding binding;
-    private final Function<ServerLevel, EntityTeleports> byLevel;
     private final PendingTeleports<List<TeleportedNode>> pending;
 
-    public EntityTeleports(ServerLevel level, LevelBinding binding, Function<ServerLevel, EntityTeleports> byLevel) {
+    public EntityTeleports(ServerLevel level, LevelBinding binding) {
         this.level = level;
         this.binding = binding;
-        this.byLevel = byLevel;
         this.pending = new PendingTeleports<>(binding::submitPlacement);
     }
 
@@ -110,8 +109,6 @@ public final class EntityTeleports {
         deferPortal(entity, 0);
     }
 
-    private static final int PORTAL_SEARCH_WINDOW_BUDGET = 100;
-
     private void deferPortal(Entity entity, int attempts) {
         binding.submitWindow(() -> {
             if (entity.isRemoved() || entity.level() != level) {
@@ -155,7 +152,7 @@ public final class EntityTeleports {
             return;
         }
 
-        EntityTeleports arrivals = byLevel.apply(target);
+        EntityTeleports arrivals = ((ServerLevelEntityAccess) target).leafs$entityTeleports();
         ChunkPos originChunk = entity.chunkPosition();
         int destinationX = SectionPos.posToSectionCoord(transition.position().x());
         int destinationZ = SectionPos.posToSectionCoord(transition.position().z());

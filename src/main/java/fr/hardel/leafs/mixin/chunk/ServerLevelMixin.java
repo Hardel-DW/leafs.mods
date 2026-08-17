@@ -6,8 +6,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiWriteReroute;
 import fr.hardel.leafs.ownership.TickGuard;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProgressListener;
@@ -25,13 +25,13 @@ public abstract class ServerLevelMixin {
 
     @WrapMethod(method = "save")
     private void leafs$saveUnderExclusion(@Nullable ProgressListener progressListener, boolean flush, boolean noSave, Operation<Void> original) {
-        ((ServerLevelRegionAccess) this).leafs$regions().ownership().runExclusive(() -> original.call(progressListener, flush, noSave));
+        LevelRegions.of((ServerLevel) (Object) this).ownership().runExclusive(() -> original.call(progressListener, flush, noSave));
     }
 
     @Inject(method = "updatePOIOnBlockStateChange", at = @At("HEAD"), cancellable = true)
     private void leafs$poiWriteToLevelSerial(BlockPos pos, BlockState oldState, BlockState newState, CallbackInfo callbackInfo) {
         ServerLevel self = (ServerLevel) (Object) this;
-        PoiWriteReroute.onBlockStateChange(self, pos, oldState, newState, task -> ((LeafsServerAccess) self.getServer()).leafs$ticking().submitToLevel(self, task));
+        PoiWriteReroute.onBlockStateChange(self, pos, oldState, newState, task -> TickingManager.of(self.getServer()).submitToLevel(self, task));
         callbackInfo.cancel();
     }
 

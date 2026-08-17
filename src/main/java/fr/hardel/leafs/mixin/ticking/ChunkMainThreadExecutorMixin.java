@@ -3,9 +3,8 @@ package fr.hardel.leafs.mixin.ticking;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.ticking.ChunkPumpAccess;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -34,9 +33,9 @@ public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
             return ran;
         }
 
-        LevelRegions regions = ((ServerLevelRegionAccess) level).leafs$regions();
+        LevelRegions regions = LevelRegions.of(level);
         if (regions.ownership().isLevelSerialHeldByCurrentThread()
-            || ((LeafsServerAccess) level.getServer()).leafs$ticking().barrier().isHeldByCurrentThread()) {
+            || TickingManager.of(level.getServer()).barrier().isHeldByCurrentThread()) {
             ran |= regions.drainTasksInline() > 0;
         }
 

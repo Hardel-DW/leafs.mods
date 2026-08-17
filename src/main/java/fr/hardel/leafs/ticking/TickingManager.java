@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Server-scoped orchestrator of the region tick machinery, reached through {@link LeafsServerAccess}. */
+/** Server-scoped orchestrator of the region tick machinery, one per server, reached by {@link #of}. */
 public final class TickingManager {
 
     private final MinecraftServer server;
@@ -45,14 +45,12 @@ public final class TickingManager {
         Leafs.LOGGER.info("Leafs ticking live - {} region workers, {} chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads(), config.effectiveChunkThreads());
     }
 
+    public static TickingManager of(MinecraftServer server) {
+        return ((LeafsServerAccess) server).leafs$ticking();
+    }
 
     public TickBarrier barrier() {
         return barrier;
-    }
-
-    /** Rare global-phase work reaching entities regions own (player teardown): runs with every region paused. */
-    public void runWithRegionsPaused(Runnable action) {
-        pauseBatch.run(action);
     }
 
     /** The connection tick opens this so a disconnect wave shares one pause instead of one per player. */
@@ -107,7 +105,7 @@ public final class TickingManager {
     /** Ticket ops first, then bookkeeping (which runs the distance updates that materialise holders), then offers. */
     public void quiesce() {
         for (ServerLevel level : server.getAllLevels()) {
-            LevelRegions regions = ((ServerLevelRegionAccess) level).leafs$regions();
+            LevelRegions regions = LevelRegions.of(level);
             LevelOwnership ownership = regions.ownership();
             ownership.enterLevelSerial();
             try {
@@ -141,12 +139,12 @@ public final class TickingManager {
     }
 
     /** Queued region tasks run inline, looped because a draining task can queue a follow-up on another level (cross-dimension teleport). */
-    private void drainRegionTasks(MinecraftServer server) {
+    private void drainRegionTasks() {
         int drained;
         do {
             drained = 0;
             for (ServerLevel level : server.getAllLevels()) {
-                drained += ((ServerLevelRegionAccess) level).leafs$regions().drainTasksInline();
+                drained += LevelRegions.of(level).drainTasksInline();
             }
         } while (drained > 0);
     }
@@ -156,14 +154,14 @@ public final class TickingManager {
      * that wedges still dies, the pool stops so the saves read settled state, then every in-flight
      * teleport places so no entity is lost to the shutdown.
      */
-    public void haltTicking(MinecraftServer server) {
+    public void haltTicking() {
         halted = true;
         watchdog.armShutdownDeadline(LeafsWatchdog.SHUTDOWN_DEADLINE);
         scheduler.shutdown();
-        drainRegionTasks(server);
+        drainRegionTasks();
         globalScheduler.drain();
         for (ServerLevel level : server.getAllLevels()) {
-            ((ServerLevelRegionAccess) level).leafs$regions().drainUnloadsForShutdown();
+            LevelRegions.of(level).drainUnloadsForShutdown();
             EntityTeleports teleports = ((ServerLevelEntityAccess) level).leafs$entityTeleports();
             try {
                 teleports.completeAll();
@@ -174,12 +172,11 @@ public final class TickingManager {
     }
 
     /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. */
-    public void shutdown(MinecraftServer server) {
-        scheduler.shutdown();
+    public void shutdown() {
         chunkWorkers.shutdown();
         watchdog.stop();
         DeferredFileWrites.stopAndFlush();
-        drainRegions(server);
+        drainRegions();
         // A dedicated JVM must now die, so the deadline stays armed until the process exits; in solo the JVM lives on.
         if (!server.isDedicatedServer()) {
             watchdog.disarmShutdownDeadline();
@@ -197,11 +194,11 @@ public final class TickingManager {
      * Walks {@code getAllLevels()} rather than the units, which only hold levels that ticked at least
      * once. Never throws: this runs after the worlds are saved, where a crash would only misattribute the shutdown.
      */
-    private void drainRegions(MinecraftServer server) {
+    private void drainRegions() {
         int regions = 0;
         int sections = 0;
         for (ServerLevel level : server.getAllLevels()) {
-            LevelRegions levelRegions = ((ServerLevelRegionAccess) level).leafs$regions();
+            LevelRegions levelRegions = LevelRegions.of(level);
             try {
                 levelRegions.settle();
             } catch (RuntimeException exception) {

@@ -80,10 +80,6 @@ public final class EntityScheduler<E> {
         }
     }
 
-    public synchronized boolean isRetired() {
-        return retired;
-    }
-
     public synchronized boolean hasPendingTasks() {
         return !scheduled.isEmpty() || !due.isEmpty();
     }

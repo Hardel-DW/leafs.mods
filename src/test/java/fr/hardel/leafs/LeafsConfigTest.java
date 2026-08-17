@@ -67,7 +67,7 @@ class LeafsConfigTest {
         }
 
         List<Invalid> cases = List.of(
-            new Invalid("{\"joins_per_tick\": 8}", "joins_per_tick"),
+            new Invalid("{\"unknown_key\": 8}", "unknown_key"),
             new Invalid("{\"debug\": {\"metrics\": 10}}", "metrics"),
             new Invalid("{\"max_threads\": 0}", "max_threads"),
             new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 30, \"watchdog_kill_seconds\": 30}}", "watchdog_kill_seconds"),

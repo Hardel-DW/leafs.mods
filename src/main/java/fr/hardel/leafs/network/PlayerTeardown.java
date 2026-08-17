@@ -1,7 +1,7 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
@@ -24,7 +24,7 @@ public final class PlayerTeardown {
         }
 
         long start = System.nanoTime();
-        ((LeafsServerAccess) server).leafs$ticking().runWithRegionsPaused(vanillaRemove);
+        TickingManager.of(server).pauseBatch().run(vanillaRemove);
         long millis = (System.nanoTime() - start) / 1_000_000L;
         if (millis > 50) {
             Leafs.LOGGER.warn("Teardown of {} took {} ms under the region pause", player.getPlainTextName(), millis);

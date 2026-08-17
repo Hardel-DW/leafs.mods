@@ -173,6 +173,26 @@ class RegionWorldDataTest {
         assertEquals(1, untickable.ticks);
     }
 
+    /**
+     * The 2026-08-05 village crash: a Lithium-sleeping ticker answers a null position while staying
+     * non-removed, so the region list keys on the chunk captured at registration.
+     */
+    @Test
+    void sleepingTickerKeepsItsBucketAndWakesUp() {
+        RegionWorldData data = worldData(0);
+        FakeTicker campfire = new FakeTicker(new BlockPos(16, 64, 16));
+        data.blockEntityTickers().add(campfire, keyOf(campfire));
+        campfire.sleeping = true;
+
+        data.blockEntityTickers().tickAll(true, _ -> true);
+        assertEquals(0, campfire.ticks);
+        assertEquals(1, data.blockEntityTickers().size());
+
+        campfire.sleeping = false;
+        data.blockEntityTickers().tickAll(true, _ -> true);
+        assertEquals(1, campfire.ticks);
+    }
+
     @Test
     void tickersFoldOnMergeAndSplit() {
         RegionWorldData from = worldData(0);
@@ -183,6 +203,7 @@ class RegionWorldDataTest {
         from.blockEntityTickers().add(west, keyOf(west));
         from.blockEntityTickers().add(east, keyOf(east));
         from.blockEntityTickers().add(orphan, keyOf(orphan));
+        east.sleeping = true;
 
         from.mergeInto(into);
         assertEquals(0, from.blockEntityTickers().size());
@@ -194,13 +215,15 @@ class RegionWorldDataTest {
         into.splitInto(SECTION_SHIFT, children::get);
 
         assertEquals(1, westChild.blockEntityTickers().size());
-        assertEquals(1, eastChild.blockEntityTickers().size());
+        assertEquals(1, eastChild.blockEntityTickers().size(), "the sleeping ticker follows the chunk key captured at registration");
         assertEquals(0, into.blockEntityTickers().size(), "the orphan ticker's section has no child: dropped");
     }
 
+    /** Lithium-shaped: asleep the wrapper answers a null position and ticks nothing, while staying non-removed. */
     private static final class FakeTicker implements TickingBlockEntity {
         private final BlockPos pos;
         private boolean removed;
+        private boolean sleeping;
         private int ticks;
         private Runnable onTick;
 
@@ -210,6 +233,10 @@ class RegionWorldDataTest {
 
         @Override
         public void tick() {
+            if (sleeping) {
+                return;
+            }
+
             ticks++;
             if (onTick != null) {
                 onTick.run();
@@ -223,12 +250,12 @@ class RegionWorldDataTest {
 
         @Override
         public BlockPos getPos() {
-            return pos;
+            return sleeping ? null : pos;
         }
 
         @Override
         public String getType() {
-            return "leafs:fake";
+            return sleeping ? "<sleeping>" : "leafs:fake";
         }
     }
 }

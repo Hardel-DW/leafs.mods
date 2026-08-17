@@ -16,9 +16,10 @@ class GlobalSchedulerTest {
         scheduler.run(() -> executed.add("first"));
         scheduler.run(() -> executed.add("second"));
 
-        assertEquals(2, scheduler.drain());
+        scheduler.drain();
         assertEquals(List.of("first", "second"), executed);
-        assertEquals(0, scheduler.drain());
+        scheduler.drain();
+        assertEquals(List.of("first", "second"), executed);
     }
 
     @Test
@@ -28,7 +29,7 @@ class GlobalSchedulerTest {
         });
         scheduler.run(() -> executed.add("survivor"));
 
-        assertEquals(2, scheduler.drain());
+        scheduler.drain();
         assertEquals(List.of("survivor"), executed);
     }
 
@@ -36,9 +37,9 @@ class GlobalSchedulerTest {
     void tasksQueuedDuringADrainWaitForTheNext() {
         scheduler.run(() -> scheduler.run(() -> executed.add("requeued")));
 
-        assertEquals(1, scheduler.drain());
+        scheduler.drain();
         assertEquals(List.of(), executed);
-        assertEquals(1, scheduler.drain());
+        scheduler.drain();
         assertEquals(List.of("requeued"), executed);
     }
 }

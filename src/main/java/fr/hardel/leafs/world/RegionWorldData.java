@@ -165,34 +165,16 @@ public final class RegionWorldData {
      * attached, where the level-serial remainder keeps draining them.
      */
     public void migrateInto(int sectionShift, LongFunction<RegionWorldData> childBySection) {
-        blockTicks.splitInto(sectionShift, section -> requireChild(childBySection, section).blockTicks);
-        fluidTicks.splitInto(sectionShift, section -> requireChild(childBySection, section).fluidTicks);
-        for (BlockEventData event : blockEvents.stream().toList()) {
-            RegionWorldData child = childBySection.apply(CoordinateKey.pack(event.pos().getX() >> (4 + sectionShift), event.pos().getZ() >> (4 + sectionShift)));
-            if (child != null) {
-                blockEvents.remove(event);
-                child.blockEvents.add(event);
-            }
-        }
-
-        blockEntityTickers.migrateInto(sectionShift, section -> {
-            RegionWorldData child = childBySection.apply(section);
-
-            return child == null ? null : child.blockEntityTickers;
-        });
+        redistribute(sectionShift, childBySection, true);
     }
 
-    private static RegionWorldData requireChild(LongFunction<RegionWorldData> childBySection, long section) {
-        RegionWorldData child = childBySection.apply(section);
-        if (child == null) {
-            throw new IllegalStateException("No region owns section " + section + " while migrating attached scheduled ticks");
-        }
-
-        return child;
-    }
-
-    /** Block events whose section died with the split are dropped, like their chunk's other transient state. */
+    /** State whose section died with the split is dropped, like its chunk's other transient state. */
     public void splitInto(int sectionShift, LongFunction<RegionWorldData> childBySection) {
+        redistribute(sectionShift, childBySection, false);
+    }
+
+    /** Scheduled containers never go unmatched: their chunk has a holder, so an absent child is a bug, not an orphan. */
+    private void redistribute(int sectionShift, LongFunction<RegionWorldData> childBySection, boolean keepOrphans) {
         blockTicks.splitInto(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
 
@@ -203,19 +185,22 @@ public final class RegionWorldData {
 
             return child == null ? null : child.fluidTicks;
         });
+        List<BlockEventData> orphans = new ArrayList<>();
         for (BlockEventData event : blockEvents) {
             RegionWorldData child = childBySection.apply(CoordinateKey.pack(event.pos().getX() >> (4 + sectionShift), event.pos().getZ() >> (4 + sectionShift)));
             if (child != null) {
                 child.blockEvents.add(event);
+            } else if (keepOrphans) {
+                orphans.add(event);
             }
         }
 
         blockEvents.clear();
-        blockEntityTickers.splitInto(sectionShift, section -> {
+        blockEvents.addAll(orphans);
+        blockEntityTickers.redistribute(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
-
             return child == null ? null : child.blockEntityTickers;
-        });
+        }, keepOrphans);
     }
 
     public void inheritTimeFrom(RegionWorldData parent) {
