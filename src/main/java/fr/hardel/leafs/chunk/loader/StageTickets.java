@@ -9,11 +9,9 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.TicketStorage;
 
 /**
- * The shared refcount table over the per-player view stages. Vanilla dedupes tickets by type and
- * level, so two players' tickets on the same chunk would collapse into one and the first leaver
- * would strip the other; this table materialises at most one real ticket per chunk and stage, on the
- * 0-to-1 and 1-to-0 transitions. A release swaps to a delayed ticket that expires on its own, which
- * keeps a player walking along a border from unloading and reloading the same chunks every tick.
+ * Refcounts the view stages into at most one real ticket per chunk and stage, because vanilla
+ * dedupes tickets by type and level and the first leaver would strip every other player's. A release
+ * swaps to a delayed ticket that expires on its own, against border-walking churn.
  */
 public final class StageTickets {
 
@@ -26,6 +24,12 @@ public final class StageTickets {
 
     public StageTickets(TicketStorage storage) {
         this.storage = storage;
+    }
+
+    /** The new stage is acquired before the old one releases, so the aggregate level never dips between the two. */
+    public void swap(long chunk, int from, int to) {
+        acquire(chunk, to);
+        release(chunk, from);
     }
 
     public synchronized void acquire(long chunk, int stage) {
@@ -52,13 +56,11 @@ public final class StageTickets {
         stageCounts.put(chunk, count - 1);
     }
 
-    public static int level(int stage) {
-        return switch (stage) {
-            case LOADED -> ChunkLevel.MAX_LEVEL;
-            case GENERATED -> ChunkLevel.byStatus(FullChunkStatus.FULL);
-            case TICK -> ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING);
-            default -> throw new IllegalArgumentException("Unknown view stage " + stage);
-        };
+    /** Vanilla only sends a chunk to its player from the ticking promotion, so both visible stages sit at this level and the ticket type alone carries the simulation axis. */
+    private static final int VIEW_LEVEL = ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING);
+
+    static int level(int stage) {
+        return stage == LOADED ? ChunkLevel.MAX_LEVEL : VIEW_LEVEL;
     }
 
     private static TicketType type(int stage) {
