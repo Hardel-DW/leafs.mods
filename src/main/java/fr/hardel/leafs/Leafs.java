@@ -2,7 +2,6 @@ package fr.hardel.leafs;
 
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.debug.LeafsCommand;
-import fr.hardel.leafs.debug.TickMetricsRecorder;
 import fr.hardel.leafs.global.LeafsGameRules;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
@@ -18,10 +17,8 @@ public final class Leafs implements ModInitializer {
         LeafsTicketTypes.register();
         LeafsGameRules.register();
         LeafsCommand.register();
-        TickMetricsRecorder.register();
 
         LeafsConfig config = LeafsConfig.get();
-        LOGGER.info("Leafs initialised - {} region workers, {}x{}-chunk sections",
-            config.effectiveThreads(), config.sectionSize(), config.sectionSize());
+        LOGGER.info("Leafs initialised - {} region workers, {}x{}-chunk sections", config.effectiveThreads(), config.sectionSize(), config.sectionSize());
     }
 }

@@ -24,8 +24,7 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
 
-    /** Surveillance and diagnostics: the watchdog thresholds, the CSV metrics period and the per-region log files. */
-    public record Debug(int watchdogWarnSeconds, int watchdogKillSeconds, int metricsLogSeconds, boolean perRegionLogs) {
+    public record Debug(int watchdogWarnSeconds, int watchdogKillSeconds, boolean perRegionLogs) {
     }
 
     private static final Codec<Integer> MAX_THREADS = Codec.intRange(ALL_CORES, 1024)
@@ -46,7 +45,6 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
     private static final MapCodec<Debug> DEBUG_MAP = RecordCodecBuilder.mapCodec(builder -> builder.group(
         Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(Debug::watchdogWarnSeconds),
         Codec.intRange(0, 3600).optionalFieldOf("watchdog_kill_seconds", 60).forGetter(Debug::watchdogKillSeconds),
-        Codec.intRange(0, 3600).optionalFieldOf("metrics_log_seconds", 0).forGetter(Debug::metricsLogSeconds),
         Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs)
     ).apply(builder, Debug::new));
 

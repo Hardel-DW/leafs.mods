@@ -54,8 +54,8 @@ public final class RecommendationCommand {
         }
 
         return Optional.of(new Recommendation(
-            problem(functions + (functions == 1 ? " function" : " functions") + " in #minecraft:tick pause every region each tick."),
-            action("/gamerule " + LeafsGameRules.tickFunctionsWork.id() + " false", "cuts the loop, /function and #load keep working")));
+            problem("%d %s in #minecraft:tick pause every region each tick.".formatted(functions, functions == 1 ? "function" : "functions")),
+            action("/gamerule %s false".formatted(LeafsGameRules.tickFunctionsWork.id()), "cuts the loop, /function and #load keep working")));
     }
 
     private static Optional<Recommendation> repeatingCommandBlocks(MinecraftServer server) {
@@ -70,8 +70,8 @@ public final class RecommendationCommand {
         }
 
         return Optional.of(new Recommendation(
-            problem("Repeating command blocks pause every region each tick, " + pressure.repeatingDeferrals() + " executions since startup."),
-            action("/gamerule " + LeafsGameRules.repeatingCommandBlocksWork.id() + " false", "skips them but keeps them armed, impulse and chain blocks keep working")));
+            problem("Repeating command blocks pause every region each tick, %d executions since startup.".formatted(pressure.repeatingDeferrals())),
+            action("/gamerule %s false".formatted(LeafsGameRules.repeatingCommandBlocksWork.id()), "skips them but keeps them armed, impulse and chain blocks keep working")));
     }
 
     private static Component problem(String text) {
@@ -79,9 +79,9 @@ public final class RecommendationCommand {
     }
 
     private static Component action(String command, String effect) {
-        return Component.literal("> " + command)
+        return Component.literal("> %s".formatted(command))
             .withStyle(style -> style.withColor(ChatFormatting.AQUA).withClickEvent(new ClickEvent.SuggestCommand(command)))
-            .append(Component.literal("  " + effect).withStyle(ChatFormatting.GRAY));
+            .append(Component.literal("  %s".formatted(effect)).withStyle(ChatFormatting.GRAY));
     }
 
     private record Recommendation(Component problem, Component action) {
