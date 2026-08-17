@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 
@@ -7,12 +8,14 @@ import fr.hardel.leafs.ownership.RegionCrashReport;
 public abstract class TickHandle {
     private final RegionContext context;
     private final TickTimings timings = new TickTimings();
+    private final StageTimings stages;
     private volatile boolean cancelled;
     private volatile long currentTick;
     private volatile long scheduledStartNanos;
 
-    protected TickHandle(RegionContext context) {
+    protected TickHandle(RegionContext context, int stageCount) {
         this.context = context;
+        this.stages = new StageTimings(stageCount);
     }
 
     public long id() {
@@ -29,6 +32,10 @@ public abstract class TickHandle {
 
     public TickTimings timings() {
         return timings;
+    }
+
+    public StageTimings stages() {
+        return stages;
     }
 
     public void cancel() {

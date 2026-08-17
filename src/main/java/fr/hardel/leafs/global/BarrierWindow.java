@@ -1,6 +1,8 @@
 package fr.hardel.leafs.global;
 
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.metrics.BarrierStats;
+import fr.hardel.leafs.metrics.WindowReason;
 import fr.hardel.leafs.ticking.TickBarrier;
 import net.minecraft.server.MinecraftServer;
 
@@ -9,18 +11,21 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /** Once-per-global-tick window: single-threaded work with full world access. An empty queue never raises the barrier. */
 public final class BarrierWindow {
     private final TickBarrier barrier;
+    private final BarrierStats stats;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private volatile Thread drainingThread;
 
-    public BarrierWindow(TickBarrier barrier) {
+    public BarrierWindow(TickBarrier barrier, BarrierStats stats) {
         this.barrier = barrier;
+        this.stats = stats;
     }
 
     public static BarrierWindow of(MinecraftServer server) {
         return ((GlobalServerAccess) server).leafs$barrierWindow();
     }
 
-    public void enqueue(Runnable task) {
+    public void enqueue(WindowReason reason, Runnable task) {
+        stats.countReason(reason);
         tasks.add(task);
     }
 
@@ -35,11 +40,13 @@ public final class BarrierWindow {
             return;
         }
 
+        long startNanos = System.nanoTime();
+        int depth = tasks.size();
         barrier.raise();
         Thread outerDrain = drainingThread;
         drainingThread = Thread.currentThread();
         try {
-            int budget = tasks.size();
+            int budget = depth;
             Runnable task;
             while (budget-- > 0 && (task = tasks.poll()) != null) {
                 task.run();
@@ -47,6 +54,8 @@ public final class BarrierWindow {
         } finally {
             drainingThread = outerDrain;
             barrier.drop();
+            long endNanos = System.nanoTime();
+            stats.recordOpen(endNanos, endNanos - startNanos, depth);
         }
     }
 

@@ -2,6 +2,9 @@ package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.leafs.Leafs;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -18,6 +21,7 @@ public final class ChunkWorkers implements Executor {
 
     private final ThreadPoolExecutor pool;
     private final int threads;
+    private final List<Thread> workerThreads = new CopyOnWriteArrayList<>();
 
     public ChunkWorkers(int threads) {
         this.threads = threads;
@@ -26,12 +30,25 @@ public final class ChunkWorkers implements Executor {
             Thread thread = new Thread(runnable, "Leafs Chunk Worker #" + ids.getAndIncrement());
             thread.setDaemon(true);
             thread.setUncaughtExceptionHandler((t, throwable) -> Leafs.LOGGER.error("Uncaught exception on {}", t.getName(), throwable));
+            workerThreads.add(thread);
             return thread;
         });
     }
 
     public int threads() {
         return threads;
+    }
+
+    public List<Thread> workerThreads() {
+        return Collections.unmodifiableList(workerThreads);
+    }
+
+    public int queuedTasks() {
+        return pool.getQueue().size();
+    }
+
+    public int activeWorkers() {
+        return pool.getActiveCount();
     }
 
     @Override

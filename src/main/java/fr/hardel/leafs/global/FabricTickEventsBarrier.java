@@ -1,5 +1,6 @@
 package fr.hardel.leafs.global;
 
+import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.ticking.TickBarrier;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -13,15 +14,17 @@ import java.util.function.Predicate;
  */
 public final class FabricTickEventsBarrier {
     private final TickBarrier barrier;
+    private final MinuteCounter pauses;
     private final Predicate<Event<?>> subscribed;
     private boolean held;
 
-    public FabricTickEventsBarrier(TickBarrier barrier) {
-        this(barrier, FabricTickEventsBarrier::hasSubscribers);
+    public FabricTickEventsBarrier(TickBarrier barrier, MinuteCounter pauses) {
+        this(barrier, pauses, FabricTickEventsBarrier::hasSubscribers);
     }
 
-    FabricTickEventsBarrier(TickBarrier barrier, Predicate<Event<?>> subscribed) {
+    FabricTickEventsBarrier(TickBarrier barrier, MinuteCounter pauses, Predicate<Event<?>> subscribed) {
         this.barrier = barrier;
+        this.pauses = pauses;
         this.subscribed = subscribed;
     }
 
@@ -48,6 +51,7 @@ public final class FabricTickEventsBarrier {
             return;
         }
 
+        pauses.increment();
         barrier.raise();
         held = true;
     }

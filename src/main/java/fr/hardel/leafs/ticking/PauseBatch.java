@@ -1,5 +1,7 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.metrics.MinuteCounter;
+
 /**
  * One region pause shared by every removal of the same connection tick: the first run raises the
  * barrier, the wave reuses it, the close releases it. Outside a batch each run pauses alone, the
@@ -7,11 +9,13 @@ package fr.hardel.leafs.ticking;
  */
 public final class PauseBatch {
     private final TickBarrier barrier;
+    private final MinuteCounter pauses;
     private boolean open;
     private boolean held;
 
-    PauseBatch(TickBarrier barrier) {
+    PauseBatch(TickBarrier barrier, MinuteCounter pauses) {
         this.barrier = barrier;
+        this.pauses = pauses;
     }
 
     public void open() {
@@ -33,6 +37,7 @@ public final class PauseBatch {
             return;
         }
 
+        pauses.increment();
         barrier.raise();
         if (open) {
             held = true;
