@@ -15,6 +15,7 @@ import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -145,6 +146,16 @@ public final class ChunkScheduling {
         return result;
     }
 
+    /** The one way to ask a position for a status: no holder means no ticket reached it yet and the caller must post one first. */
+    public void requestStatus(int chunkX, int chunkZ, ChunkStatus status) {
+        ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+        if (holder == null) {
+            return;
+        }
+
+        requestArea(chunkX, chunkZ, 0, () -> holder.scheduleChunkGenerationTask(status, chunkMap));
+    }
+
     /** Holder mutation outside a drain, like the send dependencies a player placement adds. */
     public void mutateArea(int chunkX, int chunkZ, int radius, Runnable mutation) {
         AreaLock.Node node = schedulingLock.lock(chunkX, chunkZ, radius);
@@ -188,7 +199,7 @@ public final class ChunkScheduling {
      * regions, the pump plays vanilla's main thread, which is what drives the spawn preparation.
      */
     public void runOnOwner(int chunkX, int chunkZ, Runnable task) {
-        if (isUniversalOwner() || currentRegionOwns(chunkX, chunkZ)) {
+        if (isOwner(chunkX, chunkZ)) {
             task.run();
             return;
         }
@@ -217,7 +228,7 @@ public final class ChunkScheduling {
      * after the pool halts, no region ticks either, so the server thread owns every position: that is
      * what keeps the spawn preparation and the final save from waiting on regions that never run.
      */
-    public boolean isUniversalOwner() {
+    private boolean isUniversalOwner() {
         if (regions.ownership().isLevelSerialHeldByCurrentThread() || ticking.barrier().isHeldByCurrentThread()) {
             return true;
         }
@@ -225,7 +236,8 @@ public final class ChunkScheduling {
         return (regions.taskScheduler() == null || ticking.halted()) && chunkMap.level.getServer().isSameThread();
     }
 
-    private boolean currentRegionOwns(int chunkX, int chunkZ) {
+    /** Strict region ownership, dimension included: region ids repeat across dimensions and would otherwise collide. */
+    public boolean currentRegionOwns(int chunkX, int chunkZ) {
         if (!(RegionContext.current() instanceof RegionContext.Region context) || !context.dimension().equals(regions.dimensionName())) {
             return false;
         }

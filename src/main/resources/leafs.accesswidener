@@ -6,7 +6,6 @@ accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server
 accessible field net/minecraft/server/level/ServerChunkCache chunkHoldersToBroadcast Ljava/util/Set;
 accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/minecraft/world/level/TicketStorage;
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
-accessible field net/minecraft/network/Connection packetListener Lnet/minecraft/network/PacketListener;
 accessible field net/minecraft/server/level/ServerChunkCache level Lnet/minecraft/server/level/ServerLevel;
 accessible field net/minecraft/server/ServerTickRateManager server Lnet/minecraft/server/MinecraftServer;
 
@@ -39,7 +38,6 @@ accessible field net/minecraft/server/ServerFunctionManager postReload Z
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
 accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
-accessible field net/minecraft/server/level/DistanceManager chunksToUpdateFutures Ljava/util/Set;
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
 accessible method net/minecraft/server/level/ChunkHolder updateFutures (Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/Executor;)V
 accessible field net/minecraft/server/level/ChunkMap updatingChunkMap Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;

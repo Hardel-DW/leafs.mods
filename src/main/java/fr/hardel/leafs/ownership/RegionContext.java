@@ -6,35 +6,23 @@ package fr.hardel.leafs.ownership;
  */
 public sealed interface RegionContext {
 
-    Global GLOBAL = new Global();
-
-    record Global() implements RegionContext {
-        @Override
-        public String describe() {
-            return "global phase";
-        }
-    }
-
-    /** Mid-tick of one tick unit: it owns its slice of one level and reaches everything else through the schedulers. */
-    sealed interface UnitTick extends RegionContext {
-        long id();
-
-        String dimension();
-    }
-
-    record Region(long id, String dimension) implements UnitTick {
+    record Region(long id, String dimension) implements RegionContext {
         @Override
         public String describe() {
             return "region #" + id + " in " + dimension;
         }
     }
 
-    record LevelSerial(long id, String dimension) implements UnitTick {
+    record LevelSerial(long id, String dimension) implements RegionContext {
         @Override
         public String describe() {
             return "level-serial unit #" + id + " in " + dimension;
         }
     }
+
+    long id();
+
+    String dimension();
 
     String describe();
 
@@ -43,10 +31,11 @@ public sealed interface RegionContext {
     }
 
     static void enter(RegionContext context) {
-        if (Ownership.CHECKS_ENABLED && RegionContextHolder.CURRENT.get() != null) {
-            throw new IllegalStateException("Thread '" + Thread.currentThread().getName() + "' entered " + context.describe() + " while already in " + RegionContextHolder.CURRENT.get().describe());
+        RegionContext previous = RegionContextHolder.CURRENT.get();
+        if (previous != null) {
+            throw new IllegalStateException("Thread '" + Thread.currentThread().getName() + "' entered " + context.describe() + " while already in " + previous.describe());
         }
-        
+
         RegionContextHolder.CURRENT.set(context);
     }
 

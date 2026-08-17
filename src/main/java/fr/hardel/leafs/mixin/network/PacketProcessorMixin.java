@@ -3,6 +3,7 @@ package fr.hardel.leafs.mixin.network;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.network.PacketRouting;
+import fr.hardel.leafs.network.PlayerPacketQueue;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.PacketProcessor;
 import net.minecraft.network.protocol.Packet;
@@ -13,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Queue;
 
-/** Hook only - logic in network/PacketRouting: play packets are routed to their player's queue. */
+/** Hook only - logic in network/: play packets are routed to their player's queue. */
 @Mixin(PacketProcessor.class)
 public abstract class PacketProcessorMixin {
 
@@ -23,9 +24,10 @@ public abstract class PacketProcessorMixin {
         return PacketRouting.routeToPlayer(listener, packet) || original.call(queue, entry);
     }
 
+    /** A unit draining a player queue is a packet-handling thread. */
     @Inject(method = "isSameThread", at = @At("HEAD"), cancellable = true)
     private void leafs$drainingUnitIsAPacketThread(CallbackInfoReturnable<Boolean> callback) {
-        if (PacketRouting.currentThreadHandlesPackets()) {
+        if (PlayerPacketQueue.handlingPackets()) {
             callback.setReturnValue(true);
         }
     }

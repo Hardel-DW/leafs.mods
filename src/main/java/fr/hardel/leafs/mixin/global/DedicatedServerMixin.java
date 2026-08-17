@@ -2,7 +2,7 @@ package fr.hardel.leafs.mixin.global;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.global.GlobalServerAccess;
+import fr.hardel.leafs.global.BarrierWindow;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.dedicated.DedicatedServer;
@@ -15,6 +15,6 @@ public abstract class DedicatedServerMixin {
 
     @WrapOperation(method = "handleConsoleInputs", at = @At(value = "INVOKE", target = "Lnet/minecraft/commands/Commands;performPrefixedCommand(Lnet/minecraft/commands/CommandSourceStack;Ljava/lang/String;)V"))
     private void leafs$consoleIntoWindow(Commands commands, CommandSourceStack source, String command, Operation<Void> original) {
-        ((GlobalServerAccess) this).leafs$barrierWindow().enqueue(() -> commands.performPrefixedCommand(source, command));
+        BarrierWindow.of((DedicatedServer) (Object) this).enqueue(() -> commands.performPrefixedCommand(source, command));
     }
 }

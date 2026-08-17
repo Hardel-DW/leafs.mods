@@ -44,22 +44,17 @@ public final class LevelTickUnit extends TickHandle {
     private final ServerLevel level;
     private final LevelRegions regions;
     private final RegionTickScheduler scheduler;
-    private final SharedChunkHolds holds;
-    private final RegionScheduler<RegionTickData> taskScheduler;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
     private boolean activated;
     private volatile int lastChunkCount;
-    private volatile int lastTrackedChunks;
     private volatile int lastViewChunks;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()));
         this.level = level;
-        this.regions = ((ServerLevelRegionAccess) level).leafs$regions();
+        this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
-        this.holds = new SharedChunkHolds(new ChunkTicketHolds(level));
-        this.taskScheduler = new RegionScheduler<>(regions.regionizer(), holds);
     }
 
     public LevelRegions regions() {
@@ -80,6 +75,8 @@ public final class LevelTickUnit extends TickHandle {
             int sectionShift = regionizer.sectionShift();
             WorldDataRouter router = ((ServerLevelWorldAccess) level).leafs$worldRouter();
             LevelEntityLists entityLists = ((ServerLevelEntityAccess) level).leafs$entityLists();
+            SharedChunkHolds holds = new SharedChunkHolds(new ChunkTicketHolds(level));
+            RegionScheduler<RegionTickData> taskScheduler = new RegionScheduler<>(regionizer, holds);
             LongFunction<RegionWorldData> regionWorldData = chunkKey -> resolve(regionizer, chunkKey, data -> data.worldData());
             LongFunction<RegionEntityData> regionEntityData = chunkKey -> resolve(regionizer, chunkKey, data -> data.entityData());
             regions.activate(dimension(), scheduler, holds, taskScheduler, this::submit, () -> RegionWorldData.regional(level), body, () -> {
@@ -153,7 +150,8 @@ public final class LevelTickUnit extends TickHandle {
             work.run();
 
             if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
-                takeCensus();
+                lastChunkCount = level.getChunkSource().getLoadedChunksCount();
+                lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
             }
         } finally {
             WorldTickContext.exit();
@@ -173,13 +171,6 @@ public final class LevelTickUnit extends TickHandle {
             RegionContext.exit();
             regions.ownership().exitLevelSerial();
         }
-    }
-
-    /** Chunk counts live in serial-owned structures, so they sample on the owner and publish for off-thread readers. */
-    private void takeCensus() {
-        lastChunkCount = level.getChunkSource().getLoadedChunksCount();
-        lastTrackedChunks = regions.trackedChunks();
-        lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
     }
 
     /** Time-boxed: a mass unload dump spreads over ticks instead of freezing the dimension in one. A slow task logs its origin. */
@@ -204,11 +195,6 @@ public final class LevelTickUnit extends TickHandle {
     /** Last on-owner census; readable from any thread, at most {@value #CENSUS_INTERVAL_TICKS} ticks old. */
     public int chunkCount() {
         return lastChunkCount;
-    }
-
-    /** Region-side counterpart of {@link #chunkCount()}, sampled in the same census so the two are comparable. */
-    public int trackedChunks() {
-        return lastTrackedChunks;
     }
 
     /** Chunks the player view pipelines retain a ticket on; a count that never falls back after a wave names a leak. */

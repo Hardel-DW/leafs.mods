@@ -13,12 +13,13 @@ final class RegionSection<R> {
     private int nonEmptyNeighbours;
     private volatile Region<R> region;
 
-    RegionSection(long key, int sectionShift) {
+    RegionSection(long key, int sectionShift, int nonEmptyNeighbours) {
         int chunksPerSection = 1 << (2 * sectionShift);
         this.key = key;
         this.coordinateMask = (1 << sectionShift) - 1;
         this.indexShift = sectionShift;
         this.chunkBits = new long[(chunksPerSection + 63) >>> 6];
+        this.nonEmptyNeighbours = nonEmptyNeighbours;
     }
 
     long key() {
@@ -37,7 +38,7 @@ final class RegionSection<R> {
         int index = bitIndex(chunkX, chunkZ);
         long bit = 1L << (index & 63);
         if ((chunkBits[index >>> 6] & bit) != 0L) {
-            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] is already registered in section " + describe());
+            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] is already registered in section " + CoordinateKey.describe(key));
         }
 
         chunkBits[index >>> 6] |= bit;
@@ -48,7 +49,7 @@ final class RegionSection<R> {
         int index = bitIndex(chunkX, chunkZ);
         long bit = 1L << (index & 63);
         if ((chunkBits[index >>> 6] & bit) == 0L) {
-            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] is not registered in section " + describe());
+            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] is not registered in section " + CoordinateKey.describe(key));
         }
 
         chunkBits[index >>> 6] &= ~bit;
@@ -59,17 +60,13 @@ final class RegionSection<R> {
         return nonEmptyNeighbours;
     }
 
-    void initialiseNonEmptyNeighbours(int count) {
-        this.nonEmptyNeighbours = count;
-    }
-
     void gainedNonEmptyNeighbour() {
         nonEmptyNeighbours++;
     }
 
     void lostNonEmptyNeighbour() {
         if (nonEmptyNeighbours == 0) {
-            throw new IllegalStateException("Non-empty neighbour count of section " + describe() + " dropped below zero");
+            throw new IllegalStateException("Non-empty neighbour count of section " + CoordinateKey.describe(key) + " dropped below zero");
         }
 
         nonEmptyNeighbours--;
@@ -103,9 +100,5 @@ final class RegionSection<R> {
 
     private int bitIndex(int chunkX, int chunkZ) {
         return ((chunkZ & coordinateMask) << indexShift) | (chunkX & coordinateMask);
-    }
-
-    private String describe() {
-        return "[" + CoordinateKey.x(key) + ", " + CoordinateKey.z(key) + "]";
     }
 }

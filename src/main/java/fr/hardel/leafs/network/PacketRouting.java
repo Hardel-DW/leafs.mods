@@ -35,11 +35,6 @@ public final class PacketRouting {
         return listener instanceof ServerGamePacketListenerImpl game && queueOf(game).handledByCurrentThread();
     }
 
-    /** {@code PacketProcessor.isSameThread} hook: a unit draining a player queue is a packet-handling thread. */
-    public static boolean currentThreadHandlesPackets() {
-        return PlayerPacketQueue.handlingPackets();
-    }
-
     /** Region-tick sends batch on the channel; flushing happens on the global loop's cadence. */
     public static boolean scopedFlush(boolean vanillaFlush) {
         return vanillaFlush && !(RegionContext.current() instanceof RegionContext.Region);

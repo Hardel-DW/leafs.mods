@@ -1,6 +1,5 @@
 package fr.hardel.leafs.region;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -25,7 +24,7 @@ class RegionizerFuzzTest {
     @ValueSource(longs = {1, 7, 42, 1337, 20260731})
     void randomChurnPreservesEveryInvariant(long seed) {
         Random random = new Random(seed);
-        Regionizer<Object> regionizer = new Regionizer<>(2, 1, 1, new NoopCallbacks());
+        Regionizer<Object> regionizer = new Regionizer<>(2, 1, 1, new RecordingCallbacks());
         LongOpenHashSet chunks = new LongOpenHashSet();
         LongArrayList chunkList = new LongArrayList();
         List<Region<Object>> ticking = new ArrayList<>();
@@ -114,36 +113,5 @@ class RegionizerFuzzTest {
         ticking.set(index, ticking.get(ticking.size() - 1));
         ticking.remove(ticking.size() - 1);
         region.markNotTicking();
-    }
-
-    private static final class NoopCallbacks implements RegionCallbacks<Object> {
-        @Override
-        public Object createData(Region<Object> region) {
-            return new Object();
-        }
-
-        @Override
-        public void onRegionCreate(Region<Object> region) {
-        }
-
-        @Override
-        public void onRegionDestroy(Region<Object> region) {
-        }
-
-        @Override
-        public void onRegionActive(Region<Object> region) {
-        }
-
-        @Override
-        public void onRegionInactive(Region<Object> region) {
-        }
-
-        @Override
-        public void merge(Region<Object> from, Region<Object> into) {
-        }
-
-        @Override
-        public void split(Region<Object> parent, Long2ObjectMap<Region<Object>> sectionToChild, List<Region<Object>> children) {
-        }
     }
 }

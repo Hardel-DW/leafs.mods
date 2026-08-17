@@ -1,6 +1,6 @@
 package fr.hardel.leafs.mixin.ticking;
 
-import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.thread.BlockableEventLoop;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,7 +14,7 @@ public abstract class BlockableEventLoopMixin {
 
     @Inject(method = "execute(Ljava/lang/Runnable;)V", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffThreadServerExecute(Runnable command, CallbackInfo callbackInfo) {
-        if ((Object) this instanceof MinecraftServer server && ((LeafsServerAccess) server).leafs$ticking().divertExecute(command)) {
+        if ((Object) this instanceof MinecraftServer server && TickingManager.of(server).divertExecute(command)) {
             callbackInfo.cancel();
         }
     }

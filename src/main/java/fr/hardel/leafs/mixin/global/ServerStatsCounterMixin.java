@@ -3,6 +3,7 @@ package fr.hardel.leafs.mixin.global;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.global.DeferredFileWrites;
+import fr.hardel.leafs.network.JoinPreload;
 import net.minecraft.stats.ServerStatsCounter;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -10,13 +11,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.file.LinkOption;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 
-/** The stats JSON serializes on the caller into the IO writer; the login read sees pending writes first. */
+/** The stats JSON serializes on the caller into the IO writer; the construction read goes through the prepared sources. */
 @Mixin(ServerStatsCounter.class)
 public abstract class ServerStatsCounterMixin {
 
@@ -37,13 +37,9 @@ public abstract class ServerStatsCounterMixin {
     }
 
     @WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;newBufferedReader(Ljava/nio/file/Path;Ljava/nio/charset/Charset;)Ljava/io/BufferedReader;"))
-    private BufferedReader leafs$pendingAwareReader(Path file, Charset charset, Operation<BufferedReader> original) throws IOException {
-        DeferredFileWrites writes = DeferredFileWrites.active();
-        String pending = writes == null ? null : writes.pendingText(file);
-        if (pending != null) {
-            return new BufferedReader(new StringReader(pending));
-        }
+    private BufferedReader leafs$preparedReader(Path file, Charset charset, Operation<BufferedReader> original) throws IOException {
+        BufferedReader prepared = JoinPreload.playerFileReader(file);
 
-        return original.call(file, charset);
+        return prepared == null ? original.call(file, charset) : prepared;
     }
 }
