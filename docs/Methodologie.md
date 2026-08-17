@@ -15,7 +15,7 @@ Les commentaires : une phrase, deux au maximum quand il y a une trace de bug à 
 On pense long terme : pas de fix rapide qui devient une dette, pas de cas par cas quand un point de passage unique traite toute la classe du problème. Si une correction propre demande de repenser un morceau d'architecture, on le fait.
 
 ## Tester
-Trois niveaux. Les tests unitaires, `gradlew test`, tournent avec le vrai Minecraft bootstrappé quand il le faut. La validation en jeu suit une checklist courte : connexion, déconnexion, casser et poser, coffres, four, chat, commande, mort et respawn, portail aller retour. La charge se teste avec les bots overstress en montée progressive, spark en `--thread *` sans quoi on ne voit que le thread serveur, et le CSV de métriques par région.
+Trois niveaux. Les tests unitaires, `gradlew test`, tournent avec le vrai Minecraft bootstrappé quand il le faut. La validation en jeu suit une checklist courte : connexion, déconnexion, casser et poser, coffres, four, chat, commande, mort et respawn, portail aller retour. La charge se teste avec les bots overstress en montée progressive, et spark en `--thread *` sans quoi on ne voit que le thread serveur.
 Un chantier n'est terminé que vert aux trois niveaux. Entre deux étapes d'un gros chantier, l'arbre reste compilable, testé et jouable.
 
 ## Documenter et committer

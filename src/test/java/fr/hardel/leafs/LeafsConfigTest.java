@@ -43,7 +43,6 @@ class LeafsConfigTest {
         assertTrue(config.debug().perRegionLogs());
         assertEquals(defaults.regionMergeDistance(), config.regionMergeDistance());
         assertEquals(defaults.debug().watchdogKillSeconds(), config.debug().watchdogKillSeconds());
-        assertEquals(defaults.debug().metricsLogSeconds(), config.debug().metricsLogSeconds());
     }
 
     @Test
