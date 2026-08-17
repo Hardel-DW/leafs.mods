@@ -33,11 +33,13 @@ public final class PlayerChunkLoader {
 
     private final ChunkMap chunkMap;
     private final StageTickets tickets;
+    private final LevelTicketPropagator propagator;
     private final Map<ServerPlayer, PlayerViewState> states = new ConcurrentHashMap<>();
 
     public PlayerChunkLoader(ChunkMap chunkMap, StageTickets tickets) {
         this.chunkMap = chunkMap;
         this.tickets = tickets;
+        this.propagator = ((PropagatorAccess) chunkMap.getDistanceManager()).leafs$propagator();
     }
 
     public void tick(ServerPlayer player) {
@@ -50,14 +52,14 @@ public final class PlayerChunkLoader {
         boolean posted = refreshView(player, state);
         LongArrayList newLoads = startLoads(state);
         if (posted || !newLoads.isEmpty()) {
-            propagator().drain();
+            propagator.drain();
         }
 
         requestLoads(newLoads);
         boolean progressed = progressLoading(state);
         progressed |= progressGenerating(state);
         if (progressed) {
-            propagator().drain();
+            propagator.drain();
         }
     }
 
@@ -123,34 +125,30 @@ public final class PlayerChunkLoader {
         return posted;
     }
 
-    /** A ring shift moves a retained chunk's target stage; the swap posts the new ticket before releasing the old. */
+    /** A ring shift moves a retained chunk's target stage. */
     private boolean alignStage(PlayerViewState state, Long2ByteMap.Entry entry, long chunk, byte stage, int distance) {
         if (stage == PlayerViewState.STAGE_TICK && distance > state.tickDistance) {
-            tickets.acquire(chunk, StageTickets.GENERATED);
-            tickets.release(chunk, StageTickets.TICK);
+            tickets.swap(chunk, StageTickets.TICK, StageTickets.GENERATED);
             entry.setValue(PlayerViewState.STAGE_GENERATED);
             return true;
         }
 
         if ((stage == PlayerViewState.STAGE_GENERATING || stage == PlayerViewState.STAGE_GENERATED) && distance > state.sendDistance) {
-            tickets.acquire(chunk, StageTickets.LOADED);
-            tickets.release(chunk, StageTickets.GENERATED);
+            tickets.swap(chunk, StageTickets.GENERATED, StageTickets.LOADED);
             state.generating.remove(chunk);
             entry.setValue(PlayerViewState.STAGE_LOADED);
             return true;
         }
 
         if (stage == PlayerViewState.STAGE_LOADED && distance <= state.sendDistance) {
-            tickets.acquire(chunk, StageTickets.GENERATED);
-            tickets.release(chunk, StageTickets.LOADED);
+            tickets.swap(chunk, StageTickets.LOADED, StageTickets.GENERATED);
             entry.setValue(PlayerViewState.STAGE_GENERATING);
             state.generating.add(chunk);
             return true;
         }
 
         if (stage == PlayerViewState.STAGE_GENERATED && distance <= state.tickDistance) {
-            tickets.acquire(chunk, StageTickets.TICK);
-            tickets.release(chunk, StageTickets.GENERATED);
+            tickets.swap(chunk, StageTickets.GENERATED, StageTickets.TICK);
             entry.setValue(PlayerViewState.STAGE_TICK);
             return true;
         }
@@ -209,11 +207,7 @@ public final class PlayerChunkLoader {
     private void requestLoads(LongArrayList newLoads) {
         for (int i = 0; i < newLoads.size(); i++) {
             long chunk = newLoads.getLong(i);
-            ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(chunk);
-            if (holder != null) {
-                propagator().scheduling().requestArea(ChunkPos.getX(chunk), ChunkPos.getZ(chunk), 0,
-                    () -> holder.scheduleChunkGenerationTask(ChunkStatus.EMPTY, chunkMap));
-            }
+            propagator.scheduling().requestStatus(ChunkPos.getX(chunk), ChunkPos.getZ(chunk), ChunkStatus.EMPTY);
         }
     }
 
@@ -228,8 +222,7 @@ public final class PlayerChunkLoader {
 
             iterator.remove();
             if (distanceToCenter(state, chunk) <= state.sendDistance) {
-                tickets.acquire(chunk, StageTickets.GENERATED);
-                tickets.release(chunk, StageTickets.LOADED);
+                tickets.swap(chunk, StageTickets.LOADED, StageTickets.GENERATED);
                 state.stages.put(chunk, PlayerViewState.STAGE_GENERATING);
                 state.generating.add(chunk);
                 posted = true;
@@ -252,8 +245,7 @@ public final class PlayerChunkLoader {
 
             iterator.remove();
             if (distanceToCenter(state, chunk) <= state.tickDistance) {
-                tickets.acquire(chunk, StageTickets.TICK);
-                tickets.release(chunk, StageTickets.GENERATED);
+                tickets.swap(chunk, StageTickets.GENERATED, StageTickets.TICK);
                 state.stages.put(chunk, PlayerViewState.STAGE_TICK);
                 posted = true;
             } else {
@@ -266,9 +258,5 @@ public final class PlayerChunkLoader {
 
     private static int distanceToCenter(PlayerViewState state, long chunk) {
         return Math.max(Math.abs(ChunkPos.getX(chunk) - state.centerX), Math.abs(ChunkPos.getZ(chunk) - state.centerZ));
-    }
-
-    private LevelTicketPropagator propagator() {
-        return ((PropagatorAccess) chunkMap.getDistanceManager()).leafs$propagator();
     }
 }
