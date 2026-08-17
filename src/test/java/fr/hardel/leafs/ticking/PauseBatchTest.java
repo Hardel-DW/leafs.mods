@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.metrics.MinuteCounter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class PauseBatchTest {
 
     private final TickBarrier barrier = new TickBarrier();
-    private final PauseBatch batch = new PauseBatch(barrier);
+    private final PauseBatch batch = new PauseBatch(barrier, new MinuteCounter());
     private final List<String> ran = new ArrayList<>();
 
     private void assertBarrierDown() {

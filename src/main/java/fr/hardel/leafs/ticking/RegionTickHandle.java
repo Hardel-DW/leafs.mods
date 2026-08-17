@@ -1,5 +1,7 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.metrics.RegionStage;
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 import fr.hardel.leafs.region.Region;
@@ -18,7 +20,7 @@ public final class RegionTickHandle extends TickHandle {
     private volatile int entityCensus;
 
     RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions) {
-        super(new RegionContext.Region(region.id(), dimension));
+        super(new RegionContext.Region(region.id(), dimension), RegionStage.values().length);
         this.region = region;
         this.regions = regions;
     }
@@ -58,11 +60,16 @@ public final class RegionTickHandle extends TickHandle {
 
                 WorldTickContext.enter(body.level(), worldData, data.entityData());
                 try {
+                    StageTimings stages = stages();
+                    stages.beginTick(System.nanoTime());
                     regions.taskScheduler().drain(region);
+                    stages.mark(RegionStage.TASKS);
                     regions.unloads().drain(region);
-                    body.tick(region, worldData, data.entityData(), tickCount);
+                    stages.mark(RegionStage.UNLOADS);
+                    body.tick(region, worldData, data.entityData(), tickCount, stages);
                     chunkCensus = region.chunkCount();
                     entityCensus = data.entityData().tickList().size();
+                    stages.endTick();
                 } finally {
                     WorldTickContext.exit();
                 }

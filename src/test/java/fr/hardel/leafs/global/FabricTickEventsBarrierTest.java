@@ -1,5 +1,6 @@
 package fr.hardel.leafs.global;
 
+import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.ticking.TickBarrier;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -30,7 +31,7 @@ class FabricTickEventsBarrierTest {
             return subscribed;
         };
 
-        return new FabricTickEventsBarrier(barrier, probe);
+        return new FabricTickEventsBarrier(barrier, new MinuteCounter(), probe);
     }
 
     @Test

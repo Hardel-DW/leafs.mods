@@ -1,6 +1,7 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
@@ -23,6 +24,7 @@ public final class PacketRouting {
             return false;
         }
 
+        TickingManager.of(game.player.level().getServer()).metrics().packetsIn().increment();
         queueOf(game).add(listener, packet);
         return true;
     }
