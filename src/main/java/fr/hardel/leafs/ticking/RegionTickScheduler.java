@@ -3,7 +3,9 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.ownership.RegionContext;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +20,7 @@ public final class RegionTickScheduler {
 
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
+    private final ConcurrentHashMap<Thread, TickHandle> activeByWorker = new ConcurrentHashMap<>();
     private final int threadCount;
     private final boolean regionThreadNames;
     private final TickBarrier barrier;
@@ -73,6 +76,15 @@ public final class RegionTickScheduler {
         executeTick(handle, 1);
     }
 
+    public List<Thread> workerThreads() {
+        return Collections.unmodifiableList(workers);
+    }
+
+    /** The handle a worker is ticking right now, null when it idles. */
+    public TickHandle activeHandle(Thread worker) {
+        return activeByWorker.get(worker);
+    }
+
     static long computeTickCount(long idealStartNanos, long nowNanos, long periodNanos) {
         return Math.max(1, 1 + (nowNanos - idealStartNanos) / periodNanos);
     }
@@ -101,12 +113,14 @@ public final class RegionTickScheduler {
                 worker.setName("R#" + handle.id() + " " + handle.dimension());
             }
 
+            activeByWorker.put(worker, handle);
             try {
                 executeTick(handle, tickCount);
             } catch (Throwable throwable) {
                 failurePolicy.accept(handle, throwable);
                 continue;
             } finally {
+                activeByWorker.remove(worker);
                 if (regionThreadNames) {
                     worker.setName(workerName);
                 }

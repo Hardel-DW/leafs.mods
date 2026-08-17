@@ -3,6 +3,8 @@ package fr.hardel.leafs.mixin.ticking;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.metrics.GlobalStage;
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
@@ -32,6 +34,29 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         leafs$ticking.tickLevel(level, () -> original.call(level, haveTime));
     }
 
+    /** The global stage sample spans {@code tickServer}; an early pause-branch return still publishes at RETURN. */
+    @Inject(method = "tickServer", at = @At("HEAD"))
+    private void leafs$beginGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
+        leafs$ticking.metrics().globalStages().beginTick(System.nanoTime());
+    }
+
+    @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V", shift = At.Shift.AFTER))
+    private void leafs$markConnectionsStage(CallbackInfo callbackInfo) {
+        leafs$ticking.metrics().globalStages().mark(GlobalStage.CONNECTIONS);
+    }
+
+    @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;tick()V", shift = At.Shift.AFTER))
+    private void leafs$markPlayersStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
+        leafs$ticking.metrics().globalStages().mark(GlobalStage.PLAYERS);
+    }
+
+    @Inject(method = "tickServer", at = @At("RETURN"))
+    private void leafs$endGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
+        StageTimings globalStages = leafs$ticking.metrics().globalStages();
+        globalStages.mark(GlobalStage.AUTOSAVE);
+        globalStages.endTick();
+    }
+
     /** Vanilla drains its packet queue here every loop iteration, paused included; the stolen per-player queues must too. */
     @Inject(method = "processPacketsAndTick", at = @At("HEAD"))
     private void leafs$drainPlayerQueuesWhilePaused(boolean sprinting, CallbackInfo callbackInfo) {
@@ -42,7 +67,10 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @Inject(method = "tickChildren", at = @At("TAIL"))
     private void leafs$quiesceLevels(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
+        StageTimings globalStages = leafs$ticking.metrics().globalStages();
+        globalStages.mark(GlobalStage.SEND_CHUNKS);
         leafs$ticking.quiesce();
+        globalStages.mark(GlobalStage.QUIESCE);
     }
 
     /** Before the worlds save: the pool stops so saves read settled state, then pending teleports place. */

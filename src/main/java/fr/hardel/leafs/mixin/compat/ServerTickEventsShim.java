@@ -29,7 +29,8 @@ public abstract class ServerTickEventsShim {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createTickEventsBarrier(CallbackInfo callbackInfo) {
-        leafs$tickEvents = new FabricTickEventsBarrier(TickingManager.of((MinecraftServer) (Object) this).barrier());
+        TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
+        leafs$tickEvents = new FabricTickEventsBarrier(ticking.barrier(), ticking.metrics().barrier().fabricEventPauses());
     }
 
     /** {@code START_SERVER_TICK} fires between the tick-rate manager tick and the {@code tickChildren} call. */

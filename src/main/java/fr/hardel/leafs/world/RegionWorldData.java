@@ -122,10 +122,12 @@ public final class RegionWorldData {
     }
 
     /** Vanilla drain shape at this unit's clock time; the cap is vanilla's level-wide one, applied per region. */
-    public void drainScheduledTicks(BiConsumer<BlockPos, Block> blockExecutor, BiConsumer<BlockPos, Fluid> fluidExecutor) {
-        long time = clock.currentTick();
-        blockTicks.tick(time, MAX_SCHEDULED_TICKS_PER_DRAIN, blockExecutor);
-        fluidTicks.tick(time, MAX_SCHEDULED_TICKS_PER_DRAIN, fluidExecutor);
+    public void drainBlockTicks(BiConsumer<BlockPos, Block> executor) {
+        blockTicks.tick(clock.currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
+    }
+
+    public void drainFluidTicks(BiConsumer<BlockPos, Fluid> executor) {
+        fluidTicks.tick(clock.currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
     }
 
     /** Vanilla {@code ServerLevel.runBlockEvents}: untickable positions re-queue for the next tick, cascades run this one. */

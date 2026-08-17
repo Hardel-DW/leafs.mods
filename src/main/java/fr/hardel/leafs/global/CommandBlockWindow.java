@@ -1,5 +1,6 @@
 package fr.hardel.leafs.global;
 
+import fr.hardel.leafs.metrics.WindowReason;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -32,7 +33,7 @@ public final class CommandBlockWindow {
             return true;
         }
 
-        boolean deferred = defer(level, () -> {
+        boolean deferred = defer(level, WindowReason.COMMAND_BLOCK, () -> {
             if (!level.getChunkSource().hasChunk(SectionPos.blockToSectionCoord(target.getX()), SectionPos.blockToSectionCoord(target.getZ()))) {
                 return;
             }
@@ -52,20 +53,20 @@ public final class CommandBlockWindow {
 
     /** The minecart can be destroyed before the window runs. */
     public static boolean deferMinecartActivation(ServerLevel level, MinecartCommandBlock minecart, int x, int y, int z, boolean powered) {
-        return defer(level, () -> {
+        return defer(level, WindowReason.MINECART_COMMAND_BLOCK, () -> {
             if (!minecart.isRemoved()) {
                 minecart.activateMinecart(level, x, y, z, powered);
             }
         });
     }
 
-    private static boolean defer(ServerLevel level, Runnable execution) {
+    private static boolean defer(ServerLevel level, WindowReason reason, Runnable execution) {
         BarrierWindow window = BarrierWindow.of(level.getServer());
         if (window.isDraining()) {
             return false;
         }
 
-        window.enqueue(execution);
+        window.enqueue(reason, execution);
 
         return true;
     }

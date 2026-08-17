@@ -6,6 +6,8 @@ import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.global.DeferredFileWrites;
+import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import net.minecraft.server.MinecraftServer;
@@ -22,8 +24,9 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class TickingManager {
 
     private final MinecraftServer server;
+    private final ServerMetrics metrics = new ServerMetrics();
     private final TickBarrier barrier = new TickBarrier();
-    private final PauseBatch pauseBatch = new PauseBatch(barrier);
+    private final PauseBatch pauseBatch = new PauseBatch(barrier, metrics.barrier().disconnectPauses());
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkWorkers chunkWorkers;
@@ -51,6 +54,27 @@ public final class TickingManager {
 
     public TickBarrier barrier() {
         return barrier;
+    }
+
+    public ServerMetrics metrics() {
+        return metrics;
+    }
+
+    public RegionTickScheduler scheduler() {
+        return scheduler;
+    }
+
+    /** The unit of a level that ticked at least once; null before, so callers sampling metrics stay no-ops. */
+    public LevelTickUnit unitOf(ServerLevel level) {
+        return levelUnits.get(level);
+    }
+
+    /** Serial stage boundary reached inside the vanilla remainder; ignored while no serial tick is in flight. */
+    public void markSerial(ServerLevel level, SerialStage stage) {
+        LevelTickUnit unit = levelUnits.get(level);
+        if (unit != null) {
+            unit.stages().mark(stage);
+        }
     }
 
     /** The connection tick opens this so a disconnect wave shares one pause instead of one per player. */

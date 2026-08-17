@@ -1,5 +1,7 @@
 package fr.hardel.leafs.global;
 
+import fr.hardel.leafs.metrics.BarrierStats;
+import fr.hardel.leafs.metrics.WindowReason;
 import fr.hardel.leafs.ticking.TickBarrier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -20,13 +22,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Timeout(10)
 class BarrierWindowTest {
     private final TickBarrier barrier = new TickBarrier();
-    private final BarrierWindow window = new BarrierWindow(barrier);
+    private final BarrierStats stats = new BarrierStats();
+    private final BarrierWindow window = new BarrierWindow(barrier, stats);
     private final List<String> executed = new ArrayList<>();
+
+    private void enqueue(Runnable task) {
+        window.enqueue(WindowReason.CONSOLE_COMMAND, task);
+    }
 
     @Test
     void tasksRunInOrderAtTheNextWindow() {
-        window.enqueue(() -> executed.add("first"));
-        window.enqueue(() -> executed.add("second"));
+        enqueue(() -> executed.add("first"));
+        enqueue(() -> executed.add("second"));
 
         window.runGlobalPhase();
 
@@ -46,7 +53,7 @@ class BarrierWindowTest {
 
     @Test
     void windowWaitsForInFlightTicksAndBlocksNewOnes() throws InterruptedException {
-        window.enqueue(() -> executed.add("window"));
+        enqueue(() -> executed.add("window"));
         barrier.enterTick();
         CountDownLatch windowDone = new CountDownLatch(1);
         Thread globalPhase = new Thread(() -> {
@@ -68,7 +75,7 @@ class BarrierWindowTest {
 
     @Test
     void tasksQueuedDuringTheDrainWaitForTheNextWindow() {
-        window.enqueue(() -> window.enqueue(() -> executed.add("requeued")));
+        enqueue(() -> enqueue(() -> executed.add("requeued")));
 
         window.runGlobalPhase();
         assertEquals(List.of(), executed);
@@ -79,7 +86,7 @@ class BarrierWindowTest {
 
     @Test
     void throwingTaskPropagatesButTheBarrierDropsAndTheMarkerClears() {
-        window.enqueue(() -> {
+        enqueue(() -> {
             throw new IllegalStateException("command block crash");
         });
 
@@ -93,7 +100,7 @@ class BarrierWindowTest {
     /** F-C2: raising used to happen outside the try, so a failure there froze every later tick. */
     @Test
     void aFailingRaiseLeavesTheBarrierDown() throws InterruptedException {
-        window.enqueue(() -> executed.add("never"));
+        enqueue(() -> executed.add("never"));
         barrier.enterTick();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Thread globalPhase = new Thread(() -> {
@@ -132,7 +139,7 @@ class BarrierWindowTest {
                 return;
             }
 
-            window.enqueue(unit[0]);
+            enqueue(unit[0]);
         };
 
         assertFalse(window.isDraining());
@@ -149,9 +156,9 @@ class BarrierWindowTest {
 
     @Test
     void theShutdownWindowRunsPendingWorkAndDropsWhatItQueues() {
-        window.enqueue(() -> {
+        enqueue(() -> {
             executed.add("last");
-            window.enqueue(() -> executed.add("too late"));
+            enqueue(() -> executed.add("too late"));
         });
 
         window.runShutdownPhase();
