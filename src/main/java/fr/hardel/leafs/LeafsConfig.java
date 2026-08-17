@@ -95,7 +95,9 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
             JsonElement json = JsonParser.parseString(Files.readString(file));
             if (json instanceof JsonObject object) {
                 requireKnownKeys(file, object, MAP_CODEC);
-                requireKnownGroup(file, object.get("debug"), DEBUG_MAP);
+                if (object.get("debug") instanceof JsonObject debug) {
+                    requireKnownKeys(file, debug, DEBUG_MAP);
+                }
             }
 
             return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config " + file + " is invalid: " + error));
@@ -128,12 +130,6 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
             if (!valid.contains(key)) {
                 throw new IllegalArgumentException("Config " + file + " has unknown key \"" + key + "\", valid keys: " + valid);
             }
-        }
-    }
-
-    private static void requireKnownGroup(Path file, JsonElement group, MapCodec<?> codec) {
-        if (group instanceof JsonObject object) {
-            requireKnownKeys(file, object, codec);
         }
     }
 }

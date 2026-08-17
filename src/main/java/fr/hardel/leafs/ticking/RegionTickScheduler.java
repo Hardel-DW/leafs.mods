@@ -45,12 +45,8 @@ public final class RegionTickScheduler {
         }
     }
 
-    /** Waits the workers out so a mid-flight tick can finish releasing its region before the drain runs. Idempotent. */
+    /** Waits the workers out so a mid-flight tick can finish releasing its region before the drain runs. */
     public void shutdown() {
-        if (!running) {
-            return;
-        }
-
         running = false;
         workers.forEach(Thread::interrupt);
         for (Thread worker : workers) {

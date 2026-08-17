@@ -31,12 +31,7 @@ public final class GenerationExclusion {
             return step.get();
         }
 
-        return runExcluded(pos, radius, step);
-    }
-
-    private CompletableFuture<ChunkAccess> runExcluded(ChunkPos pos, int radius, Supplier<CompletableFuture<ChunkAccess>> step) {
-        AreaLock.Node node = lock.lock(pos.x(), pos.z(), radius);
-        try {
+        return supplyExcluded(pos, radius, () -> {
             CompletableFuture<ChunkAccess> future = step.get();
             try {
                 future.join();
@@ -45,12 +40,10 @@ public final class GenerationExclusion {
             }
 
             return future;
-        } finally {
-            lock.unlock(node);
-        }
+        });
     }
 
-    /** Synchronous scope for the FULL step body, run on the owning thread with the neighbouring FEATURES held off. */
+    /** The one locking primitive: also the synchronous scope of the FULL step body on its owning thread. */
     public <T> T supplyExcluded(ChunkPos pos, int radius, Supplier<T> body) {
         AreaLock.Node node = lock.lock(pos.x(), pos.z(), radius);
         try {

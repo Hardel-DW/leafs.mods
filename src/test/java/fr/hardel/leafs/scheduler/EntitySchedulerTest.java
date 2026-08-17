@@ -65,7 +65,6 @@ class EntitySchedulerTest {
         scheduler.retire();
 
         assertEquals(List.of("retired1", "retired2"), executed);
-        assertTrue(scheduler.isRetired());
         assertFalse(scheduler.schedule(1, entity -> executed.add("never"), null));
         assertThrows(IllegalStateException.class, scheduler::retire);
     }

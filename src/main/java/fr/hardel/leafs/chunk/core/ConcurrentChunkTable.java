@@ -1,11 +1,8 @@
 package fr.hardel.leafs.chunk.core;
 
-import it.unimi.dsi.fastutil.longs.AbstractLongSortedSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
-import it.unimi.dsi.fastutil.longs.LongBidirectionalIterator;
-import it.unimi.dsi.fastutil.longs.LongComparator;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
 import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSortedSet;
@@ -27,7 +24,8 @@ import java.util.function.BiConsumer;
  * The one chunk holder table of a level, replacing vanilla's updating/visible double buffer: both
  * fields point at this instance, every thread reads it lock-free, and the promotion step reduces to
  * consuming the dirty flag. Extends the vanilla field type so the swap stays invisible to mods; the
- * superclass storage stays empty, every operation delegates to the concurrent backing.
+ * superclass storage stays empty, so a surface that is not delegated below would answer from an
+ * empty map instead of failing, and every such surface throws rather than lie.
  */
 public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
 
@@ -139,81 +137,10 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
         };
     }
 
-    /** Iteration order is undefined and the sorted-range operations are unsupported; no chunk system caller uses either. */
+    /** The sorted key view has no meaning over an unordered backing, and nothing in the chunk system asks for it. */
     @Override
     public LongSortedSet keySet() {
-        return new AbstractLongSortedSet() {
-            @Override
-            public LongBidirectionalIterator iterator() {
-                Iterator<Long> backing = holders.keySet().iterator();
-                return new LongBidirectionalIterator() {
-                    @Override
-                    public boolean hasNext() {
-                        return backing.hasNext();
-                    }
-
-                    @Override
-                    public long nextLong() {
-                        return backing.next();
-                    }
-
-                    @Override
-                    public boolean hasPrevious() {
-                        return false;
-                    }
-
-                    @Override
-                    public long previousLong() {
-                        throw new UnsupportedOperationException("The chunk table iterates forward only");
-                    }
-                };
-            }
-
-            @Override
-            public LongBidirectionalIterator iterator(long fromElement) {
-                throw new UnsupportedOperationException("The chunk table has no key order");
-            }
-
-            @Override
-            public int size() {
-                return holders.size();
-            }
-
-            @Override
-            public boolean contains(long key) {
-                return holders.containsKey(key);
-            }
-
-            @Override
-            public LongComparator comparator() {
-                return null;
-            }
-
-            @Override
-            public LongSortedSet subSet(long fromElement, long toElement) {
-                throw new UnsupportedOperationException("The chunk table has no key order");
-            }
-
-            @Override
-            public LongSortedSet headSet(long toElement) {
-                throw new UnsupportedOperationException("The chunk table has no key order");
-            }
-
-            @Override
-            public LongSortedSet tailSet(long fromElement) {
-                throw new UnsupportedOperationException("The chunk table has no key order");
-            }
-
-            @Override
-            public long firstLong() {
-                throw new UnsupportedOperationException("The chunk table has no key order");
-            }
-
-            @Override
-            public long lastLong() {
-                throw new UnsupportedOperationException("The chunk table has no key order");
-            }
-        };
+        throw new UnsupportedOperationException("The chunk table has no key order; iterate long2ObjectEntrySet or values instead");
     }
 
     @Override

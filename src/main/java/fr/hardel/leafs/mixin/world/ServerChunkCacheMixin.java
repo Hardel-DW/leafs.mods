@@ -3,9 +3,8 @@ package fr.hardel.leafs.mixin.world;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.ticking.ChunkPumpAccess;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -42,7 +41,7 @@ public abstract class ServerChunkCacheMixin {
 
     @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;tickChunks(Lnet/minecraft/util/profiling/ProfilerFiller;J)V"))
     private void leafs$serialChunkTickRemainder(ServerChunkCache instance, ProfilerFiller profiler, long timeDiff, Operation<Void> original) {
-        RegionTickBody body = ((ServerLevelRegionAccess) this.level).leafs$regions().body();
+        RegionTickBody body = LevelRegions.of(this.level).body();
         if (body == null) {
             original.call(instance, profiler, timeDiff);
 
@@ -64,13 +63,13 @@ public abstract class ServerChunkCacheMixin {
 
     @Inject(method = "move", at = @At("HEAD"), cancellable = true)
     private void leafs$deferPlayerMoveToLevelSerial(ServerPlayer player, CallbackInfo callbackInfo) {
-        LevelRegions regions = ((ServerLevelRegionAccess) this.level).leafs$regions();
+        LevelRegions regions = LevelRegions.of(this.level);
         if (regions.body() == null || regions.ownership().isLevelSerialHeldByCurrentThread()) {
             return;
         }
 
         ServerChunkCache self = (ServerChunkCache) (Object) this;
-        ((LeafsServerAccess) this.level.getServer()).leafs$ticking().submitToLevel(this.level, () -> {
+        TickingManager.of(this.level.getServer()).submitToLevel(this.level, () -> {
             if (!player.isRemoved() && player.level() == this.level) {
                 self.move(player);
             }

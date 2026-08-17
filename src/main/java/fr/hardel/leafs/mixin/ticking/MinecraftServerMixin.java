@@ -48,11 +48,11 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     /** Before the worlds save: the pool stops so saves read settled state, then pending teleports place. */
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void leafs$haltTicking(CallbackInfo callbackInfo) {
-        leafs$ticking.haltTicking((MinecraftServer) (Object) this);
+        leafs$ticking.haltTicking();
     }
 
     @Inject(method = "stopServer", at = @At("TAIL"))
     private void leafs$shutdownTicking(CallbackInfo callbackInfo) {
-        leafs$ticking.shutdown((MinecraftServer) (Object) this);
+        leafs$ticking.shutdown();
     }
 }

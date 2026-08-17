@@ -57,33 +57,22 @@ public final class RegionBlockEntityTickers {
         pending.clear();
     }
 
-    /** Tickers whose section died with the split are dropped, like their chunk's other transient state. */
-    void splitInto(int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection) {
-        rebucket(tickers, sectionShift, childBySection);
-        rebucket(pending, sectionShift, childBySection);
-    }
-
-    /** Activation variant of {@link #splitInto}: an unmatched ticker stays here instead of being dropped. */
-    void migrateInto(int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection) {
-        List<Entry> kept = new ArrayList<>();
-        for (Entry entry : tickers) {
-            RegionBlockEntityTickers child = childBySection.apply(sectionKeyOf(entry, sectionShift));
-            if (child != null) {
-                child.tickers.add(entry);
-            } else {
-                kept.add(entry);
-            }
+    void redistribute(int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection, boolean keepOrphans) {
+        List<Entry> orphans = new ArrayList<>();
+        rebucket(tickers, sectionShift, childBySection, orphans);
+        rebucket(pending, sectionShift, childBySection, orphans);
+        if (keepOrphans) {
+            tickers.addAll(orphans);
         }
-
-        tickers.clear();
-        tickers.addAll(kept);
     }
 
-    private static void rebucket(List<Entry> source, int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection) {
+    private static void rebucket(List<Entry> source, int sectionShift, LongFunction<RegionBlockEntityTickers> childBySection, List<Entry> orphans) {
         for (Entry entry : source) {
             RegionBlockEntityTickers child = childBySection.apply(sectionKeyOf(entry, sectionShift));
             if (child != null) {
                 child.tickers.add(entry);
+            } else {
+                orphans.add(entry);
             }
         }
 

@@ -16,12 +16,10 @@ public final class DegradedChunkReads {
     }
 
     public static void run(Runnable scope) {
-        ACTIVE.set(Boolean.TRUE);
-        try {
+        call(() -> {
             scope.run();
-        } finally {
-            ACTIVE.set(Boolean.FALSE);
-        }
+            return null;
+        });
     }
 
     public static <T> T call(Supplier<T> scope) {

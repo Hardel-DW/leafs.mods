@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Facade swap #34 - justifications in Modules.md entity/. */
+/** The level's entity indexes are read and written from every region, so both maps go concurrent. */
 @Mixin(EntityLookup.class)
 public abstract class EntityLookupMixin<T extends EntityAccess> {
 

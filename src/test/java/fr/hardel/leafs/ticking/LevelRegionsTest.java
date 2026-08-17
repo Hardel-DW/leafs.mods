@@ -84,7 +84,6 @@ class LevelRegionsTest {
 
         assertEquals(0, regionCount(), "regions survived an empty chunk-holder map");
         assertEquals(0, regions.sections());
-        assertEquals(0, regions.trackedChunks());
         assertEquals(0, regions.deferredHandshakes());
         assertTrue(regions.created() > 1, "the replay never created a second region");
         assertTrue(regions.merged() > 0, "the replay never merged two regions");

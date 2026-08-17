@@ -99,9 +99,7 @@ class LeafsTicketPropagatorTest {
     @Test
     void singleSourceAdd() {
         set(100, 100, 5);
-        assertTrue(propagator.hasPendingUpdates());
-        assertTrue(propagator.performUpdates(null));
-        assertFalse(propagator.hasPendingUpdates());
+        propagator.performUpdates(null);
         assertMatchesOracle(100, 100, 100, 100);
     }
 
@@ -110,7 +108,7 @@ class LeafsTicketPropagatorTest {
         set(10, 10, 8);
         propagator.performUpdates(null);
         remove(10, 10);
-        assertTrue(propagator.performUpdates(null));
+        propagator.performUpdates(null);
         assertTrue(propagator.levels.isEmpty());
     }
 
@@ -244,7 +242,6 @@ class LeafsTicketPropagatorTest {
         assertTrue(failures.isEmpty(), () -> "worker failed: " + failures.get(0));
 
         propagator.performUpdates(ticketLock);
-        assertFalse(propagator.hasPendingUpdates());
 
         for (Map<Long, Integer> threadSources : finalSources) {
             for (Map.Entry<Long, Integer> entry : threadSources.entrySet()) {

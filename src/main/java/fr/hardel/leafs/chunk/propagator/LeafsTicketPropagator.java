@@ -28,7 +28,7 @@ import java.util.concurrent.locks.LockSupport;
 public abstract class LeafsTicketPropagator {
 
     public static final int SECTION_SHIFT = 6;
-    public static final int SECTION_SIZE = 1 << SECTION_SHIFT;
+    private static final int SECTION_SIZE = 1 << SECTION_SHIFT;
     private static final int LEVEL_BITS = SECTION_SHIFT;
     private static final int LEVEL_COUNT = 1 << LEVEL_BITS;
     // 62 and not 63: removing a 63 source would examine cells two sections away, the cap keeps
@@ -98,10 +98,6 @@ public abstract class LeafsTicketPropagator {
         return (short) ((posX & (SECTION_SIZE - 1)) | ((posZ & (SECTION_SIZE - 1)) << SECTION_SHIFT));
     }
 
-    public boolean hasPendingUpdates() {
-        return updateQueue.peek() != null;
-    }
-
     /**
      * New absolute levels per chunk position, zero means no level anymore. Called while holding
      * the 3x3 ticket area of the drained section; concurrent drains of far apart sections invoke
@@ -118,13 +114,12 @@ public abstract class LeafsTicketPropagator {
      * The caller must not hold any cell of ticketLock, each drained section locks its own 3x3
      * area. A null ticketLock is allowed only when the caller synchronizes all access externally.
      */
-    public boolean performUpdates(AreaLock ticketLock) {
+    public void performUpdates(AreaLock ticketLock) {
         if (updateQueue.peek() == null) {
-            return false;
+            return;
         }
 
         long maxOrder = updateQueue.getLastOrder();
-        boolean updated = false;
         Wavefront wavefront = null;
 
         for (;;) {
@@ -134,7 +129,7 @@ public abstract class LeafsTicketPropagator {
                     if (wavefront != null) {
                         Wavefront.release(wavefront);
                     }
-                    return updated;
+                    return;
                 }
                 continue;
             }
@@ -142,19 +137,18 @@ public abstract class LeafsTicketPropagator {
             if (wavefront == null) {
                 wavefront = Wavefront.acquire();
             }
-            updated |= performUpdate(node.section, node, wavefront, ticketLock);
+            performUpdate(node.section, node, wavefront, ticketLock);
         }
     }
 
     /** The outer finally frees the node and fires the hook on every exit, or parked drainers never wake and work built under the locks never starts. */
-    private boolean performUpdate(Section section, UpdateQueue.Node node, Wavefront wavefront, AreaLock ticketLock) {
+    private void performUpdate(Section section, UpdateQueue.Node node, Wavefront wavefront, AreaLock ticketLock) {
         int sectionX = section.sectionX;
         int sectionZ = section.sectionZ;
 
         // encode offsets are needed to queue the seeds below, before the wavefronts run
         wavefront.setupEncodeOffset(sectionX, sectionZ);
 
-        boolean updated = false;
         try {
             AreaLock.Node areaNode = ticketLock == null
                 ? null
@@ -164,7 +158,7 @@ public abstract class LeafsTicketPropagator {
             try {
                 if (section != sections.get(positionKey(sectionX, sectionZ))) {
                     // a neighbouring drain de-initialised this section, its replacement re-queued itself
-                    return false;
+                    return;
                 }
 
                 int oldSourceCount = section.sources.size();
@@ -185,8 +179,7 @@ public abstract class LeafsTicketPropagator {
                     releaseNeighbours(sectionX, sectionZ, oldSourceCount != 0);
                 }
 
-                updated = !wavefront.updatedPositions.isEmpty();
-                if (updated) {
+                if (!wavefront.updatedPositions.isEmpty()) {
                     onLevelUpdates(wavefront.updatedPositions);
                     wavefront.updatedPositions.clear();
                 }
@@ -199,8 +192,6 @@ public abstract class LeafsTicketPropagator {
             updateQueue.remove(node);
             onSectionDrained();
         }
-
-        return updated;
     }
 
     private void applyQueuedSources(Section section, Wavefront wavefront) {

@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConcurrentChunkTableTest {
@@ -55,10 +56,19 @@ class ConcurrentChunkTableTest {
         assertEquals(1, table.size());
         assertEquals(1, table.values().size());
         assertTrue(table.values().contains(holder));
-        assertTrue(table.keySet().contains(key));
         assertEquals(1, table.long2ObjectEntrySet().size());
         assertSame(holder, table.remove(key));
         assertTrue(table.isEmpty());
+    }
+
+    /** The superclass storage is empty, so an undelegated surface must fail instead of answering from it. */
+    @Test
+    void unsupportedSurfacesThrowInsteadOfAnsweringEmpty() {
+        ConcurrentChunkTable table = new ConcurrentChunkTable();
+        table.put(ChunkPos.pack(1, 1), holder(1, 1));
+
+        assertThrows(UnsupportedOperationException.class, table::keySet);
+        assertThrows(UnsupportedOperationException.class, () -> table.long2ObjectEntrySet().first());
     }
 
     /** The promotion step became this flag: it must report each holder churn exactly once. */

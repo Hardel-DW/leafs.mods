@@ -23,10 +23,6 @@ public final class RegionTickHandle extends TickHandle {
         this.regions = regions;
     }
 
-    public Region<RegionTickData> region() {
-        return region;
-    }
-
     public int chunkCount() {
         return chunkCensus;
     }
