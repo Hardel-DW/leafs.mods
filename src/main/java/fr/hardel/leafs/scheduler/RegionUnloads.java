@@ -31,19 +31,15 @@ public final class RegionUnloads<R extends RegionTaskHost> {
     }
 
     /** The budget bounds a merge wave's backlog to the tick; leftovers run next tick. */
-    public int drain(Region<R> region) {
+    public void drain(Region<R> region) {
         RegionTaskQueues queues = region.data().unloadQueues();
-        int executed = 0;
-        while (executed < DRAIN_BUDGET_PER_TICK) {
+        for (int executed = 0; executed < DRAIN_BUDGET_PER_TICK; executed++) {
             QueuedTask task = queues.poll();
             if (task == null) {
-                break;
+                return;
             }
 
-            executed++;
             task.action().run();
         }
-
-        return executed;
     }
 }

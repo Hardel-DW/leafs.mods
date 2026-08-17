@@ -6,7 +6,7 @@ import fr.hardel.leafs.global.BarrierWindow;
 import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.global.LeafsGameRules;
 import fr.hardel.leafs.global.WindowPressure;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerFunctionManager;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,7 +37,7 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createBarrierWindow(CallbackInfo callbackInfo) {
-        leafs$barrierWindow = new BarrierWindow(((LeafsServerAccess) this).leafs$ticking().barrier());
+        leafs$barrierWindow = new BarrierWindow(TickingManager.of((MinecraftServer) (Object) this).barrier());
         leafs$windowPressure = new WindowPressure();
     }
     
@@ -48,7 +48,7 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
      */
     @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
     private void leafs$runBarrierWindow(CallbackInfo callbackInfo) {
-        ((LeafsServerAccess) this).leafs$ticking().globalScheduler().drain();
+        TickingManager.of((MinecraftServer) (Object) this).globalScheduler().drain();
         leafs$barrierWindow.runGlobalPhase();
     }
 

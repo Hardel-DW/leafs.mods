@@ -19,18 +19,14 @@ public final class RegionCrashWriter {
         this.directory = directory;
     }
 
-    public Path write(RegionCrashReport report, Throwable cause) {
+    public void write(RegionCrashReport report, Throwable cause) {
         String content = report.format(cause);
         Leafs.LOGGER.error("Region crash:\n{}", content);
         try {
             Files.createDirectories(directory);
-            Path file = uniqueFile();
-            Files.writeString(file, content);
-
-            return file;
+            Files.writeString(uniqueFile(), content);
         } catch (IOException exception) {
             Leafs.LOGGER.error("Unable to write the region crash report", exception);
-            return null;
         }
     }
 

@@ -17,14 +17,18 @@ public final class CommandBlockWindow {
     /**
      * The block can change before the window runs, so its state is re-read there, and only if its
      * chunk is still loaded: the window must never trigger a synchronous load.
-     */
+    * Skipped but rearmed exactly like vanilla's AUTO reschedule, so flipping the rule back on resumes every loop.
+    */
     public static boolean deferBlockTick(ServerLevel level, BlockPos pos, BlockState state) {
         BlockPos target = pos.immutable();
         CommandBlockEntity repeating = level.getBlockEntity(target) instanceof CommandBlockEntity commandBlock
             && commandBlock.getMode() == CommandBlockEntity.Mode.AUTO ? commandBlock : null;
 
         if (repeating != null && !level.getGameRules().get(LeafsGameRules.repeatingCommandBlocksWork)) {
-            skipButKeepArmed(level, target, state, repeating);
+            if (repeating.isPowered() || repeating.isAutomatic()) {
+                level.scheduleTick(target, state.getBlock(), 1);
+            }
+
             return true;
         }
 
@@ -46,13 +50,6 @@ public final class CommandBlockWindow {
         return deferred;
     }
 
-    /** Skips execution but mirrors vanilla's AUTO reschedule, so flipping the rule back on resumes every loop. */
-    private static void skipButKeepArmed(ServerLevel level, BlockPos pos, BlockState state, CommandBlockEntity commandBlock) {
-        if (commandBlock.isPowered() || commandBlock.isAutomatic()) {
-            level.scheduleTick(pos, state.getBlock(), 1);
-        }
-    }
-
     /** The minecart can be destroyed before the window runs. */
     public static boolean deferMinecartActivation(ServerLevel level, MinecartCommandBlock minecart, int x, int y, int z, boolean powered) {
         return defer(level, () -> {
@@ -63,7 +60,7 @@ public final class CommandBlockWindow {
     }
 
     private static boolean defer(ServerLevel level, Runnable execution) {
-        BarrierWindow window = ((GlobalServerAccess) level.getServer()).leafs$barrierWindow();
+        BarrierWindow window = BarrierWindow.of(level.getServer());
         if (window.isDraining()) {
             return false;
         }

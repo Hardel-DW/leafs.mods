@@ -13,6 +13,7 @@ import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
@@ -47,6 +48,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public LevelRegions(LeafsConfig config) {
         this.regionizer = new Regionizer<>(config.sectionShift(), config.regionMergeDistance(), config.regionBufferDistance(), this);
+    }
+
+    public static LevelRegions of(ServerLevel level) {
+        return ((ServerLevelRegionAccess) level).leafs$regions();
     }
 
     public Regionizer<RegionTickData> regionizer() {
@@ -168,11 +173,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
 
         deferredHandshakes = deferred;
-    }
-
-    /** Owner-thread census input: the chunks the regionizer believes this level holds. */
-    public int trackedChunks() {
-        return sumOverRegions(Region::chunkCount);
     }
 
     public int sections() {

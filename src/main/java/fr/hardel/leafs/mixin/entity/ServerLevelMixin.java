@@ -7,9 +7,9 @@ import fr.hardel.leafs.entity.ConcurrentInt2ObjectMap;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.ticking.LevelBindings;
 import fr.hardel.leafs.ticking.LevelOwnership;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.TickingBinding;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -63,7 +63,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.dragonParts = new ConcurrentInt2ObjectMap<>();
         this.players = new CopyOnWriteArrayList<>();
         this.leafs$entityLists = new LevelEntityLists();
-        this.leafs$entityTeleports = LevelBindings.entityTeleports((ServerLevel) (Object) this);
+        this.leafs$entityTeleports = new EntityTeleports((ServerLevel) (Object) this, new TickingBinding((ServerLevel) (Object) this));
     }
 
     /** Riding passengers are looked up in the owning unit's list; the vanilla list stays empty by routing. */
@@ -91,6 +91,6 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
     @Unique
     private LevelOwnership leafs$ownership() {
-        return ((ServerLevelRegionAccess) this).leafs$regions().ownership();
+        return LevelRegions.of((ServerLevel) (Object) this).ownership();
     }
 }

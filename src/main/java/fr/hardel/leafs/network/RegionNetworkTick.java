@@ -1,7 +1,7 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.global.GlobalServerAccess;
+import fr.hardel.leafs.global.BarrierWindow;
 import fr.hardel.leafs.ownership.RegionContext;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -88,7 +88,7 @@ public final class RegionNetworkTick {
         }
 
         MinecraftServer server = listener.player.level().getServer();
-        ((GlobalServerAccess) server).leafs$barrierWindow().enqueue(() -> {
+        BarrierWindow.of(server).enqueue(() -> {
             if (listener.connection.isConnected()) {
                 listener.handleClientCommand(packet);
             }

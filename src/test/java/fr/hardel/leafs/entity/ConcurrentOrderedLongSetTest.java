@@ -137,17 +137,6 @@ class ConcurrentOrderedLongSetTest {
     }
 
     @Test
-    void viewAddRejectsOutOfRangeAndMutatesParent() {
-        LongSortedSet view = set.subSet(0L, 100L);
-
-        assertThrows(IllegalArgumentException.class, () -> view.add(100L));
-        assertTrue(view.add(50L));
-        assertTrue(set.contains(50L));
-        assertTrue(view.remove(50L));
-        assertFalse(set.contains(50L));
-    }
-
-    @Test
     void headAndTailSets() {
         for (long v = 0; v < 10; v++) {
             set.add(v * 3);

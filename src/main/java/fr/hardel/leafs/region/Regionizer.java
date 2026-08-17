@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
+import java.util.function.IntSupplier;
 
 /**
  * Groups loaded chunks into independently tickable {@link Region}s, one per level. Non-empty sections
@@ -152,44 +153,35 @@ public final class Regionizer<R> {
     }
 
     int sectionCountOf(Region<R> region) {
-        if (writeLockOwner == Thread.currentThread()) {
-            return region.sectionKeys.size();
-        }
-
-        long stamp = lock.readLock();
-        try {
-            return region.sectionKeys.size();
-        } finally {
-            lock.unlockRead(stamp);
-        }
+        return readCount(() -> region.sectionKeys.size());
     }
 
     int deadSectionCountOf(Region<R> region) {
-        if (writeLockOwner == Thread.currentThread()) {
-            return region.deadSectionKeys.size();
-        }
-
-        long stamp = lock.readLock();
-        try {
-            return region.deadSectionKeys.size();
-        } finally {
-            lock.unlockRead(stamp);
-        }
+        return readCount(() -> region.deadSectionKeys.size());
     }
 
     int chunkCountOf(Region<R> region) {
+        return readCount(() -> sumChunkCounts(region));
+    }
+
+    /** The bypass is what lets a callback read a count: taking the read lock while owning the write lock deadlocks a {@link StampedLock}. */
+    private int readCount(IntSupplier count) {
         if (writeLockOwner == Thread.currentThread()) {
-            return sumChunkCounts(region);
+            return count.getAsInt();
         }
 
         long stamp = lock.readLock();
         try {
-            return sumChunkCounts(region);
+            return count.getAsInt();
         } finally {
             lock.unlockRead(stamp);
         }
     }
 
+    /**
+     * The section becomes non-empty before the buffer ring is walked, so a buffer section created here
+     * already counts it and only the pre-existing ones need an increment.
+     */
     private void addChunkToEmptySection(int chunkX, int chunkZ, long key) {
         RegionSection<R> section = sections.get(key);
         List<RegionSection<R>> created = new ArrayList<>();
@@ -197,6 +189,9 @@ public final class Regionizer<R> {
             section = createSection(key);
             created.add(section);
         }
+
+        section.addChunk(chunkX, chunkZ);
+        reviveIfDead(section);
 
         int sectionX = CoordinateKey.x(key);
         int sectionZ = CoordinateKey.z(key);
@@ -207,25 +202,15 @@ public final class Regionizer<R> {
                 }
 
                 long neighbourKey = CoordinateKey.pack(sectionX + dx, sectionZ + dz);
-                if (sections.get(neighbourKey) == null) {
+                RegionSection<R> neighbour = sections.get(neighbourKey);
+                if (neighbour == null) {
                     created.add(createSection(neighbourKey));
+                } else {
+                    neighbour.gainedNonEmptyNeighbour();
+                    reviveIfDead(neighbour);
                 }
             }
         }
-
-        section.addChunk(chunkX, chunkZ);
-        for (int dx = -bufferRadius; dx <= bufferRadius; dx++) {
-            for (int dz = -bufferRadius; dz <= bufferRadius; dz++) {
-                if (dx == 0 && dz == 0) {
-                    continue;
-                }
-
-                RegionSection<R> neighbour = sections.get(CoordinateKey.pack(sectionX + dx, sectionZ + dz));
-                neighbour.gainedNonEmptyNeighbour();
-                reviveIfDead(neighbour);
-            }
-        }
-        reviveIfDead(section);
 
         Collection<Region<R>> nearby = collectNearbyRegions(sectionX, sectionZ);
         Region<R> target = null;
@@ -253,7 +238,7 @@ public final class Regionizer<R> {
     private void removeLastChunkOfSection(int chunkX, int chunkZ, RegionSection<R> section) {
         section.removeChunk(chunkX, chunkZ);
         if (!section.isEmpty()) {
-            throw new IllegalStateException("Section " + CoordinateKey.x(section.key()) + ", " + CoordinateKey.z(section.key()) + " was mutated concurrently during removal");
+            throw new IllegalStateException("Section " + CoordinateKey.describe(section.key()) + " was mutated concurrently during removal");
         }
 
         int sectionX = CoordinateKey.x(section.key());
@@ -266,7 +251,7 @@ public final class Regionizer<R> {
 
                 RegionSection<R> neighbour = sections.get(CoordinateKey.pack(sectionX + dx, sectionZ + dz));
                 if (neighbour == null) {
-                    throw new IllegalStateException("Buffer section missing around non-empty section [" + sectionX + ", " + sectionZ + "]");
+                    throw new IllegalStateException("Buffer section missing around non-empty section " + CoordinateKey.describe(section.key()));
                 }
 
                 neighbour.lostNonEmptyNeighbour();
@@ -429,7 +414,7 @@ public final class Regionizer<R> {
             long key = iterator.nextLong();
             RegionSection<R> removed = sections.remove(key);
             if (removed == null || !removed.isEmpty() || removed.nonEmptyNeighbours() > 0) {
-                throw new IllegalStateException("Section " + CoordinateKey.x(key) + ", " + CoordinateKey.z(key) + " was marked dead but is still alive");
+                throw new IllegalStateException("Section " + CoordinateKey.describe(key) + " was marked dead but is still alive");
             }
 
             removed.clearRegion();
@@ -483,7 +468,6 @@ public final class Regionizer<R> {
     }
 
     private RegionSection<R> createSection(long key) {
-        RegionSection<R> section = new RegionSection<>(key, sectionShift);
         int sectionX = CoordinateKey.x(key);
         int sectionZ = CoordinateKey.z(key);
         int nonEmptyNeighbours = 0;
@@ -499,7 +483,8 @@ public final class Regionizer<R> {
                 }
             }
         }
-        section.initialiseNonEmptyNeighbours(nonEmptyNeighbours);
+
+        RegionSection<R> section = new RegionSection<>(key, sectionShift, nonEmptyNeighbours);
         sections.put(key, section);
 
         return section;
@@ -539,7 +524,7 @@ public final class Regionizer<R> {
 
         Region<R> owner = section.region();
         if (owner == null) {
-            throw new IllegalStateException("Section " + CoordinateKey.x(section.key()) + ", " + CoordinateKey.z(section.key()) + " has no owning region");
+            throw new IllegalStateException("Section " + CoordinateKey.describe(section.key()) + " has no owning region");
         }
 
         owner.deadSectionKeys.add(section.key());

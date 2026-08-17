@@ -5,7 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
-import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
@@ -145,7 +145,7 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
                 return;
             }
 
-            ((LeafsServerAccess) owner.getServer()).leafs$ticking().submitToLevel(owner, () -> listener.update(key, level, onlyDecreased));
+            TickingManager.of(owner.getServer()).submitToLevel(owner, () -> listener.update(key, level, onlyDecreased));
         };
     }
 }

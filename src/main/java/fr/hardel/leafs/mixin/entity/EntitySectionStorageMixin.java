@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Facade swap #33 - justifications in Modules.md entity/. 42 is the SectionPos x-field shift: vanilla range queries never span two x values. */
+/** Concurrent section index. 42 is the SectionPos x-field shift: vanilla range queries never span two x values, so each one reads a single stripe. */
 @Mixin(EntitySectionStorage.class)
 public abstract class EntitySectionStorageMixin<T extends EntityAccess> {
 

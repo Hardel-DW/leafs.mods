@@ -7,9 +7,8 @@ import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
-import fr.hardel.leafs.ticking.LevelBindings;
 import fr.hardel.leafs.ticking.LevelOwnership;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.LevelRegions;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
@@ -63,7 +62,7 @@ public abstract class ServerChunkCacheMixin {
     private void leafs$regionGetChunkPath(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
         if (leafs$degradedReadPath()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.presentChunkOrThrow(self.chunkMap, x, z, targetStatus, loadOrGenerate, LevelBindings.chunkDemand(self, x, z, targetStatus)));
+            callbackInfo.setReturnValue(RegionChunkAccess.presentChunkOrThrow(self.chunkMap, x, z, targetStatus, loadOrGenerate));
         }
     }
 
@@ -87,7 +86,7 @@ public abstract class ServerChunkCacheMixin {
             return false;
         }
 
-        LevelOwnership ownership = ((ServerLevelRegionAccess) this.level).leafs$regions().ownership();
+        LevelOwnership ownership = LevelRegions.of(this.level).ownership();
 
         return ownership.isRegionTickHeldByCurrentThread();
     }

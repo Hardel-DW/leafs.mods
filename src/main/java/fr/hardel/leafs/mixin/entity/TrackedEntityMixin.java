@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Facade swap #37 (seenBy) - justifications in Modules.md entity/. */
+/** The watcher set is written by the tracking pass of every region that owns one of the watchers. */
 @Mixin(targets = "net.minecraft.server.level.ChunkMap$TrackedEntity")
 public abstract class TrackedEntityMixin {
 

@@ -125,23 +125,16 @@ public final class RegionTickBody {
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(region, chunkMap, spawnLevels, spawningChunks, randomTickingChunks);
-        List<MobCategory> spawningCategories = List.of();
-        NaturalSpawner.SpawnState spawnState = null;
-        if (!spawningChunks.isEmpty()) {
-            spawnState = NaturalSpawner.createState(spawnableChunks, collectRegionEntities(region), (chunkKey, output) -> {
-                ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
-                if (holder != null) {
-                    holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
-                }
-            }, new LocalMobCapCalculator(chunkMap));
-            if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
-                spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnState, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
+        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, collectRegionEntities(region), (chunkKey, output) -> {
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
+            if (holder != null) {
+                holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
             }
-        }
-
+        }, new LocalMobCapCalculator(chunkMap));
+        List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
+            ? List.of()
+            : NaturalSpawner.getFilteredSpawningCategories(state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
         Util.shuffle(spawningChunks, level.getRandom());
-        NaturalSpawner.SpawnState state = spawnState;
-        List<MobCategory> categories = spawningCategories;
         for (LevelChunk chunk : spawningChunks) {
             ChunkPos chunkPos = chunk.getPos();
             chunk.incrementInhabitedTime(timeDiff);

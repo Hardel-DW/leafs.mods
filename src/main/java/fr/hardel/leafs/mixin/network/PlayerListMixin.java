@@ -8,7 +8,7 @@ import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.network.PlayerListFileAccess;
 import fr.hardel.leafs.network.PlayerTeardown;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.LevelRegions;
 import net.minecraft.network.Connection;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.server.MinecraftServer;
@@ -115,7 +115,7 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
     @WrapMethod(method = "save")
     private void leafs$savePlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
         if (player.level() instanceof ServerLevel level) {
-            ((ServerLevelRegionAccess) level).leafs$regions().ownership().runExclusive(() -> original.call(player));
+            LevelRegions.of(level).ownership().runExclusive(() -> original.call(player));
         } else {
             original.call(player);
         }

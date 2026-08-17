@@ -17,4 +17,8 @@ public final class CoordinateKey {
     public static int z(long key) {
         return (int) (key >>> 32);
     }
+
+    public static String describe(long key) {
+        return "[" + x(key) + ", " + z(key) + "]";
+    }
 }

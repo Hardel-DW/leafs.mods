@@ -2,6 +2,7 @@ package fr.hardel.leafs.global;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.ticking.TickBarrier;
+import net.minecraft.server.MinecraftServer;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -13,6 +14,10 @@ public final class BarrierWindow {
 
     public BarrierWindow(TickBarrier barrier) {
         this.barrier = barrier;
+    }
+
+    public static BarrierWindow of(MinecraftServer server) {
+        return ((GlobalServerAccess) server).leafs$barrierWindow();
     }
 
     public void enqueue(Runnable task) {
