@@ -44,7 +44,7 @@ public final class RegionsCommand {
         double serverTps = units.isEmpty() ? 0 : units.getFirst().timings().sample(now).tps();
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("Leafs ").withStyle(ChatFormatting.GREEN))
-            .append(gray(LeafsConfig.get().effectiveThreads() + " workers, server thread "))
+            .append(gray("%d workers, server thread ".formatted(LeafsConfig.get().effectiveThreads())))
             .append(tps(serverTps)), false);
 
         for (LevelTickUnit unit : units) {
@@ -61,11 +61,11 @@ public final class RegionsCommand {
         List<Region<RegionTickData>> live = liveRegions(unit.regions());
         MutableComponent line = Component.empty()
             .append(Component.literal(shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
-            .append(gray("  regions ")).append(white(live.size()))
-            .append(gray("  chunks ")).append(white(unit.chunkCount()))
-            .append(gray("  view ")).append(white(unit.viewChunks()))
-            .append(gray("  entities ")).append(white(unit.entityCount()))
-            .append(gray("  serial ")).append(rate(unit.timings().sample(now)));
+            .append(stat("regions", live.size()))
+            .append(stat("chunks", unit.chunkCount()))
+            .append(stat("view", unit.viewChunks()))
+            .append(stat("entities", unit.entityCount()))
+            .append(stat("serial", rate(unit.timings().sample(now))));
 
         RegionTickHandle slowest = null;
         double slowestTps = Double.MAX_VALUE;
@@ -81,7 +81,7 @@ public final class RegionsCommand {
         }
 
         if (slowest != null) {
-            line.append(gray("  slowest ")).append(white("R#" + slowest.id() + " ")).append(tps(slowestTps));
+            line.append(stat("slowest", white("R#" + slowest.id()))).append(sep()).append(tps(slowestTps));
         }
 
         return line;
@@ -93,12 +93,12 @@ public final class RegionsCommand {
         long now = System.nanoTime();
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal(shortDimension(level.dimension().identifier().toString())).withStyle(ChatFormatting.AQUA))
-            .append(gray("  regions ")).append(white(live.size()))
-            .append(gray("  sections ")).append(white(regions.sections())).append(gray(" (" + regions.deadSections() + " dead)"))
-            .append(gray("  created ")).append(white(regions.created()))
-            .append(gray("  merged ")).append(white(regions.merged()))
-            .append(gray("  split ")).append(white(regions.split()))
-            .append(gray("  deferred ")).append(white(regions.deferredHandshakes())), false);
+            .append(stat("regions", live.size()))
+            .append(stat("sections", regions.sections())).append(gray(" (%d dead)".formatted(regions.deadSections())))
+            .append(stat("created", regions.created()))
+            .append(stat("merged", regions.merged()))
+            .append(stat("split", regions.split()))
+            .append(stat("deferred", regions.deferredHandshakes())), false);
 
         ServerPlayer player = source.getPlayer();
         Region<RegionTickData> playerRegion = player == null || player.level() != level ? null
@@ -107,18 +107,18 @@ public final class RegionsCommand {
         for (Region<RegionTickData> region : live) {
             RegionTickHandle handle = region.data().handle();
             MutableComponent line = Component.empty()
-                .append(white(" R#" + region.id() + " "))
-                .append(state(region.state()));
+                .append(sep()).append(white("R#" + region.id()))
+                .append(sep()).append(state(region.state()));
             if (handle != null && !handle.isCancelled()) {
-                line.append(gray("  ")).append(rate(handle.timings().sample(now)))
-                    .append(gray("  chunks ")).append(white(handle.chunkCount()))
-                    .append(gray("  entities ")).append(white(handle.entityCount()));
+                line.append(sep()).append(rate(handle.timings().sample(now)))
+                    .append(stat("chunks", handle.chunkCount()))
+                    .append(stat("entities", handle.entityCount()));
             } else {
-                line.append(gray("  chunks ")).append(white(region.chunkCount()));
+                line.append(stat("chunks", region.chunkCount()));
             }
 
             if (region == playerRegion) {
-                line.append(Component.literal("  <- you").withStyle(ChatFormatting.GOLD));
+                line.append(sep()).append(Component.literal("<- you").withStyle(ChatFormatting.GOLD));
             }
 
             source.sendSuccess(() -> line, false);
@@ -144,7 +144,7 @@ public final class RegionsCommand {
             .append(Component.literal("You ").withStyle(ChatFormatting.GOLD))
             .append(white("R#" + handle.id()))
             .append(gray(" in ")).append(Component.literal(shortDimension(handle.dimension())).withStyle(ChatFormatting.AQUA))
-            .append(gray("  ")).append(rate(handle.timings().sample(now))), false);
+            .append(sep()).append(rate(handle.timings().sample(now))), false);
     }
 
     private static List<LevelTickUnit> sortedUnits(CommandSourceStack source) {
@@ -170,7 +170,7 @@ public final class RegionsCommand {
 
     private static Component rate(TickTimings.Snapshot snapshot) {
         return Component.empty().append(tps(snapshot.tps()))
-            .append(gray("  avg ")).append(white(String.format(Locale.ROOT, "%.2fms", snapshot.msptAverage())));
+            .append(stat("avg", String.format(Locale.ROOT, "%.2fms", snapshot.msptAverage())));
     }
 
     private static Component tps(double value) {
@@ -188,6 +188,19 @@ public final class RegionsCommand {
         };
 
         return Component.literal(value.name()).withStyle(color);
+    }
+
+    /** The single home of the two-space column separator every line of the command uses. */
+    private static Component sep() {
+        return Component.literal(" ");
+    }
+
+    private static Component stat(String label, Object value) {
+        return stat(label, white(value));
+    }
+
+    private static Component stat(String label, Component value) {
+        return Component.empty().append(sep()).append(gray("%s ".formatted(label))).append(value);
     }
 
     private static Component gray(String text) {
