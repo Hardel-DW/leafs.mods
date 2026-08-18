@@ -1,5 +1,7 @@
 package fr.hardel.leafs.metrics;
 
+import fr.hardel.leafs.metrics.TickStages.TickStage;
+
 import java.util.Arrays;
 
 /**
@@ -33,7 +35,7 @@ public final class StageTimings {
             return;
         }
 
-        row[stage.ordinal()] += nowNanos - lastMarkNanos;
+        row[stage.index()] += nowNanos - lastMarkNanos;
         lastMarkNanos = nowNanos;
     }
 
@@ -44,6 +46,11 @@ public final class StageTimings {
 
     public int stageCount() {
         return ring[0].length;
+    }
+
+    /** Count of completed ticks; a sampler reads it as sample index to dedup rows it already saw. */
+    public int completedTicks() {
+        return cursor;
     }
 
     /** Average nanos per stage over the last completed ticks, capped to the window actually recorded. */

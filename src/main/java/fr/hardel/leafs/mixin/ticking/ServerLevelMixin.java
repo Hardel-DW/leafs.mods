@@ -1,7 +1,8 @@
 package fr.hardel.leafs.mixin.ticking;
 
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.TickStages.TickStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -32,31 +33,31 @@ public abstract class ServerLevelMixin implements ServerLevelRegionAccess {
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/border/WorldBorder;tick()V", shift = At.Shift.AFTER))
     private void leafs$markBorderStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$markSerial(SerialStage.BORDER);
+        leafs$markSerial(TickStages.serialBorder);
     }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;updateSkyBrightness()V", shift = At.Shift.AFTER))
     private void leafs$markWeatherStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$markSerial(SerialStage.WEATHER);
+        leafs$markSerial(TickStages.serialWeather);
     }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raids;tick(Lnet/minecraft/server/level/ServerLevel;)V"))
     private void leafs$markTimeStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$markSerial(SerialStage.TIME);
+        leafs$markSerial(TickStages.serialTime);
     }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raids;tick(Lnet/minecraft/server/level/ServerLevel;)V", shift = At.Shift.AFTER))
     private void leafs$markRaidsStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$markSerial(SerialStage.RAIDS);
+        leafs$markSerial(TickStages.serialRaids);
     }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/dimension/end/EnderDragonFight;tick()V", shift = At.Shift.AFTER))
     private void leafs$markDragonStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$markSerial(SerialStage.DRAGON);
+        leafs$markSerial(TickStages.serialDragon);
     }
 
     @Unique
-    private void leafs$markSerial(SerialStage stage) {
+    private void leafs$markSerial(TickStage stage) {
         ServerLevel level = (ServerLevel) (Object) this;
         TickingManager.of(level.getServer()).markSerial(level, stage);
     }

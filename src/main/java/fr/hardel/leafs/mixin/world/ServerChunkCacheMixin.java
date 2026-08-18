@@ -5,7 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.scheduler.DeferredTransports;
@@ -80,17 +80,17 @@ public abstract class ServerChunkCacheMixin {
         }
 
         body.tickSerialRemainder(this.spawnEnemies);
-        TickingManager.of(this.level.getServer()).markSerial(this.level, SerialStage.VIEW);
+        TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialView);
     }
 
     @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z", shift = At.Shift.AFTER))
     private void leafs$markPurgeStage(CallbackInfo callbackInfo) {
-        TickingManager.of(this.level.getServer()).markSerial(this.level, SerialStage.PURGE);
+        TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialPurge);
     }
 
     @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;tick(Ljava/util/function/BooleanSupplier;)V", shift = At.Shift.AFTER))
     private void leafs$markUnloadsStage(CallbackInfo callbackInfo) {
-        TickingManager.of(this.level.getServer()).markSerial(this.level, SerialStage.UNLOADS);
+        TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialUnloads);
     }
 
     @WrapOperation(method = {"blockChanged", "onChunkReadyToSend"}, at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))

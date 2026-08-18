@@ -8,7 +8,8 @@ import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.entity.ServerEntityAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.TickStages.TickFamily;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
@@ -53,7 +54,7 @@ public final class LevelTickUnit extends TickHandle {
     private volatile int lastViewChunks;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, SerialWorkBudget serialBudget) {
-        super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), SerialStage.values().length);
+        super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
@@ -151,9 +152,9 @@ public final class LevelTickUnit extends TickHandle {
             StageTimings stages = stages();
             stages.beginTick(System.nanoTime());
             runQueuedTasks();
-            stages.mark(SerialStage.TASKS);
+            stages.mark(TickStages.serialTasks);
             ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickOwned(level);
-            stages.mark(SerialStage.SCHEDULERS);
+            stages.mark(TickStages.serialSchedulers);
             work.run();
 
             if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
@@ -161,7 +162,7 @@ public final class LevelTickUnit extends TickHandle {
                 lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
             }
 
-            stages.mark(SerialStage.MANAGEMENT);
+            stages.mark(TickStages.serialManagement);
             stages.endTick();
         } finally {
             WorldTickContext.exit();

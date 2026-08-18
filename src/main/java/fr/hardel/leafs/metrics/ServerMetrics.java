@@ -1,10 +1,12 @@
 package fr.hardel.leafs.metrics;
 
+import fr.hardel.leafs.metrics.TickStages.TickFamily;
+
 /** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
     private final BarrierStats barrier = new BarrierStats();
     private final DeferStats deferStats = new DeferStats();
-    private final StageTimings globalStages = new StageTimings(GlobalStage.values().length);
+    private final StageTimings globalStages = new StageTimings(TickStages.count(TickFamily.GLOBAL));
     private final MinuteCounter packetsIn = new MinuteCounter();
     private final MinuteCounter packetsOut = new MinuteCounter();
     private final MinuteCounter chunkLoads = new MinuteCounter();
