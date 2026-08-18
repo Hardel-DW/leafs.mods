@@ -31,7 +31,7 @@ public final class RoutingScheduledTicks<T> extends LevelTicks<T> {
     public RoutingScheduledTicks(LongPredicate tickCheck, RegionScheduledTicks<T> attached) {
         super(tickCheck);
         this.attached = attached;
-        this.resolver = chunkKey -> attached;
+        this.resolver = _ -> attached;
         this.counter = attached::count;
     }
 
@@ -56,34 +56,34 @@ public final class RoutingScheduledTicks<T> extends LevelTicks<T> {
     }
 
     @Override
-    public void tick(long currentTick, int maxTicksToProcess, BiConsumer<BlockPos, T> output) {
+    public void tick(long currentTick, int maxTicksToProcess, @NonNull BiConsumer<BlockPos, T> output) {
         attached.tick(currentTick, maxTicksToProcess, output);
     }
 
     @Override
-    public boolean hasScheduledTick(BlockPos pos, T type) {
+    public boolean hasScheduledTick(@NonNull BlockPos pos, @NonNull T type) {
         return resolver.apply(ChunkPos.pack(pos)).hasScheduledTick(pos, type);
     }
 
     @Override
-    public boolean willTickThisTick(BlockPos pos, T type) {
+    public boolean willTickThisTick(@NonNull BlockPos pos, @NonNull T type) {
         return resolver.apply(ChunkPos.pack(pos)).willTickThisTick(pos, type);
     }
 
     @Override
-    public void clearArea(BoundingBox area) {
+    public void clearArea(@NonNull BoundingBox area) {
         for (RegionScheduledTicks<T> index : indexesIn(area)) {
             index.clearArea(area);
         }
     }
 
     @Override
-    public void copyArea(BoundingBox area, Vec3i offset) {
+    public void copyArea(@NonNull BoundingBox area, @NonNull Vec3i offset) {
         attached.copyArea(area, offset);
     }
 
     @Override
-    public void copyAreaFrom(LevelTicks<T> source, BoundingBox area, Vec3i offset) {
+    public void copyAreaFrom(@NonNull LevelTicks<T> source, @NonNull BoundingBox area, @NonNull Vec3i offset) {
         attached.copyAreaFrom(source instanceof RoutingScheduledTicks<T> routing ? routing.attached : source, area, offset);
     }
 
@@ -98,6 +98,7 @@ public final class RoutingScheduledTicks<T> extends LevelTicks<T> {
         int maxX = SectionPos.posToSectionCoord(area.maxX());
         int minZ = SectionPos.posToSectionCoord(area.minZ());
         int maxZ = SectionPos.posToSectionCoord(area.maxZ());
+        
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 indexes.add(resolver.apply(ChunkPos.pack(x, z)));

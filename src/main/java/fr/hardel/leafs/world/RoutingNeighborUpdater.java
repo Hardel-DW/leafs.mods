@@ -7,13 +7,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
 import net.minecraft.world.level.redstone.Orientation;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
 
 /**
- * {@code Level.neighborUpdater} swap: the collector is a reentrancy stack of the current execution,
- * so it resolves by tick context, never by position. Off-tick callers keep the level instance.
+ * {@code Level.neighborUpdater} swap: the collector is a reentrancy stack of the current execution, so it resolves by tick context, never by position. Off-tick callers keep the level instance.
  */
 public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
     private final Level level;
@@ -31,27 +31,26 @@ public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
 
     private CollectingNeighborUpdater resolve() {
         RegionWorldData data = WorldTickContext.activeFor(level);
-
         return data == null ? fallback : data.neighborUpdater();
     }
 
     @Override
-    public void shapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit) {
+    public void shapeUpdate(@NonNull Direction direction, @NonNull BlockState neighborState, @NonNull BlockPos pos, @NonNull BlockPos neighborPos, int updateFlags, int updateLimit) {
         resolve().shapeUpdate(direction, neighborState, pos, neighborPos, updateFlags, updateLimit);
     }
 
     @Override
-    public void neighborChanged(BlockPos pos, Block block, @Nullable Orientation orientation) {
+    public void neighborChanged(@NonNull BlockPos pos, @NonNull Block block, @Nullable Orientation orientation) {
         resolve().neighborChanged(pos, block, orientation);
     }
 
     @Override
-    public void neighborChanged(BlockState state, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston) {
+    public void neighborChanged(@NonNull BlockState state, @NonNull BlockPos pos, @NonNull Block block, @Nullable Orientation orientation, boolean movedByPiston) {
         resolve().neighborChanged(state, pos, block, orientation, movedByPiston);
     }
 
     @Override
-    public void updateNeighborsAtExceptFromFacing(BlockPos pos, Block block, @Nullable Direction skipDirection, @Nullable Orientation orientation) {
+    public void updateNeighborsAtExceptFromFacing(@NonNull BlockPos pos, @NonNull Block block, @Nullable Direction skipDirection, @Nullable Orientation orientation) {
         resolve().updateNeighborsAtExceptFromFacing(pos, block, skipDirection, orientation);
     }
 

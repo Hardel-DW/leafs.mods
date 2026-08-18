@@ -2,6 +2,7 @@ package fr.hardel.leafs.world;
 
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import org.jspecify.annotations.NonNull;
 
 /** Swapped into the level's random field: resolves per call to the ticking unit's random, vanilla otherwise. */
 public final class RoutingRandomSource implements RandomSource {
@@ -19,12 +20,11 @@ public final class RoutingRandomSource implements RandomSource {
 
     private RandomSource resolve() {
         RegionWorldData data = WorldTickContext.activeFor(scope);
-
         return data == null ? vanilla : data.random();
     }
 
     @Override
-    public RandomSource fork() {
+    public @NonNull RandomSource fork() {
         return resolve().fork();
     }
 

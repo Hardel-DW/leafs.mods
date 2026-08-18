@@ -1,6 +1,6 @@
 package fr.hardel.leafs.mixin.entity;
 
-import fr.hardel.leafs.entity.ConcurrentInt2ObjectMap;
+import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ChunkMap;
 import org.spongepowered.asm.mixin.Final;

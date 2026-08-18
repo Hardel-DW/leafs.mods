@@ -73,9 +73,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
      * only then are the handles scheduled, so no region can tick against a half-migrated level.
      */
     public void activate(String dimension, RegionTickScheduler scheduler, SharedChunkHolds holds, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
-        if (this.scheduler != null) {
+        if (this.scheduler != null)
             return;
-        }
 
         this.dimension = dimension;
         this.holds = holds;
@@ -83,11 +82,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         this.taskScheduler = taskScheduler;
         this.worldDataFactory = worldDataFactory;
         this.body = body;
-        for (Region<RegionTickData> region : regionizer.regionsView()) {
-            if (region.data().worldData() == null) {
+
+        for (Region<RegionTickData> region : regionizer.regionsView())
+            if (region.data().worldData() == null)
                 region.data().attachWorldData(worldDataFactory.get());
-            }
-        }
 
         beforeScheduling.run();
         this.scheduler = scheduler;
@@ -208,6 +206,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         if (factory != null) {
             data.attachWorldData(factory.get());
         }
+
         if (scheduler != null) {
             data.attachHandle(new RegionTickHandle(region, dimension, this));
         }
@@ -270,31 +269,31 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
         parent.data().taskQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
-
             return child == null ? null : child.data().taskQueues();
         });
+
         parent.data().unloadQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
-
             return child == null ? null : child.data().unloadQueues();
         });
+
         RegionWorldData parentWorld = parent.data().worldData();
         if (parentWorld != null) {
             for (Region<RegionTickData> child : children) {
                 child.data().worldData().inheritTimeFrom(parentWorld);
             }
+
             parentWorld.splitInto(regionizer.sectionShift(), sectionKey -> {
                 Region<RegionTickData> child = sectionToChild.get(sectionKey);
-
                 return child == null ? null : child.data().worldData();
             });
         }
 
         parent.data().entityData().splitInto(regionizer.sectionShift(), sectionKey -> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
-
             return child == null ? null : child.data().entityData();
         });
+
         split++;
     }
 
@@ -327,7 +326,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
 
         feedFailure = null;
-
         throw new IllegalStateException("Region feed failed earlier on this level", failure);
     }
 }

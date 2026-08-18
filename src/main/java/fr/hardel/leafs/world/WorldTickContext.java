@@ -26,14 +26,12 @@ public final class WorldTickContext {
 
     public static RegionWorldData activeFor(Object scope) {
         WorldTickContext context = CURRENT.get();
-
         return context != null && context.scope == scope ? context.worldData : null;
     }
 
     /** Identity is scope enough here: an entity payload belongs to exactly one unit of one level. */
     public static boolean ownsEntityData(RegionEntityData entityData) {
         WorldTickContext context = CURRENT.get();
-
         return context != null && context.entityData == entityData;
     }
 }

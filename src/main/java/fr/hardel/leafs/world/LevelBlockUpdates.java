@@ -35,6 +35,7 @@ public final class LevelBlockUpdates {
                 navigationsToUpdate.add(navigation);
             }
         });
+        
         for (PathNavigation navigation : navigationsToUpdate) {
             navigation.recomputePath();
         }

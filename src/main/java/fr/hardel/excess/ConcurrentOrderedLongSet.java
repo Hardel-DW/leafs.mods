@@ -1,10 +1,11 @@
-package fr.hardel.leafs.entity;
+package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLongSortedSet;
 import it.unimi.dsi.fastutil.longs.LongBidirectionalIterator;
 import it.unimi.dsi.fastutil.longs.LongComparator;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
 import java.util.NoSuchElementException;
@@ -103,7 +104,7 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     }
 
     @Override
-    public LongBidirectionalIterator iterator() {
+    public @NonNull LongBidirectionalIterator iterator() {
         return snapshot(false, 0L, false, 0L).iterator();
     }
 
@@ -225,7 +226,7 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
         }
 
         @Override
-        public LongBidirectionalIterator iterator() {
+        public @NonNull LongBidirectionalIterator iterator() {
             return new SnapshotIterator(owner, elements, lower, upper, lower);
         }
 

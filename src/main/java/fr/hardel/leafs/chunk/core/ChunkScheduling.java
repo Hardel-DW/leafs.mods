@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.leafs.chunk.propagator.AreaLock;
 import fr.hardel.leafs.chunk.propagator.LeafsTicketPropagator;
+import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.scheduler.RegionScheduler;
@@ -30,11 +31,8 @@ import java.util.function.Supplier;
  * level exclusion or the tick barrier owns every position, because no region ticks under either.
  */
 public final class ChunkScheduling {
-
-    /** Promotions reach ticket radius 8 through task creation plus a range-2 neighbour request. */
     private static final int SCHEDULING_MARGIN = ChunkLevel.MAX_LEVEL - 33 + 2;
     private static final int UNLOADED = ChunkLevel.MAX_LEVEL + 1;
-
     private final ChunkMap chunkMap;
     private final DistanceManager distanceManager;
     private final LevelRegions regions;
@@ -224,25 +222,32 @@ public final class ChunkScheduling {
     }
 
     /**
-     * Exclusion or barrier held means no region ticks anywhere on this level. Before activation and
-     * after the pool halts, no region ticks either, so the server thread owns every position: that is
-     * what keeps the spawn preparation and the final save from waiting on regions that never run.
+     * Exclusion or barrier held means no region ticks anywhere on this level. The server thread is a
+     * universal owner unconditionally: every legitimate vanilla sync load runs there, between level
+     * ticks included. The accepted residual, documented in Fonctionnement, is that server-thread work
+     * outside the exclusion can still read a chunk a region owns; the contract's new coverage is
+     * every other thread.
      */
-    private boolean isUniversalOwner() {
+    public boolean isUniversalOwner() {
         if (regions.ownership().isLevelSerialHeldByCurrentThread() || ticking.barrier().isHeldByCurrentThread()) {
             return true;
         }
 
-        return (regions.taskScheduler() == null || ticking.halted()) && chunkMap.level.getServer().isSameThread();
+        return chunkMap.level.getServer().isSameThread();
+    }
+
+    /** The refusal counters of this level's server; the chunk contract counts here at every throw. */
+    public DeferStats deferStats() {
+        return ticking.metrics().deferStats();
     }
 
     /** Strict region ownership, dimension included: region ids repeat across dimensions and would otherwise collide. */
     public boolean currentRegionOwns(int chunkX, int chunkZ) {
-        if (!(RegionContext.current() instanceof RegionContext.Region context) || !context.dimension().equals(regions.dimensionName())) {
+        if (!(RegionContext.current() instanceof RegionContext.Region(long id, String dimension)) || !dimension.equals(regions.dimensionName())) {
             return false;
         }
 
         Region<RegionTickData> owner = regions.regionizer().regionAtUnsynchronised(chunkX, chunkZ);
-        return owner != null && owner.id() == context.id();
+        return owner != null && owner.id() == id;
     }
 }

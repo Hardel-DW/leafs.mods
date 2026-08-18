@@ -1,7 +1,10 @@
 package fr.hardel.leafs.world;
 
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.level.BlockEventData;
@@ -257,5 +260,37 @@ class RegionWorldDataTest {
         public String getType() {
             return sleeping ? "<sleeping>" : "leafs:fake";
         }
+    }
+
+    /** A refused scheduled tick re-queues one tick later, so it never re-runs inside the drain that refused it. */
+    @Test
+    void aRequeuedBlockTickFiresOnTheNextClockTickOnly() {
+        bootstrapVanilla();
+        RegionWorldData data = worldData(100);
+        data.blockTicks().addContainer(new ChunkPos(0, 0), new LevelChunkTicks<>());
+        BlockPos pos = new BlockPos(3, 64, 3);
+        List<BlockPos> drained = new ArrayList<>();
+
+        data.requeueBlockTick(pos, Blocks.STONE);
+        data.drainBlockTicks((tickedPos, block) -> drained.add(tickedPos));
+        assertTrue(drained.isEmpty(), "clock 100 must not fire a tick queued for 101");
+
+        data.clock().advance(1);
+        data.drainBlockTicks((tickedPos, block) -> drained.add(tickedPos));
+        assertEquals(List.of(pos), drained);
+    }
+
+    /** A re-queue into a chunk whose container is gone drops with vanilla's log, never a throw. */
+    @Test
+    void aRequeueIntoAnUnloadedChunkDropsWithoutThrowing() {
+        bootstrapVanilla();
+        RegionWorldData data = worldData(100);
+
+        data.requeueBlockTick(new BlockPos(500, 64, 500), Blocks.STONE);
+    }
+
+    private static void bootstrapVanilla() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
     }
 }

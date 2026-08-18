@@ -157,11 +157,6 @@ public final class TickingManager {
         scheduler.setPeriodNanos(periodNanos);
     }
 
-    /** True once the pool is stopping: late removals fall back to the inline path instead of queueing to dead regions. */
-    public boolean halted() {
-        return halted;
-    }
-
     /** Queued region tasks run inline, looped because a draining task can queue a follow-up on another level (cross-dimension teleport). */
     private void drainRegionTasks() {
         int drained;

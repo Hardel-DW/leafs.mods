@@ -27,8 +27,7 @@ import java.util.function.Supplier;
 public abstract class ChunkStatusTasksMixin {
 
     @WrapOperation(method = "full", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
-    private static CompletableFuture<Object> leafs$fullOnTheOwner(Supplier<Object> body, Executor pump, Operation<CompletableFuture<Object>> original,
-                                                                  @Local(argsOnly = true) WorldGenContext context, @Local(argsOnly = true) ChunkAccess chunk) {
+    private static CompletableFuture<Object> leafs$fullOnTheOwner(Supplier<Object> body, Executor pump, Operation<CompletableFuture<Object>> original, @Local(argsOnly = true) WorldGenContext context, @Local(argsOnly = true) ChunkAccess chunk) {
         ChunkPos pos = chunk.getPos();
         ChunkScheduling scheduling = ((PropagatorAccess) context.level().getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
         Supplier<Object> excluded = () -> scheduling.exclusion().supplyExcluded(pos, GenerationExclusion.FULL_STEP_RADIUS, body);

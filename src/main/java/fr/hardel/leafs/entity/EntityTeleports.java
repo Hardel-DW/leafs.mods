@@ -1,8 +1,8 @@
 package fr.hardel.leafs.entity;
 
-import fr.hardel.leafs.chunk.DegradedChunkReads;
-import fr.hardel.leafs.ownership.OwnershipViolationException;
-import fr.hardel.leafs.scheduler.SharedChunkHolds;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.scheduler.DeferredTransports;
+import fr.hardel.leafs.scheduler.DeferredWork;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,34 +19,19 @@ import java.util.List;
 /** Routes teleports a region worker may not run in place: serial for same-level out-of-region, pipeline for cross-dimension. */
 public final class EntityTeleports {
 
-    /** Wiring to the ticking surfaces of this level, provided at construction so this module stays free of ticking/ types. */
-    public interface LevelBinding {
-
-        SharedChunkHolds holds();
-
-        boolean currentRegionOwns(int chunkX, int chunkZ);
-
-        void submitSerial(Runnable task);
-
-        /** The barrier window: all regions paused, full world access, for work whose reach is not known in advance. */
-        void submitWindow(Runnable task);
-
-        void submitPlacement(int chunkX, int chunkZ, Runnable placement);
-    }
+    private static final int PORTAL_SEARCH_WINDOW_BUDGET = 100;
 
     private record TeleportedNode(Entity entity, PositionMoveRotation currentValues, TeleportTransition transition, int parentIndex) {
     }
 
-    private static final int PORTAL_SEARCH_WINDOW_BUDGET = 100;
-
     private final ServerLevel level;
-    private final LevelBinding binding;
+    private final DeferredTransports transports;
     private final PendingTeleports<List<TeleportedNode>> pending;
 
-    public EntityTeleports(ServerLevel level, LevelBinding binding) {
+    public EntityTeleports(ServerLevel level, DeferredTransports transports) {
         this.level = level;
-        this.binding = binding;
-        this.pending = new PendingTeleports<>(binding::submitPlacement);
+        this.transports = transports;
+        this.pending = new PendingTeleports<>((chunkX, chunkZ, placement) -> transports.toOwner(DeferReason.TELEPORT, chunkX, chunkZ, placement));
     }
 
     /** Shutdown path: places everything still in flight toward this level, before the worlds save. */
@@ -63,16 +48,14 @@ public final class EntityTeleports {
         ServerLevel target = transition.newLevel();
         int destinationX = SectionPos.posToSectionCoord(transition.position().x());
         int destinationZ = SectionPos.posToSectionCoord(transition.position().z());
-        if (target == level && binding.currentRegionOwns(destinationX, destinationZ)) {
+        if (target == level && transports.owns(destinationX, destinationZ)) {
             return false;
         }
 
         if (target == level) {
-            binding.submitSerial(() -> {
-                if (!entity.isRemoved() && entity.level() == level) {
-                    entity.teleport(transition);
-                }
-            });
+            DeferredWork.serial(DeferReason.TELEPORT, transports.stats(), () -> entity.teleport(transition))
+                .validIf(() -> !entity.isRemoved() && entity.level() == level)
+                .submit(transports);
 
             return true;
         }
@@ -85,62 +68,41 @@ public final class EntityTeleports {
     /** Defers to serial unless the current region owns both the player and the destination. */
     public boolean divertPlayerFromRegion(ServerPlayer player, TeleportTransition transition) {
         if (transition.newLevel() == level
-            && binding.currentRegionOwns(player.chunkPosition().x(), player.chunkPosition().z())
-            && binding.currentRegionOwns(SectionPos.posToSectionCoord(transition.position().x()), SectionPos.posToSectionCoord(transition.position().z()))) {
+            && transports.owns(player.chunkPosition().x(), player.chunkPosition().z())
+            && transports.owns(SectionPos.posToSectionCoord(transition.position().x()), SectionPos.posToSectionCoord(transition.position().z()))) {
             return false;
         }
 
-        binding.submitSerial(() -> {
-            if (!player.hasDisconnected() && !player.isRemoved() && player.level() == level) {
-                player.teleport(transition);
-            }
-        });
+        DeferredWork.serial(DeferReason.PLAYER_TELEPORT, transports.stats(), () -> player.teleport(transition))
+            .validIf(() -> !player.hasDisconnected() && !player.isRemoved() && player.level() == level)
+            .submit(transports);
 
         return true;
     }
 
     /**
-     * Runs in the barrier window because the search writes blocks in an unknown dimension, but the
-     * window never generates: the search runs in degraded reads, an absent chunk files a demand
-     * ticket and aborts the attempt, and the retry finds the chunk once the pool generated it. Past
-     * the retry budget, one vanilla attempt loads synchronously under the window as a last resort.
+     * The search writes blocks in an unknown dimension, so it is window work; the engine's degraded
+     * retry keeps the window from generating, and its budgeted last attempt is the synchronous net.
      */
     public void deferPortal(Entity entity) {
-        deferPortal(entity, 0);
+        DeferredWork.window(DeferReason.PORTAL, transports.stats(), () -> searchAndEnterPortal(entity))
+            .validIf(() -> !entity.isRemoved() && entity.level() == level && entity.portalProcess != null)
+            .degradedWithSyncNet(PORTAL_SEARCH_WINDOW_BUDGET)
+            .submit(transports);
     }
 
-    private void deferPortal(Entity entity, int attempts) {
-        binding.submitWindow(() -> {
-            if (entity.isRemoved() || entity.level() != level) {
-                return;
-            }
+    /** The vanilla tail of {@code handlePortal}: destination search, entry test, teleport. */
+    private void searchAndEnterPortal(Entity entity) {
+        PortalProcessor process = entity.portalProcess;
+        TeleportTransition transition = process.getPortalDestination(level, entity);
+        if (transition == null) {
+            return;
+        }
 
-            PortalProcessor process = entity.portalProcess;
-            if (process == null) {
-                return;
-            }
-
-            TeleportTransition transition;
-            if (attempts < PORTAL_SEARCH_WINDOW_BUDGET) {
-                try {
-                    transition = DegradedChunkReads.call(() -> process.getPortalDestination(level, entity));
-                } catch (OwnershipViolationException absentChunk) {
-                    deferPortal(entity, attempts + 1);
-                    return;
-                }
-            } else {
-                transition = process.getPortalDestination(level, entity);
-            }
-
-            if (transition == null) {
-                return;
-            }
-
-            ServerLevel target = transition.newLevel();
-            if (level.isAllowedToEnterPortal(target) && (target.dimension() == level.dimension() || entity.canTeleport(level, target))) {
-                entity.teleport(transition);
-            }
-        });
+        ServerLevel target = transition.newLevel();
+        if (level.isAllowedToEnterPortal(target) && (target.dimension() == level.dimension() || entity.canTeleport(level, target))) {
+            entity.teleport(transition);
+        }
     }
 
     private void beginCrossDimension(Entity entity, TeleportTransition transition) {
@@ -156,7 +118,7 @@ public final class EntityTeleports {
         ChunkPos originChunk = entity.chunkPosition();
         int destinationX = SectionPos.posToSectionCoord(transition.position().x());
         int destinationZ = SectionPos.posToSectionCoord(transition.position().z());
-        arrivals.pending.begin(binding.holds(), originChunk.x(), originChunk.z(), destinationX, destinationZ, nodes, arrivals::place);
+        arrivals.pending.begin(transports.holds(), originChunk.x(), originChunk.z(), destinationX, destinationZ, nodes, arrivals::place);
     }
 
     private void copyTree(Entity entity, TeleportTransition transition, int parentIndex, ServerLevel target, List<TeleportedNode> nodes) {
@@ -179,12 +141,12 @@ public final class EntityTeleports {
     private void teleportSpectators(Entity entity, TeleportTransition transition) {
         for (ServerPlayer player : List.copyOf(level.players())) {
             if (player.getCamera() == entity) {
-                binding.submitSerial(() -> {
-                    if (!player.hasDisconnected() && !player.isRemoved() && player.level() == level) {
-                        player.teleport(transition);
-                        player.setCamera(null);
-                    }
-                });
+                DeferredWork.serial(DeferReason.PLAYER_TELEPORT, transports.stats(), () -> {
+                    player.teleport(transition);
+                    player.setCamera(null);
+                })
+                    .validIf(() -> !player.hasDisconnected() && !player.isRemoved() && player.level() == level)
+                    .submit(transports);
             }
         }
     }
