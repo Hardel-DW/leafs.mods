@@ -1,7 +1,8 @@
-package fr.hardel.leafs.entity;
+package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Set;
@@ -45,7 +46,7 @@ public final class ConcurrentLongSet extends AbstractLongSet {
     }
 
     @Override
-    public LongIterator iterator() {
+    public @NonNull LongIterator iterator() {
         Iterator<Long> backing = set.iterator();
         return new LongIterator() {
             @Override

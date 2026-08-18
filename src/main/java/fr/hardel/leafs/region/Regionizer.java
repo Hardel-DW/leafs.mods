@@ -164,6 +164,20 @@ public final class Regionizer<R> {
         return readCount(() -> sumChunkCounts(region));
     }
 
+    /** Snapshot under the read lock: the feed can grow a ticking region's sections, so the owner never iterates the live set. */
+    long[] sectionKeysOf(Region<R> region) {
+        if (writeLockOwner == Thread.currentThread()) {
+            return region.sectionKeys.toLongArray();
+        }
+
+        long stamp = lock.readLock();
+        try {
+            return region.sectionKeys.toLongArray();
+        } finally {
+            lock.unlockRead(stamp);
+        }
+    }
+
     /** The bypass is what lets a callback read a count: taking the read lock while owning the write lock deadlocks a {@link StampedLock}. */
     private int readCount(IntSupplier count) {
         if (writeLockOwner == Thread.currentThread()) {

@@ -1,6 +1,6 @@
 package fr.hardel.leafs.mixin.network;
 
-import fr.hardel.leafs.entity.ConcurrentLongSet;
+import fr.hardel.excess.ConcurrentLongSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.network.PlayerChunkSender;
 import org.spongepowered.asm.mixin.Final;

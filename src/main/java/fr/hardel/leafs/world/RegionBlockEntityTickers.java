@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
@@ -7,6 +8,7 @@ import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 
@@ -17,6 +19,9 @@ import java.util.function.LongPredicate;
 public final class RegionBlockEntityTickers {
     private record Entry(TickingBlockEntity ticker, long chunkKey) {
     }
+
+    /** No capture, one constant for every region: a hopper refused at a border skips its own tick, not the phase. */
+    private static final Consumer<TickingBlockEntity> TICK = TickingBlockEntity::tick;
 
     private final List<Entry> tickers = new ArrayList<>();
     private final List<Entry> pending = new ArrayList<>();
@@ -39,7 +44,7 @@ public final class RegionBlockEntityTickers {
             if (entry.ticker().isRemoved()) {
                 iterator.remove();
             } else if (runsNormally && tickingChunk.test(entry.chunkKey())) {
-                entry.ticker().tick();
+                TickGuard.tickOrSkip(TICK, entry.ticker());
             }
         }
 

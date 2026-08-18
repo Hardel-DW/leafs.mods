@@ -1,6 +1,9 @@
 package fr.hardel.leafs.global;
 
-import fr.hardel.leafs.metrics.WindowReason;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.scheduler.DeferredTransports;
+import fr.hardel.leafs.scheduler.DeferredWork;
+import fr.hardel.leafs.ticking.TickingBinding;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -16,14 +19,14 @@ public final class CommandBlockWindow {
     }
 
     /**
-     * The block can change before the window runs, so its state is re-read there, and only if its
-     * chunk is still loaded: the window must never trigger a synchronous load.
-    * Skipped but rearmed exactly like vanilla's AUTO reschedule, so flipping the rule back on resumes every loop.
-    */
+     * The block can change before the window runs, so its state re-reads there, and only if its
+     * chunk is still loaded: the window must never trigger a synchronous load. A repeating block
+     * skipped by the gamerule rearms exactly like vanilla's AUTO reschedule, so flipping the rule
+     * back on resumes every loop.
+     */
     public static boolean deferBlockTick(ServerLevel level, BlockPos pos, BlockState state) {
         BlockPos target = pos.immutable();
-        CommandBlockEntity repeating = level.getBlockEntity(target) instanceof CommandBlockEntity commandBlock
-            && commandBlock.getMode() == CommandBlockEntity.Mode.AUTO ? commandBlock : null;
+        CommandBlockEntity repeating = level.getBlockEntity(target) instanceof CommandBlockEntity commandBlock && commandBlock.getMode() == CommandBlockEntity.Mode.AUTO ? commandBlock : null;
 
         if (repeating != null && !level.getGameRules().get(LeafsGameRules.repeatingCommandBlocksWork)) {
             if (repeating.isPowered() || repeating.isAutomatic()) {
@@ -33,16 +36,10 @@ public final class CommandBlockWindow {
             return true;
         }
 
-        boolean deferred = defer(level, WindowReason.COMMAND_BLOCK, () -> {
-            if (!level.getChunkSource().hasChunk(SectionPos.blockToSectionCoord(target.getX()), SectionPos.blockToSectionCoord(target.getZ()))) {
-                return;
-            }
-
-            BlockState current = level.getBlockState(target);
-            if (current.getBlock() instanceof CommandBlock) {
-                current.tick(level, target, level.getRandom());
-            }
-        });
+        DeferredTransports transports = TickingBinding.of(level);
+        boolean deferred = DeferredWork.window(DeferReason.COMMAND_BLOCK, transports.stats(), () -> tickCommandBlock(level, target))
+            .validIf(() -> level.getChunkSource().hasChunk(SectionPos.blockToSectionCoord(target.getX()), SectionPos.blockToSectionCoord(target.getZ())))
+            .submit(transports);
 
         if (deferred && repeating != null) {
             ((GlobalServerAccess) level.getServer()).leafs$windowPressure().recordRepeatingDeferral();
@@ -53,21 +50,16 @@ public final class CommandBlockWindow {
 
     /** The minecart can be destroyed before the window runs. */
     public static boolean deferMinecartActivation(ServerLevel level, MinecartCommandBlock minecart, int x, int y, int z, boolean powered) {
-        return defer(level, WindowReason.MINECART_COMMAND_BLOCK, () -> {
-            if (!minecart.isRemoved()) {
-                minecart.activateMinecart(level, x, y, z, powered);
-            }
-        });
+        DeferredTransports transports = TickingBinding.of(level);
+        return DeferredWork.window(DeferReason.MINECART_COMMAND_BLOCK, transports.stats(), () -> minecart.activateMinecart(level, x, y, z, powered))
+            .validIf(() -> !minecart.isRemoved())
+            .submit(transports);
     }
 
-    private static boolean defer(ServerLevel level, WindowReason reason, Runnable execution) {
-        BarrierWindow window = BarrierWindow.of(level.getServer());
-        if (window.isDraining()) {
-            return false;
+    private static void tickCommandBlock(ServerLevel level, BlockPos target) {
+        BlockState current = level.getBlockState(target);
+        if (current.getBlock() instanceof CommandBlock) {
+            current.tick(level, target, level.getRandom());
         }
-
-        window.enqueue(reason, execution);
-
-        return true;
     }
 }

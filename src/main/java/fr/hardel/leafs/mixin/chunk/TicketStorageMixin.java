@@ -4,7 +4,9 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
+import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.server.level.ServerLevel;
@@ -29,16 +31,40 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
     @Unique
     private volatile ServerLevel leafs$level;
 
+    @Unique
+    private volatile TicketTimeoutIndex leafs$timeouts;
+
     @Override
     public void leafs$bindLevel(ServerLevel level) {
         this.leafs$level = level;
     }
 
+    @Override
+    public TicketTimeoutIndex leafs$timeouts() {
+        return leafs$timeouts;
+    }
+
+    /** A stored timeout ticket enters the index with its identity; a reset re-uses the instance tracked at its first add. */
     @WrapMethod(method = "addTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
         synchronized (this) {
-            return original.call(key, ticket);
+            boolean added = original.call(key, ticket);
+            if (added && ticket.getType().hasTimeout())
+                leafs$timeoutIndex().track(key, ticket);
+
+            return added;
         }
+    }
+
+    /** Built under the monitor on first use, because the chunk source does not exist yet when the storage binds its level. */
+    @Unique
+    private TicketTimeoutIndex leafs$timeoutIndex() {
+        if (leafs$timeouts == null) {
+            ServerLevel owner = leafs$level;
+            leafs$timeouts = new TicketTimeoutIndex((TicketStorage) (Object) this, owner.getChunkSource().chunkMap, LevelRegions.of(owner).regionizer().sectionShift());
+        }
+
+        return leafs$timeouts;
     }
 
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")

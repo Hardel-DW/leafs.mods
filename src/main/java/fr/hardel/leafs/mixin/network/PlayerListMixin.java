@@ -4,11 +4,13 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.PropagatorAccess;
-import fr.hardel.leafs.chunk.core.ChunkScheduling;
+import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.network.PlayerListFileAccess;
 import fr.hardel.leafs.network.PlayerTeardown;
+import fr.hardel.leafs.scheduler.DeferredTransports;
+import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.TickingBinding;
 import net.minecraft.network.Connection;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.server.MinecraftServer;
@@ -91,12 +93,13 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         }
 
         ChunkPos spawnChunk = player.chunkPosition();
-        ChunkScheduling scheduling = ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
-        if (scheduling.isOwner(spawnChunk.x(), spawnChunk.z())) {
+        DeferredTransports transports = TickingBinding.of(level);
+        if (transports.owns(spawnChunk.x(), spawnChunk.z())) {
             return;
         }
 
-        scheduling.runOnOwner(spawnChunk.x(), spawnChunk.z(), () -> ((PlayerList) (Object) this).placeNewPlayer(connection, player, cookie));
+        DeferredWork.owner(DeferReason.PLAYER_PLACEMENT, transports.stats(), spawnChunk.x(), spawnChunk.z(),
+            () -> ((PlayerList) (Object) this).placeNewPlayer(connection, player, cookie)).submit(transports);
         callbackInfo.cancel();
     }
 

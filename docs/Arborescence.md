@@ -12,10 +12,10 @@ Un dossier égale une responsabilité. Le code vit dans `src/main/java/fr/hardel
 | `entity/` | Les entités : listes de tick par région, index concurrents, téléportations et pipeline inter dimensions, schedulers d'entités, primitives concurrentes maison. |
 | `chunk/` | Le système de chunks : la table concurrente des holders, l'ordonnancement shardé et le pool de génération dans `core/`, le chargeur par joueur dans `loader/`, le propagateur de niveaux dans `propagator/`, plus les lectures des régions, les tickets, le tracking et le verrou des villages. |
 | `network/` | Le réseau : files de paquets par joueur, routage, le tick réseau par région, le filet global. |
-| `scheduler/` | Les schedulers publics : par région et global, avec les tickets de rétention de chunks. |
+| `scheduler/` | Les schedulers publics, par région et global, avec les tickets de rétention de chunks, et le moteur du travail différé `DeferredWork` avec ses trois destinations. |
 | `global/` | La phase globale : la fenêtre barrière, le moniteur d'état partagé, les command blocks, les gamerules du mod, les écritures différées des fichiers de joueurs, la pause des évènements de tick de la Fabric API. |
-| `metrics/` | La mesure : les durées par étape de tick (`StageTimings` et les trois enums d'étapes), les compteurs à fenêtre d'une minute, les stats de la fenêtre barrière. Aucune dépendance, importable par tout le monde. |
-| `debug/` | Les commandes `/leafs regions`, `/leafs timings` et `/leafs recommendation`. |
+| `metrics/` | La mesure : les durées par étape de tick (`StageTimings` et les trois enums d'étapes), les compteurs à fenêtre d'une minute, les stats de la fenêtre barrière, les compteurs de reports et de refus du contrat des chunks. Importable par tout le monde, ne dépend que de `ownership/`. |
+| `debug/` | Les commandes `/leafs regions`, `/leafs timings`, `/leafs metrics` et `/leafs recommendation`. |
 | `mixin/` | Les points d'accroche, un sous dossier par module servi, plus `compat/` pour ceux qui ciblent la Fabric API au lieu de vanilla. Aucune logique. |
 
 Les règles de dépendance entre modules : `ownership/`, `config/` et `metrics/` sont importables par tout le monde. `region/` ne dépend de rien d'autre. `entity/` n'importe jamais `ticking/`, les surfaces passent par des interfaces construites au câblage. Rien ne dépend de `mixin/` ni de `debug/`.

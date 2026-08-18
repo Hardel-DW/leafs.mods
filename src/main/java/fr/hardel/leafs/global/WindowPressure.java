@@ -16,7 +16,6 @@ public final class WindowPressure {
         return repeatingDeferrals.sum();
     }
 
-    /** Zero when no repeating command block has ever deferred. */
     public long lastRepeatingDeferralNanos() {
         return lastRepeatingDeferralNanos;
     }

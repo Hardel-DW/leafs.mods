@@ -14,6 +14,7 @@ public final class LeafsCommand {
             Commands.literal("leafs").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(RegionsCommand.tree())
                 .then(TimingsCommand.tree())
+                .then(MetricsCommand.tree())
                 .then(RecommendationCommand.tree())));
     }
 }

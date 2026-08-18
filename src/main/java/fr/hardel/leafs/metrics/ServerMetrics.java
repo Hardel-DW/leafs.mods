@@ -3,15 +3,19 @@ package fr.hardel.leafs.metrics;
 /** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
     private final BarrierStats barrier = new BarrierStats();
+    private final DeferStats deferStats = new DeferStats();
     private final StageTimings globalStages = new StageTimings(GlobalStage.values().length);
     private final MinuteCounter packetsIn = new MinuteCounter();
     private final MinuteCounter packetsOut = new MinuteCounter();
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
-    private final MinuteCounter serialTeleports = new MinuteCounter();
 
     public BarrierStats barrier() {
         return barrier;
+    }
+
+    public DeferStats deferStats() {
+        return deferStats;
     }
 
     public StageTimings globalStages() {
@@ -36,10 +40,5 @@ public final class ServerMetrics {
     /** Unload decisions taken; the drop-side half of the churn. */
     public MinuteCounter chunkUnloads() {
         return chunkUnloads;
-    }
-
-    /** Teleports routed through the level-serial lane; portals and respawns count under their window reasons. */
-    public MinuteCounter serialTeleports() {
-        return serialTeleports;
     }
 }

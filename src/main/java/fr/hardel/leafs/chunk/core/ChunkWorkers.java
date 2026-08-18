@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.leafs.Leafs;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -52,7 +53,7 @@ public final class ChunkWorkers implements Executor {
     }
 
     @Override
-    public void execute(Runnable task) {
+    public void execute(@NonNull Runnable task) {
         pool.execute(task);
     }
 

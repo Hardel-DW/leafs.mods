@@ -7,8 +7,6 @@ import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
-import fr.hardel.leafs.ticking.LevelOwnership;
-import fr.hardel.leafs.ticking.LevelRegions;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
@@ -49,20 +47,21 @@ public abstract class ServerChunkCacheMixin {
         ((TicketStorageAccess) ((ServerChunkCache) (Object) this).ticketStorage).leafs$bindLevel(this.level);
     }
 
-    /** Any thread reads published FULL chunks through the concurrent table; vanilla answered null off its main thread. */
+    /** Off the main thread the concurrent table answers, with the contract's peek rule: a foreign chunk answers absent. */
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
         if (DegradedChunkReads.active() || Thread.currentThread() != this.mainThread) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z));
+            callbackInfo.setReturnValue(RegionChunkAccess.fullOwnedChunkOrNull(self.chunkMap, x, z));
         }
     }
 
+    /** The contract's full form, for every thread that is not a universal owner and every opted-in degraded scope. */
     @Inject(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;", at = @At("HEAD"), cancellable = true)
-    private void leafs$regionGetChunkPath(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
-        if (leafs$degradedReadPath()) {
+    private void leafs$contractedGetChunkPath(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
+        if (DegradedChunkReads.active() || !leafs$scheduling().isUniversalOwner()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.presentChunkOrThrow(self.chunkMap, x, z, targetStatus, loadOrGenerate));
+            callbackInfo.setReturnValue(RegionChunkAccess.contractedChunk(self.chunkMap, x, z, targetStatus, loadOrGenerate));
         }
     }
 
@@ -71,24 +70,8 @@ public abstract class ServerChunkCacheMixin {
     private void leafs$concurrentHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
         if (DegradedChunkReads.active() || Thread.currentThread() != this.mainThread) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
+            callbackInfo.setReturnValue(RegionChunkAccess.fullOwnedChunkOrNull(self.chunkMap, x, z) != null);
         }
-    }
-
-    /** A region worker mid-tick, or a serial scope that opted into region-like reads (custom spawners). */
-    @Unique
-    private boolean leafs$degradedReadPath() {
-        if (DegradedChunkReads.active()) {
-            return true;
-        }
-
-        if (Thread.currentThread() == this.mainThread) {
-            return false;
-        }
-
-        LevelOwnership ownership = LevelRegions.of(this.level).ownership();
-
-        return ownership.isRegionTickHeldByCurrentThread();
     }
 
     /** The request takes the scheduling area around the position, and the tasks it builds start after the release. */

@@ -130,6 +130,14 @@ public final class RegionWorldData {
         fluidTicks.tick(clock.currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
     }
 
+    public void requeueBlockTick(BlockPos pos, Block block) {
+        blockTicks.schedule(createTick(pos, block, 1));
+    }
+
+    public void requeueFluidTick(BlockPos pos, Fluid fluid) {
+        fluidTicks.schedule(createTick(pos, fluid, 1));
+    }
+
     /** Vanilla {@code ServerLevel.runBlockEvents}: untickable positions re-queue for the next tick, cascades run this one. */
     public void runBlockEvents(Predicate<BlockPos> tickable, Consumer<BlockEventData> executor) {
         List<BlockEventData> reschedule = null;

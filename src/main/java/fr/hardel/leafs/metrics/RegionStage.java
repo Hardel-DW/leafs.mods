@@ -4,6 +4,7 @@ package fr.hardel.leafs.metrics;
 public enum RegionStage implements TickStage {
     TASKS,
     UNLOADS,
+    TICKETS,
     PACKETS,
     BLOCK_TICKS,
     FLUID_TICKS,

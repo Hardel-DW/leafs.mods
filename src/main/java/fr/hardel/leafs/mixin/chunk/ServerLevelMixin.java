@@ -5,7 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiWriteReroute;
-import fr.hardel.leafs.ownership.TickGuard;
+import fr.hardel.leafs.chunk.SectionStorageAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.core.BlockPos;
@@ -23,6 +23,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 
+    /** The POI storage is built level-blind; its contract gate needs the level. */
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$bindPoiStorageLevel(CallbackInfo callbackInfo) {
+        ServerLevel self = (ServerLevel) (Object) this;
+        ((SectionStorageAccess) self.getPoiManager()).leafs$bindLevel(self);
+    }
+
     @WrapMethod(method = "save")
     private void leafs$saveUnderExclusion(@Nullable ProgressListener progressListener, boolean flush, boolean noSave, Operation<Void> original) {
         LevelRegions.of((ServerLevel) (Object) this).ownership().runExclusive(() -> original.call(progressListener, flush, noSave));
@@ -38,6 +45,6 @@ public abstract class ServerLevelMixin {
     /** A custom spawner probes terrain near a random player; on the serial thread that must refuse, never sync-load. */
     @WrapOperation(method = "tickCustomSpawners", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/CustomSpawner;tick(Lnet/minecraft/server/level/ServerLevel;Z)V"))
     private void leafs$refusableSpawner(CustomSpawner spawner, ServerLevel level, boolean spawnEnemies, Operation<Void> original) {
-        DegradedChunkReads.run(() -> TickGuard.tickOrSkip(target -> original.call(target, level, spawnEnemies), spawner));
+        DegradedChunkReads.run(() -> original.call(spawner, level, spawnEnemies));
     }
 }

@@ -3,10 +3,7 @@ package fr.hardel.leafs.mixin.world;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.ownership.RegionContext;
-import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.world.LevelBlockUpdates;
 import fr.hardel.leafs.world.RegionClock;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -18,12 +15,10 @@ import fr.hardel.leafs.world.WorldDataRouter;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.ticks.LevelTicks;
@@ -121,15 +116,5 @@ public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
 
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay) {
         return leafs$worldRouter.at(pos).createTick(pos, type, delay);
-    }
-
-    /** Region-side structure searches degrade to not-found instead of crashing on unloaded chunks. */
-    @WrapMethod(method = "findNearestMapStructure")
-    private BlockPos leafs$structureSearchRefusesOverCrashing(TagKey<Structure> structureTag, BlockPos origin, int maxSearchRadius, boolean createReference, Operation<BlockPos> original) {
-        if (!(RegionContext.current() instanceof RegionContext.Region)) {
-            return original.call(structureTag, origin, maxSearchRadius, createReference);
-        }
-
-        return TickGuard.callOrNull(() -> original.call(structureTag, origin, maxSearchRadius, createReference), structureTag.location());
     }
 }

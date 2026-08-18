@@ -35,7 +35,7 @@ public abstract class LevelMixin {
     @Mutable
     @Shadow
     @Final
-    protected CollectingNeighborUpdater neighborUpdater;
+    public CollectingNeighborUpdater neighborUpdater;
 
     @Inject(method = "nextSubTickCount", at = @At("HEAD"), cancellable = true)
     private void leafs$regionSubTickCount(CallbackInfoReturnable<Long> callbackInfo) {
@@ -72,10 +72,6 @@ public abstract class LevelMixin {
         }
 
         BlockPos pos = ticker.getPos();
-        if (pos == null) {
-            return;
-        }
-
         long chunkKey = ChunkPos.pack(pos);
         RegionWorldData data = host.leafs$worldRouter().at(chunkKey);
         if (data == host.leafs$worldRouter().attached()) {
