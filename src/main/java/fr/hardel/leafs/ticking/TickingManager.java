@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Server-scoped orchestrator of the region tick machinery, one per server, reached by {@link #of}. */
 public final class TickingManager {
+    private static final int QUIESCE_DRAIN_FLOOR = 64;
 
     private final MinecraftServer server;
     private final ServerMetrics metrics = new ServerMetrics();
@@ -156,10 +157,19 @@ public final class TickingManager {
         }
     }
 
+    /**
+     * Time-boxed on the shared budget above a floor: churn bookkeeping defers to the next tick
+     * instead of following the wave. Synchronous waiters drain the pump themselves through
+     * {@code managedBlock}, so a leftover only delays offers, never blocks them. A shutdown drains whole.
+     */
     private void drainChunkBookkeeping(ServerLevel level) {
+        int drained = 0;
         boolean hasMore = true;
         while (hasMore) {
             hasMore = level.getChunkSource().pollTask();
+            if (hasMore && !halted && ++drained >= QUIESCE_DRAIN_FLOOR && serialBudget.expired(System.nanoTime())) {
+                return;
+            }
         }
     }
 

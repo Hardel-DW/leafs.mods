@@ -43,7 +43,8 @@ Le routage des commandes vers le global est un choix assumé, une commande doit 
 
 | Item | Coût | Détail | Fix |
 |---|---|---|---|
-| Drain de la pompe dans la quiesce | O(Q_pompe + R) par dimension (TickingManager.java:149) | Le balayage des régions ne se fait que pompe vide, il reste le drain de la pompe sans budget de temps, qui suit le churn de chunks | Budget de temps avec report |
+| Drain de la pompe dans la quiesce | O(min(Q_pompe, budget partagé) + R) par dimension, plancher de 64 tâches, report au tick suivant, drain complet à l'extinction | Les attentes synchrones drainent la pompe elles-mêmes par managedBlock, un reliquat ne bloque personne | Fait |
+| Paquets de login | O(K_login) par tick, quelques comparaisons d'état et un keepalive par connexion | Un plafond affamerait les keepalives et ralentirait les handshakes pendant la vague qu'il prétend protéger, pour des microsecondes | Choix assumé, pas de budget |
 | Trackers de distance vanilla | O(Δ) ≈ O(P × vue²) en pointe (DistanceManager.java:69) | Seul le propagateur de chargement est shardé, la simulation, le spawn naturel et les tickets joueur restent sériels | Porter sur le modèle shardé |
 | Schedulers d'entité | O(S) de tests sériels, le travail tourne sur les régions (EntitySchedulerRegistry.tickOwned) | Chaque contexte de tick ne tique que les schedulers des entités qu'il possède ; la map est vide tant qu'aucun mod ne planifie | Aucun tant que S reste petit ; indexer par région si un mod planifie en masse |
 | Trois balayages O(P) à test unitaire O(1) | La capture des orphelins de network/OrphanNetworkSweep, le filet loader, le filet tracking | Une lecture volatile par joueur et par balayage. Le suspend, l'envoi et le resume-flush ne touchent plus que les orphelins capturés, une exclusion par niveau au lieu d'une par joueur. Les filets gardent la liste vivante parce qu'un instantané pourrait re-tiquer un joueur retiré | Aucun, le coût restant est le test lui-même |
@@ -53,7 +54,6 @@ Le routage des commandes vers le global est un choix assumé, une commande doit 
 | Attente de l'exclusion | Prise deux fois par tick et par dimension, chaque prise attend au pire τ_max | Le temps mural du thread global dépend de la région la plus lourde | Faire céder les régions à un point de sûreté |
 | Évènements de tick Fabric | Deux levées de barrière par tick si un mod s'abonne | Même modèle de coût que la fenêtre | Aucun, c'est le contrat rendu aux mods |
 | Tickables et code de mods | Arbitraire (MinecraftServer.java:1151) | Un mod qui enregistre un tickable coûteux le paie sur le global | Aucun, code tiers |
-| Paquets de login | O(Q_login) par itération | Pic sur vague de connexions, le reste du login est déjà bien traité | Budget de N logins par tick |
 
 ## La formule du tick global
 
@@ -62,7 +62,7 @@ T_global ≈ O(1)                                    socle constant
   + 4 × O(P)                                       balayages à test unitaire O(1) : capture des orphelins, filet loader, filet tracking, sommeil
   + O(K)                                           transport des connexions
   + L × [ O(sections orphelines de l'index)        purge résiduelle des tickets, quasi nul
-        + O(Q_pompe + R)                           quiesce
+        + O(min(Q_pompe, budget) + R)              quiesce, plancher 64, report
         + O(D)                                     dispatch des décharges d'entités
         + O(Δ_tickets)                             trackers vanilla
         + O(S) + O(Δ_POI) ]
@@ -76,4 +76,4 @@ Le "L × [...]" se lit comme une somme sur les dimensions, chacune avec ses prop
 
 ## Ordre d'attaque
 
-L'autosave, les correctifs moyens et les schedulers d'entité sont traités. Restent, par rentabilité décroissante : les trackers de distance vanilla, le budget du drain de la pompe dans la quiesce, et le budget des logins.
+L'autosave, les correctifs moyens, les schedulers d'entité et le budget de la quiesce sont traités. Le budget des logins est écarté, un plafond nuirait aux handshakes pour des microsecondes. Reste un seul chantier : les trackers de distance vanilla.
