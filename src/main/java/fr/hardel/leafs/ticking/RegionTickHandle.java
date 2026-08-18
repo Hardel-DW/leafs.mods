@@ -54,7 +54,9 @@ public final class RegionTickHandle extends TickHandle {
                     return;
                 }
 
+                // Vanilla runs its main-thread queue while paused; the task lane must too, or a paused solo join waits on its entity deliveries forever.
                 if (body.level().getServer().isPaused()) {
+                    regions.taskScheduler().drain(region);
                     return;
                 }
 

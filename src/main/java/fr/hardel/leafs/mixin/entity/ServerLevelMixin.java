@@ -4,8 +4,10 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.excess.ConcurrentInt2ObjectMap;
+import fr.hardel.leafs.entity.EntityManagerAccess;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.LevelEntityLists;
+import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.ticking.LevelOwnership;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -63,7 +65,10 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.dragonParts = new ConcurrentInt2ObjectMap<>();
         this.players = new CopyOnWriteArrayList<>();
         this.leafs$entityLists = new LevelEntityLists();
-        this.leafs$entityTeleports = new EntityTeleports((ServerLevel) (Object) this, new TickingBinding((ServerLevel) (Object) this));
+        ServerLevel self = (ServerLevel) (Object) this;
+        this.leafs$entityTeleports = new EntityTeleports(self, new TickingBinding(self));
+        EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
+        manager.leafs$bindPersistence(new RegionEntityPersistence(self, manager));
     }
 
     /** Riding passengers are looked up in the owning unit's list; the vanilla list stays empty by routing. */
