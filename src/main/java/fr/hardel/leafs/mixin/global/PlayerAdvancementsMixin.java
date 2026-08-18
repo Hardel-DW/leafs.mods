@@ -39,7 +39,6 @@ public abstract class PlayerAdvancementsMixin {
     @WrapOperation(method = "load(Lnet/minecraft/server/ServerAdvancementManager;)V", at = @At(value = "INVOKE", target = "Ljava/nio/file/Files;newBufferedReader(Ljava/nio/file/Path;Ljava/nio/charset/Charset;)Ljava/io/BufferedReader;"))
     private BufferedReader leafs$preparedReader(Path file, Charset charset, Operation<BufferedReader> original) throws IOException {
         BufferedReader prepared = JoinPreload.playerFileReader(file);
-
         return prepared == null ? original.call(file, charset) : prepared;
     }
 }
