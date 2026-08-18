@@ -43,7 +43,7 @@ public final class ParallelChunkTaskDispatcher extends ChunkTaskDispatcher {
             }
 
             future.complete(Unit.INSTANCE);
-        })).toArray(CompletableFuture[]::new)).whenComplete((result, failure) -> {
+        })).toArray(CompletableFuture[]::new)).whenComplete((_, _) -> {
             inFlight.decrementAndGet();
             pollTask();
         });

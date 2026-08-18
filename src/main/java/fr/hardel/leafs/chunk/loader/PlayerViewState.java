@@ -29,7 +29,7 @@ final class PlayerViewState {
     int tickDistance;
     double loadBudget;
 
-    /** The refcounted stage whose ticket a pipeline stage holds: one ticket per chunk at a time. */
+    /** The ref counted stage whose ticket a pipeline stage holds: one ticket per chunk at a time. */
     static int heldTicketStage(byte stage) {
         return switch (stage) {
             case STAGE_LOADING, STAGE_LOADED -> StageTickets.LOADED;

@@ -8,7 +8,6 @@ import java.util.Arrays;
  */
 public final class StageTimings {
     public static final int CAPACITY = 240;
-
     private final long[][] ring;
     private long[] row;
     private long lastMarkNanos;

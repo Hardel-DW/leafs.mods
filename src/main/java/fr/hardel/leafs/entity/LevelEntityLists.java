@@ -11,7 +11,7 @@ import java.util.function.LongFunction;
 /** Unsynchronized: ownership already orders all mutators (region mid-tick or level-serial). */
 public final class LevelEntityLists {
     private final RegionEntityData attached = new RegionEntityData();
-    private volatile LongFunction<RegionEntityData> resolver = chunkKey -> attached;
+    private volatile LongFunction<RegionEntityData> resolver = _ -> attached;
 
     public RegionEntityData attached() {
         return attached;

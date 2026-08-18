@@ -2,7 +2,8 @@ package fr.hardel.leafs.global;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.BarrierStats;
-import fr.hardel.leafs.metrics.WindowReason;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ticking.TickBarrier;
 import net.minecraft.server.MinecraftServer;
 
@@ -12,20 +13,22 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class BarrierWindow {
     private final TickBarrier barrier;
     private final BarrierStats stats;
+    private final DeferStats deferStats;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private volatile Thread drainingThread;
 
-    public BarrierWindow(TickBarrier barrier, BarrierStats stats) {
+    public BarrierWindow(TickBarrier barrier, BarrierStats stats, DeferStats deferStats) {
         this.barrier = barrier;
         this.stats = stats;
+        this.deferStats = deferStats;
     }
 
     public static BarrierWindow of(MinecraftServer server) {
         return ((GlobalServerAccess) server).leafs$barrierWindow();
     }
 
-    public void enqueue(WindowReason reason, Runnable task) {
-        stats.countReason(reason);
+    public void enqueue(DeferReason reason, Runnable task) {
+        deferStats.countDeferral(reason);
         tasks.add(task);
     }
 

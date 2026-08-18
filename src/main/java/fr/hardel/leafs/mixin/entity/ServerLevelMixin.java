@@ -3,7 +3,7 @@ package fr.hardel.leafs.mixin.entity;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.entity.ConcurrentInt2ObjectMap;
+import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;

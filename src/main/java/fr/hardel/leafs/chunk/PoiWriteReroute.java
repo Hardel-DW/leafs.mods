@@ -26,7 +26,7 @@ public final class PoiWriteReroute {
         }
 
         BlockPos immutable = pos.immutable();
-        oldType.ifPresent(type -> levelSerial.accept(() -> {
+        oldType.ifPresent(_ -> levelSerial.accept(() -> {
             level.getPoiManager().remove(immutable);
             level.debugSynchronizers().dropPoi(immutable);
         }));

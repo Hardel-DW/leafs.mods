@@ -2,6 +2,7 @@ package fr.hardel.leafs.global;
 
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import org.jspecify.annotations.NonNull;
 
 /** A shared sequence RandomSource serialized on its owner: loot rolls reach it from any region (#26c). */
 public final class LockedRandomSource implements RandomSource {
@@ -14,14 +15,14 @@ public final class LockedRandomSource implements RandomSource {
     }
 
     @Override
-    public RandomSource fork() {
+    public @NonNull RandomSource fork() {
         synchronized (monitor) {
             return delegate.fork();
         }
     }
 
     @Override
-    public PositionalRandomFactory forkPositional() {
+    public @NonNull PositionalRandomFactory forkPositional() {
         synchronized (monitor) {
             return delegate.forkPositional();
         }

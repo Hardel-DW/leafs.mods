@@ -1,5 +1,6 @@
 package fr.hardel.leafs.entity;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import org.junit.jupiter.api.Test;
 

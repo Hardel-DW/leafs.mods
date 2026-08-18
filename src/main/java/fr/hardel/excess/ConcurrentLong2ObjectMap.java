@@ -1,4 +1,4 @@
-package fr.hardel.leafs.entity;
+package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.longs.AbstractLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -39,7 +40,7 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
 
     @Override
     public V computeIfAbsent(long key, LongFunction<? extends V> mappingFunction) {
-        return map.computeIfAbsent(key, boxed -> mappingFunction.apply(boxed));
+        return map.computeIfAbsent(key, mappingFunction::apply);
     }
 
     @Override
@@ -82,10 +83,10 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
     }
 
     @Override
-    public ObjectCollection<V> values() {
+    public @NonNull ObjectCollection<V> values() {
         return new AbstractObjectCollection<>() {
             @Override
-            public ObjectIterator<V> iterator() {
+            public @NonNull ObjectIterator<V> iterator() {
                 return ObjectIterators.asObjectIterator(map.values().iterator());
             }
 
@@ -133,10 +134,7 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
 
             @Override
             public boolean contains(Object object) {
-                return object instanceof Map.Entry<?, ?> entry
-                        && entry.getKey() instanceof Long key
-                        && entry.getValue() != null
-                        && entry.getValue().equals(map.get(key));
+                return object instanceof Map.Entry<?, ?> entry && entry.getKey() instanceof Long key && entry.getValue() != null && entry.getValue().equals(map.get(key));
             }
         };
     }

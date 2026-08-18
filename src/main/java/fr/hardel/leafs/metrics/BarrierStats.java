@@ -1,36 +1,20 @@
 package fr.hardel.leafs.metrics;
 
 /**
- * What the barrier costs and why. The reason counters increment from any thread at enqueue time; the
- * opening ring is written by the global thread alone and read tolerating a torn sample, like {@code TickTimings}.
+ * What the barrier costs: the opening ring is written by the global thread alone and read tolerating
+ * a torn sample, like {@code TickTimings}. Why work entered the window lives in {@link DeferStats}.
  */
 public final class BarrierStats {
     private static final int CAPACITY = 256;
     private static final long WINDOW_NANOS = 60_000_000_000L;
     private static final double NANOS_PER_MILLI = 1_000_000.0;
 
-    private final MinuteCounter[] reasons;
     private final MinuteCounter fabricEventPauses = new MinuteCounter();
     private final MinuteCounter disconnectPauses = new MinuteCounter();
     private final long[] endNanos = new long[CAPACITY];
     private final long[] durationNanos = new long[CAPACITY];
     private final int[] queueDepths = new int[CAPACITY];
     private volatile int cursor;
-
-    public BarrierStats() {
-        this.reasons = new MinuteCounter[WindowReason.values().length];
-        for (int index = 0; index < reasons.length; index++) {
-            reasons[index] = new MinuteCounter();
-        }
-    }
-
-    public void countReason(WindowReason reason) {
-        reasons[reason.ordinal()].increment();
-    }
-
-    public MinuteCounter reason(WindowReason reason) {
-        return reasons[reason.ordinal()];
-    }
 
     /** Raised by a Fabric server tick event emission, outside the window queue. */
     public MinuteCounter fabricEventPauses() {

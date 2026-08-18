@@ -14,7 +14,7 @@ import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
 import fr.hardel.leafs.chunk.core.ParallelChunkTaskDispatcher;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.chunk.loader.StageTickets;
-import fr.hardel.leafs.entity.ConcurrentLongSet;
+import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.metrics.SerialStage;
 import fr.hardel.leafs.network.RegionNetworkTick;
@@ -169,8 +169,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         this.toDrop = new ConcurrentLongSet();
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
         ChunkMap self = (ChunkMap) (Object) this;
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(),
-            TickingManager.of(self.level.getServer()), this.mainThreadExecutor);
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), TickingManager.of(self.level.getServer()), this.mainThreadExecutor);
         ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
         this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
     }

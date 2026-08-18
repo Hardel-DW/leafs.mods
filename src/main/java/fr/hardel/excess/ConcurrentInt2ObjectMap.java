@@ -1,4 +1,4 @@
-package fr.hardel.leafs.entity;
+package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.ints.AbstractInt2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -61,10 +62,10 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     }
 
     @Override
-    public ObjectCollection<V> values() {
+    public @NonNull ObjectCollection<V> values() {
         return new AbstractObjectCollection<>() {
             @Override
-            public ObjectIterator<V> iterator() {
+            public @NonNull ObjectIterator<V> iterator() {
                 return ObjectIterators.asObjectIterator(map.values().iterator());
             }
 
@@ -89,7 +90,7 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     public ObjectSet<Int2ObjectMap.Entry<V>> int2ObjectEntrySet() {
         return new AbstractObjectSet<>() {
             @Override
-            public ObjectIterator<Int2ObjectMap.Entry<V>> iterator() {
+            public @NonNull ObjectIterator<Int2ObjectMap.Entry<V>> iterator() {
                 Iterator<Map.Entry<Integer, V>> backing = map.entrySet().iterator();
                 return new ObjectIterator<>() {
                     @Override
@@ -112,10 +113,7 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
 
             @Override
             public boolean contains(Object object) {
-                return object instanceof Map.Entry<?, ?> entry
-                        && entry.getKey() instanceof Integer key
-                        && entry.getValue() != null
-                        && entry.getValue().equals(map.get(key));
+                return object instanceof Map.Entry<?, ?> entry && entry.getKey() instanceof Integer key && entry.getValue() != null && entry.getValue().equals(map.get(key));
             }
         };
     }

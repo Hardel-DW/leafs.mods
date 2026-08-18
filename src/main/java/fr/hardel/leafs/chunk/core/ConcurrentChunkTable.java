@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
 import java.util.Comparator;
 import net.minecraft.server.level.ChunkHolder;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -118,10 +119,10 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
     }
 
     @Override
-    public ObjectCollection<ChunkHolder> values() {
+    public @NonNull ObjectCollection<ChunkHolder> values() {
         return new AbstractObjectCollection<>() {
             @Override
-            public ObjectIterator<ChunkHolder> iterator() {
+            public @NonNull ObjectIterator<ChunkHolder> iterator() {
                 return ObjectIterators.asObjectIterator(holders.values().iterator());
             }
 
@@ -139,7 +140,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
     /** The sorted key view has no meaning over an unordered backing, and nothing in the chunk system asks for it. */
     @Override
-    public LongSortedSet keySet() {
+    public @NonNull LongSortedSet keySet() {
         throw new UnsupportedOperationException("The chunk table has no key order; iterate long2ObjectEntrySet or values instead");
     }
 
@@ -152,7 +153,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
         implements Long2ObjectSortedMap.FastSortedEntrySet<ChunkHolder> {
 
         @Override
-        public ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> iterator() {
+        public @NonNull ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> iterator() {
             Iterator<Map.Entry<Long, ChunkHolder>> backing = holders.entrySet().iterator();
             return new ObjectBidirectionalIterator<>() {
                 @Override
@@ -212,17 +213,17 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
         }
 
         @Override
-        public ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> subSet(Long2ObjectMap.Entry<ChunkHolder> fromElement, Long2ObjectMap.Entry<ChunkHolder> toElement) {
+        public @NonNull ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> subSet(Long2ObjectMap.Entry<ChunkHolder> fromElement, Long2ObjectMap.Entry<ChunkHolder> toElement) {
             throw new UnsupportedOperationException("The chunk table has no entry order");
         }
 
         @Override
-        public ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> headSet(Long2ObjectMap.Entry<ChunkHolder> toElement) {
+        public @NonNull ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> headSet(Long2ObjectMap.Entry<ChunkHolder> toElement) {
             throw new UnsupportedOperationException("The chunk table has no entry order");
         }
 
         @Override
-        public ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> tailSet(Long2ObjectMap.Entry<ChunkHolder> fromElement) {
+        public @NonNull ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> tailSet(Long2ObjectMap.Entry<ChunkHolder> fromElement) {
             throw new UnsupportedOperationException("The chunk table has no entry order");
         }
 

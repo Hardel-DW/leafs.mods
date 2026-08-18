@@ -6,4 +6,7 @@ import net.minecraft.server.level.ServerLevel;
 public interface TicketStorageAccess {
 
     void leafs$bindLevel(ServerLevel level);
+
+    /** Null until the first timeout ticket lands; the purgers treat null as an empty index. */
+    TicketTimeoutIndex leafs$timeouts();
 }

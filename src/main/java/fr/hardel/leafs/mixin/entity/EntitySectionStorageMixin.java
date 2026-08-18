@@ -1,7 +1,7 @@
 package fr.hardel.leafs.mixin.entity;
 
-import fr.hardel.leafs.entity.ConcurrentLong2ObjectMap;
-import fr.hardel.leafs.entity.ConcurrentOrderedLongSet;
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import fr.hardel.excess.ConcurrentOrderedLongSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
 import net.minecraft.world.level.entity.EntityAccess;
