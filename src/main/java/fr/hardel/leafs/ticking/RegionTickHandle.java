@@ -1,6 +1,7 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.metrics.RegionStage;
+import fr.hardel.leafs.metrics.TickStages.TickFamily;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
@@ -20,7 +21,7 @@ public final class RegionTickHandle extends TickHandle {
     private volatile int entityCensus;
 
     RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions) {
-        super(new RegionContext.Region(region.id(), dimension), RegionStage.values().length);
+        super(new RegionContext.Region(region.id(), dimension), TickStages.count(TickFamily.REGION));
         this.region = region;
         this.regions = regions;
     }
@@ -65,12 +66,12 @@ public final class RegionTickHandle extends TickHandle {
                     StageTimings stages = stages();
                     stages.beginTick(System.nanoTime());
                     regions.taskScheduler().drain(region);
-                    stages.mark(RegionStage.TASKS);
+                    stages.mark(TickStages.regionTasks);
                     regions.unloads().drain(region);
-                    stages.mark(RegionStage.UNLOADS);
+                    stages.mark(TickStages.regionUnloads);
                     body.tick(region, worldData, data.entityData(), tickCount, stages);
                     data.autosave().tick(body.level(), region, data.entityData(), regions.autosaveEpoch());
-                    stages.mark(RegionStage.AUTOSAVE);
+                    stages.mark(TickStages.regionAutosave);
                     chunkCensus = region.chunkCount();
                     entityCensus = data.entityData().tickList().size();
                     stages.endTick();

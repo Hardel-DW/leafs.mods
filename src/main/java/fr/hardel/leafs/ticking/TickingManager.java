@@ -6,7 +6,7 @@ import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.global.DeferredFileWrites;
-import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
@@ -72,7 +72,7 @@ public final class TickingManager {
     }
 
     /** Serial stage boundary reached inside the vanilla remainder; ignored while no serial tick is in flight. */
-    public void markSerial(ServerLevel level, SerialStage stage) {
+    public void markSerial(ServerLevel level, TickStage stage) {
         LevelTickUnit unit = levelUnits.get(level);
         if (unit != null) {
             unit.stages().mark(stage);

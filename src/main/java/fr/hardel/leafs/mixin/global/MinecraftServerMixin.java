@@ -6,7 +6,7 @@ import fr.hardel.leafs.global.BarrierWindow;
 import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.global.LeafsGameRules;
 import fr.hardel.leafs.global.WindowPressure;
-import fr.hardel.leafs.metrics.GlobalStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -54,11 +54,11 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
     private void leafs$runBarrierWindow(CallbackInfo callbackInfo) {
         TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
         StageTimings globalStages = ticking.metrics().globalStages();
-        globalStages.mark(GlobalStage.LEVELS);
+        globalStages.mark(TickStages.globalLevels);
         ticking.globalScheduler().drain();
-        globalStages.mark(GlobalStage.GLOBAL_DRAIN);
+        globalStages.mark(TickStages.globalDrain);
         leafs$barrierWindow.runGlobalPhase();
-        globalStages.mark(GlobalStage.WINDOW);
+        globalStages.mark(TickStages.globalWindow);
     }
 
     /** Tick functions execute in the barrier window. The tick_functions_work rule cuts the loop; reload stays. */

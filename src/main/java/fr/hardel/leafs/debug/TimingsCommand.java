@@ -2,11 +2,10 @@ package fr.hardel.leafs.debug;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import fr.hardel.leafs.metrics.GlobalStage;
-import fr.hardel.leafs.metrics.RegionStage;
-import fr.hardel.leafs.metrics.SerialStage;
 import fr.hardel.leafs.metrics.StageTimings;
-import fr.hardel.leafs.metrics.TickStage;
+import fr.hardel.leafs.metrics.TickStages.TickFamily;
+import fr.hardel.leafs.metrics.TickStages.TickStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.LevelTickUnit;
@@ -48,7 +47,7 @@ public final class TimingsCommand {
             .append(Component.literal("server thread").withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("stages", formatMillis(sum(averages)))), false);
 
-        return sendStages(source, GlobalStage.values(), averages);
+        return sendStages(source, TickFamily.GLOBAL, averages);
     }
 
     private static int serial(CommandSourceStack source, ServerLevel level) {
@@ -64,7 +63,7 @@ public final class TimingsCommand {
             .append(Component.literal("serial " + CommandText.shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(unit.timings().sample(System.nanoTime()))), false);
 
-        return sendStages(source, SerialStage.values(), averages);
+        return sendStages(source, TickFamily.SERIAL, averages);
     }
 
     private static int region(CommandSourceStack source, ServerLevel level, int regionId) {
@@ -89,18 +88,18 @@ public final class TimingsCommand {
             .append(CommandText.stat("chunks", region.chunkCount()))
             .append(CommandText.stat("entities", region.entityCount())), false);
 
-        return sendStages(source, RegionStage.values(), averages);
+        return sendStages(source, TickFamily.REGION, averages);
     }
 
-    private static int sendStages(CommandSourceStack source, TickStage[] stages, long[] averages) {
-        for (TickStage stage : stages) {
-            long nanos = averages[stage.ordinal()];
+    private static int sendStages(CommandSourceStack source, TickFamily family, long[] averages) {
+        for (TickStage stage : TickStages.of(family)) {
+            long nanos = averages[stage.index()];
             source.sendSuccess(() -> Component.empty()
-                .append(CommandText.gray("  " + stage.label() + " "))
+                .append(CommandText.gray("  " + stage.id() + " "))
                 .append(CommandText.white(formatMillis(nanos))), false);
         }
 
-        return stages.length;
+        return TickStages.count(family);
     }
 
     private static long sum(long[] averages) {
