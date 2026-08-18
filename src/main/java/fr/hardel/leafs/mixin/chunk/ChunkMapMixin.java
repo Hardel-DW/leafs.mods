@@ -19,9 +19,8 @@ import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.metrics.SerialStage;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
-import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.RegionTickData;
+import fr.hardel.leafs.ticking.SerialWorkBudget;
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
@@ -34,6 +33,7 @@ import it.unimi.dsi.fastutil.longs.Long2LongMaps;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkHolder;
@@ -139,7 +139,14 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
     private TicketStorage ticketStorage;
 
     @Unique
+    private static final int leafs$DECISIONS_FLOOR = 50;
+
+    @Unique
     private final ConcurrentLinkedQueue<ChunkGenerationTask> leafs$pendingGenerationTasks = new ConcurrentLinkedQueue<>();
+
+    /** Serial-phase only: the drop entries an exhausted budget pushed to a later tick, in decision order. */
+    @Unique
+    private final LongLinkedOpenHashSet leafs$deferredDrops = new LongLinkedOpenHashSet();
 
     @Unique
     private ChunkScheduling leafs$scheduling;
@@ -234,17 +241,31 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
     /**
      * The unload decisions run before vanilla's loop, which then finds toDrop empty. Each claim is
      * atomic under the position's scheduling cell, so a concurrent drain that raises the level again
-     * keeps its chunk instead of losing it to a stale drop entry.
+     * keeps its chunk instead of losing it to a stale drop entry. The decisions share the serial
+     * work budget above a floor, so a mass drop wave defers to later ticks; the claim re-validates
+     * a deferred entry, so a chunk revived in between simply stays.
      */
     @Inject(method = "processUnloads", at = @At("HEAD"))
     private void leafs$lockedUnloadDecisions(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         for (LongIterator iterator = this.toDrop.iterator(); iterator.hasNext(); iterator.remove()) {
+            leafs$deferredDrops.add(iterator.nextLong());
+        }
+
+        SerialWorkBudget budget = leafs$ticking().serialBudget();
+        boolean drainAll = leafs$ticking().halted();
+        int decided = 0;
+        for (LongIterator iterator = leafs$deferredDrops.iterator(); iterator.hasNext(); ) {
             long pos = iterator.nextLong();
+            iterator.remove();
             ChunkHolder holder = leafs$scheduling.claimUnload(pos);
             if (holder != null) {
                 leafs$regions().chunkHolderDestroyed(ChunkPos.getX(pos), ChunkPos.getZ(pos));
                 leafs$ticking().metrics().chunkUnloads().increment();
                 scheduleUnload(pos, holder);
+            }
+
+            if (!drainAll && ++decided >= leafs$DECISIONS_FLOOR && budget.expired(System.nanoTime())) {
+                break;
             }
         }
     }
@@ -331,16 +352,20 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         return original.call(future, body, owner);
     }
 
-    /** The autosave sweep offers each chunk to its owner, which snapshots it on its own thread through the budgeted lane. */
-    @WrapOperation(method = "saveAllChunks", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;saveChunkIfNeeded(Lnet/minecraft/server/level/ChunkHolder;J)Z"))
-    private boolean leafs$autosaveOnTheOwner(ChunkMap map, ChunkHolder holder, long now, Operation<Boolean> original) {
-        ChunkPos pos = holder.getPos();
-        Region<RegionTickData> owner = leafs$regions().regionizer().regionAt(pos.x(), pos.z());
-        if (leafs$regions().unloads().offer(owner, pos.x(), pos.z(), () -> map.saveChunkIfNeeded(holder, now))) {
-            return false;
+    /**
+     * The autosave leaves the global thread: the epoch bump replaces the holder walk, each region
+     * walks its own chunks on its own tick. An empty server keeps the vanilla inline walk, because
+     * its parked regions would consume no epoch before the pause.
+     */
+    @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
+    private void leafs$epochAutosave(boolean flushStorage, CallbackInfo callbackInfo) {
+        if (flushStorage || ((ChunkMap) (Object) this).level.getServer().getPlayerList().getPlayers().isEmpty()) {
+            return;
         }
 
-        return original.call(map, holder, now);
+        this.nextChunkSaveTime.clear();
+        leafs$regions().bumpAutosaveEpoch();
+        callbackInfo.cancel();
     }
 
     /** View diffs run on the player's owner: the region for its own players, the serial pass only for players no region ticks. */

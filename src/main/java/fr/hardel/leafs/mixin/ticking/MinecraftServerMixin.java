@@ -37,7 +37,9 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     /** The global stage sample spans {@code tickServer}; an early pause-branch return still publishes at RETURN. */
     @Inject(method = "tickServer", at = @At("HEAD"))
     private void leafs$beginGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$ticking.metrics().globalStages().beginTick(System.nanoTime());
+        long now = System.nanoTime();
+        leafs$ticking.metrics().globalStages().beginTick(now);
+        leafs$ticking.serialBudget().beginTick(now);
     }
 
     @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V", shift = At.Shift.AFTER))

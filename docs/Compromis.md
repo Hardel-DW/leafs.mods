@@ -10,5 +10,4 @@ Chaque écart volontaire avec le comportement vanilla est listé ici, avec sa ra
 6. Quand un joueur passe le relais entre sa région et le filet global, une fenêtre rare de 50 ms peut compter un de ses ticks en double, une dérive d'un tick sur un compteur comme la faim. Leafs accepte cet écart pour ne maintenir aucune liste d'appartenance.
 7. Un joueur qui se déconnecte pendant qu'il écrit un livre ou une pancarte abandonne le texte et son exécution, la même forme que Folia.
 8. Les commandes tapées dans le chat s'exécutent sur la phase globale du serveur, pas sur le thread du joueur, parce que la phase globale est le seul endroit où une commande peut charger des chunks arbitraires.
-9. Le tick d'une entité nouvellement créée se termine sur la phase sérielle du niveau. Sous forte charge, un item droppé apparaît au tick sériel suivant.
-10. Un arrêt brutal de la machine, un kill ou une coupure de courant, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture, que vanilla aurait déjà posées sur le disque. Un arrêt normal attend toutes les écritures.
+9. Un arrêt brutal de la machine, un kill ou une coupure de courant, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture, que vanilla aurait déjà posées sur le disque. Un arrêt normal attend toutes les écritures.
