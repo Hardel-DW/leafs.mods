@@ -46,3 +46,4 @@ accessible field net/minecraft/server/level/ChunkMap pendingUnloads Lit/unimi/ds
 accessible field net/minecraft/server/level/ChunkMap serverViewDistance I
 accessible field net/minecraft/server/level/DistanceManager simulationDistance I
 accessible class net/minecraft/server/level/DistanceManager$PlayerTicketTracker
+accessible method net/minecraft/server/players/PlayerList save (Lnet/minecraft/server/level/ServerPlayer;)V

@@ -17,6 +17,4 @@ public interface EntityManagerAccess {
     void leafs$requeueUnload(long chunkKey);
 
     LongSet leafs$chunksToUnload();
-
-    LongSet leafs$chunksToSave();
 }

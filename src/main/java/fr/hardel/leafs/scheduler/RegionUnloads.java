@@ -25,7 +25,6 @@ public final class RegionUnloads<R extends RegionTaskHost> {
         return offer(owners.remove(pos), chunkX, chunkZ, teardown);
     }
 
-    /** Same lane for the autosave sweep: the owner snapshots its own chunks, spread by the drain budget. */
     public boolean offer(Region<R> owner, int chunkX, int chunkZ, Runnable task) {
         return owner != null && owner.data().unloadQueues().offer(new QueuedTask(chunkX, chunkZ, task));
     }

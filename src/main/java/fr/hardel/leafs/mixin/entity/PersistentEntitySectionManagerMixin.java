@@ -76,11 +76,6 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
         throw new IllegalStateException("Shadowed method body");
     }
 
-    @Shadow
-    private LongSet getAllChunksToSave() {
-        throw new IllegalStateException("Shadowed method body");
-    }
-
     @Unique
     private RegionEntityPersistence leafs$persistence;
 
@@ -121,10 +116,10 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
         }
     }
 
+    /** The epoch walk of each region stores its entity chunks; the vanilla body only survives for an empty server, whose regions consume no epoch. */
     @Inject(method = "autoSave", at = @At("HEAD"), cancellable = true)
     private void leafs$autosaveOnTheOwner(CallbackInfo callbackInfo) {
-        if (leafs$persistence != null) {
-            leafs$persistence.autoSave();
+        if (leafs$persistence != null && !leafs$persistence.level().getServer().getPlayerList().getPlayers().isEmpty()) {
             callbackInfo.cancel();
         }
     }
@@ -168,10 +163,5 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     @Override
     public LongSet leafs$chunksToUnload() {
         return chunksToUnload;
-    }
-
-    @Override
-    public LongSet leafs$chunksToSave() {
-        return getAllChunksToSave();
     }
 }
