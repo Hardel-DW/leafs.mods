@@ -31,6 +31,7 @@
 		"entity.ServerPlayerMixin",
 		"entity.TrackedEntityMixin",
 		"global.CommandBlockMixin",
+		"global.CommandsMixin",
 		"global.DedicatedServerMixin",
 		"global.MapIndexMixin",
 		"global.MapItemSavedDataMixin",
@@ -75,3 +76,4 @@
 		"requireAnnotations": true
 	}
 }
+
