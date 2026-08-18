@@ -16,7 +16,7 @@ import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.chunk.loader.StageTickets;
 import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.metrics.SerialStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -336,7 +336,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
 
         ChunkMap self = (ChunkMap) (Object) this;
         RegionEntityTracking.tickSerial(self);
-        leafs$ticking().markSerial(self.level, SerialStage.TRACKING);
+        leafs$ticking().markSerial(self.level, TickStages.serialTracking);
         callbackInfo.cancel();
     }
 

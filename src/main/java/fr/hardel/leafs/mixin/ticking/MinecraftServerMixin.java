@@ -3,7 +3,7 @@ package fr.hardel.leafs.mixin.ticking;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.metrics.GlobalStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -44,18 +44,18 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V", shift = At.Shift.AFTER))
     private void leafs$markConnectionsStage(CallbackInfo callbackInfo) {
-        leafs$ticking.metrics().globalStages().mark(GlobalStage.CONNECTIONS);
+        leafs$ticking.metrics().globalStages().mark(TickStages.globalConnections);
     }
 
     @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;tick()V", shift = At.Shift.AFTER))
     private void leafs$markPlayersStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        leafs$ticking.metrics().globalStages().mark(GlobalStage.PLAYERS);
+        leafs$ticking.metrics().globalStages().mark(TickStages.globalPlayers);
     }
 
     @Inject(method = "tickServer", at = @At("RETURN"))
     private void leafs$endGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         StageTimings globalStages = leafs$ticking.metrics().globalStages();
-        globalStages.mark(GlobalStage.AUTOSAVE);
+        globalStages.mark(TickStages.globalAutosave);
         globalStages.endTick();
     }
 
@@ -70,9 +70,9 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     @Inject(method = "tickChildren", at = @At("TAIL"))
     private void leafs$quiesceLevels(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         StageTimings globalStages = leafs$ticking.metrics().globalStages();
-        globalStages.mark(GlobalStage.SEND_CHUNKS);
+        globalStages.mark(TickStages.globalSendChunks);
         leafs$ticking.quiesce();
-        globalStages.mark(GlobalStage.QUIESCE);
+        globalStages.mark(TickStages.globalQuiesce);
     }
 
     /** Before the worlds save: the pool stops so saves read settled state, then pending teleports place. */

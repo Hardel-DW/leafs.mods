@@ -8,7 +8,7 @@ import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.entity.ServerEntityAccess;
-import fr.hardel.leafs.metrics.RegionStage;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.TickGuard;
@@ -78,7 +78,7 @@ public final class RegionTickBody {
     public void tick(Region<?> region, RegionWorldData worldData, RegionEntityData entityData, long tickCount, StageTimings stages) {
         worldData.clock().advance(tickCount);
         purgeTimedOutTickets(region);
-        stages.mark(RegionStage.TICKETS);
+        stages.mark(TickStages.regionTickets);
         entityData.tickList().beginTick();
         entityData.navigatingMobs().beginTick();
         entityData.tickList().forEach(entity -> {
@@ -86,35 +86,35 @@ public final class RegionTickBody {
                 RegionNetworkTick.drainOnRegion(player, level);
             }
         });
-        stages.mark(RegionStage.PACKETS);
+        stages.mark(TickStages.regionPackets);
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         boolean debug = level.isDebug();
         if (runs && !debug) {
             worldData.drainBlockTicks(guardedBlockTick);
-            stages.mark(RegionStage.BLOCK_TICKS);
+            stages.mark(TickStages.regionBlockTicks);
             worldData.drainFluidTicks(guardedFluidTick);
-            stages.mark(RegionStage.FLUID_TICKS);
+            stages.mark(TickStages.regionFluidTicks);
             tickChunks(region, worldData, stages);
-            stages.mark(RegionStage.CHUNK_TICK);
+            stages.mark(TickStages.regionChunkTick);
         }
 
         broadcastChangedChunks(worldData);
-        stages.mark(RegionStage.BROADCAST);
+        stages.mark(TickStages.regionBroadcast);
         RegionEntityTracking.tickRegion(level, entityData.tickList());
-        stages.mark(RegionStage.TRACKING);
+        stages.mark(TickStages.regionTracking);
         ServerChunkCache chunkSource = level.getChunkSource();
         LongPredicate tickingChunk = chunkSource::isPositionTicking;
         if (runs) {
             worldData.runBlockEvents(pos -> tickingChunk.test(ChunkPos.pack(pos)), this::runBlockEvent);
         }
 
-        stages.mark(RegionStage.BLOCK_EVENTS);
+        stages.mark(TickStages.regionBlockEvents);
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
             tickEntities(tickRateManager, entityData);
-            stages.mark(RegionStage.ENTITIES);
+            stages.mark(TickStages.regionEntities);
             worldData.blockEntityTickers().tickAll(runs, tickingChunk);
-            stages.mark(RegionStage.BLOCK_ENTITIES);
+            stages.mark(TickStages.regionBlockEntities);
         }
 
         ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickOwned(level);
@@ -127,7 +127,7 @@ public final class RegionTickBody {
                 player.connection.connection.flushChannel();
             }
         });
-        stages.mark(RegionStage.PLAYERS);
+        stages.mark(TickStages.regionPlayers);
     }
 
     /** The region's own timeout tickets count down here; an expiry retires its holder level, so the propagator drains right after. */
@@ -177,7 +177,7 @@ public final class RegionTickBody {
         List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
             ? List.of()
             : NaturalSpawner.getFilteredSpawningCategories(state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
-        stages.mark(RegionStage.SPAWN_CENSUS);
+        stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
             ChunkPos chunkPos = chunk.getPos();
