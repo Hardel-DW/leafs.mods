@@ -9,11 +9,12 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.Visibility;
 
 /**
- * Region routing of the entity persistence pipeline. Arrival, unload and autosave execute on the
- * region that owns the chunk, because the add and remove callbacks feed the per-region tick lists
- * and the NBT work must not ride the global thread. The serial phase only dispatches, and keeps the
- * inline fallback for chunks no region owns, which is legal there because it holds the exclusion.
- * Retries ride the vanilla chunksToUnload set, one truth source for what still has to leave.
+ * Region routing of the entity persistence pipeline. Arrival and unload execute on the region that
+ * owns the chunk, because the add and remove callbacks feed the per-region tick lists and the NBT
+ * work must not ride the global thread; the autosave store runs from each region's own epoch walk.
+ * The serial phase only dispatches the unloads, and keeps the inline fallback for chunks no region
+ * owns, which is legal there because it holds the exclusion. Retries ride the vanilla
+ * chunksToUnload set, one truth source for what still has to leave.
  */
 public final class RegionEntityPersistence {
     private final ServerLevel level;
@@ -22,6 +23,10 @@ public final class RegionEntityPersistence {
     public RegionEntityPersistence(ServerLevel level, EntityManagerAccess manager) {
         this.level = level;
         this.manager = manager;
+    }
+
+    public ServerLevel level() {
+        return level;
     }
 
     /** A loaded entity chunk lands on its owner; an empty chunk completes on the requesting owner and runs in place. */
@@ -40,9 +45,13 @@ public final class RegionEntityPersistence {
         }
     }
 
-    /** Same offer as the chunk autosave sweep: the owner serializes on its own thread through the budgeted lane. */
-    public void autoSave() {
-        manager.leafs$chunksToSave().forEach((long chunkKey) -> dispatch(chunkKey, () -> saveChunk(chunkKey)));
+    /** The owning region's autosave walk: stores the entity chunk like vanilla's entity autosave, a HIDDEN one unloads instead. */
+    public void saveChunkOnOwner(long chunkKey) {
+        if (manager.leafs$visibility(chunkKey) == Visibility.HIDDEN) {
+            unload(chunkKey);
+        } else {
+            manager.leafs$storeChunk(chunkKey);
+        }
     }
 
     /**
@@ -67,14 +76,6 @@ public final class RegionEntityPersistence {
 
         if (!manager.leafs$unloadChunk(chunkKey)) {
             manager.leafs$requeueUnload(chunkKey);
-        }
-    }
-
-    private void saveChunk(long chunkKey) {
-        if (manager.leafs$visibility(chunkKey) == Visibility.HIDDEN) {
-            unload(chunkKey);
-        } else {
-            manager.leafs$storeChunk(chunkKey);
         }
     }
 

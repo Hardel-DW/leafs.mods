@@ -41,22 +41,23 @@ import java.util.function.LongFunction;
  */
 public final class LevelTickUnit extends TickHandle {
     private static final int CENSUS_INTERVAL_TICKS = 100;
-    private static final long TASK_DRAIN_BUDGET_NANOS = 10_000_000L;
 
     private final ServerLevel level;
     private final LevelRegions regions;
     private final RegionTickScheduler scheduler;
+    private final SerialWorkBudget serialBudget;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
     private boolean activated;
     private volatile int lastChunkCount;
     private volatile int lastViewChunks;
 
-    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
+    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, SerialWorkBudget serialBudget) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), SerialStage.values().length);
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
+        this.serialBudget = serialBudget;
     }
 
     public LevelRegions regions() {
@@ -151,7 +152,7 @@ public final class LevelTickUnit extends TickHandle {
             stages.beginTick(System.nanoTime());
             runQueuedTasks();
             stages.mark(SerialStage.TASKS);
-            ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickLevel(level);
+            ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickOwned(level);
             stages.mark(SerialStage.SCHEDULERS);
             work.run();
 
@@ -182,9 +183,11 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** Time-boxed: a mass unload dump spreads over ticks instead of freezing the dimension in one. A slow task logs its origin. */
+    /**
+     * Time-boxed on the budget all dimensions share, so a mass unload dump spreads over ticks and a
+     * modded dimension count never widens the worst case. At least one task always runs; a slow one logs its origin.
+     */
     private void runQueuedTasks() {
-        long deadline = System.nanoTime() + TASK_DRAIN_BUDGET_NANOS;
         Runnable task;
         while ((task = tasks.poll()) != null) {
             long start = System.nanoTime();
@@ -195,7 +198,7 @@ public final class LevelTickUnit extends TickHandle {
                 Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
             }
 
-            if (end >= deadline) {
+            if (serialBudget.expired(end)) {
                 break;
             }
         }

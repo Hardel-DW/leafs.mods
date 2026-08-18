@@ -50,6 +50,9 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
     @Unique
     private EntityTeleports leafs$entityTeleports;
 
+    @Unique
+    private RegionEntityPersistence leafs$entityPersistence;
+
     @Override
     public LevelEntityLists leafs$entityLists() {
         return leafs$entityLists;
@@ -60,6 +63,11 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return leafs$entityTeleports;
     }
 
+    @Override
+    public RegionEntityPersistence leafs$entityPersistence() {
+        return leafs$entityPersistence;
+    }
+
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$swapForConcurrentFacade(CallbackInfo callbackInfo) {
         this.dragonParts = new ConcurrentInt2ObjectMap<>();
@@ -68,7 +76,8 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         ServerLevel self = (ServerLevel) (Object) this;
         this.leafs$entityTeleports = new EntityTeleports(self, new TickingBinding(self));
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
-        manager.leafs$bindPersistence(new RegionEntityPersistence(self, manager));
+        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager);
+        manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 
     /** Riding passengers are looked up in the owning unit's list; the vanilla list stays empty by routing. */

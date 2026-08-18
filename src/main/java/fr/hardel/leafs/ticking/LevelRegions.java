@@ -39,6 +39,9 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
 
+    /** Bumped by the global autosave trigger only; each region compares it against the epoch it last walked. */
+    private volatile long autosaveEpoch;
+
     /** Written only from the callbacks, which run under the regionizer write lock - hence plain increments. */
     private volatile long created;
     private volatile long merged;
@@ -111,6 +114,14 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public RegionUnloads<RegionTickData> unloads() {
         return unloads;
+    }
+
+    public void bumpAutosaveEpoch() {
+        autosaveEpoch++;
+    }
+
+    public long autosaveEpoch() {
+        return autosaveEpoch;
     }
 
     /** Universal-owner drain: the shutdown path and the exclusion-held wait loops run every queued region task inline. */
@@ -262,6 +273,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
 
         from.data().entityData().mergeInto(into.data().entityData());
+        into.data().autosave().absorb(from.data().autosave());
         merged++;
     }
 
@@ -293,6 +305,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
             return child == null ? null : child.data().entityData();
         });
+
+        for (Region<RegionTickData> child : children) {
+            child.data().autosave().inheritFrom(parent.data().autosave());
+        }
 
         split++;
     }

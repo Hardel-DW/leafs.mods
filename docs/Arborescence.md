@@ -9,7 +9,7 @@ Un dossier égale une responsabilité. Le code vit dans `src/main/java/fr/hardel
 | `region/` | Le découpage du monde : sections, régions, fusion, scission, le `Regionizer`. Pur, sans dépendance Minecraft. |
 | `ticking/` | L'orchestration : le scheduler des workers, les unités de tick par niveau, le verrou par niveau, la barrière, le watchdog, les timings. |
 | `world/` | Le corps du tick de région et les états de monde par région : ticks programmés, évènements de blocs, horloge, aléatoire, block entities, mises à jour de voisinage. |
-| `entity/` | Les entités : listes de tick par région, index concurrents, téléportations et pipeline inter dimensions, schedulers d'entités, primitives concurrentes maison. |
+| `entity/` | Les entités : listes de tick par région, index concurrents, routage de la persistance vers les régions propriétaires, téléportations et pipeline inter dimensions, schedulers d'entités, primitives concurrentes maison. |
 | `chunk/` | Le système de chunks : la table concurrente des holders, l'ordonnancement shardé et le pool de génération dans `core/`, le chargeur par joueur dans `loader/`, le propagateur de niveaux dans `propagator/`, plus les lectures des régions, les tickets, le tracking et le verrou des villages. |
 | `network/` | Le réseau : files de paquets par joueur, routage, le tick réseau par région, le filet global. |
 | `scheduler/` | Les schedulers publics, par région et global, avec les tickets de rétention de chunks, et le moteur du travail différé `DeferredWork` avec ses trois destinations. |

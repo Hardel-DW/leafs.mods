@@ -15,5 +15,6 @@ public enum RegionStage implements TickStage {
     BLOCK_EVENTS,
     ENTITIES,
     BLOCK_ENTITIES,
-    PLAYERS
+    PLAYERS,
+    AUTOSAVE
 }

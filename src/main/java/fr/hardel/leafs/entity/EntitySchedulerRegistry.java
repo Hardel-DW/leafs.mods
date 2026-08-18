@@ -34,7 +34,17 @@ public final class EntitySchedulerRegistry {
         }
     }
 
-    public void tickLevel(ServerLevel level) {
+    /**
+     * Ticks the schedulers of the entities the calling tick context owns: each region its own, the
+     * serial phase the residue in the attached lists. Ownership is read through the routing table,
+     * so a mod's task runs on the thread that owns the entity, never concurrently with its tick.
+     */
+    public void tickOwned(ServerLevel level) {
+        if (schedulers.isEmpty()) {
+            return;
+        }
+
+        LevelEntityLists lists = ((ServerLevelEntityAccess) level).leafs$entityLists();
         for (Map.Entry<UUID, EntityScheduler<Entity>> entry : schedulers.entrySet()) {
             EntityScheduler<Entity> scheduler = entry.getValue();
             if (!scheduler.hasPendingTasks()) {
@@ -42,7 +52,7 @@ public final class EntitySchedulerRegistry {
             }
 
             Entity entity = level.getEntity(entry.getKey());
-            if (entity != null) {
+            if (entity != null && lists.owns(entity)) {
                 scheduler.tick(entity);
             }
         }
