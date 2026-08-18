@@ -25,6 +25,11 @@ public final class CommandBlockWindow {
      * back on resumes every loop.
      */
     public static boolean deferBlockTick(ServerLevel level, BlockPos pos, BlockState state) {
+        DeferredTransports transports = TickingBinding.of(level);
+        if (transports.holdsWindow()) {
+            return false;
+        }
+
         BlockPos target = pos.immutable();
         CommandBlockEntity repeating = level.getBlockEntity(target) instanceof CommandBlockEntity commandBlock && commandBlock.getMode() == CommandBlockEntity.Mode.AUTO ? commandBlock : null;
 
@@ -36,7 +41,6 @@ public final class CommandBlockWindow {
             return true;
         }
 
-        DeferredTransports transports = TickingBinding.of(level);
         boolean deferred = DeferredWork.window(DeferReason.COMMAND_BLOCK, transports.stats(), () -> tickCommandBlock(level, target))
             .validIf(() -> level.getChunkSource().hasChunk(SectionPos.blockToSectionCoord(target.getX()), SectionPos.blockToSectionCoord(target.getZ())))
             .submit(transports);
@@ -48,9 +52,13 @@ public final class CommandBlockWindow {
         return deferred;
     }
 
-    /** The minecart can be destroyed before the window runs. */
+    /** The minecart can be destroyed before the window runs. Same re-entry rule as the block: the window's replay runs in place. */
     public static boolean deferMinecartActivation(ServerLevel level, MinecartCommandBlock minecart, int x, int y, int z, boolean powered) {
         DeferredTransports transports = TickingBinding.of(level);
+        if (transports.holdsWindow()) {
+            return false;
+        }
+
         return DeferredWork.window(DeferReason.MINECART_COMMAND_BLOCK, transports.stats(), () -> minecart.activateMinecart(level, x, y, z, powered))
             .validIf(() -> !minecart.isRemoved())
             .submit(transports);
