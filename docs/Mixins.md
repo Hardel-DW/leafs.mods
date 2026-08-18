@@ -97,8 +97,11 @@ Les séquences aléatoires passent sous le moniteur et chaque source renvoyée e
 ### `ServerWaypointManager`
 Toutes les mutations de la table des waypoints passent sous le moniteur. L'appel à `transmitters()` renvoie un snapshot immutable.
 
+### `Commands`
+Toute commande et toute mcfunction passe par `executeCommandInContext`, quel que soit le contenu qui la déclenche : une récompense d'advancement, un effet d'enchantement `run_function`, une commande de clic sur un panneau, un appel de mod. Une exécution déclenchée hors du thread serveur part entière dans la barrier window, parce qu'une commande peut toucher n'importe quel état du monde. Le thread serveur garde ses chemins vanilla, `#tick`, chat, console, rcon, et la fenêtre qui rejoue une exécution la fait tourner en place.
+
 ### `CommandBlock` et `MinecartCommandBlock`
-L'exécution d'un command block, fixe ou sur un minecart, est reportée dans la barrier window, parce qu'une commande peut toucher n'importe quel état du monde.
+L'exécution d'un command block, fixe ou sur un minecart, est reportée dans la barrier window, parce qu'une commande peut toucher n'importe quel état du monde. Quand la fenêtre rejoue le tick vanilla qu'elle a mis en file, le hook rend la main à vanilla au lieu de re-déférer.
 
 ### `PacketProcessor`
 Les paquets de jeu sont routés vers la file du joueur au lieu de la file globale du processeur. Le thread qui vide une file de joueur est reconnu comme un thread de paquets valide.
