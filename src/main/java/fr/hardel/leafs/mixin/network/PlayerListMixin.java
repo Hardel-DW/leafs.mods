@@ -114,7 +114,7 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         }
     }
 
-    /** Autosave snapshots a live player from the global thread; the owning level's exclusion orders it against region ticks. */
+    /** A region saving its own player runs in place; a global-thread save takes the exclusion to order against region ticks. */
     @WrapMethod(method = "save")
     private void leafs$savePlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
         if (player.level() instanceof ServerLevel level) {

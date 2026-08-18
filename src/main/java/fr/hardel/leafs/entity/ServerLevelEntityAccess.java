@@ -6,4 +6,6 @@ public interface ServerLevelEntityAccess {
     LevelEntityLists leafs$entityLists();
 
     EntityTeleports leafs$entityTeleports();
+
+    RegionEntityPersistence leafs$entityPersistence();
 }

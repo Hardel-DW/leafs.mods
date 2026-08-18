@@ -31,6 +31,7 @@ public final class TickingManager {
     private final RegionTickScheduler scheduler;
     private final ChunkWorkers chunkWorkers;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
+    private final SerialWorkBudget serialBudget = new SerialWorkBudget();
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
@@ -84,6 +85,15 @@ public final class TickingManager {
 
     public GlobalScheduler globalScheduler() {
         return globalScheduler;
+    }
+
+    public SerialWorkBudget serialBudget() {
+        return serialBudget;
+    }
+
+    /** True once {@code stopServer} began: budget deferrals stop, the shutdown drains remaining work in line. */
+    public boolean halted() {
+        return halted;
     }
 
     public ChunkWorkers chunkWorkers() {
@@ -236,6 +246,6 @@ public final class TickingManager {
     }
 
     private LevelTickUnit unitFor(ServerLevel level) {
-        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler));
+        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler, serialBudget));
     }
 }
