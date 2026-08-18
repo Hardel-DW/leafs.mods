@@ -75,6 +75,11 @@ public final class Region<R> {
         regionizer.forEachChunkOf(this, consumer);
     }
 
+    /** Copy of the section keys, safe to walk from any thread while the live set keeps moving. */
+    public long[] sectionKeySnapshot() {
+        return regionizer.sectionKeysOf(this);
+    }
+
     void setState(RegionState state) {
         this.state = state;
     }

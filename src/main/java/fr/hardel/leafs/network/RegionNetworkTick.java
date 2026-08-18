@@ -1,9 +1,11 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.global.BarrierWindow;
-import fr.hardel.leafs.metrics.WindowReason;
+import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.scheduler.DeferredTransports;
+import fr.hardel.leafs.scheduler.DeferredWork;
+import fr.hardel.leafs.ticking.TickingBinding;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
 import net.minecraft.network.Connection;
@@ -88,12 +90,10 @@ public final class RegionNetworkTick {
             return false;
         }
 
-        MinecraftServer server = listener.player.level().getServer();
-        BarrierWindow.of(server).enqueue(WindowReason.RESPAWN, () -> {
-            if (listener.connection.isConnected()) {
-                listener.handleClientCommand(packet);
-            }
-        });
+        DeferredTransports transports = TickingBinding.of((ServerLevel) listener.player.level());
+        DeferredWork.window(DeferReason.RESPAWN, transports.stats(), () -> listener.handleClientCommand(packet))
+            .validIf(listener.connection::isConnected)
+            .submit(transports);
 
         return true;
     }

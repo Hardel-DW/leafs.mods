@@ -1,7 +1,8 @@
 package fr.hardel.leafs.global;
 
 import fr.hardel.leafs.metrics.BarrierStats;
-import fr.hardel.leafs.metrics.WindowReason;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ticking.TickBarrier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -23,11 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BarrierWindowTest {
     private final TickBarrier barrier = new TickBarrier();
     private final BarrierStats stats = new BarrierStats();
-    private final BarrierWindow window = new BarrierWindow(barrier, stats);
+    private final BarrierWindow window = new BarrierWindow(barrier, stats, new DeferStats());
     private final List<String> executed = new ArrayList<>();
 
     private void enqueue(Runnable task) {
-        window.enqueue(WindowReason.CONSOLE_COMMAND, task);
+        window.enqueue(DeferReason.CONSOLE_COMMAND, task);
     }
 
     @Test

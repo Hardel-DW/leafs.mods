@@ -4,10 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -19,8 +19,50 @@ class TickGuardTest {
     @Test
     void ownershipViolationSkipsTheUnitInsteadOfCrashingTheRegion() {
         assertDoesNotThrow(() -> TickGuard.tickOrSkip(target -> {
-            throw new OwnershipViolationException("Chunk [4, 17] not present at minecraft:structure_starts in the visible map: a region worker cannot sync-load it");
+            throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "Chunk [4, 17] not present at minecraft:structure_starts in the visible map");
         }, "chunk [5, 18] spawn pass"));
+    }
+
+    @Test
+    void aGuardedDrainSkipsTheRefusedItemAndKeepsGoing() {
+        List<String> ticked = new ArrayList<>();
+        List<String> requeued = new ArrayList<>();
+        BiConsumer<String, String> guarded = TickGuard.guardingWithRetry((first, second) -> {
+            if (first.equals("refused")) {
+                throw new OwnershipViolationException(OwnershipViolationException.Kind.FOREIGN, "another region owns it");
+            }
+
+            ticked.add(first);
+        }, (first, second) -> requeued.add(first));
+
+        guarded.accept("one", "");
+        assertDoesNotThrow(() -> guarded.accept("refused", ""));
+        guarded.accept("two", "");
+
+        assertEquals(List.of("one", "two"), ticked);
+        assertEquals(List.of("refused"), requeued);
+    }
+
+    @Test
+    void aRefusedScheduledTickRequeuesExactlyOnce() {
+        List<String> requeued = new ArrayList<>();
+        BiConsumer<String, String> guarded = TickGuard.guardingWithRetry((first, second) -> {
+            throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "chunk not present");
+        }, (first, second) -> requeued.add(first));
+
+        guarded.accept("fluid at the border", "");
+
+        assertEquals(List.of("fluid at the border"), requeued);
+    }
+
+    @Test
+    void aGenuineFailureInAGuardedDrainStillCrashes() {
+        BiConsumer<String, String> guarded = TickGuard.guardingWithRetry((first, second) -> {
+            throw new IllegalStateException("genuine bug");
+        }, (first, second) -> {
+        });
+
+        assertThrows(IllegalStateException.class, () -> guarded.accept("hopper", ""));
     }
 
     @Test
@@ -36,14 +78,5 @@ class TickGuardTest {
         TickGuard.tickOrSkip(ticked::add, "Villager #114");
 
         assertEquals(List.of("Villager #114"), ticked);
-    }
-
-    /** A structure search refused mid-validation degrades onto vanilla's own not-found result. */
-    @Test
-    void aRefusedLookupDegradesOntoNotFound() {
-        assertEquals("stronghold", TickGuard.callOrNull(() -> "stronghold", "eye_of_ender"));
-        assertNull(TickGuard.callOrNull(() -> {
-            throw new OwnershipViolationException("Chunk [4, 17] not present");
-        }, "eye_of_ender"));
     }
 }

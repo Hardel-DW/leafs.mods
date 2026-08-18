@@ -25,20 +25,23 @@ public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
         leafs$level = level;
     }
 
+    /** The drain only runs once the pump is empty: a full pump must not pay a sweep of every region per task. */
     @WrapMethod(method = "pollTask")
     private boolean leafs$pumpWithUniversalDrain(Operation<Boolean> original) {
-        boolean ran = original.call();
+        if (original.call()) {
+            return true;
+        }
+
         ServerLevel level = leafs$level;
         if (level == null) {
-            return ran;
+            return false;
         }
 
         LevelRegions regions = LevelRegions.of(level);
-        if (regions.ownership().isLevelSerialHeldByCurrentThread()
-            || TickingManager.of(level.getServer()).barrier().isHeldByCurrentThread()) {
-            ran |= regions.drainTasksInline() > 0;
+        if (regions.ownership().isLevelSerialHeldByCurrentThread() || TickingManager.of(level.getServer()).barrier().isHeldByCurrentThread()) {
+            return regions.drainTasksInline() > 0;
         }
 
-        return ran;
+        return false;
     }
 }

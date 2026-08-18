@@ -1,13 +1,18 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
+import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.chunk.TicketStorageAccess;
+import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.entity.RegionEntityData;
 import fr.hardel.leafs.metrics.RegionStage;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.TickGuard;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.material.Fluid;
 import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import net.minecraft.core.BlockPos;
@@ -34,6 +39,7 @@ import net.minecraft.world.level.gamerules.GameRules;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 
@@ -47,9 +53,21 @@ public final class RegionTickBody {
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
 
     private final ServerLevel level;
+    private final BiConsumer<BlockPos, Block> guardedBlockTick;
+    private final BiConsumer<BlockPos, Fluid> guardedFluidTick;
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
+        this.guardedBlockTick = TickGuard.guardingWithRetry(level::tickBlock, this::requeueBlockTick);
+        this.guardedFluidTick = TickGuard.guardingWithRetry(level::tickFluid, this::requeueFluidTick);
+    }
+
+    private void requeueBlockTick(BlockPos pos, Block block) {
+        WorldTickContext.activeFor(level).requeueBlockTick(pos, block);
+    }
+
+    private void requeueFluidTick(BlockPos pos, Fluid fluid) {
+        WorldTickContext.activeFor(level).requeueFluidTick(pos, fluid);
     }
 
     public ServerLevel level() {
@@ -58,6 +76,8 @@ public final class RegionTickBody {
 
     public void tick(Region<?> region, RegionWorldData worldData, RegionEntityData entityData, long tickCount, StageTimings stages) {
         worldData.clock().advance(tickCount);
+        purgeTimedOutTickets(region);
+        stages.mark(RegionStage.TICKETS);
         entityData.tickList().beginTick();
         entityData.navigatingMobs().beginTick();
         entityData.tickList().forEach(entity -> {
@@ -70,9 +90,9 @@ public final class RegionTickBody {
         boolean runs = tickRateManager.runsNormally();
         boolean debug = level.isDebug();
         if (runs && !debug) {
-            worldData.drainBlockTicks(level::tickBlock);
+            worldData.drainBlockTicks(guardedBlockTick);
             stages.mark(RegionStage.BLOCK_TICKS);
-            worldData.drainFluidTicks(level::tickFluid);
+            worldData.drainFluidTicks(guardedFluidTick);
             stages.mark(RegionStage.FLUID_TICKS);
             tickChunks(region, worldData, stages);
             stages.mark(RegionStage.CHUNK_TICK);
@@ -106,6 +126,18 @@ public final class RegionTickBody {
             }
         });
         stages.mark(RegionStage.PLAYERS);
+    }
+
+    /** The region's own timeout tickets count down here; an expiry retires its holder level, so the propagator drains right after. */
+    private void purgeTimedOutTickets(Region<?> region) {
+        TicketTimeoutIndex timeouts = ((TicketStorageAccess) level.getChunkSource().ticketStorage).leafs$timeouts();
+        if (timeouts == null || timeouts.isEmpty()) {
+            return;
+        }
+
+        if (timeouts.purgeSections(region.sectionKeySnapshot()) > 0) {
+            ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().drain();
+        }
     }
 
     /** What is left of the serial {@code tickChunks} pass: the loaders of players no region ticks, then the custom spawners. */
@@ -191,17 +223,12 @@ public final class RegionTickBody {
     }
 
     /** Activation hand-off: vanilla's level-wide ticker list re-buckets to the owning regions, strays stay level-serial. */
+    // A ticker already asleep answers no position (Lithium); it stays level-serial where the sleeping guard applies.
     public void migrateVanillaBlockEntityTickers(LongFunction<RegionWorldData> regionByChunk) {
         List<TickingBlockEntity> vanilla = level.blockEntityTickers;
         List<TickingBlockEntity> kept = new ArrayList<>();
         for (TickingBlockEntity ticker : vanilla) {
             BlockPos pos = ticker.getPos();
-            // A ticker already asleep answers no position (Lithium); it stays level-serial where the sleeping guard applies.
-            if (pos == null) {
-                kept.add(ticker);
-                continue;
-            }
-
             long chunkKey = ChunkPos.pack(pos);
             RegionWorldData owner = regionByChunk.apply(chunkKey);
             if (owner != null) {
@@ -250,6 +277,7 @@ public final class RegionTickBody {
         }
     }
 
+    // A player in a still-loading chunk waits for the 1-radius FULL completion; vanilla would sync-load under it, a worker cannot.
     private void tickEntities(TickRateManager tickRateManager, RegionEntityData entityData) {
         ServerChunkCache chunkSource = level.getChunkSource();
         DistanceManager distanceManager = chunkSource.chunkMap.getDistanceManager();
@@ -259,7 +287,6 @@ public final class RegionTickBody {
             }
 
             entity.checkDespawn();
-            // A player in a still-loading chunk waits for the 1-radius FULL completion; vanilla would sync-load under it, a worker cannot.
             if (entity instanceof ServerPlayer ? chunkSource.isPositionTicking(entity.chunkPosition().pack()) : distanceManager.inEntityTickingRange(entity.chunkPosition().pack())) {
                 Entity vehicle = entity.getVehicle();
                 if (vehicle != null) {

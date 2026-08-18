@@ -2,12 +2,17 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiLockAccess;
 import fr.hardel.leafs.chunk.PoiVillageLock;
-import fr.hardel.leafs.entity.ConcurrentLongSet;
+import fr.hardel.leafs.chunk.SectionStorageAccess;
+import fr.hardel.excess.ConcurrentLongSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.level.LevelReader;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -51,6 +56,19 @@ public abstract class PoiManagerMixin {
     @WrapMethod(method = "sectionsToVillage")
     private int leafs$villageQueryUnderLock(SectionPos sectionPos, Operation<Integer> original) {
         return leafs$lock().callLocked(() -> original.call(sectionPos));
+    }
+
+    /**
+     * The one place POI forces chunks into existence, {@code getChunk(EMPTY, load)} over a square:
+     * legal for a universal owner, a sync load a region thread may not run. Off the owner the
+     * section gate already answers present-only, so skipping the force is the whole degradation.
+     */
+    @WrapMethod(method = "ensureLoadedAndValid")
+    private void leafs$forceLoadsOnlyAsUniversalOwner(LevelReader reader, BlockPos center, int radius, Operation<Void> original) {
+        ServerLevel level = ((SectionStorageAccess) this).leafs$level();
+        if (level == null || (!DegradedChunkReads.active() && level.getServer().isSameThread())) {
+            original.call(reader, center, radius);
+        }
     }
 
     @Unique

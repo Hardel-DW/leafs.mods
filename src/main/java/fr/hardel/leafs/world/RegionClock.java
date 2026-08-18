@@ -20,7 +20,6 @@ public final class RegionClock {
         return attachedSource != null ? attachedSource.getAsLong() : tick;
     }
 
-    /** Region bodies only; a late region advances by every missed period at once (catch-up). */
     public void advance(long ticks) {
         if (attachedSource != null) {
             throw new IllegalStateException("An attached clock follows game time and cannot be advanced");

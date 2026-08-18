@@ -1,15 +1,58 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PropagatorAccess;
-import fr.hardel.leafs.entity.EntityTeleports;
+import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.global.BarrierWindow;
-import fr.hardel.leafs.metrics.WindowReason;
-import fr.hardel.leafs.scheduler.RegionScheduler;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.metrics.DeferStats;
+import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import net.minecraft.server.level.ServerLevel;
 
-/** Hands ticking/'s per-level surfaces to entity/, which must not import ticking/. Resolved per call, the level activates later. */
-public record TickingBinding(ServerLevel level) implements EntityTeleports.LevelBinding {
+/** The per-level implementation of the three deferral transports, resolved per call because the level activates later. */
+public record TickingBinding(ServerLevel level) implements DeferredTransports {
+
+    public static DeferredTransports of(ServerLevel level) {
+        return new TickingBinding(level);
+    }
+
+    @Override
+    public void toWindow(DeferReason reason, Runnable task) {
+        BarrierWindow.of(level.getServer()).enqueue(reason, task);
+    }
+
+    @Override
+    public void toSerial(DeferReason reason, Runnable task) {
+        stats().countDeferral(reason);
+        TickingManager.of(level.getServer()).submitToLevel(level, task);
+    }
+
+    @Override
+    public void toOwner(DeferReason reason, int chunkX, int chunkZ, Runnable task) {
+        stats().countDeferral(reason);
+        scheduling().runOnOwner(chunkX, chunkZ, task);
+    }
+
+    @Override
+    public boolean holdsWindow() {
+        return BarrierWindow.of(level.getServer()).isDraining();
+    }
+
+    @Override
+    public boolean holdsSerial() {
+        return regions().ownership().isLevelSerialHeldByCurrentThread();
+    }
+
+    @Override
+    public boolean owns(int chunkX, int chunkZ) {
+        return scheduling().isOwner(chunkX, chunkZ);
+    }
+
+    @Override
+    public void runDegraded(Runnable task) {
+        DegradedChunkReads.run(task);
+    }
 
     @Override
     public SharedChunkHolds holds() {
@@ -17,31 +60,12 @@ public record TickingBinding(ServerLevel level) implements EntityTeleports.Level
     }
 
     @Override
-    public boolean currentRegionOwns(int chunkX, int chunkZ) {
-        return ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager())
-            .leafs$propagator().scheduling().currentRegionOwns(chunkX, chunkZ);
+    public DeferStats stats() {
+        return TickingManager.of(level.getServer()).metrics().deferStats();
     }
 
-    @Override
-    public void submitSerial(Runnable task) {
-        TickingManager ticking = TickingManager.of(level.getServer());
-        ticking.metrics().serialTeleports().increment();
-        ticking.submitToLevel(level, task);
-    }
-
-    @Override
-    public void submitWindow(Runnable task) {
-        BarrierWindow.of(level.getServer()).enqueue(WindowReason.PORTAL, task);
-    }
-
-    @Override
-    public void submitPlacement(int chunkX, int chunkZ, Runnable placement) {
-        RegionScheduler<RegionTickData> scheduler = regions().taskScheduler();
-        if (scheduler != null) {
-            scheduler.queue(chunkX, chunkZ, placement);
-        } else {
-            submitSerial(placement);
-        }
+    private ChunkScheduling scheduling() {
+        return ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
     }
 
     private LevelRegions regions() {

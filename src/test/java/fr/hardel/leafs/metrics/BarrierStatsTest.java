@@ -30,15 +30,4 @@ class BarrierStatsTest {
 
         assertEquals(0, stats.sample(80 * SECOND).opensPerMinute());
     }
-
-    @Test
-    void reasonCountersAreIndependent() {
-        stats.countReason(WindowReason.COMMAND_BLOCK);
-        stats.countReason(WindowReason.COMMAND_BLOCK);
-        stats.countReason(WindowReason.PORTAL);
-
-        assertEquals(2, stats.reason(WindowReason.COMMAND_BLOCK).total());
-        assertEquals(1, stats.reason(WindowReason.PORTAL).total());
-        assertEquals(0, stats.reason(WindowReason.RESPAWN).total());
-    }
 }

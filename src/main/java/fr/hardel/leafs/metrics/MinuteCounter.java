@@ -11,7 +11,6 @@ import java.util.function.LongSupplier;
  */
 public final class MinuteCounter {
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
-
     private final AtomicLongArray counts = new AtomicLongArray(60);
     private final AtomicLongArray seconds = new AtomicLongArray(60);
     private final LongAdder total = new LongAdder();
@@ -27,7 +26,7 @@ public final class MinuteCounter {
 
     public void increment() {
         long second = secondSource.getAsLong();
-        int slot = (int) Math.floorMod(second, 60);
+        int slot = Math.floorMod(second, 60);
         if (seconds.get(slot) != second) {
             seconds.set(slot, second);
             counts.set(slot, 0);

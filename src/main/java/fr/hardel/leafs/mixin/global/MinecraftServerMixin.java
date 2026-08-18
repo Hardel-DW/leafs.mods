@@ -8,7 +8,7 @@ import fr.hardel.leafs.global.LeafsGameRules;
 import fr.hardel.leafs.global.WindowPressure;
 import fr.hardel.leafs.metrics.GlobalStage;
 import fr.hardel.leafs.metrics.StageTimings;
-import fr.hardel.leafs.metrics.WindowReason;
+import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerFunctionManager;
@@ -41,7 +41,7 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createBarrierWindow(CallbackInfo callbackInfo) {
         TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
-        leafs$barrierWindow = new BarrierWindow(ticking.barrier(), ticking.metrics().barrier());
+        leafs$barrierWindow = new BarrierWindow(ticking.barrier(), ticking.metrics().barrier(), ticking.metrics().deferStats());
         leafs$windowPressure = new WindowPressure();
     }
 
@@ -66,7 +66,7 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
     private void leafs$functionsIntoWindow(ServerFunctionManager manager, Operation<Void> original) {
         boolean tickFunctionsDue = !manager.ticking.isEmpty() && ((MinecraftServer) (Object) this).getGameRules().get(LeafsGameRules.tickFunctionsWork);
         if (manager.postReload || tickFunctionsDue) {
-            leafs$barrierWindow.enqueue(WindowReason.TICK_FUNCTIONS, manager::tick);
+            leafs$barrierWindow.enqueue(DeferReason.TICK_FUNCTIONS, manager::tick);
         }
     }
 
