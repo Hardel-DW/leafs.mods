@@ -28,7 +28,6 @@ import java.util.function.Predicate;
 /** Merge and split only run between region ticks, under the regionizer's write lock. */
 public final class RegionWorldData {
     private static final int MAX_SCHEDULED_TICKS_PER_DRAIN = 65536;
-
     private final RegionClock clock;
     private final RegionScheduledTicks<Block> blockTicks;
     private final RegionScheduledTicks<Fluid> fluidTicks;
@@ -117,7 +116,6 @@ public final class RegionWorldData {
     public long advanceInhabitedTime(long gameTime) {
         long delta = gameTime - lastInhabitedUpdate;
         lastInhabitedUpdate = gameTime;
-
         return delta;
     }
 
@@ -187,14 +185,14 @@ public final class RegionWorldData {
     private void redistribute(int sectionShift, LongFunction<RegionWorldData> childBySection, boolean keepOrphans) {
         blockTicks.splitInto(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
-
             return child == null ? null : child.blockTicks;
         });
+
         fluidTicks.splitInto(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
-
             return child == null ? null : child.fluidTicks;
         });
+        
         List<BlockEventData> orphans = new ArrayList<>();
         for (BlockEventData event : blockEvents) {
             RegionWorldData child = childBySection.apply(CoordinateKey.pack(event.pos().getX() >> (4 + sectionShift), event.pos().getZ() >> (4 + sectionShift)));
