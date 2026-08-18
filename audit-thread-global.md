@@ -25,24 +25,19 @@ Ces items forment le socle O(1) que le projet vise. Ils ne posent aucun problèm
 | playerList.tick, buildServerStatus, timeSync | O(P) amorti sur 600, 100 et 20 ticks | MinecraftServer.java |
 | Ticks programmés, block events, entités et block entities attachés | O(résidu), proche de zéro dès que les régions couvrent les chunks actifs | world/RoutingScheduledTicks.java |
 | Purge résiduelle des tickets à timeout | O(sections orphelines de l'index), quasi nul. Chaque région purge ses propres sections pendant son tick | chunk/TicketTimeoutIndex.java |
+| Pipeline d'entités | O(D) de dispatch pour les décharges; l'ajout au monde, la sérialisation NBT et la désérialisation tournent sur les régions et le pool de chunks | entity/RegionEntityPersistence.java |
 
 ## Ce qui casse le déterminisme
 
 Chaque item ci-dessous fait dépendre le coût du thread global de la charge. Tous sont confirmés par les deux audits, dans le même ordre de sévérité.
 
-### 1. Le pipeline d'entités
+### 1. L'autosave
 
-`entityManager.tick()` (ServerLevel.java:456) draine toute la boîte de réception des chunks d'entités fraîchement chargés et ajoute chaque entité au monde sur le thread sériel, sans budget (PersistentEntitySectionManager.java:242). Le coût suit le débit de chargement, donc la vitesse de déplacement des joueurs. Un joueur en élytres le fait exploser.
+Toutes les 300 secondes environ, l'autosave fait trois balayages sur le thread global. P prises d'exclusion pour les sauvegardes de joueurs (PlayerListMixin.java:118). Un balayage de tous les holders visibles, O(L × C), chaque chunk étant offert à sa région (ChunkMapMixin.java:335). Et le même balayage pour les chunks d'entités, chaque chunk offert à sa région qui sérialise sur son propre thread (entity/RegionEntityPersistence.java). La sérialisation a quitté le thread global, le balayage de dispatch reste O(L × C) et concentré sur un tick.
 
-Les chunks sont régionalisés en profondeur, table concurrente, propagateur shardé, démontage et autosave offerts au propriétaire. Les entités entrent et sortent du monde entièrement en sériel. Cette asymétrie est le prochain gain structurel. L'ajout d'une entité au monde appartient à la région de sa position, comme le pas FULL des chunks.
+Le fix restant: étaler le balayage sur plusieurs ticks, ou le confier aux régions qui connaissent déjà leurs chunks.
 
-### 2. L'autosave
-
-Toutes les 300 secondes environ, l'autosave fait trois choses sur le thread global. P prises d'exclusion pour les sauvegardes de joueurs (PlayerListMixin.java:118). Un balayage de tous les holders visibles, O(L × C), chaque chunk étant offert à sa région (ChunkMapMixin.java:335). Et `entityManager.autoSave` (ServerLevel.java:891) qui sérialise les entités de tous les chunks à sauver sur le thread global, sous exclusion, sans offre à la région.
-
-Le résultat est un pic de latence proportionnel au monde, concentré sur un tick. Le balayage peut s'étaler, et la sauvegarde d'entités peut suivre le même chemin que celle des chunks.
-
-### 3. Le drain global sans budget de temps
+### 2. Le drain global sans budget de temps
 
 `GlobalScheduler.drain` (GlobalScheduler.java:15) borne le nombre de tâches par un snapshot de la file, mais pas leur durée. Les commandes tapées en chat y atterrissent (ServerGamePacketListenerImplMixin.java:53), et une commande comme /fill ou /locate s'exécute intégralement ici. Un seul joueur peut faire dépasser le thread global à volonté, sans aucun garde fou.
 
@@ -74,13 +69,13 @@ T_global ≈ O(1)                                    socle constant
   + O(K)                                           transport des connexions
   + L × [ O(sections orphelines de l'index)        purge résiduelle des tickets, quasi nul
         + O(Q_pompe + R)                           quiesce
-        + O(ΔC_load × E/chunk)                     entités, item 1
+        + O(D)                                     dispatch des décharges d'entités
         + O(Δ_tickets)                             trackers vanilla
         + O(min(Q_serial, 10 ms))                  file sérielle, budgétée par dimension
         + O(S) + O(D) + O(Δ_POI) ]
-  + O(Q_global × coût_commande)                    drain global, item 3
+  + O(Q_global × coût_commande)                    drain global, item 2
   + [fenêtre non vide] × (τ_max + O(Q_window))     barrière, sur évènement
-  + [tick d'autosave] × O(P + L×C + E)             autosave, item 2
+  + [tick d'autosave] × O(P + L×C)                 autosave, item 1, dispatch seulement
 ```
 
 Le "L × [...]" se lit comme une somme sur les dimensions, chacune avec ses propres valeurs. Une dimension vide coûte quasi rien, et c'est presque toujours l'overworld qui domine chaque terme.
@@ -88,4 +83,4 @@ Le "L × [...]" se lit comme une somme sur les dimensions, chacune avec ses prop
 ## Ordre d'attaque
 
 1. Les correctifs moyens. Budget global de la file sérielle, budget des décisions de déchargement, liste d'orphelins, groupage des exclusions d'envoi.
-2. Régionaliser le pipeline d'entités, chargement et autosave. C'est le chantier structurel suivant.
+2. Étaler les balayages d'autosave, ou les confier aux régions.
