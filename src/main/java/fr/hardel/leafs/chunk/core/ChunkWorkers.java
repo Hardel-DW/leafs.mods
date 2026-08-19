@@ -15,8 +15,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * The server's chunk progression pool: it runs the generation layer resumptions, the disk reads and
  * the drain reactions that vanilla funneled through one consecutive worldgen lane. Priorities live in
- * the dispatcher's queue, so the pool itself is plain FIFO threads. Thread count is the one real
- * arbitration knob between region ticks and generation, {@code chunk_threads} in the config.
+ * the dispatcher's queue, so the pool itself is plain FIFO threads. The pool is sized like the
+ * region pool, {@code max_threads} in the config, because an idle worker costs nothing. Under
+ * contention the minimum thread priority lets the OS serve region ticks, which have a 50 ms
+ * deadline, before generation, which is throughput work.
  */
 public final class ChunkWorkers implements Executor {
 
@@ -28,8 +30,12 @@ public final class ChunkWorkers implements Executor {
         this.threads = threads;
         AtomicInteger ids = new AtomicInteger(1);
         this.pool = new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
-            Thread thread = new Thread(runnable, "Leafs Chunk Worker #" + ids.getAndIncrement());
+            Thread thread = new Thread(() -> {
+                NativeThreadPriority.lowerCurrentThread();
+                runnable.run();
+            }, "Leafs Chunk Worker #" + ids.getAndIncrement());
             thread.setDaemon(true);
+            thread.setPriority(Thread.MIN_PRIORITY);
             thread.setUncaughtExceptionHandler((t, throwable) -> Leafs.LOGGER.error("Uncaught exception on {}", t.getName(), throwable));
             workerThreads.add(thread);
             return thread;

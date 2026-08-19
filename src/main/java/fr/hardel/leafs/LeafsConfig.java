@@ -19,7 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug) {
+public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -30,11 +30,6 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
     private static final Codec<Integer> MAX_THREADS = Codec.intRange(ALL_CORES, 1024)
         .validate(value -> value == 0
             ? DataResult.error(() -> "max_threads 0 is invalid: -1 uses all cores")
-            : DataResult.success(value));
-
-    private static final Codec<Integer> CHUNK_THREADS = Codec.intRange(ALL_CORES, 1024)
-        .validate(value -> value == 0
-            ? DataResult.error(() -> "chunk_threads 0 is invalid: -1 uses half the cores")
             : DataResult.success(value));
 
     private static final Codec<Integer> SECTION_SIZE = Codec.intRange(2, 256)
@@ -55,7 +50,6 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
 
     private static final MapCodec<LeafsConfig> MAP_CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
         MAX_THREADS.optionalFieldOf("max_threads", ALL_CORES).forGetter(LeafsConfig::maxThreads),
-        CHUNK_THREADS.optionalFieldOf("chunk_threads", ALL_CORES).forGetter(LeafsConfig::chunkThreads),
         SECTION_SIZE.optionalFieldOf("section_size", 16).forGetter(LeafsConfig::sectionSize),
         Codec.intRange(1, 8).optionalFieldOf("region_merge_distance", 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf("region_buffer_distance", 1).forGetter(LeafsConfig::regionBufferDistance),
@@ -108,10 +102,6 @@ public record LeafsConfig(int maxThreads, int chunkThreads, int sectionSize, int
 
     public int effectiveThreads() {
         return maxThreads > 0 ? maxThreads : Runtime.getRuntime().availableProcessors();
-    }
-
-    public int effectiveChunkThreads() {
-        return chunkThreads > 0 ? chunkThreads : Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
     }
 
     public int sectionShift() {
