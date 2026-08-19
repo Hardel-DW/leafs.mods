@@ -43,11 +43,11 @@ public final class TickingManager {
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), Duration.ofSeconds(config.debug().watchdogKillSeconds()), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
-        this.chunkWorkers = new ChunkWorkers(config.effectiveChunkThreads());
+        this.chunkWorkers = new ChunkWorkers(config.effectiveThreads());
         DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
-        Leafs.LOGGER.info("Leafs ticking live - {} region workers, {} chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads(), config.effectiveChunkThreads());
+        Leafs.LOGGER.info("Leafs ticking live - {} region workers and as many low-priority chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads());
     }
 
     public static TickingManager of(MinecraftServer server) {
