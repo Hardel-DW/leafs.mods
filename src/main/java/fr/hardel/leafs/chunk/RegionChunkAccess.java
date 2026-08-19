@@ -28,7 +28,8 @@ public final class RegionChunkAccess {
 
     /**
      * Deliberately ownership-blind: this backs the region body's own loops over chunks it owns by
-     * construction, where an ownership test per chunk per tick would buy no new refusal.
+     * construction, where an ownership test per chunk per tick would buy no new refusal. The
+     * companion mod's map reads through it too, a torn-read it tolerates by design.
      */
     public static LevelChunk fullChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
         return fullChunkOrNull(chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ)));
