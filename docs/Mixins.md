@@ -23,8 +23,10 @@ Les commandes tapées dans la console passent par la barrier window, parce qu'un
 - Le mixin `ticking/` porte le `LevelRegions`, qui contient le `Regionizer` et le verrou de la dimension. Le champ s'initialise avant le premier chunk holder.
 - Le mixin `chunk/` fait passer la sauvegarde du niveau sous le verrou exclusif de `LevelOwnership` et redirige les écritures de points d'intérêt vers la phase sérielle du niveau. Il fait aussi tiquer chaque spawner custom sous la portée de lecture dégradée : un spawner qui sonde un terrain jamais généré refuse et saute son passage au lieu de bloquer le thread sériel sur la génération, ce qui gelait toute la dimension.
 - Le mixin `entity/` remplace `dragonParts` par une map concurrente et `players` par une `CopyOnWriteArrayList`. Il crée les listes d'entités par région et le routeur de téléportation. Les ajouts et retraits de joueurs prennent le verrou exclusif et se sérialisent en plus entre régions, parce que deux régions partagent le côté lecture du verrou et toucheraient sinon les mêmes maps de joueurs du niveau en même temps.
-- Le mixin `global/` déplace l'exécution de la `TimerQueue` dans la barrier window, parce que les fonctions programmées peuvent toucher n'importe quel état du monde.
 - Le mixin `world/` redirige les ticks programmés, les block events, l'horloge de région, le générateur aléatoire, les mises à jour de voisinage et le cache de path types vers la région propriétaire. Les recherches de structures depuis une région renvoient un résultat vide au lieu de crasher quand un chunk n'est pas chargé.
+
+### `TimerQueue`
+L'exécution d'un callback planifié dû, une fonction de `/schedule`, part dans la barrier window, parce qu'elle peut toucher n'importe quel état du monde. Le hook porte sur l'appel du callback lui-même : la tenue de la file reste vanilla, et un tick sans évènement dû n'exécute aucun code de Leafs, donc n'ouvre jamais la fenêtre.
 
 ### `Level`
 Le compteur de sub-tick, le générateur aléatoire et le neighbor updater deviennent dépendants de la région qui tique. L'appel à `getBlockEntity` répond correctement depuis un worker de région au lieu de renvoyer null. L'enregistrement d'un block entity ticker va dans la région propriétaire du chunk si elle existe, pour que la région tique ses propres block entities.
