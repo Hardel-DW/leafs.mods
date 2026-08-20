@@ -3,8 +3,10 @@ package fr.hardel.leafs.network;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingBinding;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -64,9 +66,9 @@ public final class RegionNetworkTick {
         return PacketRouting.queueOf(listener).regionOwnerFresh(OWNER_STALE_NANOS);
     }
 
-    /** {@code Connection.tick}'s listener half: skipped while a region owns it, vanilla-complete otherwise (credits, login gap). */
+    /** {@code Connection.tick}'s listener half: skipped while a region owns it, otherwise the complete vanilla tick under the level exclusion, which is what makes the server thread own the positions its handlers read. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
-        if (!(listener instanceof ServerGamePacketListenerImpl game)) {
+        if (!(listener instanceof ServerGamePacketListenerImpl game) || !(game.player.level() instanceof ServerLevel level)) {
             original.run();
             return;
         }
@@ -75,8 +77,10 @@ public final class RegionNetworkTick {
             return;
         }
 
-        PacketRouting.queueOf(game).drain();
-        original.run();
+        LevelRegions.of(level).ownership().runExclusive(() -> {
+            PacketRouting.queueOf(game).drain();
+            TickGuard.tickOrSkip(ignored -> original.run(), game.player);
+        });
     }
 
     /**

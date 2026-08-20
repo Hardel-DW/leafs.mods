@@ -46,7 +46,7 @@ public final class AreaPreload {
 
     // The write square of createPortal, resident at FULL before a single block is placed: no partial frame.
     public static void ensurePortalWriteSquare(ServerLevel level, BlockPos origin) {
-        if (!DegradedChunkReads.active() && level.getServer().isSameThread()) {
+        if (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).isUniversalOwner()) {
             return;
         }
 
