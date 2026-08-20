@@ -32,6 +32,7 @@ Decompiled and reference sources are in the "repository" folder outside the work
 - No Commented Code.
 - If you have huge rename/move refactor, I can use Intelij, it does instantly.
 - sub-agent is not permitted to create a sub-agent
+- Line Width 180 characters
 
 # Long Term:
 No leaving work for later. We do everything end-to-end, cleanly and completely. We can potentially make several commits, but no leaving things for later. No shortcuts, no hacks. Everything done properly.

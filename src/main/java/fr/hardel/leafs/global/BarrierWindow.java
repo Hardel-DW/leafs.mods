@@ -9,7 +9,7 @@ import net.minecraft.server.MinecraftServer;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** Once-per-global-tick window: single-threaded work with full world access. An empty queue never raises the barrier. */
+// Once-per-global-tick window: single-threaded work with full world access. An empty queue never raises the barrier.
 public final class BarrierWindow {
     private final TickBarrier barrier;
     private final BarrierStats stats;
@@ -27,17 +27,23 @@ public final class BarrierWindow {
         return ((GlobalServerAccess) server).leafs$barrierWindow();
     }
 
+    // The direct callers outside the engine count their deferral here.
     public void enqueue(DeferReason reason, Runnable task) {
         deferStats.countDeferral(reason);
+        enqueue(task);
+    }
+
+    // The engine's entry: DeferredWork.submit already counted the deferral, a replay counts as a retry.
+    public void enqueue(Runnable task) {
         tasks.add(task);
     }
 
-    /** True while the calling thread runs a window task: its work already has the window's guarantees. */
+    // True while the calling thread runs a window task: its work already has the window's guarantees.
     public boolean isDraining() {
         return drainingThread == Thread.currentThread();
     }
 
-    /** Called by the global phase after the level ticks; tasks queued during the drain wait for the next window. */
+    // Called by the global phase after the level ticks; tasks queued during the drain wait for the next window.
     public void runGlobalPhase() {
         if (tasks.isEmpty()) {
             return;

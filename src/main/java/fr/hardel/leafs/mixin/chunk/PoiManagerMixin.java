@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.AreaPreload;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiLockAccess;
 import fr.hardel.leafs.chunk.PoiVillageLock;
@@ -24,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/** Concurrent loadedChunks facade plus village lock: the distance tracker graph cannot be made concurrent by facades. */
+// Concurrent loadedChunks facade plus village lock: the distance tracker graph cannot be made concurrent by facades.
 @Mixin(PoiManager.class)
 public abstract class PoiManagerMixin {
 
@@ -58,17 +59,16 @@ public abstract class PoiManagerMixin {
         return leafs$lock().callLocked(() -> original.call(sectionPos));
     }
 
-    /**
-     * The one place POI forces chunks into existence, {@code getChunk(EMPTY, load)} over a square:
-     * legal for a universal owner, a sync load a region thread may not run. Off the owner the
-     * section gate already answers present-only, so skipping the force is the whole degradation.
-     */
+    // The one place POI forces chunks into existence; off the universal owner the square's absent chunks are demanded in one pass, so an exit-portal search converges in one round trip.
     @WrapMethod(method = "ensureLoadedAndValid")
     private void leafs$forceLoadsOnlyAsUniversalOwner(LevelReader reader, BlockPos center, int radius, Operation<Void> original) {
         ServerLevel level = ((SectionStorageAccess) this).leafs$level();
         if (level == null || (!DegradedChunkReads.active() && level.getServer().isSameThread())) {
             original.call(reader, center, radius);
+            return;
         }
+
+        AreaPreload.ensurePoiSquare((PoiManager) (Object) this, level, center, radius);
     }
 
     @Unique
