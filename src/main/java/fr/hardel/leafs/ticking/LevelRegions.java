@@ -117,19 +117,21 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return autosaveEpoch;
     }
 
-    /** Universal-owner drain: the shutdown path and the exclusion-held wait loops run every queued region task inline. */
+    /** Universal-owner drain: the exclusion is what grants that ownership, without it a task routed to an owner would queue itself back forever. */
     public int drainTasksInline() {
         RegionScheduler<RegionTickData> scheduler = taskScheduler;
         if (scheduler == null) {
             return 0;
         }
 
-        int drained = scheduler.drainPendingInline();
-        for (Region<RegionTickData> region : regionizer.regionsView()) {
-            drained += scheduler.drain(region);
-        }
+        return ownership.callExclusive(() -> {
+            int drained = scheduler.drainPendingInline();
+            for (Region<RegionTickData> region : regionizer.regionsView()) {
+                drained += scheduler.drain(region);
+            }
 
-        return drained;
+            return drained;
+        });
     }
 
     /** Shutdown path, pool already stopped: every queued teardown runs inline so the final save misses nothing. */

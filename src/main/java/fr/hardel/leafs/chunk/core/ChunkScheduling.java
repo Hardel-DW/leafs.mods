@@ -51,15 +51,9 @@ public final class ChunkScheduling {
         return exclusion;
     }
 
-    /**
-     * The drain reaction, called by the propagator while it holds the 3x3 ticket area of the drained
-     * section. Level writes come first so every promotion sees its whole neighbourhood, then the
-     * status cancellations, then the future wiring whose side effects ride the owner executors.
-     */
+    /** The drain reaction, called by the propagator under the drained section's ticket area: level writes first, then the promotions; their side effects stage until the locks release. */
     public void applyLevelUpdates(Long2ByteLinkedOpenHashMap updates) {
-        if (deferredOwnerTasks.get() == null) {
-            deferredOwnerTasks.set(new ArrayList<>());
-        }
+        openStagingFrame();
 
         int minX = Integer.MAX_VALUE;
         int minZ = Integer.MAX_VALUE;
@@ -104,14 +98,22 @@ public final class ChunkScheduling {
         }
     }
 
-    /**
-     * Called by the propagator after each drained section releases its locks: the generation tasks
-     * start and the deferred owner routings queue for real. Posting a hold ticket takes the storage
-     * monitor, which a concurrent ticket writer holds while it waits for a cell of the ticket area;
-     * doing it while the drain still held that area would close a cycle between the two.
-     */
+    /** After the area locks release: a staged effect may post a ticket, whose storage monitor a writer can hold while waiting on a cell, a cycle if run under the area. */
     public void startCollectedTasks() {
         chunkMap.runGenerationTasks();
+        flushStagedTasks();
+    }
+
+    private boolean openStagingFrame() {
+        if (deferredOwnerTasks.get() != null) {
+            return false;
+        }
+
+        deferredOwnerTasks.set(new ArrayList<>());
+        return true;
+    }
+
+    private void flushStagedTasks() {
         List<DeferredOwnerTask> deferred = deferredOwnerTasks.get();
         if (deferred == null) {
             return;
@@ -125,6 +127,7 @@ public final class ChunkScheduling {
 
     /** A request path (getChunkFuture, addTicketAndLoadWithRadius) locks its area, then starts what it built. */
     public <T> T requestArea(int chunkX, int chunkZ, int radius, Supplier<T> request) {
+        boolean stagedHere = openStagingFrame();
         T result;
         AreaLock.Node node = schedulingLock.lock(chunkX, chunkZ, radius + SCHEDULING_MARGIN);
         try {
@@ -134,6 +137,10 @@ public final class ChunkScheduling {
         }
 
         chunkMap.runGenerationTasks();
+        if (stagedHere) {
+            flushStagedTasks();
+        }
+
         return result;
     }
 
@@ -149,19 +156,20 @@ public final class ChunkScheduling {
 
     /** Holder mutation outside a drain, like the send dependencies a player placement adds. */
     public void mutateArea(int chunkX, int chunkZ, int radius, Runnable mutation) {
+        boolean stagedHere = openStagingFrame();
         AreaLock.Node node = schedulingLock.lock(chunkX, chunkZ, radius);
         try {
             mutation.run();
         } finally {
             schedulingLock.unlock(node);
         }
+
+        if (stagedHere) {
+            flushStagedTasks();
+        }
     }
 
-    /**
-     * The serial unload decision, atomic against a concurrent drain that would revive the position:
-     * under the position's scheduling cell the level is re-read, and a chunk whose ticket level rose
-     * again stays. The claimed holder moves to the pending unloads before the cell releases.
-     */
+    /** The serial unload decision, atomic under the position's scheduling cell: a concurrent drain that raised the level again keeps its chunk. */
     public ChunkHolder claimUnload(long pos) {
         int chunkX = ChunkPos.getX(pos);
         int chunkZ = ChunkPos.getZ(pos);
@@ -190,14 +198,14 @@ public final class ChunkScheduling {
      * regions, the pump plays vanilla's main thread, which is what drives the spawn preparation.
      */
     public void runOnOwner(int chunkX, int chunkZ, Runnable task) {
-        if (isOwner(chunkX, chunkZ)) {
-            task.run();
-            return;
-        }
-
         List<DeferredOwnerTask> deferred = deferredOwnerTasks.get();
         if (deferred != null) {
             deferred.add(new DeferredOwnerTask(chunkX, chunkZ, task));
+            return;
+        }
+
+        if (isOwner(chunkX, chunkZ)) {
+            task.run();
             return;
         }
 
@@ -214,19 +222,14 @@ public final class ChunkScheduling {
         return isUniversalOwner() || currentRegionOwns(chunkX, chunkZ);
     }
 
-    /**
-     * Exclusion or barrier held means no region ticks anywhere on this level. The server thread is a
-     * universal owner unconditionally: every legitimate vanilla sync load runs there, between level
-     * ticks included. The accepted residual, documented in Fonctionnement, is that server-thread work
-     * outside the exclusion can still read a chunk a region owns; the contract's new coverage is
-     * every other thread.
-     */
+    // Exclusion or barrier held means no region ticks on this level. The server thread only keeps the right before the regions activate:
+    // once they tick, a vanilla sync load dies anyway, the concurrent timeout purge kills its one-tick unknown ticket mid-generation.
     public boolean isUniversalOwner() {
         if (regions.ownership().isLevelSerialHeldByCurrentThread() || ticking.barrier().isHeldByCurrentThread()) {
             return true;
         }
 
-        return chunkMap.level.getServer().isSameThread();
+        return regions.body() == null && chunkMap.level.getServer().isSameThread();
     }
 
     /** The refusal counters of this level's server; the chunk contract counts here at every throw. */

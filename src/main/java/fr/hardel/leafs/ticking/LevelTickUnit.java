@@ -146,9 +146,11 @@ public final class LevelTickUnit extends TickHandle {
         }
 
         pendingWork = null;
+        LevelEntityLists entityLists = ((ServerLevelEntityAccess) level).leafs$entityLists();
         regions.ownership().enterLevelSerial();
-        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), ((ServerLevelEntityAccess) level).leafs$entityLists().attached());
+        WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), entityLists.attached());
         try {
+            entityLists.rehomeStrays();
             StageTimings stages = stages();
             stages.beginTick(System.nanoTime());
             runQueuedTasks();

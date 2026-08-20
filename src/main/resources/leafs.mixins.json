@@ -66,10 +66,12 @@
 		"ticking.ServerLevelMixin",
 		"ticking.ServerTickRateManagerMixin",
 		"ticking.ServerWatchdogMixin",
+		"world.ChunkGeneratorMixin",
 		"world.LevelMixin",
 		"world.SerializableChunkDataMixin",
 		"world.ServerChunkCacheMixin",
 		"world.ServerLevelMixin",
+		"world.StructureCheckMixin",
 		"world.StructureManagerMixin"
 	],
 	"injectors": {

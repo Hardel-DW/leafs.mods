@@ -57,7 +57,7 @@ public final class RegionChunkAccess {
             readiness);
     }
 
-    static ChunkScheduling scheduling(ChunkMap chunkMap) {
+    public static ChunkScheduling scheduling(ChunkMap chunkMap) {
         return ((PropagatorAccess) chunkMap.getDistanceManager()).leafs$propagator().scheduling();
     }
 
