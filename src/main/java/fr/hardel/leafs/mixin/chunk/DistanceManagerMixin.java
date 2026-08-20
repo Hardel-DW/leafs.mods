@@ -3,37 +3,61 @@ package fr.hardel.leafs.mixin.chunk;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.PropagatorAccess;
+import fr.hardel.leafs.chunk.SpawnProximity;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
+import fr.hardel.leafs.chunk.propagator.SimulationLevels;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.LoadingChunkTracker;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.TicketStorage;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Pure read of spawn distance: vanilla's version drains the tracker queue, which only the serial side may run. */
+/**
+ * The three per-level distance authorities of Leafs hang here: the loading propagator, the
+ * simulation levels and the spawn proximity. Vanilla's graphs stay in place unfed, as the net for
+ * pre-binding strays, and run empty in steady state.
+ */
 @Mixin(DistanceManager.class)
 public abstract class DistanceManagerMixin implements PropagatorAccess {
-
-    @Shadow
-    @Final
-    private DistanceManager.FixedPlayerDistanceChunkTracker naturalSpawnChunkCounter;
 
     @Unique
     private volatile LevelTicketPropagator leafs$propagator;
 
+    @Unique
+    private volatile SimulationLevels leafs$simulation;
+
+    @Unique
+    private volatile SpawnProximity leafs$spawnProximity;
+
     @Override
     public LevelTicketPropagator leafs$propagator() {
         return leafs$propagator;
+    }
+
+    @Override
+    public SimulationLevels leafs$simulation() {
+        return leafs$simulation;
+    }
+
+    @Override
+    public SpawnProximity leafs$spawnProximity() {
+        return leafs$spawnProximity;
+    }
+
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$createAuthorities(CallbackInfo callbackInfo) {
+        leafs$propagator = new LevelTicketPropagator();
+        leafs$simulation = new SimulationLevels();
+        leafs$spawnProximity = new SpawnProximity();
     }
 
     /** The per-player loader owns the view and simulation tickets; the vanilla per-player halves disconnect here. */
@@ -53,29 +77,55 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
     private void leafs$noVanillaViewDistanceSweep(DistanceManager.PlayerTicketTracker tracker, int viewDistance, Operation<Void> original) {
     }
 
-    @Inject(method = "<init>", at = @At("TAIL"))
-    private void leafs$createPropagator(CallbackInfo callbackInfo) {
-        leafs$propagator = new LevelTicketPropagator();
+    /** The spawn disk marks directly at vanilla's own feed sites, instead of waking the serial graph. */
+    @WrapOperation(method = "addPlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/DistanceManager$FixedPlayerDistanceChunkTracker;update(JIZ)V"))
+    private void leafs$spawnDiskEnter(DistanceManager.FixedPlayerDistanceChunkTracker tracker, long pos, int level, boolean added, Operation<Void> original) {
+        leafs$spawnProximity.add(ChunkPos.getX(pos), ChunkPos.getZ(pos));
     }
 
-    /** The Leafs propagator replaces vanilla's budgeted graph; vanilla's drain stays as the net for pre-binding strays and runs empty. */
+    @WrapOperation(method = "removePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/DistanceManager$FixedPlayerDistanceChunkTracker;update(JIZ)V"))
+    private void leafs$spawnDiskLeave(DistanceManager.FixedPlayerDistanceChunkTracker tracker, long pos, int level, boolean added, Operation<Void> original) {
+        leafs$spawnProximity.remove(ChunkPos.getX(pos), ChunkPos.getZ(pos));
+    }
+
+    /** The serial net: both Leafs authorities drain here too, covering tickets posted where no loader ticks. */
     @WrapOperation(method = "runAllUpdates", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/LoadingChunkTracker;runDistanceUpdates(I)I"))
-    private int leafs$drainPropagator(LoadingChunkTracker tracker, int toProcess, Operation<Integer> original) {
+    private int leafs$drainAuthorities(LoadingChunkTracker tracker, int toProcess, Operation<Integer> original) {
         leafs$propagator.drain();
+        leafs$simulation.drain();
 
         return original.call(tracker, toProcess);
     }
 
     @Inject(method = "hasPlayersNearby", at = @At("HEAD"), cancellable = true)
-    private void leafs$pureSpawnDistanceRead(long pos, CallbackInfoReturnable<TriState> callbackInfo) {
-        int distance = this.naturalSpawnChunkCounter.chunks.get(pos);
-        TriState result;
-        if (distance <= NaturalSpawner.INSCRIBED_SQUARE_SPAWN_DISTANCE_CHUNK) {
-            result = TriState.TRUE;
-        } else {
-            result = distance > 8 ? TriState.FALSE : TriState.DEFAULT;
-        }
+    private void leafs$directSpawnProximity(long pos, CallbackInfoReturnable<TriState> callbackInfo) {
+        callbackInfo.setReturnValue(leafs$spawnProximity.nearby(pos));
+    }
 
-        callbackInfo.setReturnValue(result);
+    @Inject(method = "getNaturalSpawnChunkCount", at = @At("HEAD"), cancellable = true)
+    private void leafs$directSpawnChunkCount(CallbackInfoReturnable<Integer> callbackInfo) {
+        callbackInfo.setReturnValue(leafs$spawnProximity.coveredCount());
+    }
+
+    @Inject(method = "getSpawnCandidateChunks", at = @At("HEAD"), cancellable = true)
+    private void leafs$directSpawnCandidates(CallbackInfoReturnable<LongIterator> callbackInfo) {
+        callbackInfo.setReturnValue(leafs$spawnProximity.coveredChunks());
+    }
+
+    @Inject(method = "inEntityTickingRange", at = @At("HEAD"), cancellable = true)
+    private void leafs$shardedEntityTickingRange(long key, CallbackInfoReturnable<Boolean> callbackInfo) {
+        callbackInfo.setReturnValue(ChunkLevel.isEntityTicking(leafs$simulation.level(key)));
+    }
+
+    @Inject(method = "inBlockTickingRange", at = @At("HEAD"), cancellable = true)
+    private void leafs$shardedBlockTickingRange(long key, CallbackInfoReturnable<Boolean> callbackInfo) {
+        callbackInfo.setReturnValue(ChunkLevel.isBlockTicking(leafs$simulation.level(key)));
+    }
+
+    @Inject(method = "getChunkLevel", at = @At("HEAD"), cancellable = true)
+    private void leafs$shardedSimulationLevel(long key, boolean simulation, CallbackInfoReturnable<Integer> callbackInfo) {
+        if (simulation) {
+            callbackInfo.setReturnValue(leafs$simulation.level(key));
+        }
     }
 }

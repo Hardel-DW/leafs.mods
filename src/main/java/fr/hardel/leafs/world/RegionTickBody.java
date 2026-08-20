@@ -3,6 +3,7 @@ package fr.hardel.leafs.world;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.chunk.SpawnProximity;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
@@ -15,7 +16,6 @@ import fr.hardel.leafs.ownership.TickGuard;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import fr.hardel.leafs.region.Region;
-import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
 import net.minecraft.server.level.ChunkHolder;
@@ -138,7 +138,9 @@ public final class RegionTickBody {
         }
 
         if (timeouts.purgeSections(region.sectionKeySnapshot()) > 0) {
-            ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().drain();
+            PropagatorAccess access = (PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager();
+            access.leafs$propagator().drain();
+            access.leafs$simulation().drain();
         }
     }
 
@@ -161,13 +163,12 @@ public final class RegionTickBody {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
         DistanceManager distanceManager = chunkMap.getDistanceManager();
-        Long2ByteMap spawnLevels = distanceManager.naturalSpawnChunkCounter.chunks;
         long gameTime = level.getGameTime();
         long timeDiff = worldData.advanceInhabitedTime(gameTime);
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
-        int spawnableChunks = countAndCollect(region, chunkMap, spawnLevels, spawningChunks, randomTickingChunks);
+        int spawnableChunks = countAndCollect(region, chunkMap, spawningChunks, randomTickingChunks);
         NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, collectRegionEntities(region), (chunkKey, output) -> {
             ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
             if (holder != null) {
@@ -197,8 +198,9 @@ public final class RegionTickBody {
     }
 
     /** One pass over the owned chunks: the spawnable census, the spawning list and the random-tick list. */
-    private int countAndCollect(Region<?> region, ChunkMap chunkMap, Long2ByteMap spawnLevels, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
+    private int countAndCollect(Region<?> region, ChunkMap chunkMap, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
         DistanceManager distanceManager = chunkMap.getDistanceManager();
+        SpawnProximity proximity = ((PropagatorAccess) distanceManager).leafs$spawnProximity();
         int[] spawnable = new int[1];
         region.forEachChunk((chunkX, chunkZ) -> {
             long chunkKey = ChunkPos.pack(chunkX, chunkZ);
@@ -208,8 +210,7 @@ public final class RegionTickBody {
                 return;
             }
 
-            boolean nearPlayers = spawnLevels.containsKey(chunkKey);
-            if (nearPlayers) {
+            if (proximity.covered(chunkKey)) {
                 spawnable[0]++;
                 if (chunkMap.anyPlayerCloseEnoughForSpawningInternal(chunk.getPos())) {
                     spawningChunks.add(chunk);
