@@ -33,6 +33,17 @@ public final class LevelEntityLists {
         });
     }
 
+    public void rehomeStrays() {
+        attached.tickList().rehome(chunkKey -> {
+            RegionEntityData owner = resolver.apply(chunkKey);
+            return owner == attached ? null : owner.tickList();
+        });
+        attached.navigatingMobs().rehome(chunkKey -> {
+            RegionEntityData owner = resolver.apply(chunkKey);
+            return owner == attached ? null : owner.navigatingMobs();
+        });
+    }
+
     public void tickingStarted(Entity entity) {
         long chunkKey = entity.chunkPosition().pack();
         resolver.apply(chunkKey).tickList().add(entity.getId(), entity, chunkKey);

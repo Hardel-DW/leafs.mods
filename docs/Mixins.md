@@ -108,6 +108,9 @@ Les séquences aléatoires passent sous le moniteur et chaque source renvoyée e
 ### `ServerWaypointManager`
 Toutes les mutations de la table des waypoints passent sous le moniteur. L'appel à `transmitters()` renvoie un snapshot immutable.
 
+### `StructureManager`, `StructureCheck` et `ChunkGenerator`
+Une recherche de structure hors du propriétaire universel ne charge jamais de chunk : quand le vérificateur vanilla a prouvé qu'une structure existe ou naîtrait à une position, la réponse devient présente au lieu de demander un chargement, et vanilla rend la position tout seul. Une recherche avec référence rend la position immédiatement, et la référence s'écrit sur le thread propriétaire à la livraison du chunk. Les caches du vérificateur, que vanilla confinait au thread serveur, passent sous le moniteur de l'instance parce que les régions cherchent aussi. Les lectures de starts qui refusent malgré tout répondent une liste vide au lieu de faire crasher l'appelant.
+
 ### `Commands`
 Toute commande et toute mcfunction passe par `executeCommandInContext`, quel que soit le contenu qui la déclenche : une récompense d'advancement, un effet d'enchantement `run_function`, une commande de clic sur un panneau, un appel de mod. Une exécution déclenchée hors du thread serveur part entière dans la barrier window, parce qu'une commande peut toucher n'importe quel état du monde. Le thread serveur garde ses chemins vanilla, `#tick`, chat, console, rcon, et la fenêtre qui rejoue une exécution la fait tourner en place.
 

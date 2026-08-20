@@ -153,6 +153,21 @@ public final class RegionEntityTickList<E> {
         chunkKeys.clear();
     }
 
+    /** Owner-only sweep: an entry whose chunk has since gained a tick unit leaves for it through the mailbox, like any other cross-list arrival. */
+    public void rehome(LongFunction<RegionEntityTickList<E>> targetByChunk) {
+        drainPending();
+        for (int id : active.keySet().toIntArray()) {
+            long chunkKey = chunkKeys.get(id);
+            RegionEntityTickList<E> target = targetByChunk.apply(chunkKey);
+            if (target == null || target == this) {
+                continue;
+            }
+
+            target.queueAdd(id, active.get(id), chunkKey);
+            remove(id);
+        }
+    }
+
     private void drainPending() {
         if (pending.isEmpty()) {
             return;
