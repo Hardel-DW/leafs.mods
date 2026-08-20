@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.chunk.AreaPreload;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiLockAccess;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.PoiVillageLock;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
 import fr.hardel.excess.ConcurrentLongSet;
@@ -63,7 +64,7 @@ public abstract class PoiManagerMixin {
     @WrapMethod(method = "ensureLoadedAndValid")
     private void leafs$forceLoadsOnlyAsUniversalOwner(LevelReader reader, BlockPos center, int radius, Operation<Void> original) {
         ServerLevel level = ((SectionStorageAccess) this).leafs$level();
-        if (level == null || (!DegradedChunkReads.active() && level.getServer().isSameThread())) {
+        if (level == null || (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).isUniversalOwner())) {
             original.call(reader, center, radius);
             return;
         }
