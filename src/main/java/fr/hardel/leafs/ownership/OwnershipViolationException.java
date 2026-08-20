@@ -1,11 +1,8 @@
 package fr.hardel.leafs.ownership;
 
-/**
- * The chunk contract's typed refusal. ABSENT: the chunk is not loaded, a demand ticket has been
- * filed and a later attempt finds it. FOREIGN: the chunk is loaded but another region owns it, and
- * no ticket is filed because one would pin a holder that owner controls. Both are absorbed by
- * {@link TickGuard} at the nearest tick unit, never at the call site.
- */
+import java.util.concurrent.CompletableFuture;
+
+// The contract's typed refusal. ABSENT: not loaded, a demand ticket is filed, readiness completes at delivery. FOREIGN: another region owns it, no ticket. Absorbed by TickGuard, never at call sites.
 public final class OwnershipViolationException extends RuntimeException {
     public enum Kind {
         ABSENT,
@@ -13,13 +10,23 @@ public final class OwnershipViolationException extends RuntimeException {
     }
 
     private final Kind kind;
+    private final transient CompletableFuture<?> readiness;
 
     public OwnershipViolationException(Kind kind, String message) {
+        this(kind, message, null);
+    }
+
+    public OwnershipViolationException(Kind kind, String message, CompletableFuture<?> readiness) {
         super(message);
         this.kind = kind;
+        this.readiness = readiness;
     }
 
     public Kind kind() {
         return kind;
+    }
+
+    public CompletableFuture<?> readiness() {
+        return readiness;
     }
 }

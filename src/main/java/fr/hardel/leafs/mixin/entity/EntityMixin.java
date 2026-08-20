@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Entity hooks: scheduler retirement, teleport diversion off the owning region, portal-search deferral. */
+// Entity hooks: scheduler retirement, teleport diversion off the owning region, portal-search deferral.
 @Mixin(Entity.class)
 public abstract class EntityMixin {
 
@@ -28,7 +28,7 @@ public abstract class EntityMixin {
         }
     }
 
-    /** Region workers only: the serial side runs vanilla inline, a wider gate re-diverts its own deferred tasks forever. */
+    // Region workers only: the serial side runs vanilla inline, a wider gate re-diverts its own deferred tasks forever.
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffOwnerTeleport(TeleportTransition transition, CallbackInfoReturnable<Entity> callbackInfo) {
         Entity self = (Entity) (Object) this;
@@ -37,19 +37,19 @@ public abstract class EntityMixin {
         }
 
         if (self.level() instanceof ServerLevel origin && !self.isRemoved()
-            && ((ServerLevelEntityAccess) origin).leafs$entityTeleports().divertFromRegion(self, transition)) {
+            && ((ServerLevelEntityAccess) origin).leafs$entityTeleports().route(self, transition)) {
             callbackInfo.setReturnValue(null);
         }
     }
 
-    /** The search writes foreign-dimension blocks; off a region worker the whole tail defers to the barrier window. */
+    // The search writes foreign-dimension blocks; off a region worker it defers to the window, the processor captured as the request.
     @WrapOperation(method = "handlePortal", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/PortalProcessor;getPortalDestination(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;"))
     private TeleportTransition leafs$deferPortalSearchOffOwner(PortalProcessor processor, ServerLevel level, Entity entity, Operation<TeleportTransition> original) {
         if (!(RegionContext.current() instanceof RegionContext.Region)) {
             return original.call(processor, level, entity);
         }
 
-        ((ServerLevelEntityAccess) level).leafs$entityTeleports().deferPortal(entity);
+        ((ServerLevelEntityAccess) level).leafs$entityTeleports().deferPortal(entity, processor);
 
         return null;
     }

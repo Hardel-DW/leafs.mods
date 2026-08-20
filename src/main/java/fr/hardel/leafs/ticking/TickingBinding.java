@@ -4,10 +4,8 @@ import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.global.BarrierWindow;
-import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.scheduler.DeferredTransports;
-import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import net.minecraft.server.level.ServerLevel;
 
 /** The per-level implementation of the three deferral transports, resolved per call because the level activates later. */
@@ -18,19 +16,17 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     }
 
     @Override
-    public void toWindow(DeferReason reason, Runnable task) {
-        BarrierWindow.of(level.getServer()).enqueue(reason, task);
+    public void toWindow(Runnable task) {
+        BarrierWindow.of(level.getServer()).enqueue(task);
     }
 
     @Override
-    public void toSerial(DeferReason reason, Runnable task) {
-        stats().countDeferral(reason);
+    public void toSerial(Runnable task) {
         TickingManager.of(level.getServer()).submitToLevel(level, task);
     }
 
     @Override
-    public void toOwner(DeferReason reason, int chunkX, int chunkZ, Runnable task) {
-        stats().countDeferral(reason);
+    public void toOwner(int chunkX, int chunkZ, Runnable task) {
         scheduling().runOnOwner(chunkX, chunkZ, task);
     }
 
@@ -52,11 +48,6 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     @Override
     public void runDegraded(Runnable task) {
         DegradedChunkReads.run(task);
-    }
-
-    @Override
-    public SharedChunkHolds holds() {
-        return regions().holds();
     }
 
     @Override
