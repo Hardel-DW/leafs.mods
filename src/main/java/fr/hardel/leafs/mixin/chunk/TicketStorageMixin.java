@@ -6,6 +6,7 @@ import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
+import fr.hardel.leafs.chunk.propagator.SimulationLevels;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -21,9 +22,9 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 /**
- * The ticket table takes writers from any thread under one monitor. The loading listener feeds the
- * Leafs propagator inline, thread-safe by its area lock. The simulation listener still routes to the
- * level-serial side, because vanilla's simulation graph stays single-threaded.
+ * The ticket table takes writers from any thread under one monitor. The loading and simulation
+ * listeners feed the Leafs authorities inline, thread-safe by their area locks; vanilla's graphs
+ * only see pre-binding strays, routed to the level-serial side that owns them.
  */
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
@@ -149,13 +150,35 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
 
     @WrapMethod(method = "setSimulationChunkUpdatedListener")
     private void leafs$routeSimulationListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        original.call(leafs$routed(listener));
+        TicketStorage.ChunkUpdated strays = leafs$routed(listener);
+        TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
+            SimulationLevels simulation = leafs$simulation();
+            if (simulation == null) {
+                strays.update(key, level, onlyDecreased);
+                return;
+            }
+
+            simulation.feed(key, level);
+        };
+        original.call(shim);
     }
 
     @Unique
     private LevelTicketPropagator leafs$propagator() {
+        PropagatorAccess access = leafs$distanceAccess();
+        return access == null ? null : access.leafs$propagator();
+    }
+
+    @Unique
+    private SimulationLevels leafs$simulation() {
+        PropagatorAccess access = leafs$distanceAccess();
+        return access == null ? null : access.leafs$simulation();
+    }
+
+    @Unique
+    private PropagatorAccess leafs$distanceAccess() {
         ServerLevel owner = leafs$level;
-        return owner == null ? null : ((PropagatorAccess) owner.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator();
+        return owner == null ? null : (PropagatorAccess) owner.getChunkSource().chunkMap.getDistanceManager();
     }
 
     @Unique
