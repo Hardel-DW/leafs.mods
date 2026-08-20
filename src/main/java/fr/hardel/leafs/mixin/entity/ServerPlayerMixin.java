@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Player moves from region workers defer to the level-serial side. Pearl set goes concurrent for cross-region registration. */
+// Player moves from region workers defer to the level-serial side. Pearl set goes concurrent for cross-region registration.
 @Mixin(ServerPlayer.class)
 public abstract class ServerPlayerMixin {
 
@@ -32,7 +32,7 @@ public abstract class ServerPlayerMixin {
         this.enderPearls = ConcurrentHashMap.newKeySet();
     }
 
-    /** Region workers only: the serial side runs vanilla inline, a wider gate would re-divert its own deferred tasks forever. */
+    // Region workers only: the serial side runs vanilla inline, a wider gate would re-divert its own deferred tasks forever.
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/server/level/ServerPlayer;", at = @At("HEAD"), cancellable = true)
     private void leafs$deferOffOwnerPlayerMove(TeleportTransition transition, CallbackInfoReturnable<ServerPlayer> callbackInfo) {
         ServerPlayer self = (ServerPlayer) (Object) this;
@@ -40,7 +40,7 @@ public abstract class ServerPlayerMixin {
             return;
         }
 
-        if (((ServerLevelEntityAccess) origin).leafs$entityTeleports().divertPlayerFromRegion(self, transition)) {
+        if (!self.isRemoved() && ((ServerLevelEntityAccess) origin).leafs$entityTeleports().route(self, transition)) {
             callbackInfo.setReturnValue(null);
         }
     }

@@ -122,7 +122,7 @@ public final class RegionTickBody {
         entityData.tickList().forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 loader.tick(player);
-                RegionNetworkTick.tickListenerOnRegion(player, level.getServer());
+                TickGuard.tickOrSkip(ticked -> RegionNetworkTick.tickListenerOnRegion(ticked, level.getServer()), player);
                 player.connection.chunkSender.sendNextChunks(player);
                 player.connection.connection.flushChannel();
             }

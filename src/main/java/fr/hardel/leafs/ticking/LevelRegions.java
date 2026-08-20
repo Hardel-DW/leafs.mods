@@ -9,7 +9,6 @@ import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.scheduler.RegionUnloads;
-import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -32,7 +31,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     private final RegionUnloads<RegionTickData> unloads = new RegionUnloads<>();
 
     private volatile String dimension;
-    private volatile SharedChunkHolds holds;
     private volatile Consumer<Runnable> serialUnloadSink;
     private volatile RegionScheduler<RegionTickData> taskScheduler;
     private volatile Supplier<RegionWorldData> worldDataFactory;
@@ -75,12 +73,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
      * Regions are equipped first, the caller's migration then re-buckets the attached payloads, and
      * only then are the handles scheduled, so no region can tick against a half-migrated level.
      */
-    public void activate(String dimension, RegionTickScheduler scheduler, SharedChunkHolds holds, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
+    public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
         if (this.scheduler != null)
             return;
 
         this.dimension = dimension;
-        this.holds = holds;
         this.serialUnloadSink = serialUnloadSink;
         this.taskScheduler = taskScheduler;
         this.worldDataFactory = worldDataFactory;
@@ -102,10 +99,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public RegionTickBody body() {
         return body;
-    }
-
-    public SharedChunkHolds holds() {
-        return holds;
     }
 
     public RegionScheduler<RegionTickData> taskScheduler() {
