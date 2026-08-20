@@ -15,22 +15,18 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 /**
- * The chunk contract: every request from a thread that is not a universal owner gets one of three
- * answers, decided here and never at the call site. Mine, buffer included, passes. Absent refuses
- * with a demand ticket, so a later attempt finds the chunk. Foreign, loaded but owned by another
- * region, refuses without a ticket, because one would pin a holder that owner controls. Ownership is
- * tested before presence: a foreign chunk that happens to be present must still refuse.
+ * The chunk contract, decided here and never at the call site. Any thread may look at the published
+ * world: a peek answers from presence, foreign chunks included, because block state reads ride the
+ * volatile snapshot of the palette container. Only loading stays with the owner: a required read of
+ * an absent chunk refuses with a demand ticket so a later attempt finds it, and a required read of a
+ * foreign chunk refuses without a ticket, because one would pin a holder that owner controls.
  */
 public final class RegionChunkAccess {
 
     private RegionChunkAccess() {
     }
 
-    /**
-     * Deliberately ownership-blind: this backs the region body's own loops over chunks it owns by
-     * construction, where an ownership test per chunk per tick would buy no new refusal. The
-     * companion mod's map reads through it too, a torn-read it tolerates by design.
-     */
+    /** The peek form of the contract, backing {@code getChunkNow} and {@code hasChunk} from any thread. */
     public static LevelChunk fullChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
         return fullChunkOrNull(chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ)));
     }
@@ -40,32 +36,28 @@ public final class RegionChunkAccess {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
-    /** The peek form of the contract, backing {@code getChunkNow} and {@code hasChunk}: a foreign chunk answers absent. */
-    public static LevelChunk fullOwnedChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
-        return scheduling(chunkMap).isOwner(chunkX, chunkZ) ? fullChunkOrNull(chunkMap, chunkX, chunkZ) : null;
-    }
-
     /**
-     * The full form of the contract. A refused required read of an ABSENT chunk files a short-lived
-     * ticket, drains it and requests the status, so the pool loads the chunk and a later attempt
-     * finds it; the ticket alone would only pin a holder (roadmap 11). A FOREIGN refusal files
-     * nothing and names the owning region, so the log line is attributable.
+     * The full form of the contract. A peek answers from presence for every thread. A refused
+     * required read of an ABSENT chunk files a short-lived ticket, drains it and requests the
+     * status, so the pool loads the chunk and a later attempt finds it; the ticket alone would only
+     * pin a holder (roadmap 11). A required read of a FOREIGN chunk files nothing and names the
+     * owning region, so the log line is attributable.
      */
     public static ChunkAccess contractedChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {
+        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+        ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);
+        if (!required) {
+            return chunk;
+        }
+
         ChunkScheduling scheduling = scheduling(chunkMap);
         if (!scheduling.isOwner(chunkX, chunkZ)) {
-            if (!required) {
-                return null;
-            }
-
             scheduling.deferStats().countRefusal(OwnershipViolationException.Kind.FOREIGN, sourceOfCurrentThread());
             throw new OwnershipViolationException(OwnershipViolationException.Kind.FOREIGN,
                 "Chunk [" + chunkX + ", " + chunkZ + "] is owned by another region than " + RegionContext.current() + ": crossing costs a refusal, never a lock");
         }
 
-        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
-        ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);
-        if (chunk != null || !required) {
+        if (chunk != null) {
             return chunk;
         }
 

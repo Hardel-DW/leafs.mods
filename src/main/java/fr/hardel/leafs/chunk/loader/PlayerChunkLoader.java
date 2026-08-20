@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk.loader;
 
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
+import fr.hardel.leafs.chunk.propagator.SimulationLevels;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
@@ -34,12 +35,15 @@ public final class PlayerChunkLoader {
     private final ChunkMap chunkMap;
     private final StageTickets tickets;
     private final LevelTicketPropagator propagator;
+    private final SimulationLevels simulation;
     private final Map<ServerPlayer, PlayerViewState> states = new ConcurrentHashMap<>();
 
     public PlayerChunkLoader(ChunkMap chunkMap, StageTickets tickets) {
         this.chunkMap = chunkMap;
         this.tickets = tickets;
-        this.propagator = ((PropagatorAccess) chunkMap.getDistanceManager()).leafs$propagator();
+        PropagatorAccess access = (PropagatorAccess) chunkMap.getDistanceManager();
+        this.propagator = access.leafs$propagator();
+        this.simulation = access.leafs$simulation();
     }
 
     public void tick(ServerPlayer player) {
@@ -53,6 +57,7 @@ public final class PlayerChunkLoader {
         LongArrayList newLoads = startLoads(state);
         if (posted || !newLoads.isEmpty()) {
             propagator.drain();
+            simulation.drain();
         }
 
         requestLoads(newLoads);
@@ -60,6 +65,7 @@ public final class PlayerChunkLoader {
         progressed |= progressGenerating(state);
         if (progressed) {
             propagator.drain();
+            simulation.drain();
         }
     }
 

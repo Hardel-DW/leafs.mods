@@ -45,7 +45,7 @@ Le routage des commandes vers le global est un choix assumé, une commande doit 
 |---|---|---|---|
 | Drain de la pompe dans la quiesce | O(min(Q_pompe, budget partagé) + R) par dimension, plancher de 64 tâches, report au tick suivant, drain complet à l'extinction | Les attentes synchrones drainent la pompe elles-mêmes par managedBlock, un reliquat ne bloque personne | Fait |
 | Paquets de login | O(K_login) par tick, quelques comparaisons d'état et un keepalive par connexion | Un plafond affamerait les keepalives et ralentirait les handshakes pendant la vague qu'il prétend protéger, pour des microsecondes | Choix assumé, pas de budget |
-| Trackers de distance vanilla | O(Δ) ≈ O(P × vue²) en pointe (DistanceManager.java:69) | Seul le propagateur de chargement est shardé, la simulation, le spawn naturel et les tickets joueur restent sériels | Porter sur le modèle shardé |
+| Trackers de distance vanilla | O(1), les graphes vanilla tournent à vide | La simulation est portée sur le propagateur shardé (`SimulationLevels`), le spawn naturel sur le marquage direct de disque (`SpawnProximity`), et les tickets joueur étaient déjà morts avec le `PlayerTicketTracker` | Fait, 20 août |
 | Schedulers d'entité | O(S) de tests sériels, le travail tourne sur les régions (EntitySchedulerRegistry.tickOwned) | Chaque contexte de tick ne tique que les schedulers des entités qu'il possède ; la map est vide tant qu'aucun mod ne planifie | Aucun tant que S reste petit ; indexer par région si un mod planifie en masse |
 | Trois balayages O(P) à test unitaire O(1) | La capture des orphelins de network/OrphanNetworkSweep, le filet loader, le filet tracking | Une lecture volatile par joueur et par balayage. Le suspend, l'envoi et le resume-flush ne touchent plus que les orphelins capturés, une exclusion par niveau au lieu d'une par joueur. Les filets gardent la liste vivante parce qu'un instantané pourrait re-tiquer un joueur retiré | Aucun, le coût restant est le test lui-même |
 | Test de sommeil | O(P) par dimension, deux lectures de booléens par joueur (SleepStatus.update) | Décision de gameplay qui doit voir tous les joueurs, régionalisés compris | Aucun, vanilla incompressible |
@@ -64,7 +64,6 @@ T_global ≈ O(1)                                    socle constant
   + L × [ O(sections orphelines de l'index)        purge résiduelle des tickets, quasi nul
         + O(min(Q_pompe, budget) + R)              quiesce, plancher 64, report
         + O(D)                                     dispatch des décharges d'entités
-        + O(Δ_tickets)                             trackers vanilla
         + O(S) + O(Δ_POI) ]
   + O(min(Q_serial + D, 10 ms))                    file sérielle et décisions de déchargement, budget partagé entre dimensions
   + O(Q_global × coût_commande)                    drain global, item 1
@@ -76,4 +75,4 @@ Le "L × [...]" se lit comme une somme sur les dimensions, chacune avec ses prop
 
 ## Ordre d'attaque
 
-L'autosave, les correctifs moyens, les schedulers d'entité et le budget de la quiesce sont traités. Le budget des logins est écarté, un plafond nuirait aux handshakes pour des microsecondes. Reste un seul chantier : les trackers de distance vanilla.
+L'autosave, les correctifs moyens, les schedulers d'entité, le budget de la quiesce et les trackers de distance sont traités. Le budget des logins est écarté, un plafond nuirait aux handshakes pour des microsecondes. Aucun chantier ouvert : le seul poste sériel non borné restant est le drain global des commandes, item 1, un choix assumé.

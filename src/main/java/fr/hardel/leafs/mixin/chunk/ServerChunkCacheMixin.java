@@ -47,12 +47,12 @@ public abstract class ServerChunkCacheMixin {
         ((TicketStorageAccess) ((ServerChunkCache) (Object) this).ticketStorage).leafs$bindLevel(this.level);
     }
 
-    /** Off the main thread the concurrent table answers, with the contract's peek rule: a foreign chunk answers absent. */
+    /** Off the main thread the concurrent table answers, with the contract's peek rule: presence serves every thread. */
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
         if (DegradedChunkReads.active() || Thread.currentThread() != this.mainThread) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.fullOwnedChunkOrNull(self.chunkMap, x, z));
+            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z));
         }
     }
 
@@ -70,7 +70,7 @@ public abstract class ServerChunkCacheMixin {
     private void leafs$concurrentHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
         if (DegradedChunkReads.active() || Thread.currentThread() != this.mainThread) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.fullOwnedChunkOrNull(self.chunkMap, x, z) != null);
+            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
         }
     }
 

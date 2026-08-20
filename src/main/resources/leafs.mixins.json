@@ -6,6 +6,8 @@
 		"chunk.ChunkMapMixin",
 		"chunk.ChunkStatusTasksMixin",
 		"chunk.DistanceManagerMixin",
+		"chunk.HashMapPaletteMixin",
+		"chunk.PalettedContainerMixin",
 		"chunk.PoiManagerMixin",
 		"chunk.SectionStorageMixin",
 		"chunk.ServerChunkCacheMixin",
