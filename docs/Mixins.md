@@ -64,7 +64,10 @@ Le mixin met la table de tickets sous un moniteur, pour qu'une région pose ses 
 Le mixin remplace `storage` par une map concurrente et porte le `PoiVillageLock`. Le flush de sauvegarde passe sous ce verrou.
 
 ### `PoiManager`
-Le mixin remplace `loadedChunks` par un set concurrent. Les opérations qui touchent le graphe de distance des villages passent sous le `PoiVillageLock` porté par `SectionStorage`, parce que ce graphe ne peut pas devenir concurrent par une simple façade.
+Le mixin remplace `loadedChunks` par un set concurrent. Les opérations qui touchent le graphe de distance des villages passent sous le `PoiVillageLock` porté par `SectionStorage`, parce que ce graphe ne peut pas devenir concurrent par une simple façade. `ensureLoadedAndValid`, le seul endroit où les points d'intérêt chargent des chunks de force, garde son corps vanilla pour le propriétaire universel et demande sinon tous les chunks absents de son carré en un seul lot, si bien qu'une recherche de portail de sortie converge en un aller-retour.
+
+### `PortalForcer`
+`createPortal` sonde une spirale de 16 blocs puis écrit un cadre. Le mixin exige la présence de tout son carré d'écriture avant le premier bloc posé, pour qu'un refus ne laisse jamais un cadre partiel.
 
 ### `EntitySectionStorage`, `EntityLookup`, `ChunkMap.TrackedEntity`
 Trois façades concurrentes sur les index d'entités. `EntitySectionStorage` remplace `sections` et `sectionIds`. `EntityLookup` remplace `byId` et `byUuid`. `TrackedEntity` remplace `seenBy`, le set des joueurs qui voient une entité trackée, et ré-ancre la base de position du tracker au premier appairage, parce qu'un projectile spawné sur une région appaire son premier spectateur un tick après sa création.
@@ -85,7 +88,7 @@ Les callbacks de section routent les entités vers les listes de tick de la rég
 Le mixin capture la section avant un `onMove` et rattache l'entité aux listes de sa nouvelle région quand elle change de chunk. Le rattachement se fait avant le `updateStatus` pour qu'un changement de visibilité de ticking à hidden trouve l'entrée dans la bonne liste.
 
 ### `Entity`
-Le mixin retire le scheduler d'une entité quand elle quitte le monde. Il intercepte `teleport` depuis un worker de région pour dévier le mouvement vers le routeur de téléportation au lieu de l'exécuter sur place. Il reporte la recherche de portail dans la barrier window, parce que la recherche peut créer des blocs dans une autre dimension, comme la plateforme d'obsidienne de l'End.
+Le mixin retire le scheduler d'une entité quand elle quitte le monde. Il intercepte `teleport` depuis un worker de région pour dévier le mouvement vers l'entonnoir de téléportation au lieu de l'exécuter sur place. Il reporte la recherche de portail dans la barrier window en capturant le processeur de portail comme demande, si bien que vanilla peut détruire son état de portail sans annuler la traversée, parce que la recherche peut créer des blocs dans une autre dimension, comme la plateforme d'obsidienne de l'End.
 
 ### `ServerPlayer`
 Le mixin remplace le set d'ender pearls par un set concurrent, parce qu'une perle lancée depuis une autre région s'inscrit depuis un autre thread. Il intercepte `teleport` depuis un worker de région pour dévier le mouvement vers le routeur de téléportation.

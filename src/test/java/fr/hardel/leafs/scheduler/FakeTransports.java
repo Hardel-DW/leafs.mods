@@ -1,6 +1,5 @@
 package fr.hardel.leafs.scheduler;
 
-import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 
 import java.util.ArrayList;
@@ -18,20 +17,17 @@ final class FakeTransports implements DeferredTransports {
     boolean owner;
 
     @Override
-    public void toWindow(DeferReason reason, Runnable task) {
-        stats.countDeferral(reason);
+    public void toWindow(Runnable task) {
         windowQueue.add(task);
     }
 
     @Override
-    public void toSerial(DeferReason reason, Runnable task) {
-        stats.countDeferral(reason);
+    public void toSerial(Runnable task) {
         serialQueue.add(task);
     }
 
     @Override
-    public void toOwner(DeferReason reason, int chunkX, int chunkZ, Runnable task) {
-        stats.countDeferral(reason);
+    public void toOwner(int chunkX, int chunkZ, Runnable task) {
         ownerQueue.add(task);
     }
 
@@ -53,11 +49,6 @@ final class FakeTransports implements DeferredTransports {
     @Override
     public void runDegraded(Runnable task) {
         task.run();
-    }
-
-    @Override
-    public SharedChunkHolds holds() {
-        throw new UnsupportedOperationException("The engine never takes holds itself");
     }
 
     @Override

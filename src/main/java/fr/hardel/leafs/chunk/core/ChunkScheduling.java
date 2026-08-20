@@ -20,16 +20,11 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-/**
- * The sharded coordination of one level's chunk system. Holder level writes and promotions run under
- * the scheduling area lock, taken after the propagator's ticket area and never before it. Everything
- * heavy stays outside: generation tasks are built under the lock and started after, and the effects
- * that touch live game state route to the thread that owns the position. A thread that holds the
- * level exclusion or the tick barrier owns every position, because no region ticks under either.
- */
+// Manages a level's chunks. Respect lock order, do heavy work outside locks, and route changes to the thread that owns the affected area.
 public final class ChunkScheduling {
     private static final int SCHEDULING_MARGIN = ChunkLevel.MAX_LEVEL - 33 + 2;
     private static final int UNLOADED = ChunkLevel.MAX_LEVEL + 1;
@@ -42,9 +37,7 @@ public final class ChunkScheduling {
     private final GenerationExclusion exclusion = new GenerationExclusion();
     private final ThreadLocal<List<DeferredOwnerTask>> deferredOwnerTasks = new ThreadLocal<>();
 
-    /** An owner routing built while the thread held the drained ticket area; its hold ticket posts after the release. */
-    private record DeferredOwnerTask(int chunkX, int chunkZ, Runnable task) {
-    }
+    private record DeferredOwnerTask(int chunkX, int chunkZ, Runnable task) {}
 
     public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, TickingManager ticking, Executor pump) {
         this.chunkMap = chunkMap;
@@ -144,14 +137,14 @@ public final class ChunkScheduling {
         return result;
     }
 
-    /** The one way to ask a position for a status: no holder means no ticket reached it yet and the caller must post one first. */
-    public void requestStatus(int chunkX, int chunkZ, ChunkStatus status) {
+    // The one way to ask a position for a status; null when no ticket reached it yet. The future completes at delivery, letting a deferred retry replay on readiness instead of polling.
+    public CompletableFuture<?> requestStatus(int chunkX, int chunkZ, ChunkStatus status) {
         ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         if (holder == null) {
-            return;
+            return null;
         }
 
-        requestArea(chunkX, chunkZ, 0, () -> holder.scheduleChunkGenerationTask(status, chunkMap));
+        return requestArea(chunkX, chunkZ, 0, () -> holder.scheduleChunkGenerationTask(status, chunkMap));
     }
 
     /** Holder mutation outside a drain, like the send dependencies a player placement adds. */

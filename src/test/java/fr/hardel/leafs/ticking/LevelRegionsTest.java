@@ -247,7 +247,7 @@ class LevelRegionsTest {
             public void removeHold(int chunkX, int chunkZ) {
             }
         });
-        regions.activate("leafs:test", scheduler, holds, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run,
+        regions.activate("leafs:test", scheduler, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run,
             () -> new RegionWorldData(new RegionClock(0L), _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache()), null, () -> {
             });
     }

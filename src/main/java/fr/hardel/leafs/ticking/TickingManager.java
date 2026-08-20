@@ -3,8 +3,6 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
-import fr.hardel.leafs.entity.EntityTeleports;
-import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.global.DeferredFileWrites;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
@@ -190,8 +188,8 @@ public final class TickingManager {
 
     /**
      * Head of {@code stopServer}, before the worlds save: the shutdown deadline arms first so a stop
-     * that wedges still dies, the pool stops so the saves read settled state, then every in-flight
-     * teleport places so no entity is lost to the shutdown.
+     * that wedges still dies, then the pool stops so the saves read settled state. A teleport still
+     * in flight is a barrier-window task, and the shutdown window places it before the saves.
      */
     public void haltTicking() {
         halted = true;
@@ -201,12 +199,6 @@ public final class TickingManager {
         globalScheduler.drain();
         for (ServerLevel level : server.getAllLevels()) {
             LevelRegions.of(level).drainUnloadsForShutdown();
-            EntityTeleports teleports = ((ServerLevelEntityAccess) level).leafs$entityTeleports();
-            try {
-                teleports.completeAll();
-            } catch (RuntimeException exception) {
-                Leafs.LOGGER.error("Completing pending teleports into {} failed; {} may be lost", level.dimension().identifier(), teleports.pendingCount(), exception);
-            }
         }
     }
 

@@ -2,12 +2,7 @@ package fr.hardel.leafs.chunk;
 
 import java.util.function.Supplier;
 
-/**
- * A serial-phase scope that must read chunks like a region: present chunks only, a refusal and a
- * demand ticket instead of a sync load. The custom spawners probe blocks near a random player who
- * may stand in ungenerated terrain; vanilla would block the serial thread on generation there,
- * holding the exclusion and freezing every region of the dimension.
- */
+// A scope that reads chunks like a region: present-only, refusal plus demand ticket instead of a sync load that would freeze every region of the dimension.
 public final class DegradedChunkReads {
 
     private static final ThreadLocal<Boolean> ACTIVE = ThreadLocal.withInitial(() -> Boolean.FALSE);
@@ -28,6 +23,17 @@ public final class DegradedChunkReads {
             return scope.get();
         } finally {
             ACTIVE.set(Boolean.FALSE);
+        }
+    }
+
+    // A nested block that must run raw, like the final teleport of a portal task whose search ran degraded.
+    public static void escape(Runnable block) {
+        boolean active = ACTIVE.get();
+        ACTIVE.set(Boolean.FALSE);
+        try {
+            block.run();
+        } finally {
+            ACTIVE.set(active);
         }
     }
 
