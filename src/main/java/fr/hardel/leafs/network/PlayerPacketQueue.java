@@ -1,12 +1,13 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.ownership.OwnershipViolationException;
 import net.minecraft.ReportedException;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketUtils;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
@@ -15,7 +16,7 @@ public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();
     private static final long QUEUE_AGE_WARN_NANOS = 250_000_000L;
 
-    private final ConcurrentLinkedQueue<Entry> packets = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedDeque<Entry> packets = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean claimed = new AtomicBoolean();
     private volatile long regionStampNanos;
 
@@ -89,7 +90,6 @@ public final class PlayerPacketQueue {
         return true;
     }
 
-    /** The queue-age tracer measures the latency a player feels between sending an action and its handling. */
     private void drainLoop(BooleanSupplier ownerHolds) {
         long slowestAge = 0;
         String slowestEntry = null;
@@ -101,7 +101,12 @@ public final class PlayerPacketQueue {
                 slowestEntry = next.describe();
             }
 
-            next.handle();
+            try {
+                next.handle();
+            } catch (OwnershipViolationException _) {
+                packets.addFirst(next);
+                break;
+            }
         }
 
         if (slowestAge > QUEUE_AGE_WARN_NANOS) {
@@ -145,6 +150,10 @@ public final class PlayerPacketQueue {
             try {
                 packet.handle(listener);
             } catch (Exception exception) {
+                if (exception instanceof OwnershipViolationException refusal) {
+                    throw refusal;
+                }
+
                 if (exception instanceof ReportedException reported && reported.getCause() instanceof OutOfMemoryError) {
                     throw PacketUtils.makeReportedException(exception, packet, listener);
                 }

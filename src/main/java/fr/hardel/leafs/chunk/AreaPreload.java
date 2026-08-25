@@ -75,17 +75,8 @@ public final class AreaPreload {
             return;
         }
 
-        // Only owned positions may be demanded, the contract's line; the window owns them all.
         ChunkScheduling scheduling = RegionChunkAccess.scheduling(chunkMap);
-        LongList demandable = new LongArrayList(missing.size());
-        for (int index = 0; index < missing.size(); index++) {
-            long position = missing.getLong(index);
-            if (scheduling.isOwner(ChunkPos.getX(position), ChunkPos.getZ(position))) {
-                demandable.add(position);
-            }
-        }
-
-        CompletableFuture<?> readiness = demandable.isEmpty() ? null : ChunkDemands.demand(chunkMap, status, demandable);
+        CompletableFuture<?> readiness = ChunkDemands.demand(chunkMap, status, missing);
         scheduling.deferStats().countRefusal(OwnershipViolationException.Kind.ABSENT, RegionChunkAccess.sourceOfCurrentThread());
 
         throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT,

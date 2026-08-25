@@ -2,7 +2,6 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
@@ -83,18 +82,17 @@ public final class RegionNetworkTick {
         });
     }
 
-    /**
-     * A respawn moves the player across levels and the handler's tail reads the new instance, so the
-     * whole vanilla branch replays in the barrier window; the window runs on the server thread, where
-     * the re-entered thread guard passes.
-     */
+    
     public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
-        if (packet.getAction() != ServerboundClientCommandPacket.Action.PERFORM_RESPAWN
-            || !(RegionContext.current() instanceof RegionContext.Region)) {
+        if (packet.getAction() != ServerboundClientCommandPacket.Action.PERFORM_RESPAWN) {
             return false;
         }
 
         DeferredTransports transports = TickingBinding.of((ServerLevel) listener.player.level());
+        if (transports.holdsWindow()) {
+            return false;
+        }
+
         DeferredWork.window(DeferReason.RESPAWN, transports.stats(), () -> listener.handleClientCommand(packet))
             .validIf(listener.connection::isConnected)
             .submit(transports);

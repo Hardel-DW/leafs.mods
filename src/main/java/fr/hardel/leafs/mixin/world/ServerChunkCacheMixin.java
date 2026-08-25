@@ -83,12 +83,12 @@ public abstract class ServerChunkCacheMixin {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialView);
     }
 
-    @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z", shift = At.Shift.AFTER))
+    @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z", shift = At.Shift.AFTER), require = 0)
     private void leafs$markPurgeStage(CallbackInfo callbackInfo) {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialPurge);
     }
 
-    @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;tick(Ljava/util/function/BooleanSupplier;)V", shift = At.Shift.AFTER))
+    @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;tick(Ljava/util/function/BooleanSupplier;)V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markUnloadsStage(CallbackInfo callbackInfo) {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialUnloads);
     }

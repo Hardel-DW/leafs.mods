@@ -1,20 +1,20 @@
 # Project Overview
-Fabric 26.2 mod in Java 25, server side. The goal: bring regionised multithreading to Fabric, like Folia, but completely rethought for the modern Minecraft architecture. Everything through Mixins, no fork, no patched jar, just a mod.
-This is not a port of Folia patches. We take the concepts (regions, one tick loop per region, no global main thread) and we redesign them for vanilla 26.2 + Fabric.
-The mod adds only the multithreading, nothing else. No extra features, no gameplay change, no API bloat.
+Fabric 26.2 mod in Java 25, server side. Goal: Regionised multithreading to Fabric.
+The mod adds only the multithreading, nothing else. No extra features, no gameplay change, no API bloat with own architecture
 The documentation entry point is docs\README.md.
 
 # Reference Code
 Decompiled and reference sources are in the "repository" folder outside the workspace, just ask if you need permissions:
 - "minecraft-26.2" - Minecraft source code. (e.g repository\minecraft-26.2\net\minecraft\SharedConstants.java)
-- "folia" - Fork of Paper, patch format. The whole region logic is in folia-server\minecraft-patches\features\0001-Region-Threading-Base.patch
-- "paper" - Contains Moonrise readable in paper-server\src\main\java\ca\spottedleaf\moonrise (concurrent chunk system, concurrency utils). Folia is built on top of it.
+- "folia" - Fork of Paper. Region logic in folia-server\minecraft-patches\features\0001-Region-Threading-Base.patch
+- "paper" - Contains Moonrise readable in paper-server\src\main\java\ca\spottedleaf\moonrise. Folia is built on top of it.
+- "optimods\" - folder with tons of mods. Lithium, Async, Ferrite, ModernFix, VMP, Moonrise, C2ME, Alternate...
 
 # Global Rules
 - Avoid Memory, use docs or roadmap folder.
 - Never commit without explicit authorization.
 - No folder containing a single file.
-- No em-dash use ponctuations. Complete sentence
+- No em-dash use ponctuations or other exotics characters. Complete sentence
 - No redundancy, we must avoid duplicating truth sources.
 - No function/variable with a single line/reference. Except Getter/Setter...
 - Avoid over engineering.
@@ -34,7 +34,17 @@ Decompiled and reference sources are in the "repository" folder outside the work
 - Line Width 180 characters
 
 # Long Term:
-No leaving work for later. We do everything end-to-end, cleanly and completely. We can potentially make several commits, but no leaving things for later. No shortcuts, no hacks. Everything done properly.
-With good coding practices, clean up dead code, duplication, etc.
-We do it really clean, for the long term. Good code quality without hacks.
-Removing code can sometimes require writing a bit of new code to eliminate a lot more. We're not aiming for fast delivery but for code quality over multiple years.
+No leaving work for later. We do everything end-to-end, cleanly and completely. We can potentially make several commits, but no leaving things for later. No shortcuts, no hacks. Everything done properly, wihout legacy/deprecated support. With good coding practices, clean up dead code, duplication, etc.
+We do it really clean, for the long term. Good code quality without hacks. Splited; concis, compact, Readable.
+
+# How to Code
+Try to write readable code, well split up, with generic methods/class that each have a clear responsibility. Type things properly, no "Object" or equivalent. Avoid too much nesting of if/else/switch/for/try. Think about early returns, or splitting the codebase up well to keep it readable.
+Avoid implementing too many safety nets. Code/Architecture and logic that is well built by nature will never have problems. These nets can degrade maintainability, potential bugs and future optimization, and they can also be a sign of a poor quality codebase.
+
+# Reponse
+Try to vulgarize, explain things in the simplest terms possible, I don't have every part of this codebase or repositories or patterns and mathematical concepts in my mind.
+Summarize, be simple, direct, concise, but complete. Try not to leave out any context, or any information that's useful for understanding. But be as concise as you can.
+
+# Rules
+- You can only write in docs\ia not docs\ all files in ai folder, have not been reviewed by humans, so their information has not been verified and may therefore be factually incorrect do not take them as a source of truth.
+- Code is not a place for documentation. The comments are brief simple, just a few words to capture key information.

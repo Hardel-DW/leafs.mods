@@ -8,7 +8,6 @@ import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.entity.RegionEntityData;
-import fr.hardel.leafs.entity.ServerEntityAccess;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.network.RegionNetworkTick;
@@ -117,7 +116,6 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionBlockEntities);
         }
 
-        ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickOwned(level);
         PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkSource.chunkMap).leafs$playerLoader();
         entityData.tickList().forEach(entity -> {
             if (entity instanceof ServerPlayer player) {

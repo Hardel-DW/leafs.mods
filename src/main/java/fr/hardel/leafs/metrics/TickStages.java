@@ -39,7 +39,6 @@ public final class TickStages {
     public static final TickStage globalAutosave = create(TickFamily.GLOBAL, "autosave");
 
     public static final TickStage serialTasks = create(TickFamily.SERIAL, "tasks");
-    public static final TickStage serialSchedulers = create(TickFamily.SERIAL, "schedulers");
     public static final TickStage serialBorder = create(TickFamily.SERIAL, "border");
     public static final TickStage serialWeather = create(TickFamily.SERIAL, "weather");
     public static final TickStage serialTime = create(TickFamily.SERIAL, "time");

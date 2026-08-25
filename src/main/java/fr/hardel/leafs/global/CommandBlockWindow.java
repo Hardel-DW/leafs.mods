@@ -41,15 +41,10 @@ public final class CommandBlockWindow {
             return true;
         }
 
-        boolean deferred = DeferredWork.window(DeferReason.COMMAND_BLOCK, transports.stats(), () -> tickCommandBlock(level, target))
+        DeferReason reason = repeating != null ? DeferReason.REPEATING_COMMAND_BLOCK : DeferReason.COMMAND_BLOCK;
+        return DeferredWork.window(reason, transports.stats(), () -> tickCommandBlock(level, target))
             .validIf(() -> level.getChunkSource().hasChunk(SectionPos.blockToSectionCoord(target.getX()), SectionPos.blockToSectionCoord(target.getZ())))
             .submit(transports);
-
-        if (deferred && repeating != null) {
-            ((GlobalServerAccess) level.getServer()).leafs$windowPressure().recordRepeatingDeferral();
-        }
-
-        return deferred;
     }
 
     /** The minecart can be destroyed before the window runs. Same re-entry rule as the block: the window's replay runs in place. */
