@@ -56,7 +56,7 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     private void leafs$endGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         StageTimings globalStages = leafs$ticking.metrics().globalStages();
         globalStages.mark(TickStages.globalAutosave);
-        globalStages.endTick();
+        globalStages.endTick(System.nanoTime());
     }
 
     /** Vanilla drains its packet queue here every loop iteration, paused included; the stolen per-player queues must too. */

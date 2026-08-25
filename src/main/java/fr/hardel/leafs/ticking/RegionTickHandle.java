@@ -12,7 +12,7 @@ import fr.hardel.leafs.world.WorldTickContext;
 
 /**
  * The schedulable side of one region. Both gates only TRY: blocking here would let a raised barrier
- * or a level-serial holder park a pool worker. A skipped period is caught up by the scheduler's tick counting.
+ * or a level-serial holder park a pool worker. A skipped pass is a region tick that never happened.
  */
 public final class RegionTickHandle extends TickHandle {
     private final Region<RegionTickData> region;
@@ -35,7 +35,12 @@ public final class RegionTickHandle extends TickHandle {
     }
 
     @Override
-    protected void tick(long tickCount) {
+    public long currentTick() {
+        return region.data().clock().currentTick();
+    }
+
+    @Override
+    protected void tick() {
         if (!regions.ownership().tryEnterRegionTick()) {
             return;
         }
@@ -69,12 +74,12 @@ public final class RegionTickHandle extends TickHandle {
                     stages.mark(TickStages.regionTasks);
                     regions.unloads().drain(region);
                     stages.mark(TickStages.regionUnloads);
-                    body.tick(region, worldData, data.entityData(), tickCount, stages);
+                    body.tick(region, data.clock(), worldData, data.entityData(), stages);
                     data.autosave().tick(body.level(), region, data.entityData(), regions.autosaveEpoch());
                     stages.mark(TickStages.regionAutosave);
                     chunkCensus = region.chunkCount();
                     entityCensus = data.entityData().tickList().size();
-                    stages.endTick();
+                    stages.endTick(System.nanoTime());
                 } finally {
                     WorldTickContext.exit();
                 }

@@ -35,7 +35,7 @@ class LeafsWatchdogTest {
     void stalledTickIsReportedWithItsRegionAndStack() throws InterruptedException {
         LeafsWatchdog watchdog = watchdog(Duration.ofMillis(50), KILL_DISABLED);
         watchdog.start();
-        TestTickHandle handle = new TestTickHandle(7, tickCount -> { });
+        TestTickHandle handle = new TestTickHandle(7, () -> { });
         CountDownLatch release = new CountDownLatch(1);
         Thread stalled = stalledTick(watchdog, handle, release);
 
@@ -55,7 +55,7 @@ class LeafsWatchdogTest {
     void tickPastTheKillThresholdRunsTheKillerOnce() throws InterruptedException {
         LeafsWatchdog watchdog = watchdog(Duration.ofMillis(40), Duration.ofMillis(120));
         watchdog.start();
-        TestTickHandle handle = new TestTickHandle(9, tickCount -> { });
+        TestTickHandle handle = new TestTickHandle(9, () -> { });
         CountDownLatch release = new CountDownLatch(1);
         Thread stalled = stalledTick(watchdog, handle, release);
 

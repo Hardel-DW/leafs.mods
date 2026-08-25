@@ -2,7 +2,7 @@ package fr.hardel.leafs.metrics;
 
 /**
  * What the barrier costs: the opening ring is written by the global thread alone and read tolerating
- * a torn sample, like {@code TickTimings}. Why work entered the window lives in {@link DeferStats}.
+ * a torn sample, like {@link StageTimings}. Why work entered the window lives in {@link DeferStats}.
  */
 public final class BarrierStats {
     private static final int CAPACITY = 256;

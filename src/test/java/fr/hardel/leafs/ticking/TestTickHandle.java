@@ -3,25 +3,31 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 
-import java.util.function.LongConsumer;
 
 final class TestTickHandle extends TickHandle {
-    private final LongConsumer body;
+    private final Runnable body;
+    private long ticks;
     private final boolean crashReportFails;
 
-    TestTickHandle(long id, LongConsumer body) {
+    TestTickHandle(long id, Runnable body) {
         this(id, body, false);
     }
 
-    TestTickHandle(long id, LongConsumer body, boolean crashReportFails) {
+    TestTickHandle(long id, Runnable body, boolean crashReportFails) {
         super(new RegionContext.Region(id, "test:world"), 1);
         this.body = body;
         this.crashReportFails = crashReportFails;
     }
 
     @Override
-    protected void tick(long tickCount) {
-        body.accept(tickCount);
+    public long currentTick() {
+        return ticks;
+    }
+
+    @Override
+    protected void tick() {
+        ticks++;
+        body.run();
     }
 
     @Override

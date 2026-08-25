@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class RegionScheduledTicksTest {
     private static final int SECTION_SHIFT = 4;
 
-    private final RegionScheduledTicks<String> ticks = new RegionScheduledTicks<>(_ -> true);
+    private final RegionScheduledTicks<String> ticks = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
     private final List<String> drained = new ArrayList<>();
 
     private LevelChunkTicks<String> newContainer(int chunkX, int chunkZ) {
@@ -75,7 +75,7 @@ class RegionScheduledTicksTest {
         newContainer(0, 0);
         ticks.schedule(new ScheduledTick<>("moved", blockIn(0, 0, 0), 105, TickPriority.NORMAL, 0));
 
-        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true);
+        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
         LevelChunkTicks<String> targetContainer = new LevelChunkTicks<>();
         target.addContainer(new ChunkPos(2, 0), targetContainer);
         target.schedule(new ScheduledTick<>("resident", blockIn(2, 0, 0), 1004, TickPriority.NORMAL, 1));
@@ -94,7 +94,7 @@ class RegionScheduledTicksTest {
     @Test
     void mergedContainerKeepsReceivingSchedules() {
         newContainer(0, 0);
-        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true);
+        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
 
         ticks.mergeInto(target, 0);
         target.schedule(new ScheduledTick<>("after-merge", blockIn(0, 0, 2), 30, TickPriority.NORMAL, 0));
@@ -111,8 +111,8 @@ class RegionScheduledTicksTest {
         ticks.schedule(new ScheduledTick<>("east", blockIn(17, 0, 0), 50, TickPriority.NORMAL, 1));
 
         Long2ObjectMap<RegionScheduledTicks<String>> children = new Long2ObjectOpenHashMap<>();
-        children.put(CoordinateKey.pack(0, 0), new RegionScheduledTicks<>(_ -> true));
-        children.put(CoordinateKey.pack(1, 0), new RegionScheduledTicks<>(_ -> true));
+        children.put(CoordinateKey.pack(0, 0), new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L));
+        children.put(CoordinateKey.pack(1, 0), new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L));
 
         ticks.splitInto(SECTION_SHIFT, children::get);
 
@@ -135,7 +135,7 @@ class RegionScheduledTicksTest {
         LevelChunkTicks<String> loaded = new LevelChunkTicks<>(List.of(new SavedTick<>("pending", blockIn(0, 0, 3), 7, TickPriority.NORMAL)));
         ticks.addContainer(new ChunkPos(0, 0), loaded);
 
-        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true);
+        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
         ticks.mergeInto(target, 900);
         loaded.unpack(1000);
 
@@ -149,11 +149,11 @@ class RegionScheduledTicksTest {
     void packAfterMergeSavesRegionRelativeDelays() {
         newContainer(0, 0);
         ticks.schedule(new ScheduledTick<>("saved", blockIn(0, 0, 0), 110, TickPriority.NORMAL, 0));
-        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true);
+        RegionScheduledTicks<String> target = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
 
         ticks.mergeInto(target, 900);
 
-        List<SavedTick<String>> saved = target.containerAt(0, 0).pack(1005);
+        List<SavedTick<String>> saved = target.allContainers.get(ChunkPos.pack(0, 0)).pack(1005);
         assertEquals(1, saved.size());
         assertEquals(5, saved.getFirst().delay(), "10 ticks remaining at merge, 5 elapsed on the new clock");
     }

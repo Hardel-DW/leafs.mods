@@ -17,7 +17,8 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
 /**
@@ -33,7 +34,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     private volatile String dimension;
     private volatile Consumer<Runnable> serialUnloadSink;
     private volatile RegionScheduler<RegionTickData> taskScheduler;
-    private volatile Supplier<RegionWorldData> worldDataFactory;
+    private volatile LongSupplier gameTime;
+    private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
 
@@ -73,19 +75,20 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
      * Regions are equipped first, the caller's migration then re-buckets the attached payloads, and
      * only then are the handles scheduled, so no region can tick against a half-migrated level.
      */
-    public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
+    public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
         if (this.scheduler != null)
             return;
 
         this.dimension = dimension;
         this.serialUnloadSink = serialUnloadSink;
         this.taskScheduler = taskScheduler;
+        this.gameTime = gameTime;
         this.worldDataFactory = worldDataFactory;
         this.body = body;
 
         for (Region<RegionTickData> region : regionizer.regionsView())
             if (region.data().worldData() == null)
-                region.data().attachWorldData(worldDataFactory.get());
+                attachWorld(region.data());
 
         beforeScheduling.run();
         this.scheduler = scheduler;
@@ -218,9 +221,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     public RegionTickData createData(Region<RegionTickData> region) {
         RegionTickData data = new RegionTickData();
         data.attachEntityData(new RegionEntityData());
-        Supplier<RegionWorldData> factory = worldDataFactory;
-        if (factory != null) {
-            data.attachWorldData(factory.get());
+        if (worldDataFactory != null) {
+            attachWorld(data);
         }
 
         if (scheduler != null) {
@@ -228,6 +230,12 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
 
         return data;
+    }
+
+    /** A region's clock starts at the game time of its birth, so a chunk unpacked before it had an owner keeps its delays. */
+    private void attachWorld(RegionTickData data) {
+        RegionClock clock = new RegionClock(gameTime.getAsLong());
+        data.attachWorld(clock, worldDataFactory.apply(clock::currentTick));
     }
 
     @Override
@@ -297,7 +305,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         RegionWorldData parentWorld = parent.data().worldData();
         if (parentWorld != null) {
             for (Region<RegionTickData> child : children) {
-                child.data().worldData().inheritTimeFrom(parentWorld);
+                child.data().clock().resetTo(parent.data().clock().currentTick());
+                child.data().worldData().inheritCountersFrom(parentWorld);
             }
 
             parentWorld.splitInto(regionizer.sectionShift(), sectionKey -> {
