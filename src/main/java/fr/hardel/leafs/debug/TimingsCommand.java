@@ -61,7 +61,7 @@ public final class TimingsCommand {
         long[] averages = unit.stages().averageNanos(AVERAGE_WINDOW_TICKS);
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("serial " + CommandText.shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
-            .append(CommandText.sep()).append(CommandText.rate(unit.timings().sample(System.nanoTime()))), false);
+            .append(CommandText.sep()).append(CommandText.rate(unit.stages().sample(System.nanoTime()))), false);
 
         return sendStages(source, TickFamily.SERIAL, averages);
     }
@@ -84,7 +84,7 @@ public final class TimingsCommand {
         RegionTickHandle region = handle;
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("R#" + region.id() + " " + CommandText.shortDimension(region.dimension())).withStyle(ChatFormatting.AQUA))
-            .append(CommandText.sep()).append(CommandText.rate(region.timings().sample(System.nanoTime())))
+            .append(CommandText.sep()).append(CommandText.rate(region.stages().sample(System.nanoTime())))
             .append(CommandText.stat("chunks", region.chunkCount()))
             .append(CommandText.stat("entities", region.entityCount())), false);
 

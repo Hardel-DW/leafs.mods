@@ -2,6 +2,7 @@ package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.region.CoordinateKey;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -13,8 +14,6 @@ import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
 import net.minecraft.world.ticks.ScheduledTick;
 import net.minecraft.world.ticks.TickPriority;
 
-import net.minecraft.core.BlockPos;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,12 +22,18 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
+import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
-/** Merge and split only run between region ticks, under the regionizer's write lock. */
+/**
+ * The world state of one tick unit. Its time is the unit's own: the region clock, or the game time
+ * for the attached payload the level-serial remainder drains. Ticks are created in game time like
+ * vanilla and dated on the unit's time by the index. Merge and split only run between region ticks.
+ */
 public final class RegionWorldData {
     private static final int MAX_SCHEDULED_TICKS_PER_DRAIN = 65536;
-    private final RegionClock clock;
+    private final LongSupplier gameTime;
+    private final LongSupplier time;
     private final RegionScheduledTicks<Block> blockTicks;
     private final RegionScheduledTicks<Fluid> fluidTicks;
     private final ObjectLinkedOpenHashSet<BlockEventData> blockEvents;
@@ -40,10 +45,11 @@ public final class RegionWorldData {
     private long subTick;
     private long lastInhabitedUpdate;
 
-    public RegionWorldData(RegionClock clock, LongPredicate tickCheck, ObjectLinkedOpenHashSet<BlockEventData> blockEvents, RandomSource random, CollectingNeighborUpdater neighborUpdater, Set<ChunkHolder> broadcastHolders, PathTypeCache pathTypeCache) {
-        this.clock = clock;
-        this.blockTicks = new RegionScheduledTicks<>(tickCheck);
-        this.fluidTicks = new RegionScheduledTicks<>(tickCheck);
+    public RegionWorldData(LongSupplier gameTime, LongSupplier time, LongPredicate tickCheck, ObjectLinkedOpenHashSet<BlockEventData> blockEvents, RandomSource random, CollectingNeighborUpdater neighborUpdater, Set<ChunkHolder> broadcastHolders, PathTypeCache pathTypeCache) {
+        this.gameTime = gameTime;
+        this.time = time;
+        this.blockTicks = new RegionScheduledTicks<>(tickCheck, gameTime, time);
+        this.fluidTicks = new RegionScheduledTicks<>(tickCheck, gameTime, time);
         this.blockEvents = blockEvents;
         this.random = random;
         this.neighborUpdater = neighborUpdater;
@@ -51,20 +57,15 @@ public final class RegionWorldData {
         this.pathTypeCache = pathTypeCache;
     }
 
-    /**
-     * The counter starts at the level's CURRENT game time: deadlines scheduled against game time
-     * before activation (spawn-chunk unpack) then read correctly without a migration rebase, and a
-     * chunk moving between units stays delay-consistent through pack/unpack.
-     */
-    public static RegionWorldData regional(ServerLevel level) {
-        RegionWorldData data = new RegionWorldData(new RegionClock(level.getGameTime()), level::isPositionTickingWithEntitiesLoaded, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), new HashSet<>(), new PathTypeCache());
+    public static RegionWorldData regional(ServerLevel level, LongSupplier time) {
+        RegionWorldData data = new RegionWorldData(level::getGameTime, time, level::isPositionTickingWithEntitiesLoaded, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), new HashSet<>(), new PathTypeCache());
         data.lastInhabitedUpdate = level.getGameTime();
 
         return data;
     }
 
-    public RegionClock clock() {
-        return clock;
+    public long currentTick() {
+        return time.getAsLong();
     }
 
     public RegionScheduledTicks<Block> blockTicks() {
@@ -103,13 +104,13 @@ public final class RegionWorldData {
         return subTick++;
     }
 
-    /** Deadlines are relative to this unit's clock (two clocks); the sub-tick tie-break comes from the same unit. */
+    /** Vanilla's shape, game time plus delay; the sub-tick tie-break comes from this unit so its drain order stays deterministic. */
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
-        return new ScheduledTick<>(type, pos, clock.currentTick() + delay, priority, nextSubTick());
+        return new ScheduledTick<>(type, pos, gameTime.getAsLong() + delay, priority, nextSubTick());
     }
 
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay) {
-        return new ScheduledTick<>(type, pos, clock.currentTick() + delay, nextSubTick());
+        return new ScheduledTick<>(type, pos, gameTime.getAsLong() + delay, nextSubTick());
     }
 
     /** Inhabited-time bookkeeping reads global time (absolute consumer); returns the delta since the last body tick. */
@@ -119,13 +120,13 @@ public final class RegionWorldData {
         return delta;
     }
 
-    /** Vanilla drain shape at this unit's clock time; the cap is vanilla's level-wide one, applied per region. */
+    /** Vanilla drain shape at this unit's time; the cap is vanilla's level-wide one, applied per region. */
     public void drainBlockTicks(BiConsumer<BlockPos, Block> executor) {
-        blockTicks.tick(clock.currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
+        blockTicks.tick(currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
     }
 
     public void drainFluidTicks(BiConsumer<BlockPos, Fluid> executor) {
-        fluidTicks.tick(clock.currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
+        fluidTicks.tick(currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
     }
 
     public void requeueBlockTick(BlockPos pos, Block block) {
@@ -156,8 +157,9 @@ public final class RegionWorldData {
         }
     }
 
+    /** The two units run on two clocks: the scheduled ticks move by the offset so their remaining delays survive. */
     public void mergeInto(RegionWorldData target) {
-        long tickOffset = target.clock.currentTick() - clock.currentTick();
+        long tickOffset = target.currentTick() - currentTick();
         blockTicks.mergeInto(target.blockTicks, tickOffset);
         fluidTicks.mergeInto(target.fluidTicks, tickOffset);
         target.blockEvents.addAll(blockEvents);
@@ -194,7 +196,7 @@ public final class RegionWorldData {
             RegionWorldData child = childBySection.apply(section);
             return child == null ? null : child.fluidTicks;
         });
-        
+
         List<BlockEventData> orphans = new ArrayList<>();
         for (BlockEventData event : blockEvents) {
             RegionWorldData child = childBySection.apply(CoordinateKey.pack(event.pos().getX() >> (4 + sectionShift), event.pos().getZ() >> (4 + sectionShift)));
@@ -213,8 +215,8 @@ public final class RegionWorldData {
         }, keepOrphans);
     }
 
-    public void inheritTimeFrom(RegionWorldData parent) {
-        clock.resetTo(parent.clock.currentTick());
+    /** A split child continues the parent's counters; its clock is reset by the caller, which owns it. */
+    public void inheritCountersFrom(RegionWorldData parent) {
         subTick = parent.subTick;
         lastInhabitedUpdate = parent.lastInhabitedUpdate;
     }

@@ -6,11 +6,12 @@ Ces compromis sont un peu des fonctionnalités. En réalités ils sont même bé
 
 1. Chaque région a son propre aléatoire, Aucun effet visible en jeu.
 2. La quantité de spawn de mobs sont calculés pour chaque région et non par dimension entière.
+3. Chaque régions vie a sont propre TPS. Un four peut être plus lent d'une régions a l'autre par exemple.
 
 # Vrai Compromis
-3. Les actions qui traversent les régions comme les téléportations ou les portails arrivent avec au plus un tick de retard comme la téléportation.
-4. Un joueur qui se déconnecte pendant qu'il écrit un livre ou une pancarte perd le texte.
-5. Les commandes tapées dans le chat s'exécutent sur le thread globale, pas sur la région du joueur, parce que la phase globale est le seul endroit où une commande peut charger des chunks arbitraires.
-6. Si la machine s'éteint brutalement, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture. Sans corruptions.
-7. Deux joueurs qui localise une structure au même moment peuvent recevoir la même.
-8. Une déconnexion met toutes les régions en pause quelques millisecondes le temps de retirer le joueur.
+4. Les actions qui traversent les régions comme les téléportations ou les portails arrivent avec au plus un tick de retard comme la téléportation.
+5. Un joueur qui se déconnecte pendant qu'il écrit un livre ou une pancarte perd le texte.
+6. Les commandes tapées dans le chat s'exécutent sur le thread globale, pas sur la région du joueur, parce que la phase globale est le seul endroit où une commande peut charger des chunks arbitraires.
+7. Si la machine s'éteint brutalement, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture. Sans corruptions.
+8. Deux joueurs qui localise une structure au même moment peuvent recevoir la même.
+9. Une déconnexion met toutes les régions en pause quelques millisecondes le temps de retirer le joueur.

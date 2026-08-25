@@ -3,24 +3,22 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.ownership.RegionContext;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 /**
- * Region thread pool at 20 TPS: a late handle advances its clock by the missed periods instead of
- * catching up tick by tick. {@link #runAttached} runs the same tick path on the calling thread.
+ * Region thread pool at 20 TPS: one due handle per poll, one tick per pass. A late handle is
+ * rescheduled from now, so a lagging region runs fewer ticks per second instead of catching up.
+ * {@link #runAttached} runs the same tick path on the calling thread.
  */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
 
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
-    private final ConcurrentHashMap<Thread, TickHandle> activeByWorker = new ConcurrentHashMap<>();
     private final int threadCount;
     private final boolean regionThreadNames;
     private final TickBarrier barrier;
@@ -73,20 +71,7 @@ public final class RegionTickScheduler {
     }
 
     public void runAttached(TickHandle handle) {
-        executeTick(handle, 1);
-    }
-
-    public List<Thread> workerThreads() {
-        return Collections.unmodifiableList(workers);
-    }
-
-    /** The handle a worker is ticking right now, null when it idles. */
-    public TickHandle activeHandle(Thread worker) {
-        return activeByWorker.get(worker);
-    }
-
-    static long computeTickCount(long idealStartNanos, long nowNanos, long periodNanos) {
-        return Math.max(1, 1 + (nowNanos - idealStartNanos) / periodNanos);
+        executeTick(handle);
     }
 
     private void workerLoop() {
@@ -104,31 +89,25 @@ public final class RegionTickScheduler {
             }
 
             TickHandle handle = next.handle;
-            long period = periodNanos;
-            long now = System.nanoTime();
-            long tickCount = computeTickCount(handle.scheduledStartNanos(), now, period);
             Thread worker = Thread.currentThread();
             String workerName = worker.getName();
             if (regionThreadNames) {
                 worker.setName("R#" + handle.id() + " " + handle.dimension());
             }
 
-            activeByWorker.put(worker, handle);
             try {
-                executeTick(handle, tickCount);
+                executeTick(handle);
             } catch (Throwable throwable) {
                 failurePolicy.accept(handle, throwable);
                 continue;
             } finally {
-                activeByWorker.remove(worker);
                 if (regionThreadNames) {
                     worker.setName(workerName);
                 }
             }
 
             if (!handle.isCancelled()) {
-                long idealNext = handle.scheduledStartNanos() + tickCount * period;
-                handle.setScheduledStartNanos(Math.max(System.nanoTime(), idealNext));
+                handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos));
                 queue.add(next);
             }
         }
@@ -138,15 +117,13 @@ public final class RegionTickScheduler {
      * Each acquisition is paired with its own {@code finally} so a failed entry can never strand an
      * active tick and block a later barrier raise. The crash report is built before the context exits.
      */
-    private void executeTick(TickHandle handle, long tickCount) {
+    private void executeTick(TickHandle handle) {
         barrier.enterTick();
         try {
             RegionContext.enter(handle.context());
-            long start = System.nanoTime();
             try {
                 watchdog.beginTick(handle);
-                handle.tick(tickCount);
-                handle.advance(tickCount);
+                handle.tick();
             } catch (Throwable throwable) {
                 try {
                     crashWriter.write(handle.buildCrashReport(), throwable);
@@ -156,8 +133,6 @@ public final class RegionTickScheduler {
 
                 throw throwable;
             } finally {
-                long end = System.nanoTime();
-                handle.timings().record(end, end - start);
                 watchdog.endTick(handle);
                 RegionContext.exit();
             }

@@ -5,13 +5,20 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 import java.util.Arrays;
 
 /**
- * Per-stage durations of one tick unit, written single-threaded by the owning tick loop with one
- * {@link #mark} between stages. Reads tolerate a torn row, so sampling never touches the tick path.
+ * Per-tick record of one tick unit: the duration of every stage plus the whole tick's end and
+ * length, written single-threaded by the owning tick loop. Reads tolerate a torn row, so sampling
+ * never touches the tick path. Only completed ticks are recorded, a skipped pass counts for nothing.
  */
 public final class StageTimings {
     public static final int CAPACITY = 240;
+    private static final long WINDOW_NANOS = 5_000_000_000L;
+    private static final double NANOS_PER_MILLI = 1_000_000.0;
+
     private final long[][] ring;
+    private final long[] endNanos = new long[CAPACITY];
+    private final long[] durationNanos = new long[CAPACITY];
     private long[] row;
+    private long beginNanos;
     private long lastMarkNanos;
     private volatile int cursor;
 
@@ -22,6 +29,7 @@ public final class StageTimings {
     public void beginTick(long nowNanos) {
         row = ring[cursor % CAPACITY];
         Arrays.fill(row, 0);
+        beginNanos = nowNanos;
         lastMarkNanos = nowNanos;
     }
 
@@ -39,18 +47,16 @@ public final class StageTimings {
         lastMarkNanos = nowNanos;
     }
 
-    public void endTick() {
+    public void endTick(long nowNanos) {
+        int index = cursor % CAPACITY;
+        endNanos[index] = nowNanos;
+        durationNanos[index] = nowNanos - beginNanos;
         row = null;
         cursor++;
     }
 
     public int stageCount() {
         return ring[0].length;
-    }
-
-    /** Count of completed ticks; a sampler reads it as sample index to dedup rows it already saw. */
-    public int completedTicks() {
-        return cursor;
     }
 
     /** Average nanos per stage over the last completed ticks, capped to the window actually recorded. */
@@ -74,5 +80,41 @@ public final class StageTimings {
         }
 
         return averages;
+    }
+
+    /** TPS and tick length percentiles over the last five seconds of completed ticks. */
+    public Snapshot sample(long nowNanos) {
+        long cutoff = nowNanos - WINDOW_NANOS;
+        long[] window = new long[CAPACITY];
+        int ticks = 0;
+        long total = 0;
+        long oldestEnd = nowNanos;
+        for (int index = 0; index < CAPACITY; index++) {
+            if (endNanos[index] >= cutoff && durationNanos[index] > 0) {
+                window[ticks++] = durationNanos[index];
+                total += durationNanos[index];
+                oldestEnd = Math.min(oldestEnd, endNanos[index]);
+            }
+        }
+
+        if (ticks == 0) {
+            return Snapshot.IDLE;
+        }
+
+        Arrays.sort(window, 0, ticks);
+        double spanSeconds = Math.max((nowNanos - oldestEnd) / 1_000_000_000.0, 1.0 / 20.0);
+        double tps = Math.min(ticks / spanSeconds, 20.0);
+        return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50), percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
+    }
+
+    /** Nearest-rank on the window: with ~100 samples per 5s window, interpolation would be false precision. */
+    private static double percentile(long[] sorted, int count, double fraction) {
+        int rank = Math.clamp((long) Math.ceil(fraction * count) - 1, 0, count - 1);
+
+        return sorted[rank] / NANOS_PER_MILLI;
+    }
+
+    public record Snapshot(double tps, double msptAverage, double mspt50, double mspt95, double mspt99, double msptMax) {
+        static final Snapshot IDLE = new Snapshot(0, 0, 0, 0, 0, 0);
     }
 }

@@ -20,6 +20,6 @@ public abstract class SerializableChunkDataMixin {
         ServerLevelWorldAccess host = (ServerLevelWorldAccess) level;
         RegionWorldData data = host.leafs$worldRouter().atChunk(chunk.getPos().x(), chunk.getPos().z());
 
-        return original.call(chunk, data == host.leafs$worldData() ? time : data.clock().currentTick());
+        return original.call(chunk, data == host.leafs$worldData() ? time : data.currentTick());
     }
 }

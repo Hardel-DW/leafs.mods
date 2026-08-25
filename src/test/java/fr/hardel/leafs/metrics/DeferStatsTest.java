@@ -16,11 +16,11 @@ class DeferStatsTest {
         stats.countRetry(DeferReason.PORTAL);
         stats.countDrop(DeferReason.RESPAWN);
 
-        assertEquals(2, stats.deferrals(DeferReason.COMMAND_BLOCK).total());
-        assertEquals(0, stats.deferrals(DeferReason.PORTAL).total());
-        assertEquals(1, stats.retries(DeferReason.PORTAL).total());
-        assertEquals(1, stats.drops(DeferReason.RESPAWN).total());
-        assertEquals(0, stats.drops(DeferReason.TELEPORT).total());
+        assertEquals(2, stats.deferrals(DeferReason.COMMAND_BLOCK).perMinute());
+        assertEquals(0, stats.deferrals(DeferReason.PORTAL).perMinute());
+        assertEquals(1, stats.retries(DeferReason.PORTAL).perMinute());
+        assertEquals(1, stats.drops(DeferReason.RESPAWN).perMinute());
+        assertEquals(0, stats.drops(DeferReason.TELEPORT).perMinute());
     }
 
     @Test
@@ -28,8 +28,8 @@ class DeferStatsTest {
         stats.countRefusal(OwnershipViolationException.Kind.ABSENT, DeferStats.RefusalSource.REGION);
         stats.countRefusal(OwnershipViolationException.Kind.FOREIGN, DeferStats.RefusalSource.FOREIGN_THREAD);
 
-        assertEquals(1, stats.refusals(OwnershipViolationException.Kind.ABSENT, DeferStats.RefusalSource.REGION).total());
-        assertEquals(1, stats.refusals(OwnershipViolationException.Kind.FOREIGN, DeferStats.RefusalSource.FOREIGN_THREAD).total());
-        assertEquals(0, stats.refusals(OwnershipViolationException.Kind.FOREIGN, DeferStats.RefusalSource.REGION).total());
+        assertEquals(1, stats.refusals(OwnershipViolationException.Kind.ABSENT, DeferStats.RefusalSource.REGION).perMinute());
+        assertEquals(1, stats.refusals(OwnershipViolationException.Kind.FOREIGN, DeferStats.RefusalSource.FOREIGN_THREAD).perMinute());
+        assertEquals(0, stats.refusals(OwnershipViolationException.Kind.FOREIGN, DeferStats.RefusalSource.REGION).perMinute());
     }
 }

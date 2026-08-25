@@ -38,7 +38,7 @@ public final class RegionsCommand {
     private static int overview(CommandSourceStack source) {
         List<LevelTickUnit> units = sortedUnits(source);
         long now = System.nanoTime();
-        double serverTps = units.isEmpty() ? 0 : units.getFirst().timings().sample(now).tps();
+        double serverTps = units.isEmpty() ? 0 : units.getFirst().stages().sample(now).tps();
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("Leafs ").withStyle(ChatFormatting.GREEN))
             .append(CommandText.gray("%d workers, server thread ".formatted(LeafsConfig.get().effectiveThreads())))
@@ -62,14 +62,14 @@ public final class RegionsCommand {
             .append(CommandText.stat("chunks", unit.chunkCount()))
             .append(CommandText.stat("view", unit.viewChunks()))
             .append(CommandText.stat("entities", unit.entityCount()))
-            .append(CommandText.stat("serial", CommandText.rate(unit.timings().sample(now))));
+            .append(CommandText.stat("serial", CommandText.rate(unit.stages().sample(now))));
 
         RegionTickHandle slowest = null;
         double slowestTps = Double.MAX_VALUE;
         for (Region<RegionTickData> region : live) {
             RegionTickHandle handle = region.data().handle();
             if (handle != null && !handle.isCancelled()) {
-                double regionTps = handle.timings().sample(now).tps();
+                double regionTps = handle.stages().sample(now).tps();
                 if (regionTps < slowestTps) {
                     slowestTps = regionTps;
                     slowest = handle;
@@ -107,7 +107,7 @@ public final class RegionsCommand {
                 .append(CommandText.sep()).append(CommandText.white("R#" + region.id()))
                 .append(CommandText.sep()).append(state(region.state()));
             if (handle != null && !handle.isCancelled()) {
-                line.append(CommandText.sep()).append(CommandText.rate(handle.timings().sample(now)))
+                line.append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now)))
                     .append(CommandText.stat("chunks", handle.chunkCount()))
                     .append(CommandText.stat("entities", handle.entityCount()));
             } else {
@@ -141,7 +141,7 @@ public final class RegionsCommand {
             .append(Component.literal("You ").withStyle(ChatFormatting.GOLD))
             .append(CommandText.white("R#" + handle.id()))
             .append(CommandText.gray(" in ")).append(Component.literal(CommandText.shortDimension(handle.dimension())).withStyle(ChatFormatting.AQUA))
-            .append(CommandText.sep()).append(CommandText.rate(handle.timings().sample(now))), false);
+            .append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now))), false);
     }
 
     private static List<LevelTickUnit> sortedUnits(CommandSourceStack source) {

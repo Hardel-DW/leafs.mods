@@ -5,7 +5,6 @@ import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
-import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -23,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** The scheduled-tick sub-tick counter, the level random, the neighbor updater and block-entity ticker registration become unit-owned. */
+/** The level random, the neighbor updater and block-entity ticker registration become unit-owned. */
 @Mixin(Level.class)
 public abstract class LevelMixin {
 
@@ -36,16 +35,6 @@ public abstract class LevelMixin {
     @Shadow
     @Final
     public CollectingNeighborUpdater neighborUpdater;
-
-    @Inject(method = "nextSubTickCount", at = @At("HEAD"), cancellable = true)
-    private void leafs$regionSubTickCount(CallbackInfoReturnable<Long> callbackInfo) {
-        if (!(this instanceof ServerLevelWorldAccess host) || host.leafs$worldData() == null) {
-            return;
-        }
-
-        RegionWorldData data = WorldTickContext.activeFor(this);
-        callbackInfo.setReturnValue((data == null ? host.leafs$worldData() : data).nextSubTick());
-    }
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$routeUnitState(CallbackInfo callbackInfo) {
