@@ -43,6 +43,7 @@ La connexion et déconnexion sont partiellement modifier, elles sont asynchrones
 - Quand un joueur se déconnecte, c'est instantané pour lui, mais les données joueur, chunks et la région peuvent prendre quelque temps avant de se décharger. Quand beaucoup de joueurs se déconnectent, tout faire d'un coup créerait un grand coup de lag. C'est pour cela qu'on délaye ça proprement sur le temps.
 
 # Compatibilité des mods.
+Primitives sont les méthodes dans le code de Minecraft qui sont les plus basses est sont les plus utiliser, ou le plus de traffic passe par elle.
 Leafs explore une voie assez simple,  modifié toutes les primitives les plus basses de Minecraft les fonctions de téléportation, de réseau, de lecture/écriture des chunks. Des portails, structures, entités...
 Les mods utilisent ces fonctions sans le savoir et sont donc automatiquement compatibles.
 La listes des mods imcompatible n'est pas encore défini. Non tester. Pour sûr Lithium/Ferrite/Mapple seront compatible.

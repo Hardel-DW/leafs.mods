@@ -7,10 +7,8 @@ import fr.hardel.leafs.ownership.RegionCrashReport;
 /** One schedulable tick unit, subclassed by the whole-level attached tick and by a real region. */
 public abstract class TickHandle {
     private final RegionContext context;
-    private final TickTimings timings = new TickTimings();
     private final StageTimings stages;
     private volatile boolean cancelled;
-    private volatile long currentTick;
     private volatile long scheduledStartNanos;
 
     protected TickHandle(RegionContext context, int stageCount) {
@@ -24,14 +22,6 @@ public abstract class TickHandle {
 
     public String dimension() {
         return context.dimension();
-    }
-
-    public long currentTick() {
-        return currentTick;
-    }
-
-    public TickTimings timings() {
-        return timings;
     }
 
     public StageTimings stages() {
@@ -50,10 +40,6 @@ public abstract class TickHandle {
         return context;
     }
 
-    void advance(long tickCount) {
-        currentTick += tickCount;
-    }
-
     long scheduledStartNanos() {
         return scheduledStartNanos;
     }
@@ -62,7 +48,10 @@ public abstract class TickHandle {
         this.scheduledStartNanos = scheduledStartNanos;
     }
 
-    protected abstract void tick(long tickCount);
+    /** The unit's own time: the region clock, or the game time for the level-serial unit. */
+    public abstract long currentTick();
+
+    protected abstract void tick();
 
     protected abstract RegionCrashReport buildCrashReport();
 }

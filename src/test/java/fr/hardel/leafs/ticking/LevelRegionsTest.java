@@ -8,7 +8,6 @@ import fr.hardel.leafs.region.RegionizerAssertions;
 import fr.hardel.leafs.scheduler.ChunkHoldController;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.scheduler.SharedChunkHolds;
-import fr.hardel.leafs.world.RegionClock;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -191,12 +190,12 @@ class LevelRegionsTest {
         regions.chunkHolderDestroyed(64, 0);
 
         regions.ownership().enterLevelSerial();
-        parentHandle.tick(1);
+        parentHandle.tick();
         regions.ownership().exitLevelSerial();
         assertEquals(1, regionCount(), "a handle must skip while the level-serial side is held");
         assertEquals(0, regions.split());
 
-        parentHandle.tick(1);
+        parentHandle.tick();
         assertEquals(2, regionCount(), "the handle's own release is what splits");
         assertEquals(1, regions.split());
         assertTrue(parentHandle.isCancelled());
@@ -247,8 +246,8 @@ class LevelRegionsTest {
             public void removeHold(int chunkX, int chunkZ) {
             }
         });
-        regions.activate("leafs:test", scheduler, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run,
-            () -> new RegionWorldData(new RegionClock(0L), _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache()), null, () -> {
+        regions.activate("leafs:test", scheduler, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run, () -> 0L,
+            time -> new RegionWorldData(() -> 0L, time, _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache()), null, () -> {
             });
     }
 

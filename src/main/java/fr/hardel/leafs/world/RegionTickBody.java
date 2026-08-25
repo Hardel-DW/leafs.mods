@@ -15,6 +15,7 @@ import fr.hardel.leafs.ownership.TickGuard;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import fr.hardel.leafs.region.Region;
+import fr.hardel.leafs.ticking.RegionClock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
 import net.minecraft.server.level.ChunkHolder;
@@ -74,8 +75,13 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<?> region, RegionWorldData worldData, RegionEntityData entityData, long tickCount, StageTimings stages) {
-        worldData.clock().advance(tickCount);
+    public void tick(Region<?> region, RegionClock clock, RegionWorldData worldData, RegionEntityData entityData, StageTimings stages) {
+        TickRateManager tickRateManager = level.tickRateManager();
+        boolean runs = tickRateManager.runsNormally();
+        if (runs) {
+            clock.advance();
+        }
+
         purgeTimedOutTickets(region);
         stages.mark(TickStages.regionTickets);
         entityData.tickList().beginTick();
@@ -86,8 +92,6 @@ public final class RegionTickBody {
             }
         });
         stages.mark(TickStages.regionPackets);
-        TickRateManager tickRateManager = level.tickRateManager();
-        boolean runs = tickRateManager.runsNormally();
         boolean debug = level.isDebug();
         if (runs && !debug) {
             worldData.drainBlockTicks(guardedBlockTick);

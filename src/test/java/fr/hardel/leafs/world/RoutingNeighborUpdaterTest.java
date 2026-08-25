@@ -50,7 +50,7 @@ class RoutingNeighborUpdaterTest {
     }
 
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
-        return new RegionWorldData(new RegionClock(0), _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), updater, new HashSet<>(), new PathTypeCache());
+        return new RegionWorldData(() -> 0L, () -> 0L, _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), updater, new HashSet<>(), new PathTypeCache());
     }
 
     private static void callAll(RoutingNeighborUpdater router) {

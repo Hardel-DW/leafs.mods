@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoutingScheduledTicksTest {
-    private final RegionScheduledTicks<String> attached = new RegionScheduledTicks<>(_ -> true);
-    private final RegionScheduledTicks<String> other = new RegionScheduledTicks<>(_ -> true);
+    private final RegionScheduledTicks<String> attached = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
+    private final RegionScheduledTicks<String> other = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
     private final RoutingScheduledTicks<String> router = new RoutingScheduledTicks<>(_ -> true, attached);
 
     private static BlockPos blockIn(int chunkX, int chunkZ) {
@@ -67,7 +67,7 @@ class RoutingScheduledTicksTest {
 
     @Test
     void copyAreaFromUnwrapsARouterSource() {
-        RegionScheduledTicks<String> sourceAttached = new RegionScheduledTicks<>(_ -> true);
+        RegionScheduledTicks<String> sourceAttached = new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L);
         RoutingScheduledTicks<String> sourceRouter = new RoutingScheduledTicks<>(_ -> true, sourceAttached);
         sourceRouter.addContainer(new ChunkPos(0, 0), new LevelChunkTicks<>());
         sourceRouter.schedule(tickAt("copied", blockIn(0, 0)));

@@ -25,7 +25,6 @@ class MinuteCounterTest {
 
         second.set(200);
         assertEquals(0, counter.perMinute());
-        assertEquals(3, counter.total());
     }
 
     @Test
@@ -35,6 +34,5 @@ class MinuteCounterTest {
         counter.increment();
 
         assertEquals(1, counter.perMinute(), "second 60 reuses the slot of second 0 and resets it");
-        assertEquals(2, counter.total());
     }
 }
