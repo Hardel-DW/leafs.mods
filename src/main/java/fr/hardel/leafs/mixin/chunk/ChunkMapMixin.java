@@ -8,6 +8,7 @@ import fr.hardel.leafs.chunk.PendingUnloadClaims;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.chunk.StalledShutdown;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
@@ -42,6 +43,9 @@ import net.minecraft.server.level.ChunkTaskDispatcher;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ChunkTaskDispatcher;
+import net.minecraft.server.level.ThreadedLevelLightEngine;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StaticCache2D;
 import net.minecraft.util.thread.BlockableEventLoop;
@@ -69,6 +73,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.Queue;
 
 /**
  * Hook only - the chunk core wires here: the concurrent table, the pool-backed dispatcher, the
@@ -106,6 +111,29 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
     @Shadow
     @Final
     private LongSet toDrop;
+
+    @Shadow
+    @Final
+    private Queue<Runnable> unloadQueue;
+
+    @Shadow
+    @Final
+    private ThreadedLevelLightEngine lightEngine;
+
+    @Shadow
+    @Final
+    private PoiManager poiManager;
+
+    @Shadow
+    @Final
+    private ChunkTaskDispatcher worldgenTaskDispatcher;
+
+    @Shadow
+    @Final
+    private ChunkTaskDispatcher lightTaskDispatcher;
+
+    @Unique
+    private final StalledShutdown leafs$stalledShutdown = new StalledShutdown();
 
     @Mutable
     @Shadow
@@ -245,6 +273,29 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
      * work budget above a floor, so a mass drop wave defers to later ticks; the claim re-validates
      * a deferred entry, so a chunk revived in between simply stays.
      */
+    /** Only this class sees the nine sources vanilla's stop loop waits on, so it is the one that can name them. */
+    @WrapMethod(method = "hasWork")
+    private boolean leafs$nameWhatHoldsTheShutdown(Operation<Boolean> original) {
+        boolean hasWork = original.call();
+        ChunkMap self = (ChunkMap) (Object) this;
+        if (hasWork && leafs$ticking().halted() && leafs$stalledShutdown.due()) {
+            leafs$stalledShutdown
+                .holding("pendingUnloads", pendingUnloads.size())
+                .holding("updatingChunkMap", updatingChunkMap.size())
+                .holding("toDrop", toDrop.size())
+                .holding("unloadQueue", unloadQueue.size())
+                .holding("light", lightEngine.hasLightWork())
+                .holding("poi", poiManager.hasWork())
+                .holding("worldgen", worldgenTaskDispatcher.hasWork())
+                .holding("lightTasks", lightTaskDispatcher.hasWork())
+                .holding("tickets", self.getDistanceManager().hasTickets())
+                .holding("regionLanes", leafs$regions().queuedWork())
+                .report(self.level);
+        }
+
+        return hasWork;
+    }
+
     @Inject(method = "processUnloads", at = @At("HEAD"))
     private void leafs$lockedUnloadDecisions(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         for (LongIterator iterator = this.toDrop.iterator(); iterator.hasNext(); iterator.remove()) {

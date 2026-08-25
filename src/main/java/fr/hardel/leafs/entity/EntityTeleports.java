@@ -25,13 +25,16 @@ public final class EntityTeleports {
         this.transports = transports;
     }
 
-    // False when the vanilla path is safe in place; otherwise the move has been routed.
+    // False when the vanilla path is safe in place; otherwise the move has been routed. Asking the
+    // destination rather than the caller is what stops a replay from routing itself again forever.
     public boolean route(Entity entity, TeleportTransition transition) {
         ServerLevel target = transition.newLevel();
         ChunkPos origin = entity.chunkPosition();
         int destinationX = SectionPos.posToSectionCoord(transition.position().x());
         int destinationZ = SectionPos.posToSectionCoord(transition.position().z());
-        if (target == level && transports.owns(origin.x(), origin.z()) && transports.owns(destinationX, destinationZ)) {
+        if (target == level
+            ? transports.owns(origin.x(), origin.z()) && transports.owns(destinationX, destinationZ)
+            : transports.holdsWindow()) {
             return false;
         }
 
@@ -45,11 +48,18 @@ public final class EntityTeleports {
     }
 
     // The processor carries the portal and entry position, so vanilla may drop entity.portalProcess without killing the traversal; the search writes foreign-dimension blocks, window work.
-    public void deferPortal(Entity entity, PortalProcessor process) {
+    // False when the window already runs here, so vanilla keeps its own tail instead of a replay routing itself again.
+    public boolean deferPortal(Entity entity, PortalProcessor process) {
+        if (transports.holdsWindow()) {
+            return false;
+        }
+
         DeferredWork.window(DeferReason.PORTAL, transports.stats(), () -> searchAndEnterPortal(entity, process))
             .validIf(() -> stillTeleportable(entity))
             .degradedWithSyncNet(PORTAL_PHASE_BUDGET)
             .submit(transports);
+
+        return true;
     }
 
     // Vanilla's handlePortal tail; the teleport escapes the degraded scope so a refusal can never cut it mid-move.

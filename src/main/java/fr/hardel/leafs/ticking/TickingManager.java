@@ -192,9 +192,9 @@ public final class TickingManager {
      * in flight is a barrier-window task, and the shutdown window places it before the saves.
      */
     public void haltTicking() {
-        halted = true;
         watchdog.armShutdownDeadline(LeafsWatchdog.SHUTDOWN_DEADLINE);
         scheduler.shutdown();
+        halted = true;
         drainRegionTasks();
         globalScheduler.drain();
         for (ServerLevel level : server.getAllLevels()) {

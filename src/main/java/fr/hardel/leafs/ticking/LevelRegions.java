@@ -117,6 +117,16 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return autosaveEpoch;
     }
 
+    /** What the region lanes still owe: a shutdown that cannot finish needs to know whether the work waits on a lane nobody drains. */
+    public int queuedWork() {
+        int queued = 0;
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            queued += region.data().taskQueues().size() + region.data().unloadQueues().size();
+        }
+
+        return queued;
+    }
+
     /** Universal-owner drain: the exclusion is what grants that ownership, without it a task routed to an owner would queue itself back forever. */
     public int drainTasksInline() {
         RegionScheduler<RegionTickData> scheduler = taskScheduler;

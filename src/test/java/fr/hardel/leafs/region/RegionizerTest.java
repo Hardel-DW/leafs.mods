@@ -124,7 +124,7 @@ class RegionizerTest {
     }
 
     @Test
-    void bridgingWhileEverythingTicksCreatesAFreshTarget() {
+    void bridgingWhileEverythingTicksAdoptsIntoATickingRegion() {
         regionizer.addChunk(0, 0);
         regionizer.addChunk(80, 0);
         Region<Object> left = regionizer.regionAt(0, 0);
@@ -134,21 +134,38 @@ class RegionizerTest {
 
         regionizer.addChunk(40, 0);
 
-        assertEquals(3, regionizer.regionsView().size());
+        assertEquals(2, regionizer.regionsView().size(), "a ticking neighbour adopts instead of spawning a target");
         Region<Object> target = regionizer.regionAt(40, 0);
-        assertNotSame(left, target);
-        assertNotSame(right, target);
-        assertFalse(target.tryMarkTicking(), "the fresh target still expects merges from the ticking regions");
+        assertTrue(target == left || target == right);
         RegionizerAssertions.assertInvariants(regionizer, false);
 
         left.markNotTicking();
         right.markNotTicking();
 
         assertEquals(1, regionizer.regionsView().size());
-        assertSame(target, regionizer.regionAt(0, 0));
-        assertSame(target, regionizer.regionAt(80, 0));
-        assertTrue(target.tryMarkTicking());
-        target.markNotTicking();
+        Region<Object> survivor = regionizer.regionAt(0, 0);
+        assertSame(survivor, regionizer.regionAt(80, 0));
+        assertTrue(survivor.tryMarkTicking());
+        survivor.markNotTicking();
+        RegionizerAssertions.assertInvariants(regionizer, true);
+    }
+
+    /** 2026-08-22: a player's own loader runs inside his region's tick, so every new section spawned a region and merged his away, burning an id per tick. */
+    @Test
+    void aTickingRegionKeepsItsIdentityWhenItsOwnLoaderReachesANewSection() {
+        regionizer.addChunk(0, 0);
+        Region<Object> region = regionizer.regionAt(0, 0);
+        assertTrue(region.tryMarkTicking());
+
+        regionizer.addChunk(20, 0);
+
+        assertEquals(1, regionizer.regionsView().size());
+        assertSame(region, regionizer.regionAt(20, 0));
+
+        region.markNotTicking();
+
+        assertSame(region, regionizer.regionAt(0, 0));
+        assertSame(region, regionizer.regionAt(20, 0));
         RegionizerAssertions.assertInvariants(regionizer, true);
     }
 

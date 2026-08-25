@@ -1,36 +1,56 @@
-# Architecture
-Ce document décrit le modèle d'exécution. Tout ce qui est écrit ici est en place dans le code.
+# Comment fonctionne Minecraft Vanilla
+Minecraft gère le monde avec un seul thread en séquentiel. Donc plus y'a de joueurs, d'entités, de machines redstones et de joueurs qui génèrent et plus vous tirez sur les performances. Comme tout est en commun chaque joueur impacte les autres joueurs.
+Le serveur fait des boucles de 50ms, 20 fois par seconde. Le fameux 20 TPS. Quand y'a trop de joueurs le serveur peut mettre plus de temps que ces 50ms a traiter un tick. donc le TPS chute. Ce qui ralentit tout sans exception c'est le lag que vous ressentez.
 
-## Les régions
-Le monde est découpé en sections de 16 par 16 chunks. Les sections actives proches les unes des autres se regroupent en régions, avec toujours au moins une section vide entre deux régions. Cette marge vide est ce qui rend le système sûr. Une région a le droit de lire et d'écrire jusqu'à 8 chunks au-delà de sa bordure, ce qui couvre tout ce qu'un tick vanilla peut atteindre, un piston, une explosion, l'IA d'un mob. Comme deux régions sont toujours séparées par plus que cette distance, elles ne peuvent jamais toucher le même chunk en même temps. La sûreté vient de la géométrie, pas de verrous.
+## Problèmes
+Donc ça veut dire que si vous avez 6 ou 12 ou 50 cœurs le jeu en prend un seul pour tout gérer. Donc si vous achetez du matériel plus cher, vous n'y gagnez rien. Minecraft a été développé il y a 15 ans et à l'époque il n'était pas courant d'avoir plusieurs cœurs, le jeu a donc été conçu pour son temps.
 
-Deux régions qui se rapprochent fusionnent. Une région dont les chunks ne se touchent plus se scinde. Ces opérations se font entre deux ticks de région, jamais pendant. Le code est dans `region/`, la classe centrale est le `Regionizer`.
+## La solutions: Les régions
+Leafs découpe le monde en sections de 16x16 chunks autour des joueurs en `Sections`. Les sections actives qui se touchent sont regroupées en une région. Avec toujours au moins une section vide entre deux régions. Cette marge vide est ce qui rend le système sûr. Deux joueurs éloignés sont donc dans une région différente chacun.
+Les régions bougent avec les joueurs. Deux joueurs qui se rapprochent voient leurs régions fusionner en une seule. Une région qui s'étire jusqu'à se couper en deux morceaux se scinde. Ces opérations se font entre deux ticks, jamais au milieu d'un tick.
 
-Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les files de paquets de ses joueurs, ses évènements de blocs et son générateur aléatoire. Pendant son tick, elle joue le rôle que le thread serveur joue en vanilla, et rien d'autre ne touche à son contenu.
+Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les paquets réseau de ses joueurs et son propre générateur aléatoire. Pendant son tick, et rien d'autre au monde ne touche à son contenu.
 
-## Les quatre familles de threads
-1. Le thread global. C'est le thread serveur de vanilla, conservé. Il exécute une fois par tick ce qui est global par nature : les horloges du monde, la météo, les fonctions de datapacks, la liste des joueurs, le déclencheur d'autosave, le transport réseau, et la fenêtre barrière décrite plus bas.
-2. Les workers de régions. Un worker est un thread dont le seul travail est d'exécuter des ticks de régions. Ils sont en nombre fixe, réglé par `max_threads` dans la config. Une région n'est pas un thread, c'est une tâche. Quand un worker est libre, il prend la prochaine région dont le tick est dû dans une file commune. La charge s'équilibre toute seule et une région calme ne monopolise rien.
-3. Les workers de chunks. Ce pool, dimensionné comme le pool de régions par `max_threads`, exécute la progression de génération et les lectures disque des chunks, plusieurs chunks à la fois par dimension. Ses threads tournent en priorité OS minimale. Quand les deux pools veulent plus de cœurs qu'il n'y en a, l'ordonnanceur sert d'abord les ticks de régions, qui ont une échéance de 50 ms, et la génération prend le temps restant. Les étapes de génération qui traversent les frontières de chunks s'excluent spatialement entre elles, les autres tournent librement.
-4. Les pools de vanilla restants. La lumière garde sa lane vanilla mono thread, le bruit de terrain et les entrées sorties gardent leurs pools Mojang.
+# Thread
+**Le thread serveur vanilla existe toujours.** Tout ce qu'il exécute est sériel, donc chaque milliseconde passée ici est une milliseconde où le serveur ne parallélise rien. Son coût est parfaitement déterministe et minime, sans dépendre du nombre de joueurs, de chunks ou d'entités.
+Il fait une fois par tick ce qui est global par nature et n'appartient à personne:E l'heure du monde, la météo, la liste des joueurs, le déclencheur d'autosave.
 
-## Le verrou par dimension
-Chaque dimension a un verrou en lecture écriture, la classe `ticking/LevelOwnership`. Quand une région tique, elle tient le verrou en lecture, que toutes les régions de la dimension partagent. Quand la partie encore sérielle du tick de la dimension tourne, la météo par exemple, elle tient le verrou en écriture, exclusif. Il en découle que la phase sérielle d'une dimension et les ticks de ses régions ne tournent jamais en même temps. Un worker n'attend jamais ce verrou. Si la prise échoue, la région saute son tour et réessaie au tick suivant. Le système de chunks ne passe plus par ce verrou : sa coordination est shardée par zones sous ses propres verrous de surface, et elle avance pendant que les régions tiquent.
+## Workers de Région
+Une région n'est pas un thread ! Une région est une tâche nommés Workers. Ça veut dire que 200 régions tournent très bien sur 8 threads. Cela fonctionne un peu comme les caisses de supermarché Dans l'idée à chaque tick ils vont choisir la file ayant le moins de monde. Ce qui par nature équilibre parfaitement la charge.
 
-## Les deux horloges
-Le temps du jeu reste global, avancé par le thread global, comme en vanilla. Mais tout ce qui mesure une durée relative, le temps de cuisson d'un four, le délai d'un tick programmé de redstone, compte en temps de région, un simple compteur qui augmente de un à chaque tick de la région. Ce doublon existe parce que deux régions n'ont pas vécu le même nombre de ticks. Sans lui, un four qui compterait en temps global sauterait ou perdrait des ticks de cuisson à la première fusion. À la fusion, les échéances de la région absorbée sont recalées sur le compteur de la région qui reste.
+Les TPS en vanilla sont globaux sur Leafs ils sont par région. Chaque région a son propre TPS. Si une Région A exige plus de ressources cela baisse son TPS, cela n'affecte pas les autres régions qui gardent leurs TPS au max.
+- L'heure de la journée reste globale. Gérée par le thread global commun. Donc la météo, le soleil se couche à la même vitesse pour tout le monde peu importe vos TPS.
+- Tout ce qui mesure une durée relative, la cuisson d'un four, les entités, redstone, sont gérés par l'horloge de la région. Un four ne cuira pas à la même vitesse dans deux régions. Tout dépend du TPS.
 
-## La fenêtre barrière
-Certaines actions ont besoin du monde entier, comme un command block qui exécute une commande, un respawn de joueur ou la fin d'une traversée de portail. Pour elles, le thread global met toutes les régions en pause, exécute ces actions une par une avec un accès complet au monde, puis relâche tout. Ça s'appelle la fenêtre barrière, et elle s'ouvre au plus une fois par tick global. Si aucune action n'attend, la fenêtre ne s'ouvre pas et les régions ne s'arrêtent jamais. Un serveur sans command block actif ne paie donc rien. À l'inverse, un command block en repeat ou une fonction de datapack dans `#minecraft:tick` ouvrent la fenêtre à chaque tick, et le serveur repasse alors par un moment sériel à chaque tick, dont la durée dépend de la région la plus lente à finir son tick en cours. Deux gamerules permettent de couper ce contenu, [Fonctionnement.md](Fonctionnement.md) les décrit. Le code est dans `global/BarrierWindow`.
+## Workers de Chunks
+Les workers de chunks, parfaitement indépendants des workers de régions. Il gère la lecture des chunks sur le disque, il génère, charge et décharge les chunks. Plusieurs chunks à la fois par dimension. Ces workers tournent en priorité système minimale sur le systémes d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
+- Un joueur qui explore ne fait plus laguer les autres joueurs, même de sa propre régions.
+- Une zones trés denses, avec un TPS bas n'affecte pas la vitesse de générations du mondes donc il peut continuer a se déplacer fluidement.
+- En théorie, ça veut dire que si il y'a qu'une seul régions et que vous avez plusieurs workers de chunks. ça charge plus de chunks simultanés ?
 
-## Les flux de données
-Quand un joueur bouge, clique ou écrit, son jeu envoie un paquet au serveur. Leafs range chaque paquet dans la file du joueur qui l'a envoyé. La région qui possède ce joueur vide sa file au début de son tick et traite les paquets. Dans l'autre sens, le serveur envoie en permanence des paquets aux joueurs, les mouvements des entités, les blocs qui changent, les messages du chat. Ces envois partent directement, sans file, parce que la méthode d'envoi de vanilla est thread safe. Une région envoie donc depuis son propre thread, et Leafs groupe les envois d'un même tick de région pour qu'ils partent ensemble.
+# La fenêtre barrière.
+Un concept de Leafs. Pour vulgariser, cette fenêtre permet temporairement de synchroniser le monde. C'est surtout utilisée pour les téléportations, les commandes dans le chat. Un respawn, les portails. Les actions qui touchent plusieurs régions. Et les évenements Fabric.
+Le thread global met toutes les régions en pause, imperceptible sans impact sur les performances ou l'expérience de jeu, exécute ces actions une par une avec l'accès complet au monde, puis relâche tout. Elle peut s'ouvrir au plus une fois par tick global, cette fenêtre doit s'ouvrir le moins possible.
+Deux gamerules existe pour désactiver le tag `#minecraft:tick` et les command blocks à répétition. Car ils détruisent un peu le parallélisme des régions et resynchronisent à chaque tick les régions.
 
-Une action qui vise une autre région ou une autre dimension, une téléportation par exemple, ne s'exécute jamais directement. Elle est mise en file chez le destinataire, qui l'exécute pendant son propre tick. Les game rules, les registres et les autres données globales sont en lecture seule pendant le jeu, chaque région les lit sans précaution. Les rares écritures passent par le thread global.
+> Note de développeur: 
+> WIP Tous ce qui est liés a la connexion/deconnexion/teleportations doit être retirer de cette fenêtre. Les deux régions arrivé et départ. actifs ou non actifs doivent communiquer pour résoudre la téléportatio, (Donc indirectement le respawn, le portail, le changement de dimensions)
+> Une téléportation dans la même régions doit lui aussi ne pas ouvrir cette B arriére.
 
-## Qui a le droit de toucher quoi
-Une donnée du jeu n'est jamais touchée par deux threads en même temps. C'est la règle que tout le mod protège. Concrètement, un mob qui vit dans une région n'est modifié que par le worker de cette région, pendant son tick. La météo ou le système de chunks d'une dimension ne sont modifiés que quand aucune région de cette dimension ne tique, grâce au verrou décrit plus haut. Le scoreboard, la liste des joueurs et le reste de l'état global ne sont modifiés que depuis le thread global.
+# Connexion et déconnexion
+La connexion et déconnexion sont partiellement modifier, elles sont asynchrones de manière à ce que ces deux tâches n'aient aucun impact de lag sur le serveur. L'objectif est qu'aucun joueur ne ressente le moindre tick de différence dans son expérience.
+- Quand un joueur se connecte, Ses fichiers sont lu pendant l'écran de connexion, le placement du joueurs tourne sur la régions de sont point d'apparition.
+- Quand un joueur se déconnecte, c'est instantané pour lui, mais les données joueur, chunks et la région peuvent prendre quelque temps avant de se décharger. Quand beaucoup de joueurs se déconnectent, tout faire d'un coup créerait un grand coup de lag. C'est pour cela qu'on délaye ça proprement sur le temps.
 
-Un chunk déjà publié se lit depuis n'importe quel thread, la publication volatile du conteneur de palette rend cette lecture sûre. Un worker qui exige un chunk absent ou possédé par une autre région, là où vanilla le chargerait sur le champ, reçoit un refus. Le garde `ownership/TickGuard` absorbe ce refus et fait sauter son tick à la seule entité concernée, pendant que le pool de chunks charge ce qui manquait pour le réessai suivant. On préfère une entité qui saute un tick à un thread qui bloque sur du chargement.
+# Compatibilité des mods.
+Leafs explore une voie assez simple,  modifié toutes les primitives les plus basses de Minecraft les fonctions de téléportation, de réseau, de lecture/écriture des chunks. Des portails, structures, entités...
+Les mods utilisent ces fonctions sans le savoir et sont donc automatiquement compatibles.
+La listes des mods imcompatible n'est pas encore défini. Non tester. Pour sûr Lithium/Ferrite/Mapple seront compatible.
 
-Quand une région crash, elle écrit un crash report qui la décrit : son id, sa dimension, son tick, ses chunks, ses entités. On peut comprendre le crash sans fouiller les logs du serveur entier. Ensuite le serveur s'arrête proprement.
+# Mapple
+Leafs ne rajoute aucune optimisation que ça soit `CPU`, `RAM`, `Garbage Collector` ou `load-time allocations`. N'importe quelle forme d'optimisation sera faite dans un mod indépendant nommé Mapple. Ce mod fonctionne avec ou sans Leafs comme un mod sans config/compromis, du pur gain. Mais penser pour le meilleurs gains possible pour le multithreading Leafs.
+Actuellement ce mod réduit la consommation de la RAM d'environ 40%. Le Garbage Collector de 73% et l'allocation au chargement de 77%. Ce qui permet de créer davantage de régions.
+
+# Debuging & Metrics
+La créations des metrics, récupération des valeurs se fait dans Leafs, Elle fourni toutes fois des commandes simplifier pour accéder a ces données.
+`Leafs Debug and Metrics` est un mods indépendant, additionnel qui permet l'affichage cotés client F3, F8, F9 et l'analyse de la RAM.

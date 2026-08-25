@@ -70,7 +70,7 @@ public final class Region<R> {
         void accept(int chunkX, int chunkZ);
     }
 
-    /** Legal only while TICKING on the owner (sections frozen) or under the regionizer's write lock. */
+    /** Walks a snapshot of the sections, so the owner may call it mid-tick while the feed adopts more. */
     public void forEachChunk(ChunkConsumer consumer) {
         regionizer.forEachChunkOf(this, consumer);
     }

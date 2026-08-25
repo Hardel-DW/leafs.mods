@@ -42,12 +42,12 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         leafs$ticking.serialBudget().beginTick(now);
     }
 
-    @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V", shift = At.Shift.AFTER))
+    @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markConnectionsStage(CallbackInfo callbackInfo) {
         leafs$ticking.metrics().globalStages().mark(TickStages.globalConnections);
     }
 
-    @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;tick()V", shift = At.Shift.AFTER))
+    @Inject(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;tick()V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markPlayersStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$ticking.metrics().globalStages().mark(TickStages.globalPlayers);
     }

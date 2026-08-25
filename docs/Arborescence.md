@@ -1,22 +1,19 @@
 # Arborescence
+Un dossier est une responsabilité. Une brique indépendante. Le code vit dans `src/main/java/fr/hardel/leafs/`. Le dossier `excess` dans hardel vit a cotés du mods. Il donnes des class utilitaires non liés a Minecraft.
 
-Un dossier égale une responsabilité. Le code vit dans `src/main/java/fr/hardel/leafs/`.
+- `chunk/` porte le système de chunks, la table concurrente des holders, l'ordonnancement et le pool de génération dans `core/`, le chargeur par joueur dans `loader/`, le propagateur de tickets dans `propagator/`, le contrat de lecture des chunks, les tickets, le tracking des entités et le verrou des villages.
+- `debug/` porte les commandes `/leafs regions`, `timings`, `metrics` et `recommendation`, l'affichage côté client et l'analyse de la RAM étant dans le mod à part `Leafs Debug and Metrics`.
+- `entity/` gère les listes de tick d'entités par région avec leur boîte aux lettres, la persistance routée vers les régions propriétaires et les téléportations.
+- `global/` porte la phase globale, la fenêtre barrière, le moniteur d'état partagé, les command blocks, les gamerules du mod, les écritures différées des fichiers joueurs et la pause des évènements de tick de la Fabric API.
+- `metrics/` mesure le serveur avec les durées par étape de tick du catalogue `TickStages` publié dans le registre `leafs:tick_stage`, les compteurs à fenêtre d'une minute, les stats de la fenêtre barrière et les compteurs de reports et de refus du contrat des chunks.
+- `mixin/` regroupe les points d'accroche sans logique, un sous dossier par module servi, plus `compat/` pour ceux qui visent la Fabric API.
+- `network/` gère les files de paquets par joueur, le routage, le tick réseau par région, la déconnexion et la préparation de la connexion.
+- `ownership/` dit qui possède quoi avec le contexte de thread courant, le refus typé `OwnershipViolationException`, le garde `TickGuard` qui saute une unité refusée et le crash report par région.
+- `region/` découpe le monde en sections et en régions avec la fusion, la scission et le `Regionizer`, sans aucune dépendance Minecraft.
+- `scheduler/` expose les schedulers publics par région et global, les tickets de rétention de chunks et le moteur du travail différé `DeferredWork` avec ses trois destinations, la fenêtre, le sériel de la dimension et la région d'une position.
+- `ticking/` orchestre les régions avec le pool de workers, l'unité de tick sérielle par dimension, le verrou par dimension, la barrière, le budget sériel, le watchdog et les timings.
+- `world/` porte le corps du tick de région et les états de monde par région, ticks programmés, évènements de blocs, horloge, aléatoire, block entities, mises à jour de voisinage et autosave.
 
-| Dossier | Responsabilité |
-|---|---|
-| `config/` | La configuration du mod, parsing strict, clés inconnues refusées. |
-| `ownership/` | Qui possède quoi : le contexte de thread courant, l'exception de violation, le garde de dégradation `TickGuard`, le rapport de crash par région. |
-| `region/` | Le découpage du monde : sections, régions, fusion, scission, le `Regionizer`. Pur, sans dépendance Minecraft. |
-| `ticking/` | L'orchestration : le scheduler des workers, les unités de tick par niveau, le verrou par niveau, la barrière, le watchdog, les timings. |
-| `world/` | Le corps du tick de région et les états de monde par région : ticks programmés, évènements de blocs, horloge, aléatoire, block entities, mises à jour de voisinage. |
-| `entity/` | Les entités : listes de tick par région, index concurrents, routage de la persistance vers les régions propriétaires, téléportations et pipeline inter dimensions, schedulers d'entités, primitives concurrentes maison. |
-| `chunk/` | Le système de chunks : la table concurrente des holders, l'ordonnancement shardé et le pool de génération dans `core/`, le chargeur par joueur dans `loader/`, le propagateur de niveaux dans `propagator/`, plus les lectures des régions, les tickets, le tracking et le verrou des villages. |
-| `network/` | Le réseau : files de paquets par joueur, routage, le tick réseau par région, le filet global. |
-| `scheduler/` | Les schedulers publics, par région et global, avec les tickets de rétention de chunks, et le moteur du travail différé `DeferredWork` avec ses trois destinations. |
-| `global/` | La phase globale : la fenêtre barrière, le moniteur d'état partagé, les command blocks, les gamerules du mod, les écritures différées des fichiers de joueurs, la pause des évènements de tick de la Fabric API. |
-| `metrics/` | La mesure : les durées par étape de tick (`StageTimings` et le catalogue `TickStages`, publié au démarrage dans le registre `leafs:tick_stage`, clefs dans `LeafsRegistries` et instances dans `LeafsBuiltInRegistries` comme chez vanilla), les compteurs à fenêtre d'une minute, les stats de la fenêtre barrière, les compteurs de reports et de refus du contrat des chunks. Importable par tout le monde, ne dépend que de `ownership/`. |
-| `debug/` | Les commandes `/leafs regions`, `/leafs timings`, `/leafs metrics` et `/leafs recommendation`. |
-| `mixin/` | Les points d'accroche, un sous dossier par module servi, plus `compat/` pour ceux qui ciblent la Fabric API au lieu de vanilla. Aucune logique. |
-
-Les règles de dépendance entre modules : `ownership/`, `config/` et `metrics/` sont importables par tout le monde. `region/` ne dépend de rien d'autre. `entity/` n'importe jamais `ticking/`, les surfaces passent par des interfaces construites au câblage. Rien ne dépend de `mixin/` ni de `debug/`.
-Les tests vivent dans `src/test/java` en miroir des modules. Les ressources dans `src/main/resources` : le manifest du mod avec les options Lithium, la liste des mixins, l'access widener.
+`LeafsConfig` et les registres du mod sont à la racine du paquet. Le parsing de la config est strict, une clé inconnue est refusée.
+Deux règles de dépendance existent. `region/` ne dépend de rien d'autre, et rien ne dépend de `mixin/` et de `debug/`.
+Les tests vivent dans `src/test/java` en miroir des modules. Les ressources vivent dans `src/main/resources` avec le manifest du mod et ses options Lithium, la liste des mixins et l'access widener.

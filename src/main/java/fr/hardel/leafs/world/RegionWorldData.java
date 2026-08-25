@@ -162,6 +162,8 @@ public final class RegionWorldData {
         fluidTicks.mergeInto(target.fluidTicks, tickOffset);
         target.blockEvents.addAll(blockEvents);
         blockEvents.clear();
+        target.broadcastHolders.addAll(broadcastHolders);
+        broadcastHolders.clear();
         blockEntityTickers.mergeInto(target.blockEntityTickers);
         target.subTick = Math.max(target.subTick, subTick);
         target.lastInhabitedUpdate = Math.max(target.lastInhabitedUpdate, lastInhabitedUpdate);
