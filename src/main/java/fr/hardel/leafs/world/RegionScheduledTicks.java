@@ -12,12 +12,7 @@ import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 import java.util.function.LongSupplier;
 
-/**
- * A region's scheduled-tick index, dated on the region clock. A trigger arrives in game time, the
- * vanilla convention every caller uses, and is rebased on entry, so a tick built by hand from
- * {@code getGameTime()} lands at the right delay too. A merge rebases by the clock offset between
- * the two regions, a split re-buckets containers by grid section; both only run between region ticks.
- */
+/** The vanilla index on the region clock. Triggers come in game time, like vanilla, and are rebased at the door. */
 public final class RegionScheduledTicks<T> extends LevelTicks<T> {
     private final LongSupplier gameTime;
     private final LongSupplier time;
@@ -43,7 +38,6 @@ public final class RegionScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    /** No tick offset: split children inherit the parent's clock. */
     public void splitInto(int sectionShift, LongFunction<RegionScheduledTicks<T>> targetBySection) {
         for (long chunkKey : allContainers.keySet().toLongArray()) {
             int chunkX = ChunkPos.getX(chunkKey);
@@ -60,7 +54,7 @@ public final class RegionScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    /** Pending (still packed, delay-relative) ticks need no rebase; only the live queue holds absolute times. */
+    /** Packed ticks are delay-relative already, only the live queue moves. */
     private static <T> void rebase(LevelChunkTicks<T> container, long tickOffset) {
         if (tickOffset == 0) {
             return;

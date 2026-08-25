@@ -10,10 +10,7 @@ import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 
-/**
- * The schedulable side of one region. Both gates only TRY: blocking here would let a raised barrier
- * or a level-serial holder park a pool worker. A skipped pass is a region tick that never happened.
- */
+/** The schedulable side of one region. Both gates only try, a worker never parks; a skipped pass is a tick that never happened. */
 public final class RegionTickHandle extends TickHandle {
     private final Region<RegionTickData> region;
     private final LevelRegions regions;
@@ -60,7 +57,7 @@ public final class RegionTickHandle extends TickHandle {
                     return;
                 }
 
-                // Vanilla runs its main-thread queue while paused; the task lane must too, or a paused solo join waits on its entity deliveries forever.
+                // Paused solo: the task lane still drains, like vanilla's main-thread queue.
                 if (body.level().getServer().isPaused()) {
                     regions.taskScheduler().drain(region);
                     return;

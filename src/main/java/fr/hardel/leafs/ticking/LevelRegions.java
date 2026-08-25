@@ -232,7 +232,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return data;
     }
 
-    /** A region's clock starts at the game time of its birth, so a chunk unpacked before it had an owner keeps its delays. */
+    /** A clock starts at game time, so ticks unpacked before the region existed keep their delays. */
     private void attachWorld(RegionTickData data) {
         RegionClock clock = new RegionClock(gameTime.getAsLong());
         data.attachWorld(clock, worldDataFactory.apply(clock::currentTick));
