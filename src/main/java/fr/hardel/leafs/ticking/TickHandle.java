@@ -48,7 +48,7 @@ public abstract class TickHandle {
         this.scheduledStartNanos = scheduledStartNanos;
     }
 
-    /** The unit's own time: the region clock, or the game time for the level-serial unit. */
+    /** The region clock, or game time for the level-serial unit. */
     public abstract long currentTick();
 
     protected abstract void tick();

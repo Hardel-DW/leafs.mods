@@ -1,6 +1,6 @@
 package fr.hardel.leafs.ticking;
 
-/** A region's own time, one tick per body pass; scheduled ticks are dated on it and only ever compared to it. */
+/** The region's own time, one tick per pass, only ever compared to itself. */
 public final class RegionClock {
     private long tick;
 

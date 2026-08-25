@@ -9,11 +9,7 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
-/**
- * Region thread pool at 20 TPS: one due handle per poll, one tick per pass. A late handle is
- * rescheduled from now, so a lagging region runs fewer ticks per second instead of catching up.
- * {@link #runAttached} runs the same tick path on the calling thread.
- */
+/** Region worker pool, one tick per pass, a late region restarts from now instead of catching up. */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
 
@@ -46,7 +42,7 @@ public final class RegionTickScheduler {
         }
     }
 
-    /** Waits the workers out so a mid-flight tick can finish releasing its region before the drain runs. */
+    /** Lets a mid-flight tick release its region before the drain. */
     public void shutdown() {
         running = false;
         workers.forEach(Thread::interrupt);
@@ -65,7 +61,7 @@ public final class RegionTickScheduler {
         queue.add(new ScheduledTick(handle));
     }
 
-    /** From the tick-rate manager; handles pick the new period up at their next scheduling. */
+    /** From the tick-rate manager, applied at the next scheduling. */
     public void setPeriodNanos(long periodNanos) {
         this.periodNanos = Math.max(1, periodNanos);
     }
@@ -113,10 +109,7 @@ public final class RegionTickScheduler {
         }
     }
 
-    /**
-     * Each acquisition is paired with its own {@code finally} so a failed entry can never strand an
-     * active tick and block a later barrier raise. The crash report is built before the context exits.
-     */
+    /** One finally per acquisition, a failed entry must never strand an active tick. */
     private void executeTick(TickHandle handle) {
         barrier.enterTick();
         try {
