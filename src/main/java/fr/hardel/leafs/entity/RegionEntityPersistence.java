@@ -3,6 +3,8 @@ package fr.hardel.leafs.entity;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.SerialWorkBudget;
+import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -17,6 +19,8 @@ import net.minecraft.world.level.entity.Visibility;
  * chunksToUnload set, one truth source for what still has to leave.
  */
 public final class RegionEntityPersistence {
+    private static final int SWEEP_FLOOR = 64;
+
     private final ServerLevel level;
     private final EntityManagerAccess manager;
 
@@ -34,13 +38,23 @@ public final class RegionEntityPersistence {
         scheduling().runOnOwner(pos.x(), pos.z(), delivery);
     }
 
-    /** The serial sweep of hidden chunks: each one is removed here and re-queued by its task if the store refuses. */
+    /**
+     * The serial sweep of hidden chunks, on the budget every serial voice shares: a disconnection
+     * wave hides every chunk of every leaving player at once, and dispatching all of them in one
+     * tick is what stalls the level. What the budget leaves behind stays in the set for the next tick.
+     */
     public void sweepUnloads() {
+        SerialWorkBudget budget = TickingManager.of(level.getServer()).serialBudget();
+        int swept = 0;
         for (LongIterator iterator = manager.leafs$chunksToUnload().iterator(); iterator.hasNext(); ) {
             long chunkKey = iterator.nextLong();
             iterator.remove();
             if (manager.leafs$visibility(chunkKey) == Visibility.HIDDEN) {
                 dispatch(chunkKey, () -> unload(chunkKey));
+            }
+
+            if (++swept >= SWEEP_FLOOR && budget.expired(System.nanoTime())) {
+                return;
             }
         }
     }

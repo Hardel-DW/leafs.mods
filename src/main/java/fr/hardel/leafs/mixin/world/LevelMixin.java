@@ -55,11 +55,11 @@ public abstract class LevelMixin {
         }
     }
 
-    /** Off the server thread vanilla silently returns null; a region worker mid-tick is a game thread for its level. */
+    /** Vanilla answers null off its one game thread; the chunk contract already decides what any thread may read, so the read follows it. */
     @Inject(method = "getBlockEntity(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/entity/BlockEntity;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionBlockEntityPath(BlockPos pos, CallbackInfoReturnable<BlockEntity> callbackInfo) {
         Level self = (Level) (Object) this;
-        if (self.isInValidBounds(pos) && this instanceof ServerLevelRegionAccess access && access.leafs$regions().ownership().isRegionTickHeldByCurrentThread()) {
+        if (self.isInValidBounds(pos) && this instanceof ServerLevelRegionAccess) {
             callbackInfo.setReturnValue(self.getChunkAt(pos).getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE));
         }
     }

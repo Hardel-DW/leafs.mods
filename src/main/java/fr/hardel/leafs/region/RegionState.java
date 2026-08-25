@@ -6,7 +6,7 @@ public enum RegionState {
     TRANSIENT,
     /** Alive and schedulable, as long as no merge involving it is pending. */
     READY,
-    /** Currently ticking: its section ownership is frozen until {@link Region#markNotTicking()}. */
+    /** Currently ticking: it may still gain sections from the feed, and it never loses any until {@link Region#markNotTicking()}. */
     TICKING,
     /** Merged away or split; the object must no longer be used. */
     DEAD

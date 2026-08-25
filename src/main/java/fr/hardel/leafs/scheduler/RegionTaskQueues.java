@@ -72,7 +72,7 @@ public final class RegionTaskQueues {
         }
     }
 
-    synchronized int size() {
+    public synchronized int size() {
         return tasks.size();
     }
 }

@@ -31,27 +31,27 @@ public abstract class ServerLevelMixin implements ServerLevelRegionAccess {
         return leafs$regions;
     }
 
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/border/WorldBorder;tick()V", shift = At.Shift.AFTER))
+    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/border/WorldBorder;tick()V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markBorderStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$markSerial(TickStages.serialBorder);
     }
 
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;updateSkyBrightness()V", shift = At.Shift.AFTER))
+    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;updateSkyBrightness()V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markWeatherStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$markSerial(TickStages.serialWeather);
     }
 
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raids;tick(Lnet/minecraft/server/level/ServerLevel;)V"))
+    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raids;tick(Lnet/minecraft/server/level/ServerLevel;)V"), require = 0)
     private void leafs$markTimeStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$markSerial(TickStages.serialTime);
     }
 
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raids;tick(Lnet/minecraft/server/level/ServerLevel;)V", shift = At.Shift.AFTER))
+    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raids;tick(Lnet/minecraft/server/level/ServerLevel;)V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markRaidsStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$markSerial(TickStages.serialRaids);
     }
 
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/dimension/end/EnderDragonFight;tick()V", shift = At.Shift.AFTER))
+    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/dimension/end/EnderDragonFight;tick()V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markDragonStage(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$markSerial(TickStages.serialDragon);
     }

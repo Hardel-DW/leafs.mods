@@ -30,7 +30,8 @@ public final class RegionChunkAccess {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
-    // The full form: peek serves everyone; required ABSENT demands and carries readiness, required FOREIGN names the owner so the log line is attributable.
+    // The full form: a published chunk serves every thread, an absent one is demanded whatever the
+    // caller, because a demand posts a ticket and mutates nothing. Refusing it would strand the reader.
     public static ChunkAccess contractedChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);
@@ -38,17 +39,11 @@ public final class RegionChunkAccess {
             return chunk;
         }
 
-        ChunkScheduling scheduling = scheduling(chunkMap);
-        if (!scheduling.isOwner(chunkX, chunkZ)) {
-            scheduling.deferStats().countRefusal(OwnershipViolationException.Kind.FOREIGN, sourceOfCurrentThread());
-            throw new OwnershipViolationException(OwnershipViolationException.Kind.FOREIGN,
-                "Chunk [" + chunkX + ", " + chunkZ + "] is owned by another region than " + RegionContext.current() + ": crossing costs a refusal, never a lock");
-        }
-
         if (chunk != null) {
             return chunk;
         }
 
+        ChunkScheduling scheduling = scheduling(chunkMap);
         CompletableFuture<?> readiness = ChunkDemands.demand(chunkMap, status, LongList.of(ChunkPos.pack(chunkX, chunkZ)));
         scheduling.deferStats().countRefusal(OwnershipViolationException.Kind.ABSENT, sourceOfCurrentThread());
 

@@ -164,7 +164,7 @@ public final class Regionizer<R> {
         return readCount(() -> sumChunkCounts(region));
     }
 
-    /** Snapshot under the read lock: the feed can grow a ticking region's sections, so the owner never iterates the live set. */
+    /** Snapshot under the read lock: the feed grows a ticking region's sections, so the owner never iterates the live set. */
     long[] sectionKeysOf(Region<R> region) {
         if (writeLockOwner == Thread.currentThread()) {
             return region.sectionKeys.toLongArray();
@@ -227,13 +227,7 @@ public final class Regionizer<R> {
         }
 
         Collection<Region<R>> nearby = collectNearbyRegions(sectionX, sectionZ);
-        Region<R> target = null;
-        for (Region<R> candidate : nearby) {
-            if (candidate.state() != RegionState.TICKING) {
-                target = candidate;
-                break;
-            }
-        }
+        Region<R> target = preferredTarget(nearby);
         if (target == null) {
             target = createRegion();
         }
@@ -321,11 +315,12 @@ public final class Regionizer<R> {
 
     /**
      * Executes every pending merge around {@code region} whose two sides are not ticking, following
-     * the surviving region as merges chain. Without this, two non-ticking regions could be left owing each other a merge that the ticking gate would block forever.
+     * the surviving region as merges chain. A ticking region resolves nothing now and everything at
+     * its release. Without this, two non-ticking regions could be left owing each other a merge that the ticking gate would block forever.
      */
     private Region<R> resolvePendingMerges(Region<R> region) {
         boolean progress = true;
-        while (progress && region.state() != RegionState.DEAD) {
+        while (progress && region.state() != RegionState.DEAD && region.state() != RegionState.TICKING) {
             progress = false;
             for (Region<R> source : List.copyOf(region.expectingMergeFrom)) {
                 if (source.state() != RegionState.TICKING) {
@@ -504,6 +499,21 @@ public final class Regionizer<R> {
         return section;
     }
 
+    /**
+     * A ticking neighbour is a legal target: sections only ever arrive, never leave, and every reader
+     * of the live set walks a snapshot. Preferring an idle one keeps an immediate adoption immediate.
+     */
+    private Region<R> preferredTarget(Collection<Region<R>> nearby) {
+        Region<R> chosen = null;
+        for (Region<R> candidate : nearby) {
+            if (chosen == null || (chosen.state() == RegionState.TICKING && candidate.state() != RegionState.TICKING)) {
+                chosen = candidate;
+            }
+        }
+
+        return chosen;
+    }
+
     private Region<R> createRegion() {
         Region<R> region = new Region<>(nextRegionId.getAndIncrement(), this, callbacks);
         regionsById.put(region.id(), region);
@@ -544,9 +554,13 @@ public final class Regionizer<R> {
         owner.deadSectionKeys.add(section.key());
     }
 
+    /** Walks a snapshot: the feed adopts sections into a region while it ticks, and a dead section may vanish under another region's release. */
     void forEachChunkOf(Region<R> region, Region.ChunkConsumer consumer) {
-        for (LongIterator iterator = region.sectionKeys.iterator(); iterator.hasNext(); ) {
-            sections.get(iterator.nextLong()).forEachChunk(consumer);
+        for (long key : sectionKeysOf(region)) {
+            RegionSection<R> section = sections.get(key);
+            if (section != null) {
+                section.forEachChunk(consumer);
+            }
         }
     }
 

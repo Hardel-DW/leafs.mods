@@ -1,9 +1,9 @@
 package fr.hardel.leafs.debug;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.global.LeafsGameRules;
-import fr.hardel.leafs.global.WindowPressure;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -14,12 +14,9 @@ import net.minecraft.server.MinecraftServer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 /** {@code /leafs recommendation}: suggests gamerule changes that improve parallelism. */
 public final class RecommendationCommand {
-
-    private static final long RECENT_PRESSURE_NANOS = TimeUnit.SECONDS.toNanos(10);
 
     private RecommendationCommand() {
     }
@@ -63,14 +60,13 @@ public final class RecommendationCommand {
             return Optional.empty();
         }
 
-        WindowPressure pressure = ((GlobalServerAccess) server).leafs$windowPressure();
-        long last = pressure.lastRepeatingDeferralNanos();
-        if (last == 0 || System.nanoTime() - last > RECENT_PRESSURE_NANOS) {
+        long perMinute = TickingManager.of(server).metrics().deferStats().deferrals(DeferReason.REPEATING_COMMAND_BLOCK).perMinute();
+        if (perMinute == 0) {
             return Optional.empty();
         }
 
         return Optional.of(new Recommendation(
-            problem("Repeating command blocks pause every region each tick, %d executions since startup.".formatted(pressure.repeatingDeferrals())),
+            problem("Repeating command blocks pause every region each tick, %d executions in the last minute.".formatted(perMinute)),
             action("/gamerule %s false".formatted(LeafsGameRules.repeatingCommandBlocksWork.id()), "skips them but keeps them armed, impulse and chain blocks keep working")));
     }
 

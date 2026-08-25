@@ -6,7 +6,6 @@ import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.entity.RegionEntityData;
-import fr.hardel.leafs.entity.ServerEntityAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
 import fr.hardel.leafs.metrics.TickStages;
@@ -155,8 +154,6 @@ public final class LevelTickUnit extends TickHandle {
             stages.beginTick(System.nanoTime());
             runQueuedTasks();
             stages.mark(TickStages.serialTasks);
-            ((ServerEntityAccess) level.getServer()).leafs$entitySchedulers().tickOwned(level);
-            stages.mark(TickStages.serialSchedulers);
             work.run();
 
             if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
