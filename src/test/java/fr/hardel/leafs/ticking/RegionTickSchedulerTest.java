@@ -38,22 +38,13 @@ class RegionTickSchedulerTest {
     }
 
     @Test
-    void catchUpAdvancesClocksByMissedPeriods() {
-        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000, RegionTickScheduler.TICK_PERIOD_NANOS));
-        assertEquals(1, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS - 1, RegionTickScheduler.TICK_PERIOD_NANOS));
-        assertEquals(2, RegionTickScheduler.computeTickCount(1_000, 1_000 + RegionTickScheduler.TICK_PERIOD_NANOS, RegionTickScheduler.TICK_PERIOD_NANOS));
-        assertEquals(3, RegionTickScheduler.computeTickCount(1_000, 1_000 + 2 * RegionTickScheduler.TICK_PERIOD_NANOS, RegionTickScheduler.TICK_PERIOD_NANOS));
-        assertEquals(2, RegionTickScheduler.computeTickCount(1_000, 1_000 + 25_000_000L, 25_000_000L));
-    }
-
-    @Test
     void regionThreadNamesScopeTheWorkerDuringItsTick(@TempDir Path crashDirectory) throws InterruptedException {
         scheduler = new RegionTickScheduler(1, true, new TickBarrier(), new LeafsWatchdog(Duration.ofSeconds(60), Duration.ZERO, message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
         scheduler.start();
         CountDownLatch ticked = new CountDownLatch(1);
         AtomicReference<String> nameDuringTick = new AtomicReference<>();
         AtomicReference<Thread> worker = new AtomicReference<>();
-        TestTickHandle handle = new TestTickHandle(4, tickCount -> {
+        TestTickHandle handle = new TestTickHandle(4, () -> {
             worker.set(Thread.currentThread());
             nameDuringTick.set(Thread.currentThread().getName());
             ticked.countDown();
@@ -76,7 +67,7 @@ class RegionTickSchedulerTest {
     void attachedTickRunsWithTheRegionContext(@TempDir Path crashDirectory) {
         RegionTickScheduler attached = createScheduler(1, crashDirectory);
         AtomicReference<RegionContext> observed = new AtomicReference<>();
-        TestTickHandle handle = new TestTickHandle(7, tickCount -> observed.set(RegionContext.current()));
+        TestTickHandle handle = new TestTickHandle(7, () -> observed.set(RegionContext.current()));
 
         attached.runAttached(handle);
 
@@ -88,7 +79,7 @@ class RegionTickSchedulerTest {
     @Test
     void attachedCrashWritesTheRegionReportAndPropagates(@TempDir Path crashDirectory) throws IOException {
         RegionTickScheduler attached = createScheduler(1, crashDirectory);
-        TestTickHandle handle = new TestTickHandle(9, tickCount -> {
+        TestTickHandle handle = new TestTickHandle(9, () -> {
             throw new IllegalStateException("boom");
         });
 
@@ -108,7 +99,7 @@ class RegionTickSchedulerTest {
     @Test
     void aFailingCrashReportNeverReplacesTheOriginalFailure(@TempDir Path crashDirectory) {
         RegionTickScheduler attached = createScheduler(1, crashDirectory);
-        TestTickHandle handle = new TestTickHandle(11, tickCount -> {
+        TestTickHandle handle = new TestTickHandle(11, () -> {
             throw new IllegalStateException("boom");
         }, true);
 
@@ -124,7 +115,7 @@ class RegionTickSchedulerTest {
     void aFailedTickReleasesItsBarrierEntry(@TempDir Path crashDirectory) throws InterruptedException {
         TickBarrier barrier = new TickBarrier();
         scheduler = new RegionTickScheduler(1, false, barrier, new LeafsWatchdog(Duration.ofSeconds(60), Duration.ZERO, message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory), (handle, throwable) -> { });
-        TestTickHandle handle = new TestTickHandle(12, tickCount -> {
+        TestTickHandle handle = new TestTickHandle(12, () -> {
             throw new IllegalStateException("boom");
         }, true);
 
@@ -147,7 +138,7 @@ class RegionTickSchedulerTest {
         pool.start();
         CountDownLatch threeTicks = new CountDownLatch(3);
         AtomicLong ticks = new AtomicLong();
-        TestTickHandle handle = new TestTickHandle(1, tickCount -> {
+        TestTickHandle handle = new TestTickHandle(1, () -> {
             ticks.incrementAndGet();
             threeTicks.countDown();
         });
@@ -172,7 +163,7 @@ class RegionTickSchedulerTest {
         });
         scheduler.start();
         AtomicLong attempts = new AtomicLong();
-        TestTickHandle handle = new TestTickHandle(1, tickCount -> {
+        TestTickHandle handle = new TestTickHandle(1, () -> {
             attempts.incrementAndGet();
             throw new IllegalStateException("boom");
         });

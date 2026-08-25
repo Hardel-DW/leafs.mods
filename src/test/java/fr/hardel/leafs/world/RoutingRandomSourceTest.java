@@ -17,7 +17,7 @@ class RoutingRandomSourceTest {
     private final RandomSource vanilla = fixed(1);
     private final RandomSource unitRandom = fixed(2);
     private final RoutingRandomSource routing = new RoutingRandomSource(scope, vanilla);
-    private final RegionWorldData worldData = new RegionWorldData(new RegionClock(0L), _ -> true, new ObjectLinkedOpenHashSet<>(), unitRandom, null, new HashSet<>(), new PathTypeCache());
+    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, () -> 0L, _ -> true, new ObjectLinkedOpenHashSet<>(), unitRandom, null, new HashSet<>(), new PathTypeCache());
 
     @AfterEach
     void exitContext() {

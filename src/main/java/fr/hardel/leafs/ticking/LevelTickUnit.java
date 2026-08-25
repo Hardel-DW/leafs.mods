@@ -82,7 +82,7 @@ public final class LevelTickUnit extends TickHandle {
             RegionScheduler<RegionTickData> taskScheduler = new RegionScheduler<>(regionizer, holds);
             LongFunction<RegionWorldData> regionWorldData = chunkKey -> resolve(regionizer, chunkKey, data -> data.worldData());
             LongFunction<RegionEntityData> regionEntityData = chunkKey -> resolve(regionizer, chunkKey, data -> data.entityData());
-            regions.activate(dimension(), scheduler, taskScheduler, this::submit, () -> RegionWorldData.regional(level), body, () -> {
+            regions.activate(dimension(), scheduler, taskScheduler, this::submit, level::getGameTime, time -> RegionWorldData.regional(level, time), body, () -> {
                 router.route(chunkKey -> orAttached(regionWorldData.apply(chunkKey), router.attached()));
                 entityLists.route(chunkKey -> orAttached(regionEntityData.apply(chunkKey), entityLists.attached()));
                 routeScheduledTicks(router, regionizer);
@@ -138,7 +138,12 @@ public final class LevelTickUnit extends TickHandle {
     }
 
     @Override
-    protected void tick(long tickCount) {
+    public long currentTick() {
+        return level.getGameTime();
+    }
+
+    @Override
+    protected void tick() {
         Runnable work = pendingWork;
         if (work == null) {
             throw new IllegalStateException("Level tick unit ticked without prepared work");
@@ -156,13 +161,13 @@ public final class LevelTickUnit extends TickHandle {
             stages.mark(TickStages.serialTasks);
             work.run();
 
-            if (currentTick() % CENSUS_INTERVAL_TICKS == 0) {
+            if (level.getGameTime() % CENSUS_INTERVAL_TICKS == 0) {
                 lastChunkCount = level.getChunkSource().getLoadedChunksCount();
                 lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
             }
 
             stages.mark(TickStages.serialManagement);
-            stages.endTick();
+            stages.endTick(System.nanoTime());
         } finally {
             WorldTickContext.exit();
             regions.ownership().exitLevelSerial();

@@ -28,7 +28,7 @@ class DeferredWorkTest {
         assertFalse(deferred, "nothing was deferred, the caller must not cancel vanilla");
         assertEquals(List.of("inline"), ran);
         assertTrue(transports.windowQueue.isEmpty());
-        assertEquals(0, transports.stats.deferrals(DeferReason.COMMAND_BLOCK).total(), "an inline run is not a deferral");
+        assertEquals(0, transports.stats.deferrals(DeferReason.COMMAND_BLOCK).perMinute(), "an inline run is not a deferral");
     }
 
     @Test
@@ -39,7 +39,7 @@ class DeferredWorkTest {
         assertEquals(List.of(), ran);
         transports.serialQueue.getFirst().run();
         assertEquals(List.of("serial"), ran);
-        assertEquals(1, transports.stats.deferrals(DeferReason.TELEPORT).total());
+        assertEquals(1, transports.stats.deferrals(DeferReason.TELEPORT).perMinute());
     }
 
     @Test
@@ -51,7 +51,7 @@ class DeferredWorkTest {
         transports.drainWindow();
 
         assertEquals(List.of(), ran);
-        assertEquals(1, transports.stats.drops(DeferReason.RESPAWN).total());
+        assertEquals(1, transports.stats.drops(DeferReason.RESPAWN).perMinute());
     }
 
     @Test
@@ -73,7 +73,7 @@ class DeferredWorkTest {
         transports.drainWindow();
 
         assertEquals(List.of("landed"), ran);
-        assertEquals(2, transports.stats.retries(DeferReason.PORTAL).total());
+        assertEquals(2, transports.stats.retries(DeferReason.PORTAL).perMinute());
     }
 
     @Test
@@ -111,8 +111,8 @@ class DeferredWorkTest {
         transports.drainWindow();
         transports.drainWindow();
 
-        assertEquals(1, transports.stats.deferrals(DeferReason.PORTAL).total(), "a replay is a retry, never a second deferral");
-        assertEquals(2, transports.stats.retries(DeferReason.PORTAL).total());
+        assertEquals(1, transports.stats.deferrals(DeferReason.PORTAL).perMinute(), "a replay is a retry, never a second deferral");
+        assertEquals(2, transports.stats.retries(DeferReason.PORTAL).perMinute());
     }
 
     /**

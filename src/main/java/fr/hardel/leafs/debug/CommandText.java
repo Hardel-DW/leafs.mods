@@ -1,6 +1,6 @@
 package fr.hardel.leafs.debug;
 
-import fr.hardel.leafs.ticking.TickTimings;
+import fr.hardel.leafs.metrics.StageTimings;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -19,7 +19,7 @@ final class CommandText {
         return location.getNamespace().equals(Identifier.DEFAULT_NAMESPACE) ? location.getPath() : location.toString();
     }
 
-    static Component rate(TickTimings.Snapshot snapshot) {
+    static Component rate(StageTimings.Snapshot snapshot) {
         return Component.empty().append(tps(snapshot.tps()))
             .append(stat("avg", String.format(Locale.ROOT, "%.2fms", snapshot.msptAverage())));
     }

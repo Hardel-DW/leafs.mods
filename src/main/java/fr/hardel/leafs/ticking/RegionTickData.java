@@ -6,12 +6,13 @@ import fr.hardel.leafs.scheduler.RegionTaskQueues;
 import fr.hardel.leafs.world.RegionAutosave;
 import fr.hardel.leafs.world.RegionWorldData;
 
-/** The per-region composite: task queues always, tick handle and the world/entity payloads once the level activated. */
+/** The per-region composite: task queues always, tick handle, clock and the world/entity payloads once the level activated. */
 public final class RegionTickData implements RegionTaskHost {
     private final RegionTaskQueues taskQueues = new RegionTaskQueues();
     private final RegionTaskQueues unloadQueues = new RegionTaskQueues();
     private final RegionAutosave autosave = new RegionAutosave();
     private volatile RegionTickHandle handle;
+    private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
     private volatile RegionEntityData entityData;
 
@@ -37,11 +38,16 @@ public final class RegionTickData implements RegionTaskHost {
         this.handle = handle;
     }
 
+    public RegionClock clock() {
+        return clock;
+    }
+
     public RegionWorldData worldData() {
         return worldData;
     }
 
-    void attachWorldData(RegionWorldData worldData) {
+    void attachWorld(RegionClock clock, RegionWorldData worldData) {
+        this.clock = clock;
         this.worldData = worldData;
     }
 

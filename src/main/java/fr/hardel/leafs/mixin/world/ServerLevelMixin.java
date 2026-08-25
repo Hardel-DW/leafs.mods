@@ -5,7 +5,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.world.LevelBlockUpdates;
-import fr.hardel.leafs.world.RegionClock;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
@@ -67,7 +66,7 @@ public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createRegionWorldData(CallbackInfo callbackInfo) {
         ServerLevel self = (ServerLevel) (Object) this;
-        this.leafs$worldData = new RegionWorldData(new RegionClock(self::getGameTime), self::isPositionTickingWithEntitiesLoaded, self.blockEvents, RoutingRandomSource.unwrap(self.getRandom()), RoutingNeighborUpdater.unwrap(self.neighborUpdater), self.getChunkSource().chunkHoldersToBroadcast, self.getPathTypeCache());
+        this.leafs$worldData = new RegionWorldData(self::getGameTime, self::getGameTime, self::isPositionTickingWithEntitiesLoaded, self.blockEvents, RoutingRandomSource.unwrap(self.getRandom()), RoutingNeighborUpdater.unwrap(self.neighborUpdater), self.getChunkSource().chunkHoldersToBroadcast, self.getPathTypeCache());
         this.leafs$worldRouter = new WorldDataRouter(leafs$worldData);
         this.blockTicks = new RoutingScheduledTicks<>(self::isPositionTickingWithEntitiesLoaded, leafs$worldData.blockTicks());
         this.fluidTicks = new RoutingScheduledTicks<>(self::isPositionTickingWithEntitiesLoaded, leafs$worldData.fluidTicks());
@@ -100,7 +99,7 @@ public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
     private long leafs$unpackAtOwnerClock(ServerLevel instance, Operation<Long> original, @Local(argsOnly = true) LevelChunk chunk) {
         RegionWorldData data = leafs$worldRouter.atChunk(chunk.getPos().x(), chunk.getPos().z());
 
-        return data == leafs$worldData ? original.call(instance) : data.clock().currentTick();
+        return data == leafs$worldData ? original.call(instance) : data.currentTick();
     }
 
     @Inject(method = "sendBlockUpdated", at = @At("HEAD"), cancellable = true)

@@ -12,10 +12,12 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import net.minecraft.world.ticks.LevelChunkTicks;
+import net.minecraft.world.ticks.ScheduledTick;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.Map;
 
@@ -23,14 +25,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionWorldDataTest {
     private static final int SECTION_SHIFT = 4;
 
     private static RegionWorldData worldData(long clockStart) {
-        return new RegionWorldData(new RegionClock(clockStart), _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache());
+        return worldData(new AtomicLong(clockStart));
+    }
+
+    private static RegionWorldData worldData(AtomicLong clock) {
+        return new RegionWorldData(() -> 0L, clock::get, _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache());
     }
 
     private static BlockEventData eventIn(int chunkX, int chunkZ) {
@@ -55,8 +60,8 @@ class RegionWorldDataTest {
 
         from.mergeInto(into);
 
-        assertSame(container, into.blockTicks().containerAt(0, 0));
-        assertNull(from.blockTicks().containerAt(0, 0));
+        assertSame(container, into.blockTicks().allContainers.get(ChunkPos.pack(0, 0)));
+        assertNull(from.blockTicks().allContainers.get(ChunkPos.pack(0, 0)));
         assertTrue(into.blockEvents().contains(event));
         assertTrue(from.blockEvents().isEmpty());
         assertEquals(3, into.nextSubTick(), "the survivor's sub-tick counter continues past both regions' maxima");
@@ -76,17 +81,16 @@ class RegionWorldDataTest {
         RegionWorldData westChild = worldData(0);
         RegionWorldData eastChild = worldData(0);
         Map<Long, RegionWorldData> children = Map.of(0L, westChild, 1L, eastChild);
-        westChild.inheritTimeFrom(parent);
-        eastChild.inheritTimeFrom(parent);
+        westChild.inheritCountersFrom(parent);
+        eastChild.inheritCountersFrom(parent);
         parent.splitInto(SECTION_SHIFT, children::get);
 
-        assertSame(west, westChild.blockTicks().containerAt(0, 0));
-        assertSame(east, eastChild.blockTicks().containerAt(17, 0));
-        assertNull(parent.blockTicks().containerAt(0, 0));
+        assertSame(west, westChild.blockTicks().allContainers.get(ChunkPos.pack(0, 0)));
+        assertSame(east, eastChild.blockTicks().allContainers.get(ChunkPos.pack(17, 0)));
+        assertNull(parent.blockTicks().allContainers.get(ChunkPos.pack(0, 0)));
         assertEquals(1, westChild.blockEvents().size());
         assertTrue(eastChild.blockEvents().isEmpty(), "the orphan event's section has no child: dropped");
         assertTrue(parent.blockEvents().isEmpty());
-        assertEquals(500, westChild.clock().currentTick());
         assertEquals(1, eastChild.nextSubTick());
     }
 
@@ -103,20 +107,10 @@ class RegionWorldDataTest {
 
         attached.migrateInto(SECTION_SHIFT, section -> section == 0L ? owner : null);
 
-        assertSame(container, owner.blockTicks().containerAt(0, 0));
+        assertSame(container, owner.blockTicks().allContainers.get(ChunkPos.pack(0, 0)));
         assertTrue(owner.blockEvents().contains(owned));
         assertTrue(attached.blockEvents().contains(stray), "an event without an owning region stays attached");
         assertFalse(attached.blockEvents().contains(owned));
-    }
-
-    @Test
-    void clockAdvanceIsCounterModeOnly() {
-        RegionClock counter = new RegionClock(10L);
-        counter.advance(3);
-        assertEquals(13, counter.currentTick());
-
-        RegionClock attached = new RegionClock(() -> 5L);
-        assertThrows(IllegalStateException.class, () -> attached.advance(1));
     }
 
     @Test
@@ -262,11 +256,35 @@ class RegionWorldDataTest {
         }
     }
 
+    /** The vanilla convention holds for every caller: a trigger built from game time lands at the same delay on the region clock. */
+    @Test
+    void aTickScheduledInGameTimeLandsAtTheSameDelayOnTheRegionClock() {
+        bootstrapVanilla();
+        AtomicLong gameTime = new AtomicLong(1_000);
+        AtomicLong clock = new AtomicLong(40);
+        RegionWorldData data = new RegionWorldData(gameTime::get, clock::get, _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache());
+        data.blockTicks().addContainer(new ChunkPos(0, 0), new LevelChunkTicks<>());
+        BlockPos pos = new BlockPos(3, 64, 3);
+        List<BlockPos> drained = new ArrayList<>();
+
+        data.blockTicks().schedule(new ScheduledTick<>(Blocks.STONE, pos, gameTime.get() + 3, 0));
+        data.blockTicks().schedule(data.createTick(pos.above(), Blocks.STONE, 3));
+
+        clock.addAndGet(2);
+        data.drainBlockTicks((tickedPos, block) -> drained.add(tickedPos));
+        assertTrue(drained.isEmpty(), "two clock ticks later, a 3-tick delay is still pending");
+
+        clock.incrementAndGet();
+        data.drainBlockTicks((tickedPos, block) -> drained.add(tickedPos));
+        assertEquals(List.of(pos, pos.above()), drained);
+    }
+
     /** A refused scheduled tick re-queues one tick later, so it never re-runs inside the drain that refused it. */
     @Test
     void aRequeuedBlockTickFiresOnTheNextClockTickOnly() {
         bootstrapVanilla();
-        RegionWorldData data = worldData(100);
+        AtomicLong clock = new AtomicLong(100);
+        RegionWorldData data = worldData(clock);
         data.blockTicks().addContainer(new ChunkPos(0, 0), new LevelChunkTicks<>());
         BlockPos pos = new BlockPos(3, 64, 3);
         List<BlockPos> drained = new ArrayList<>();
@@ -275,7 +293,7 @@ class RegionWorldDataTest {
         data.drainBlockTicks((tickedPos, block) -> drained.add(tickedPos));
         assertTrue(drained.isEmpty(), "clock 100 must not fire a tick queued for 101");
 
-        data.clock().advance(1);
+        clock.incrementAndGet();
         data.drainBlockTicks((tickedPos, block) -> drained.add(tickedPos));
         assertEquals(List.of(pos), drained);
     }
