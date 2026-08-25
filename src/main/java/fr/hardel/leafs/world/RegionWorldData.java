@@ -25,11 +25,7 @@ import java.util.function.LongPredicate;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
-/**
- * The world state of one tick unit. Its time is the unit's own: the region clock, or the game time
- * for the attached payload the level-serial remainder drains. Ticks are created in game time like
- * vanilla and dated on the unit's time by the index. Merge and split only run between region ticks.
- */
+/** The world state of one tick unit, on its own time: the region clock, or game time for the attached payload. */
 public final class RegionWorldData {
     private static final int MAX_SCHEDULED_TICKS_PER_DRAIN = 65536;
     private final LongSupplier gameTime;
@@ -104,7 +100,7 @@ public final class RegionWorldData {
         return subTick++;
     }
 
-    /** Vanilla's shape, game time plus delay; the sub-tick tie-break comes from this unit so its drain order stays deterministic. */
+    /** Vanilla's shape; the sub-tick counter is per unit so the drain order stays deterministic. */
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
         return new ScheduledTick<>(type, pos, gameTime.getAsLong() + delay, priority, nextSubTick());
     }
@@ -113,14 +109,14 @@ public final class RegionWorldData {
         return new ScheduledTick<>(type, pos, gameTime.getAsLong() + delay, nextSubTick());
     }
 
-    /** Inhabited-time bookkeeping reads global time (absolute consumer); returns the delta since the last body tick. */
+    /** Inhabited time follows game time. */
     public long advanceInhabitedTime(long gameTime) {
         long delta = gameTime - lastInhabitedUpdate;
         lastInhabitedUpdate = gameTime;
         return delta;
     }
 
-    /** Vanilla drain shape at this unit's time; the cap is vanilla's level-wide one, applied per region. */
+    /** Vanilla's level-wide cap, applied per region. */
     public void drainBlockTicks(BiConsumer<BlockPos, Block> executor) {
         blockTicks.tick(currentTick(), MAX_SCHEDULED_TICKS_PER_DRAIN, executor);
     }
@@ -137,7 +133,7 @@ public final class RegionWorldData {
         fluidTicks.schedule(createTick(pos, fluid, 1));
     }
 
-    /** Vanilla {@code ServerLevel.runBlockEvents}: untickable positions re-queue for the next tick, cascades run this one. */
+    /** Vanilla runBlockEvents: untickable events wait, cascades run now. */
     public void runBlockEvents(Predicate<BlockPos> tickable, Consumer<BlockEventData> executor) {
         List<BlockEventData> reschedule = null;
         while (!blockEvents.isEmpty()) {
@@ -157,7 +153,7 @@ public final class RegionWorldData {
         }
     }
 
-    /** The two units run on two clocks: the scheduled ticks move by the offset so their remaining delays survive. */
+    /** Two clocks: the ticks move by the offset so their delays survive. */
     public void mergeInto(RegionWorldData target) {
         long tickOffset = target.currentTick() - currentTick();
         blockTicks.mergeInto(target.blockTicks, tickOffset);
@@ -171,21 +167,17 @@ public final class RegionWorldData {
         target.lastInhabitedUpdate = Math.max(target.lastInhabitedUpdate, lastInhabitedUpdate);
     }
 
-    /**
-     * Activation hand-off of what accumulated before the level's first tick. Scheduled containers
-     * always have an owning region (their chunk has a holder); events and tickers without one stay
-     * attached, where the level-serial remainder keeps draining them.
-     */
+    /** Activation hand-off; what has no owning region stays attached. */
     public void migrateInto(int sectionShift, LongFunction<RegionWorldData> childBySection) {
         redistribute(sectionShift, childBySection, true);
     }
 
-    /** State whose section died with the split is dropped, like its chunk's other transient state. */
+    /** A dead section drops its state. */
     public void splitInto(int sectionShift, LongFunction<RegionWorldData> childBySection) {
         redistribute(sectionShift, childBySection, false);
     }
 
-    /** Scheduled containers never go unmatched: their chunk has a holder, so an absent child is a bug, not an orphan. */
+    /** A tick container always has an owner, its chunk has a holder. */
     private void redistribute(int sectionShift, LongFunction<RegionWorldData> childBySection, boolean keepOrphans) {
         blockTicks.splitInto(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
@@ -215,7 +207,7 @@ public final class RegionWorldData {
         }, keepOrphans);
     }
 
-    /** A split child continues the parent's counters; its clock is reset by the caller, which owns it. */
+    /** Split child; the clock is the caller's. */
     public void inheritCountersFrom(RegionWorldData parent) {
         subTick = parent.subTick;
         lastInhabitedUpdate = parent.lastInhabitedUpdate;
