@@ -222,14 +222,13 @@ public final class ChunkScheduling {
         return isUniversalOwner() || currentRegionOwns(chunkX, chunkZ);
     }
 
-    // Exclusion or barrier held means no region ticks on this level. The server thread only keeps the right before the regions activate:
-    // once they tick, a vanilla sync load dies anyway, the concurrent timeout purge kills its one-tick unknown ticket mid-generation.
+    // Universal ownership is the absence of rivals, not an identity: the exclusion, the barrier, a level whose regions have not started, and a halted pool all mean nobody else can tick this level.
     public boolean isUniversalOwner() {
         if (regions.ownership().isLevelSerialHeldByCurrentThread() || ticking.barrier().isHeldByCurrentThread()) {
             return true;
         }
 
-        return regions.body() == null && chunkMap.level.getServer().isSameThread();
+        return (regions.body() == null || ticking.halted()) && chunkMap.level.getServer().isSameThread();
     }
 
     /** The refusal counters of this level's server; the chunk contract counts here at every throw. */

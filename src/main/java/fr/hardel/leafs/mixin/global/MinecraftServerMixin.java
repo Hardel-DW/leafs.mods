@@ -5,7 +5,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.global.BarrierWindow;
 import fr.hardel.leafs.global.GlobalServerAccess;
 import fr.hardel.leafs.global.LeafsGameRules;
-import fr.hardel.leafs.global.WindowPressure;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.DeferReason;
@@ -25,24 +24,15 @@ public abstract class MinecraftServerMixin implements GlobalServerAccess {
     @Unique
     private BarrierWindow leafs$barrierWindow;
 
-    @Unique
-    private WindowPressure leafs$windowPressure;
-
     @Override
     public BarrierWindow leafs$barrierWindow() {
         return leafs$barrierWindow;
-    }
-
-    @Override
-    public WindowPressure leafs$windowPressure() {
-        return leafs$windowPressure;
     }
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createBarrierWindow(CallbackInfo callbackInfo) {
         TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
         leafs$barrierWindow = new BarrierWindow(ticking.barrier(), ticking.metrics().barrier(), ticking.metrics().deferStats());
-        leafs$windowPressure = new WindowPressure();
     }
 
     /**

@@ -5,5 +5,4 @@ public interface GlobalServerAccess {
 
     BarrierWindow leafs$barrierWindow();
 
-    WindowPressure leafs$windowPressure();
 }

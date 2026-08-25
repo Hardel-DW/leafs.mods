@@ -1,15 +1,16 @@
-# Compromis
+# Les Compromis
+Chaque écart volontaire est listé ici. Avec sont explications. Un refactor/ammélioration du code peut biensur en retirer, s'ils ils sont là c'est qu'ont a pas eu le choix.
 
-Chaque écart volontaire avec le comportement vanilla est listé ici, avec sa raison et son effet visible. Rien ne dévie en dehors de cette liste. Un compromis se retire quand un chantier le rend inutile, il ne s'aggrave jamais en silence.
+# Compromis bénéfiques.
+Ces compromis sont un peu des fonctionnalités. En réalités ils sont même bénéfiques pour le jeu, moins de triches, ou plus de possibilités de gameplays indirectement. Honnétement ont évite des les supprimers.
 
-1. Chaque région a son propre aléatoire, c'est inévitable avec plusieurs threads. Aucun effet visible en jeu.
-2. Les plafonds de spawn de mobs sont calculés par région et non par dimension entière, comme chez Folia. Une dimension très peuplée répartit ses mobs un peu différemment.
-3. Aux frontières de régions, Leafs préfère laisser tomber plutôt que crasher. Une mise à jour redstone qui sort de la zone atteignable est ignorée, un projectile gèle à la frontière, et ces situations se résolvent seules quand les régions fusionnent.
-4. Les actions qui traversent les régions ou les dimensions arrivent avec au plus un tick de retard, 50 ms. Les téléportations hors région, les traversées de portails et les respawns sont dans ce cas. Folia paie le même tick par ses files, et en pratique ce retard est invisible.
-5. La traversée d'un portail est asynchrone. Il peut être un peu plus long.
-6. Une région ne charge jamais un chunk de force. Le code qui tombe sur un chunk absent saute son passage ce tick, un ticket court fait charger le chunk par le pool de chunks, et le réessai suivant le trouve. Les chunks déjà publiés se lisent depuis n'importe quel thread, seul le chunk encore absent se refuse.
-7. Quand un joueur passe le relais entre sa région et le filet global, une fenêtre rare de 50 ms peut compter un de ses ticks en double, une dérive d'un tick sur un compteur comme la faim. Leafs accepte cet écart pour ne maintenir aucune liste d'appartenance.
-8. Un joueur qui se déconnecte pendant qu'il écrit un livre ou une pancarte abandonne le texte et son exécution, la même forme que Folia.
-9. Les commandes tapées dans le chat s'exécutent sur la phase globale du serveur, pas sur le thread du joueur, parce que la phase globale est le seul endroit où une commande peut charger des chunks arbitraires.
-10. Un arrêt brutal de la machine, un kill ou une coupure de courant, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture, que vanilla aurait déjà posées sur le disque. Un arrêt normal attend toutes les écritures.
-11. Deux recherches de structure presque simultanées peuvent viser la même structure, le temps que la première soit marquée.
+1. Chaque région a son propre aléatoire, Aucun effet visible en jeu.
+2. La quantité de spawn de mobs sont calculés pour chaque région et non par dimension entière.
+
+# Vrai Compromis
+3. Les actions qui traversent les régions comme les téléportations ou les portails arrivent avec au plus un tick de retard comme la téléportation.
+4. Un joueur qui se déconnecte pendant qu'il écrit un livre ou une pancarte perd le texte.
+5. Les commandes tapées dans le chat s'exécutent sur le thread globale, pas sur la région du joueur, parce que la phase globale est le seul endroit où une commande peut charger des chunks arbitraires.
+6. Si la machine s'éteint brutalement, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture. Sans corruptions.
+7. Deux joueurs qui localise une structure au même moment peuvent recevoir la même.
+8. Une déconnexion met toutes les régions en pause quelques millisecondes le temps de retirer le joueur.
