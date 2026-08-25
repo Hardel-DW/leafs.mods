@@ -4,11 +4,7 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 
 import java.util.Arrays;
 
-/**
- * Per-tick record of one tick unit: the duration of every stage plus the whole tick's end and
- * length, written single-threaded by the owning tick loop. Reads tolerate a torn row, so sampling
- * never touches the tick path. Only completed ticks are recorded, a skipped pass counts for nothing.
- */
+/** Per-tick ring of one unit, stage durations plus tick length; single writer, torn reads tolerated, skipped passes count for nothing. */
 public final class StageTimings {
     public static final int CAPACITY = 240;
     private static final long WINDOW_NANOS = 5_000_000_000L;
@@ -33,7 +29,7 @@ public final class StageTimings {
         lastMarkNanos = nowNanos;
     }
 
-    /** Attributes the time elapsed since the previous mark to {@code stage}; additive, a stage may be marked twice. */
+    /** Time since the previous mark goes to this stage; additive. */
     public void mark(TickStage stage) {
         mark(stage, System.nanoTime());
     }
@@ -59,7 +55,7 @@ public final class StageTimings {
         return ring[0].length;
     }
 
-    /** Average nanos per stage over the last completed ticks, capped to the window actually recorded. */
+    /** Average nanos per stage over the last ticks. */
     public long[] averageNanos(int ticks) {
         int end = cursor;
         int count = Math.min(ticks, Math.min(end, CAPACITY - 1));
@@ -82,7 +78,7 @@ public final class StageTimings {
         return averages;
     }
 
-    /** TPS and tick length percentiles over the last five seconds of completed ticks. */
+    /** TPS and tick length over the last five seconds. */
     public Snapshot sample(long nowNanos) {
         long cutoff = nowNanos - WINDOW_NANOS;
         long[] window = new long[CAPACITY];
@@ -107,7 +103,7 @@ public final class StageTimings {
         return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50), percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
     }
 
-    /** Nearest-rank on the window: with ~100 samples per 5s window, interpolation would be false precision. */
+    /** Nearest rank, ~100 samples make interpolation false precision. */
     private static double percentile(long[] sorted, int count, double fraction) {
         int rank = Math.clamp((long) Math.ceil(fraction * count) - 1, 0, count - 1);
 
