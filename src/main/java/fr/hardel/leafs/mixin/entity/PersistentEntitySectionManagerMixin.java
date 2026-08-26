@@ -7,6 +7,7 @@ import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.entity.EntityManagerAccess;
 import fr.hardel.leafs.entity.EntitySectionVisibilityAccess;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
+import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.world.level.entity.ChunkEntities;
@@ -107,11 +108,10 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
         return original.call(future, delivery);
     }
 
-    /** The serial call keeps only the dispatch; the save-unload of each hidden chunk runs on its owner. */
+    /** Each region unloads its own hidden chunks; the serial sweep only runs once the pool stopped. */
     @Inject(method = "processUnloads", at = @At("HEAD"), cancellable = true)
     private void leafs$unloadsOnTheOwner(CallbackInfo callbackInfo) {
-        if (leafs$persistence != null) {
-            leafs$persistence.sweepUnloads();
+        if (leafs$persistence != null && !TickingManager.of(leafs$persistence.level().getServer()).halted()) {
             callbackInfo.cancel();
         }
     }

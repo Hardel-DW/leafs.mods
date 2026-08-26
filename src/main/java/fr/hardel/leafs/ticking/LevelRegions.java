@@ -13,7 +13,6 @@ import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -163,10 +162,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
     }
 
-    /** The owner is captured before the removal, because after it the chunk belongs to nobody (see {@link RegionUnloads}). */
     public void chunkHolderDestroyed(int chunkX, int chunkZ) {
         try {
-            unloads.noteOwner(ChunkPos.pack(chunkX, chunkZ), regionizer.regionAt(chunkX, chunkZ));
             regionizer.removeChunk(chunkX, chunkZ);
         } catch (RuntimeException exception) {
             throw recordFeedFailure("destroy", chunkX, chunkZ, exception);
@@ -292,15 +289,16 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     @Override
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
+        Consumer<Runnable> orphans = task -> serialUnloadSink.accept(new OrphanedUnload(task));
         parent.data().taskQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
             return child == null ? null : child.data().taskQueues();
-        });
+        }, orphans);
 
         parent.data().unloadQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
             Region<RegionTickData> child = sectionToChild.get(sectionKey);
             return child == null ? null : child.data().unloadQueues();
-        });
+        }, orphans);
 
         RegionWorldData parentWorld = parent.data().worldData();
         if (parentWorld != null) {

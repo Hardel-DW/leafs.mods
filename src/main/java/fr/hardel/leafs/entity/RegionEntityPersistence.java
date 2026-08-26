@@ -1,32 +1,26 @@
 package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.chunk.PropagatorAccess;
-import fr.hardel.leafs.chunk.core.ChunkScheduling;
-import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.SerialWorkBudget;
-import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.Visibility;
 
+import java.util.function.LongPredicate;
+
 /**
- * Region routing of the entity persistence pipeline. Arrival and unload execute on the region that
- * owns the chunk, because the add and remove callbacks feed the per-region tick lists and the NBT
- * work must not ride the global thread; the autosave store runs from each region's own epoch walk.
- * The serial phase only dispatches the unloads, and keeps the inline fallback for chunks no region
- * owns, which is legal there because it holds the exclusion. Retries ride the vanilla
- * chunksToUnload set, one truth source for what still has to leave.
+ * Region routing of the entity persistence pipeline: arrival, unload and autosave run on the region
+ * that owns the chunk, because they feed the per-region tick lists. Retries ride vanilla's chunksToUnload set.
  */
 public final class RegionEntityPersistence {
-    private static final int SWEEP_FLOOR = 64;
-
     private final ServerLevel level;
     private final EntityManagerAccess manager;
+    private final Runnable regionTaskDrain;
 
-    public RegionEntityPersistence(ServerLevel level, EntityManagerAccess manager) {
+    public RegionEntityPersistence(ServerLevel level, EntityManagerAccess manager, Runnable regionTaskDrain) {
         this.level = level;
         this.manager = manager;
+        this.regionTaskDrain = regionTaskDrain;
     }
 
     public ServerLevel level() {
@@ -35,26 +29,16 @@ public final class RegionEntityPersistence {
 
     /** A loaded entity chunk lands on its owner; an empty chunk completes on the requesting owner and runs in place. */
     public void deliver(ChunkPos pos, Runnable delivery) {
-        scheduling().runOnOwner(pos.x(), pos.z(), delivery);
+        ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling().runOnOwner(pos.x(), pos.z(), delivery);
     }
 
-    /**
-     * The serial sweep of hidden chunks, on the budget every serial voice shares: a disconnection
-     * wave hides every chunk of every leaving player at once, and dispatching all of them in one
-     * tick is what stalls the level. What the budget leaves behind stays in the set for the next tick.
-     */
-    public void sweepUnloads() {
-        SerialWorkBudget budget = TickingManager.of(level.getServer()).serialBudget();
-        int swept = 0;
+    /** Vanilla's processUnloads over the chunks the caller owns: a chunk no longer hidden leaves the set, a hidden one unloads. */
+    public void unloadHidden(LongPredicate owned) {
         for (LongIterator iterator = manager.leafs$chunksToUnload().iterator(); iterator.hasNext(); ) {
             long chunkKey = iterator.nextLong();
-            iterator.remove();
-            if (manager.leafs$visibility(chunkKey) == Visibility.HIDDEN) {
-                dispatch(chunkKey, () -> unload(chunkKey));
-            }
-
-            if (++swept >= SWEEP_FLOOR && budget.expired(System.nanoTime())) {
-                return;
+            if (owned.test(chunkKey)) {
+                iterator.remove();
+                unload(chunkKey);
             }
         }
     }
@@ -68,18 +52,14 @@ public final class RegionEntityPersistence {
         }
     }
 
-    /**
-     * The saveAll wait loop: it spins on loads it requested itself, and with the pool possibly
-     * stopped only the calling universal owner can run the routed deliveries. The chunk pump runs
-     * first because deliveries issued before the level activated were queued there.
-     */
+    /** The saveAll wait loop spins on loads it requested itself; only the calling universal owner can run the routed deliveries. */
     public void drainPendingLoadsInline() {
         boolean hasMore = true;
         while (hasMore) {
             hasMore = level.getChunkSource().pollTask();
         }
 
-        LevelRegions.of(level).drainTasksInline();
+        regionTaskDrain.run();
     }
 
     /** A chunk revived between dispatch and execution stays; the next HIDDEN transition re-queues it. */
@@ -91,19 +71,5 @@ public final class RegionEntityPersistence {
         if (!manager.leafs$unloadChunk(chunkKey)) {
             manager.leafs$requeueUnload(chunkKey);
         }
-    }
-
-    /** The owner is resolved at dispatch: entity visibility drops while the holder still exists, so it is usually alive. */
-    private void dispatch(long chunkKey, Runnable task) {
-        int chunkX = ChunkPos.getX(chunkKey);
-        int chunkZ = ChunkPos.getZ(chunkKey);
-        LevelRegions regions = LevelRegions.of(level);
-        if (!regions.unloads().offer(regions.regionizer().regionAt(chunkX, chunkZ), chunkX, chunkZ, task)) {
-            task.run();
-        }
-    }
-
-    private ChunkScheduling scheduling() {
-        return ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
     }
 }

@@ -9,6 +9,8 @@ import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.StalledShutdown;
+import fr.hardel.leafs.chunk.ChunkUnloadAccess;
+import fr.hardel.leafs.chunk.ChunkUnloads;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
@@ -20,8 +22,9 @@ import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.region.Region;
+import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.SerialWorkBudget;
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.ServerLevelWorldAccess;
@@ -35,7 +38,7 @@ import it.unimi.dsi.fastutil.longs.Long2LongMaps;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongIterators;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
@@ -84,7 +87,7 @@ import java.util.Queue;
  * claims feed it from the serial decision, strictly alternating per position as the regionizer requires.
  */
 @Mixin(ChunkMap.class)
-public abstract class ChunkMapMixin implements PlayerLoaderAccess {
+public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAccess {
 
     @Mutable
     @Shadow
@@ -169,14 +172,10 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
     private TicketStorage ticketStorage;
 
     @Unique
-    private static final int leafs$DECISIONS_FLOOR = 50;
-
-    @Unique
     private final ConcurrentLinkedQueue<ChunkGenerationTask> leafs$pendingGenerationTasks = new ConcurrentLinkedQueue<>();
 
-    /** Serial-phase only: the drop entries an exhausted budget pushed to a later tick, in decision order. */
     @Unique
-    private final LongLinkedOpenHashSet leafs$deferredDrops = new LongLinkedOpenHashSet();
+    private ChunkUnloads leafs$unloads;
 
     @Unique
     private ChunkScheduling leafs$scheduling;
@@ -187,6 +186,16 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
     @Override
     public PlayerChunkLoader leafs$playerLoader() {
         return leafs$playerLoader;
+    }
+
+    @Override
+    public ChunkUnloads leafs$unloads() {
+        return leafs$unloads;
+    }
+
+    @Override
+    public void leafs$scheduleUnload(long pos, ChunkHolder holder) {
+        scheduleUnload(pos, holder);
     }
 
     /**
@@ -209,6 +218,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), TickingManager.of(self.level.getServer()), this.mainThreadExecutor);
         ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
         this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
+        this.leafs$unloads = new ChunkUnloads(self, this.toDrop, leafs$regions(), leafs$ticking().metrics().chunkUnloads());
     }
 
     /** The visibility pass of a move runs on the regions, against every player that moved; the rest of the move stays. */
@@ -274,14 +284,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         leafs$scheduling.mutateArea(centerChunk.x(), centerChunk.z(), chunkRadius + 1, () -> original.call(centerChunk, chunkRadius));
     }
 
-    /**
-     * The unload decisions run before vanilla's loop, which then finds toDrop empty. Each claim is
-     * atomic under the position's scheduling cell, so a concurrent drain that raises the level again
-     * keeps its chunk instead of losing it to a stale drop entry. The decisions share the serial
-     * work budget above a floor, so a mass drop wave defers to later ticks; the claim re-validates
-     * a deferred entry, so a chunk revived in between simply stays.
-     */
-    /** Only this class sees the nine sources vanilla's stop loop waits on, so it is the one that can name them. */
+    /** Only this class sees the sources vanilla's stop loop waits on, so it is the one that can name them. */
     @WrapMethod(method = "hasWork")
     private boolean leafs$nameWhatHoldsTheShutdown(Operation<Boolean> original) {
         boolean hasWork = original.call();
@@ -304,29 +307,17 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         return hasWork;
     }
 
+    /** Regions decide their own unloads; vanilla's drop loop sees nothing, and the server thread decides for everyone once the pool stopped. */
     @Inject(method = "processUnloads", at = @At("HEAD"))
-    private void leafs$lockedUnloadDecisions(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        for (LongIterator iterator = this.toDrop.iterator(); iterator.hasNext(); iterator.remove()) {
-            leafs$deferredDrops.add(iterator.nextLong());
+    private void leafs$decideAllOnShutdown(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
+        if (leafs$ticking().halted()) {
+            leafs$unloads.decideAll();
         }
+    }
 
-        SerialWorkBudget budget = leafs$ticking().serialBudget();
-        boolean drainAll = leafs$ticking().halted();
-        int decided = 0;
-        for (LongIterator iterator = leafs$deferredDrops.iterator(); iterator.hasNext(); ) {
-            long pos = iterator.nextLong();
-            iterator.remove();
-            ChunkHolder holder = leafs$scheduling.claimUnload(pos);
-            if (holder != null) {
-                leafs$regions().chunkHolderDestroyed(ChunkPos.getX(pos), ChunkPos.getZ(pos));
-                leafs$ticking().metrics().chunkUnloads().increment();
-                scheduleUnload(pos, holder);
-            }
-
-            if (!drainAll && ++decided >= leafs$DECISIONS_FLOOR && budget.expired(System.nanoTime())) {
-                break;
-            }
-        }
+    @WrapOperation(method = "processUnloads", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;iterator()Lit/unimi/dsi/fastutil/longs/LongIterator;"))
+    private LongIterator leafs$noSerialDropLoop(LongSet instance, Operation<LongIterator> original) {
+        return LongIterators.EMPTY_ITERATOR;
     }
 
     /** The read half of a chunk load ran on the pump; it runs on the chunk workers now, the pump is no longer a funnel. */
@@ -399,16 +390,20 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess {
         callbackInfo.cancel();
     }
 
-    /** The teardown runs on the region that owned the chunk at the unload decision; chunks nobody owned keep vanilla's serial queue. */
+    /** The teardown runs on the chunk's owner at scheduling time; a dead owner or an unactivated level keeps vanilla's serial queue. */
     @WrapOperation(method = "scheduleUnload", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenRunAsync(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$teardownOnTheOwner(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original, @Local(argsOnly = true, ordinal = 0) long pos) {
-        Executor owner = task -> {
-            if (!leafs$regions().unloads().offerToOwner(pos, ChunkPos.getX(pos), ChunkPos.getZ(pos), task)) {
+        LevelRegions regions = leafs$regions();
+        int chunkX = ChunkPos.getX(pos);
+        int chunkZ = ChunkPos.getZ(pos);
+        Region<RegionTickData> owner = regions.body() == null ? null : regions.regionizer().regionAtUnsynchronised(chunkX, chunkZ);
+        Executor executor = task -> {
+            if (!regions.unloads().offer(owner, chunkX, chunkZ, task)) {
                 serialQueue.execute(task);
             }
         };
 
-        return original.call(future, body, owner);
+        return original.call(future, body, executor);
     }
 
     /**
