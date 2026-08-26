@@ -7,23 +7,10 @@ import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.chunk.Strategy;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Reads ride vanilla's volatile snapshot; writes and serializations take the monitor (IO packs while the region writes). The crashing detector is disabled. */
+/** Reads ride vanilla's volatile snapshot; writes and serializations take the monitor (IO packs while the region writes), so vanilla's detector never trips. */
 @Mixin(PalettedContainer.class)
 public abstract class PalettedContainerMixin {
-
-    @Inject(method = "acquire", at = @At("HEAD"), cancellable = true)
-    private void leafs$noCrashingDetector(CallbackInfo callbackInfo) {
-        callbackInfo.cancel();
-    }
-
-    @Inject(method = "release", at = @At("HEAD"), cancellable = true)
-    private void leafs$noCrashingDetectorRelease(CallbackInfo callbackInfo) {
-        callbackInfo.cancel();
-    }
 
     @WrapMethod(method = "getAndSet(IIILjava/lang/Object;)Ljava/lang/Object;")
     private Object leafs$monitoredGetAndSet(int x, int y, int z, Object value, Operation<Object> original) {
