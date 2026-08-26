@@ -54,7 +54,11 @@ public final class TickGuard {
         };
     }
 
-    /** Vanilla wraps mid-tick failures into crash reports (ServerPlayer.doTick) before the guard sees them; the refusal hides in the cause chain. */
+    /** Vanilla wraps mid-tick failures into crash reports before the guard sees them; the refusal hides in the cause chain. */
+    public static boolean isRefusal(Throwable throwable) {
+        return throwable instanceof OwnershipViolationException || refusalIn(throwable) != null;
+    }
+
     private static OwnershipViolationException refusalIn(Throwable throwable) {
         for (Throwable cause = throwable.getCause(); cause != null; cause = cause.getCause()) {
             if (cause instanceof OwnershipViolationException refusal) {

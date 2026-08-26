@@ -43,14 +43,16 @@ public final class RegionTaskQueues {
         }
     }
 
-    public void closeAndReroute(int sectionShift, LongFunction<RegionTaskQueues> queuesBySection) {
+    /** A task whose section died with the split has no child; it goes to the caller's sink. */
+    public void closeAndReroute(int sectionShift, LongFunction<RegionTaskQueues> queuesBySection, Consumer<Runnable> orphans) {
         synchronized (this) {
             closed = true;
             for (QueuedTask task : tasks) {
                 long sectionKey = CoordinateKey.pack(task.chunkX() >> sectionShift, task.chunkZ() >> sectionShift);
                 RegionTaskQueues target = queuesBySection.apply(sectionKey);
                 if (target == null) {
-                    throw new IllegalStateException("No child queue for section [" + CoordinateKey.x(sectionKey) + ", " + CoordinateKey.z(sectionKey) + "] while splitting");
+                    orphans.accept(task.action());
+                    continue;
                 }
 
                 synchronized (target) {
