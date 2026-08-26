@@ -15,6 +15,8 @@ public final class LeafsCommand {
                 .then(RegionsCommand.tree())
                 .then(TimingsCommand.tree())
                 .then(MetricsCommand.tree())
-                .then(RecommendationCommand.tree())));
+                .then(RecommendationCommand.tree())
+                .then(ConfigCommand.tree())
+                .then(CrashCommand.tree())));
     }
 }
