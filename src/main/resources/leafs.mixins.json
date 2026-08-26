@@ -45,6 +45,7 @@
 		"global.RandomSequencesMixin",
 		"global.SavedDataStorageMixin",
 		"global.ScoreboardMixin",
+		"global.ServerBossEventMixin",
 		"global.ServerScoreboardMixin",
 		"global.ServerStatsCounterMixin",
 		"global.ServerWaypointManagerMixin",

@@ -10,7 +10,6 @@ public final class BarrierStats {
     private static final double NANOS_PER_MILLI = 1_000_000.0;
 
     private final MinuteCounter fabricEventPauses = new MinuteCounter();
-    private final MinuteCounter disconnectPauses = new MinuteCounter();
     private final long[] endNanos = new long[CAPACITY];
     private final long[] durationNanos = new long[CAPACITY];
     private final int[] queueDepths = new int[CAPACITY];
@@ -19,11 +18,6 @@ public final class BarrierStats {
     /** Raised by a Fabric server tick event emission, outside the window queue. */
     public MinuteCounter fabricEventPauses() {
         return fabricEventPauses;
-    }
-
-    /** Raised by a player disconnect wave, outside the window queue. */
-    public MinuteCounter disconnectPauses() {
-        return disconnectPauses;
     }
 
     public void recordOpen(long openEndNanos, long openDurationNanos, int queueDepth) {
