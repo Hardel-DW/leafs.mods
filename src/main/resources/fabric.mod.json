@@ -19,6 +19,11 @@
 	"mixins": [
 		"leafs.mixins.json"
 	],
+	"breaks": {
+		"c2me": "*",
+		"moonrise": "*",
+		"vmp": "*"
+	},
 	"depends": {
 		"fabricloader": ">=0.19.3",
 		"minecraft": "~26.2",

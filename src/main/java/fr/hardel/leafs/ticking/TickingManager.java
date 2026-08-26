@@ -31,6 +31,7 @@ public final class TickingManager {
     private final ChunkWorkers chunkWorkers;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
     private final SerialWorkBudget serialBudget = new SerialWorkBudget();
+    private final int slowTaskWarnMillis;
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
@@ -38,6 +39,7 @@ public final class TickingManager {
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
+        this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), killAfter(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
@@ -228,6 +230,6 @@ public final class TickingManager {
     }
 
     private LevelTickUnit unitFor(ServerLevel level) {
-        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler, serialBudget));
+        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler, serialBudget, slowTaskWarnMillis));
     }
 }

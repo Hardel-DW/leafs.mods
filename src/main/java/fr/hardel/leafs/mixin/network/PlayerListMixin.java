@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.network.PlayerListFileAccess;
 import fr.hardel.leafs.network.PlayerTeardown;
@@ -106,7 +107,8 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         long start = System.nanoTime();
         original.call(connection, player, cookie);
         long millis = (System.nanoTime() - start) / 1_000_000L;
-        if (millis > 100) {
+        int threshold = LeafsConfig.get().debug().slowTaskWarnMillis();
+        if (threshold > 0 && millis > threshold) {
             Leafs.LOGGER.warn("Placing {} took {} ms on its owner", player.getPlainTextName(), millis);
         }
     }

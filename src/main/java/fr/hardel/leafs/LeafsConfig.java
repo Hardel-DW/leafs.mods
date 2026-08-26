@@ -24,7 +24,7 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
 
-    public record Debug(int watchdogWarnSeconds, boolean perRegionLogs) {
+    public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
     }
 
     private static final Codec<Integer> MAX_THREADS = Codec.intRange(ALL_CORES, 1024)
@@ -39,7 +39,8 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
 
     private static final MapCodec<Debug> DEBUG_MAP = RecordCodecBuilder.mapCodec(builder -> builder.group(
         Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(Debug::watchdogWarnSeconds),
-        Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs)
+        Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs),
+        Codec.intRange(0, 60_000).optionalFieldOf("slow_task_warn_millis", 50).forGetter(Debug::slowTaskWarnMillis)
     ).apply(builder, Debug::new));
 
     private static final Codec<Debug> DEBUG = DEBUG_MAP.codec();
