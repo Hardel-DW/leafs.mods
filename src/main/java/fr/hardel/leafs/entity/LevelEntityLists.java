@@ -38,6 +38,7 @@ public final class LevelEntityLists {
             RegionEntityData owner = resolver.apply(chunkKey);
             return owner == attached ? null : owner.tickList();
         });
+        
         attached.navigatingMobs().rehome(chunkKey -> {
             RegionEntityData owner = resolver.apply(chunkKey);
             return owner == attached ? null : owner.navigatingMobs();

@@ -43,9 +43,8 @@ public final class FabricTickEventsBarrier {
     }
 
     private void openFor(Event<?> event) {
-        if (held || !subscribed.test(event)) {
+        if (held || !subscribed.test(event))
             return;
-        }
 
         pauses.increment();
         barrier.raise();
