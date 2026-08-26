@@ -93,11 +93,7 @@ class PlayerPacketQueueTest {
         assertEquals(List.of("survivor"), handled);
     }
 
-    /**
-     * The regression that crashed the server on an ordinary death: the routing hook re-queued and
-     * rethrew because it re-read the listener's player, which respawn had just moved to another
-     * level. The queue owns every packet it drains, whatever a handler does to the player.
-     */
+    /** Death crash regression: the queue owns every packet it drains, whatever a handler does to the player. */
     @Test
     void ownershipHoldsForEveryPacketOfADrainAcrossAPlayerSwap() {
         FakeListener listener = new FakeListener(true);

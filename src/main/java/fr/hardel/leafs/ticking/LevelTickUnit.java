@@ -33,12 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 
-/**
- * The level-serial remainder: runs the shrunk vanilla level tick body under the exclusive side of
- * ownership while the chunk-anchored phases tick on the region handles. Activation is the flip's
- * runtime switch: routing goes live, the attached payloads migrate to their owning regions, and the
- * handles are scheduled, all under the exclusion so nothing ticks against a half-migrated level.
- */
+/** The server-thread remainder of the level tick. Activation flips routing, migrates the attached payloads and schedules the regions, before any region ticks. */
 public final class LevelTickUnit extends TickHandle {
     private static final int CENSUS_INTERVAL_TICKS = 100;
 
@@ -64,7 +59,7 @@ public final class LevelTickUnit extends TickHandle {
         return regions;
     }
 
-    /** Server thread only, before the first tick of this level; regions stay try-blocked for the whole switch. */
+    /** Server thread only, before the first tick of this level; no region is scheduled yet. */
     void ensureActivated() {
         if (activated) {
             return;
@@ -111,7 +106,7 @@ public final class LevelTickUnit extends TickHandle {
         fluidTicks.route(chunkKey -> router.at(chunkKey).fluidTicks(), () -> countScheduled(regionizer, router, RegionWorldData::fluidTicks));
     }
 
-    /** Serial-side debug read: legal because the caller holds the exclusion or the barrier. */
+    /** Debug read from the server thread, tolerating a torn count. */
     private int countScheduled(Regionizer<RegionTickData> regionizer, WorldDataRouter router, Function<RegionWorldData, RegionScheduledTicks<?>> index) {
         int total = index.apply(router.attached()).count();
         for (Region<RegionTickData> region : regionizer.regionsView()) {
@@ -167,7 +162,7 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** The pause-exempt pass, same framing as {@link #tick}: vanilla drains packets while paused, so the per-player queues must too - drain only, no listener tick. */
+    /** Paused solo: vanilla drains packets while paused, so the per-player queues do too, without listener tick. */
     void tickPausedNetwork() {
         RegionContext.enter(context());
         WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), ((ServerLevelEntityAccess) level).leafs$entityLists().attached());
@@ -179,10 +174,7 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /**
-     * Time-boxed on the budget all dimensions share, so a mass unload dump spreads over ticks and a
-     * modded dimension count never widens the worst case. At least one task always runs; a slow one logs its origin.
-     */
+    /** Time-boxed on the budget all dimensions share; at least one task runs, a slow one logs its class. */
     private void runQueuedTasks() {
         Runnable task;
         while ((task = tasks.poll()) != null) {
@@ -210,7 +202,7 @@ public final class LevelTickUnit extends TickHandle {
         return lastViewChunks;
     }
 
-    /** Derived from the sizes of the owned tick lists instead of walking every entity, O(regions), any thread (Roadmap 10). */
+    /** Sum of the tick list sizes, O(regions), any thread. */
     public int entityCount() {
         int entities = ((ServerLevelEntityAccess) level).leafs$entityLists().attached().tickList().size();
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {

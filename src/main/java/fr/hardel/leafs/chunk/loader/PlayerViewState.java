@@ -4,11 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
-/**
- * One player's view pipeline, touched only by the thread that ticks the player. The stage map holds
- * every chunk the player retains a ticket on, the pending queue feeds new chunks in ring order, and
- * the two in-flight sets are what the progress polls walk instead of the whole map.
- */
+/** One player's view, touched only by the thread that ticks him. The in-flight sets are what the polls walk, not the whole stage map. */
 final class PlayerViewState {
 
     static final byte STAGE_LOADING = 1;

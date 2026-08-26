@@ -28,11 +28,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * The three per-level distance authorities of Leafs hang here: the loading propagator, the
- * simulation levels and the spawn proximity. Vanilla's graphs stay in place unfed, as the net for
- * pre-binding strays, and run empty in steady state.
- */
+/** The three distance authorities hang here: loading propagator, simulation levels, spawn proximity. Vanilla's graphs stay unfed and run empty. */
 @Mixin(DistanceManager.class)
 public abstract class DistanceManagerMixin implements PropagatorAccess {
 

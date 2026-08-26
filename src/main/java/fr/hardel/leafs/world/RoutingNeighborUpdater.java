@@ -12,9 +12,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
 
-/**
- * {@code Level.neighborUpdater} swap: the collector is a reentrancy stack of the current execution, so it resolves by tick context, never by position. Off-tick callers keep the level instance.
- */
+/** {@code Level.neighborUpdater} swap: a reentrancy stack of the current execution, resolved by tick context, never by position. */
 public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
     private final Level level;
     private final CollectingNeighborUpdater fallback;

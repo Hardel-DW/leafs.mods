@@ -6,12 +6,7 @@ import net.minecraft.server.RunningOnDifferentThreadException;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
-/**
- * Vanilla's click handler flips suppressRemoteUpdates around clicked() without a finally: one
- * exception and the menu never corrects the client again, a permanent inventory lie that only a
- * relog heals. A region thread can throw where vanilla's main thread could not, so the guard
- * restores the sync and sends a full resync before the error path runs.
- */
+/** Vanilla flips suppressRemoteUpdates without a finally; a region thread can throw where vanilla never did, so the guard restores the sync and resends the menu. */
 public final class ContainerClickGuard {
 
     private ContainerClickGuard() {

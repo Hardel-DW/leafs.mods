@@ -8,10 +8,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * ConcurrentHashMap-keySet-backed LongSet facade: atomic membership operations, weakly consistent
- * unordered iteration, boxing accepted for its cold call sites.
- */
+/** LongSet over a ConcurrentHashMap key set: atomic membership, weakly consistent iteration, boxing accepted. */
 public final class ConcurrentLongSet extends AbstractLongSet {
     private final Set<Long> set = ConcurrentHashMap.newKeySet();
 

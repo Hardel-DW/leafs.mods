@@ -15,14 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.IntSupplier;
 
-/**
- * A queued light task only reaches the engine when something calls {@code tryScheduleUpdate}, and in
- * vanilla the single caller is the chunk source pump on the server thread. The INITIALIZE_LIGHT and
- * LIGHT steps are joined under the generation exclusion, so a chunk worker waits on that thread while
- * it holds an area, and the server thread waits on the region ticks every time it quiesces a level.
- * A region tick that wants the same area closes the cycle. The lane drives itself here: a task arms
- * its own drain from inside the queue, and a drain that leaves work behind arms the next one.
- */
+/** Vanilla only drains light from the server-thread pump, a cycle with the generation exclusion. The lane drives itself: each task arms its own drain. */
 @Mixin(ThreadedLevelLightEngine.class)
 public abstract class ThreadedLevelLightEngineMixin {
 
@@ -37,11 +30,7 @@ public abstract class ThreadedLevelLightEngineMixin {
     @Shadow
     public abstract void tryScheduleUpdate();
 
-    /**
-     * The arming rides inside the queued task instead of following the submission, because the
-     * dispatcher hands the task to the light lane later; an arming that ran here would look at a
-     * queue its own entry has not reached yet, and the task would wait for the next caller.
-     */
+    /** The arming rides inside the task: armed at submission it would look at a queue its entry has not reached yet. */
     @WrapOperation(method = "addTask(IILjava/util/function/IntSupplier;Lnet/minecraft/server/level/ThreadedLevelLightEngine$TaskType;Ljava/lang/Runnable;)V",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkTaskDispatcher;submit(Ljava/lang/Runnable;JLjava/util/function/IntSupplier;)V"))
     private void leafs$armDrainFromTheQueue(ChunkTaskDispatcher dispatcher, Runnable queued, long pos, IntSupplier level, Operation<Void> original) {

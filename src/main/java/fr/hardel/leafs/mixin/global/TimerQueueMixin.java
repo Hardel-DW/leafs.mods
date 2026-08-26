@@ -10,11 +10,7 @@ import net.minecraft.world.level.timers.TimerQueue;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/**
- * A due scheduled function reaches arbitrary state, so its execution rides the barrier window.
- * The hook sits on the callback call itself: the queue bookkeeping stays vanilla, and a tick with
- * nothing due never runs any Leafs code, so an idle server never opens the window for it.
- */
+/** A due {@code /schedule} callback rides the barrier window. Hooked on the callback call only, so a tick with nothing due never opens the window. */
 @Mixin(TimerQueue.class)
 public abstract class TimerQueueMixin {
 

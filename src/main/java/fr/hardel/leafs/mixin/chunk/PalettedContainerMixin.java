@@ -11,13 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Block state reads from any thread ride the volatile data snapshot vanilla already publishes, so
- * only the writers need care. The section has one gameplay writer at a time by region geometry, but
- * the IO worker packs and the network path writes the same container, so every mutation and
- * serialization takes the container's monitor. The ThreadingDetector crashes the second entrant
- * instead of waiting, which turns that legitimate pair into a crash: it is disabled outright.
- */
+/** Reads ride vanilla's volatile snapshot; writes and serializations take the monitor (IO packs while the region writes). The crashing detector is disabled. */
 @Mixin(PalettedContainer.class)
 public abstract class PalettedContainerMixin {
 

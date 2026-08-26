@@ -1,9 +1,6 @@
 package fr.hardel.leafs.ticking;
 
-/**
- * Global sync point: {@link #raise()} blocks until every in-flight tick finishes, then parks new
- * ticks until {@link #drop()}. Raising from inside a tick, or ticking while holding, is rejected rather than deadlocked.
- */
+/** Global sync point: raise waits for in-flight ticks then parks new ones until drop. Raising inside a tick throws instead of deadlocking. */
 public final class TickBarrier {
     private final ThreadLocal<int[]> activeTickDepth = ThreadLocal.withInitial(() -> new int[1]);
 

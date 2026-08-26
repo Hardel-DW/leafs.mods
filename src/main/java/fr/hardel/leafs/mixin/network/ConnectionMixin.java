@@ -8,7 +8,7 @@ import net.minecraft.network.TickablePacketListener;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Hook only - network/RegionNetworkTick splits the tick: transport stays here, the listener half runs on the owning region. */
+/** Hook only, network/RegionNetworkTick splits the tick: transport stays here, the listener half runs on the owning region. */
 @Mixin(Connection.class)
 public abstract class ConnectionMixin {
 

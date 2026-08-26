@@ -35,11 +35,7 @@ class RegionChunkAccessTest {
         }
     };
 
-    /**
-     * The overstress crash of 2026-08-04: vanilla {@code ServerChunkCache.hasChunk} answers from the
-     * ticket level, which only says the chunk is DUE; the region read path answers from presence.
-     * Both surfaces must agree for a region worker or a correct hasChunk-then-read sequence crashes.
-     */
+    /** 2026-08-04 overstress crash: hasChunk answered from the ticket level, the read path from presence; both must agree. */
     @Test
     void ticketEligibleHolderWithoutCompletedChunkReadsAbsent() {
         ChunkHolder holder = new ChunkHolder(new ChunkPos(0, 0), ChunkLevel.byStatus(ChunkStatus.FULL), HEIGHT, null,

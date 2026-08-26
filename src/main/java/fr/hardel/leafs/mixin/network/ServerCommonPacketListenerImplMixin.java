@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Hook only - the #8 flush scope lives in network/PacketRouting: region-tick sends batch on the channel. */
+/** Hook only, the flush scope lives in network/PacketRouting: region-tick sends batch on the channel. */
 @Mixin(ServerCommonPacketListenerImpl.class)
 public abstract class ServerCommonPacketListenerImplMixin {
 

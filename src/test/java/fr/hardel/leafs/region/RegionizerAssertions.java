@@ -17,10 +17,7 @@ public final class RegionizerAssertions {
         return !region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty();
     }
 
-    /**
-     * Verifies every structural invariant of the regionizer. {@code strict} additionally requires that
-     * no merge is pending anywhere - the steady state once every region stopped ticking.
-     */
+    /** Every structural invariant; strict also requires no pending merge. */
     public static <R> void assertInvariants(Regionizer<R> regionizer, boolean strict) {
         Map<Long, RegionSection<R>> sections = regionizer.sectionsView();
         int bufferRadius = regionizer.bufferRadiusValue();

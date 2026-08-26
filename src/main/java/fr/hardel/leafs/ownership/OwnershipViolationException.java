@@ -5,10 +5,7 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.concurrent.CompletableFuture;
 
-/**
- * The contract's typed refusal. ABSENT: not loaded, a demand ticket is filed, readiness completes at
- * delivery. FOREIGN: another owner holds the position, the refusal names it so the work can hop there.
- */
+/** The chunk contract's refusal. ABSENT files a demand ticket and readiness completes at delivery; FOREIGN names the owner so the work can hop there. */
 public final class OwnershipViolationException extends RuntimeException {
     public enum Kind {
         ABSENT,

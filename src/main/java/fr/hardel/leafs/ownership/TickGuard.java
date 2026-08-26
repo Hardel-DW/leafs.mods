@@ -6,11 +6,7 @@ import net.minecraft.ReportedException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-/**
- * A tick unit that reaches a chunk it may not touch refuses itself before mutating anything; the
- * guard skips that one unit for the tick instead of crashing the region. Every other failure keeps
- * vanilla's crash path.
- */
+/** A refused item skips its own tick instead of crashing the region; every other failure keeps vanilla's crash path. */
 public final class TickGuard {
 
     private TickGuard() {
@@ -31,11 +27,7 @@ public final class TickGuard {
         }
     }
 
-    /**
-     * The scheduled-tick form, built once per drain so the loop pays no allocation per item:
-     * vanilla fires a scheduled tick exactly once, so a refused one must re-queue instead of being
-     * lost. {@code onRefusal} is that re-queue, and this is its only home.
-     */
+    /** Scheduled-tick form, built once per drain. Vanilla fires a scheduled tick once, so a refused one re-queues through {@code onRefusal}. */
     public static <A, B> BiConsumer<A, B> guardingWithRetry(BiConsumer<A, B> action, BiConsumer<A, B> onRefusal) {
         return (a, b) -> {
             try {

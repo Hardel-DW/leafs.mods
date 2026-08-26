@@ -15,12 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/**
- * Brackets the two Fabric API server tick event emissions of {@code tickServer} with the region
- * barrier when subscribers exist. The anchors are the vanilla calls just before each emission point
- * and just after it, so the pause covers exactly the fabric-lifecycle-events injections, whatever
- * their mixin priority.
- */
+/** Brackets the two Fabric server tick events with the barrier when subscribed. Anchored on the vanilla calls around each emission, whatever the Fabric mixin priority. */
 @Mixin(MinecraftServer.class)
 public abstract class ServerTickEventsShim {
 

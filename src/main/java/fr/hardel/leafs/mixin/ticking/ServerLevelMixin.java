@@ -15,11 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/**
- * Region carrier, plus the serial stage boundaries of the shrunk vanilla level tick. Field
- * initialiser runs after {@code super(...)}, so the regionizer exists before the first chunk holder.
- * The marks anchor on the vanilla calls still executed serially; a skipped anchor leaves its stage at zero.
- */
+/** Region carrier plus the serial stage marks. The field initialiser runs before the first chunk holder; a skipped anchor leaves its stage at zero. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelRegionAccess {
 

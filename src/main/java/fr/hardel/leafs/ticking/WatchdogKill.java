@@ -11,11 +11,7 @@ import net.minecraft.util.Util;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
-/**
- * The kill side of the watchdog: dumps every thread into a vanilla-style crash report, then halts
- * the JVM. {@code Runtime.halt} because a wedged server cannot be trusted to run its shutdown path,
- * the lesson of the arret-bloque ticket.
- */
+/** Dumps every thread into a crash report then {@code Runtime.halt}: a wedged server cannot run its own shutdown. */
 public final class WatchdogKill implements Consumer<LeafsWatchdog.Stall> {
     private final MinecraftServer server;
 

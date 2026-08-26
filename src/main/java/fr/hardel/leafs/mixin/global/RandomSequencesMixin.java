@@ -15,10 +15,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
-/**
- * A roll locks its own sequence, so two regions rolling on different loot tables never meet; the map
- * itself stays under the instance monitor. Lock order is instance then sequence, never the reverse.
- */
+/** A roll locks its own sequence, the map stays under the instance monitor. Lock order: instance then sequence. */
 @Mixin(RandomSequences.class)
 public abstract class RandomSequencesMixin {
 

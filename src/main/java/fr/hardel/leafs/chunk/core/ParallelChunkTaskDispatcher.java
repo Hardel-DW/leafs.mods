@@ -9,12 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * The worldgen dispatcher pumped in continuous flow: vanilla pops one chunk's tasks and waits for
- * their completion before popping the next, which serializes generation per dimension. This subclass
- * keeps popping until the in-flight window fills, so the pool's workers all draw work, and priorities
- * still apply at every pop through the vanilla queue.
- */
+/** Vanilla pops one chunk and waits for it; this keeps popping until the in-flight window fills, priorities still apply at each pop. */
 public final class ParallelChunkTaskDispatcher extends ChunkTaskDispatcher {
     private final TaskScheduler<Runnable> workers;
     private final AtomicInteger inFlight = new AtomicInteger();
