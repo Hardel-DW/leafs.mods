@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The disk half of the per-player saves: playerdata NBT, stats and advancements JSON. The caller
- * serializes on its own thread, under the pause or the exclusion that stabilises the player, and
+ * serializes on its own thread, the one that owns the player, and
  * only the file write moves here, on one writer thread, in submission order. Reads consult the
  * pending payloads first, so a player who reconnects immediately never reads a stale file. The
  * server flushes everything at shutdown, after the world save; while no instance is active, the

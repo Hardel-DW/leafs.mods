@@ -10,7 +10,6 @@ import fr.hardel.leafs.network.PlayerListFileAccess;
 import fr.hardel.leafs.network.PlayerTeardown;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
-import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingBinding;
 import net.minecraft.network.Connection;
 import net.minecraft.world.level.ChunkPos;
@@ -114,16 +113,6 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         long millis = (System.nanoTime() - start) / 1_000_000L;
         if (millis > 100) {
             Leafs.LOGGER.warn("Placing {} took {} ms on its owner", player.getPlainTextName(), millis);
-        }
-    }
-
-    /** A region saving its own player runs in place; a global-thread save takes the exclusion to order against region ticks. */
-    @WrapMethod(method = "save")
-    private void leafs$savePlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
-        if (player.level() instanceof ServerLevel level) {
-            LevelRegions.of(level).ownership().runExclusive(() -> original.call(player));
-        } else {
-            original.call(player);
         }
     }
 

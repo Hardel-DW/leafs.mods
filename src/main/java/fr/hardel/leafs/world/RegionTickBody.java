@@ -151,7 +151,7 @@ public final class RegionTickBody {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkMap).leafs$playerLoader();
         for (ServerPlayer player : chunkMap.playerMap.getAllPlayers()) {
-            if (!RegionNetworkTick.ownedByRegion(player.connection)) {
+            if (!RegionNetworkTick.ownedByRegion(player)) {
                 loader.tick(player);
             }
         }

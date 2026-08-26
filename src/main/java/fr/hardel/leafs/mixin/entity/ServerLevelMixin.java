@@ -10,7 +10,7 @@ import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.ownership.RegionContext;
-import fr.hardel.leafs.ticking.LevelOwnership;
+import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingBinding;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -31,7 +31,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Facade swap (dragonParts, players COW), per-region entity lists, teleport routing. Player mutations take the exclusion. */
+/** Facade swap (dragonParts, players COW), per-region entity lists, teleport routing. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
@@ -87,7 +87,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return leafs$entityLists.containsTicking(entity);
     }
 
-    /** From a region of another level the add hops to this level's owner of the position; here it is serialized on the level-wide player maps. */
+    /** From a region of another level the add hops to this level's owner of the position; here two regions serialize on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
         if (leafs$fromAnotherLevel()) {
@@ -95,7 +95,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return;
         }
 
-        leafs$ownership().runExclusiveSerialized(() -> original.call(player));
+        SharedStateMonitor.run(this, () -> original.call(player));
     }
 
     /** A hop answers true: the duplicate-UUID check happens at delivery, on the owner. */
@@ -106,7 +106,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return true;
         }
 
-        return leafs$ownership().callExclusive(() -> original.call(entity));
+        return original.call(entity);
     }
 
     @WrapMethod(method = "removePlayerImmediately")
@@ -116,7 +116,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return;
         }
 
-        leafs$ownership().runExclusiveSerialized(() -> original.call(player, reason));
+        SharedStateMonitor.run(this, () -> original.call(player, reason));
     }
 
     @Unique
@@ -131,8 +131,4 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         TickingBinding.of(self).toOwner(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
     }
 
-    @Unique
-    private LevelOwnership leafs$ownership() {
-        return LevelRegions.of((ServerLevel) (Object) this).ownership();
-    }
 }

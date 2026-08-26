@@ -18,21 +18,10 @@ public final class PlayerPacketQueue {
 
     private final ConcurrentLinkedDeque<Entry> packets = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean claimed = new AtomicBoolean();
-    private volatile long regionStampNanos;
 
     /** Vanilla's "am I the packet-handling thread", asked without a listener in scope (Fabric's receive-thread check). */
     public static boolean handlingPackets() {
         return DRAINING.get() != null;
-    }
-
-    /** The owning region's liveness mark: while fresh, the global loop leaves this listener alone. */
-    public void stampRegionOwner() {
-        regionStampNanos = System.nanoTime();
-    }
-
-    public boolean regionOwnerFresh(long staleNanos) {
-        long stamp = regionStampNanos;
-        return stamp != 0 && System.nanoTime() - stamp < staleNanos;
     }
 
     public <T extends PacketListener> void add(T listener, Packet<T> packet) {

@@ -23,11 +23,9 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelData;
 
-import java.util.concurrent.TimeUnit;
 
 /** Player network split: owning region drains packets and runs the listener tick; global loop keeps transport. */
 public final class RegionNetworkTick {
-    private static final long OWNER_STALE_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
     private static final int RESPAWN_BUDGET = 100;
 
     private RegionNetworkTick() {
@@ -36,15 +34,12 @@ public final class RegionNetworkTick {
     /** Region tick start: the owned player's packets, stopped if a handler moves the player off-level. */
     public static void drainOnRegion(ServerPlayer player, ServerLevel level) {
         ServerGamePacketListenerImpl listener = player.connection;
-        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
-        queue.stampRegionOwner();
-        queue.drain(() -> listener.player.level() == level);
+        PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
     }
 
     /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch; a chunk refusal is not an error and reaches the guard. */
     public static void tickListenerOnRegion(ServerPlayer player, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
-        PacketRouting.queueOf(listener).stampRegionOwner();
         Connection connection = listener.connection;
         if (connection.isConnecting() || !connection.isConnected()) {
             return;
@@ -68,26 +63,30 @@ public final class RegionNetworkTick {
         }
     }
 
-    /** Whether a region ticked this player recently enough that the global loop must keep its hands off. */
-    public static boolean ownedByRegion(ServerGamePacketListenerImpl listener) {
-        return PacketRouting.queueOf(listener).regionOwnerFresh(OWNER_STALE_NANOS);
+    /** A region owns the player when one owns his chunk; the global loop keeps its hands off him. */
+    public static boolean ownedByRegion(ServerPlayer player) {
+        if (!(player.level() instanceof ServerLevel level)) {
+            return false;
+        }
+
+        LevelRegions regions = LevelRegions.of(level);
+        ChunkPos chunk = player.chunkPosition();
+        return regions.body() != null && regions.regionizer().regionAt(chunk.x(), chunk.z()) != null;
     }
 
-    /** {@code Connection.tick}'s listener half: skipped while a region owns it, otherwise the complete vanilla tick under the level exclusion, which is what makes the server thread own the positions its handlers read. */
+    /** {@code Connection.tick}'s listener half: skipped while a region owns the player, otherwise the complete vanilla tick, nobody else touches his chunks. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
-        if (!(listener instanceof ServerGamePacketListenerImpl game) || !(game.player.level() instanceof ServerLevel level)) {
+        if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             original.run();
             return;
         }
 
-        if (ownedByRegion(game)) {
+        if (ownedByRegion(game.player)) {
             return;
         }
 
-        LevelRegions.of(level).ownership().runExclusive(() -> {
-            PacketRouting.queueOf(game).drain();
-            TickGuard.tickOrSkip(ignored -> original.run(), game.player);
-        });
+        PacketRouting.queueOf(game).drain();
+        TickGuard.tickOrSkip(ignored -> original.run(), game.player);
     }
 
         /** The respawn replays on the owner of the respawn spot, as that listener's packet-handling thread; the death level's removal hops back through the primitives. */

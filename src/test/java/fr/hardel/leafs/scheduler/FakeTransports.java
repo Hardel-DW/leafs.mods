@@ -9,21 +9,14 @@ import java.util.List;
 final class FakeTransports implements DeferredTransports {
 
     final List<Runnable> windowQueue = new ArrayList<>();
-    final List<Runnable> serialQueue = new ArrayList<>();
     final List<Runnable> ownerQueue = new ArrayList<>();
     final DeferStats stats = new DeferStats();
     boolean holdsWindow;
-    boolean holdsSerial;
     boolean owner;
 
     @Override
     public void toWindow(Runnable task) {
         windowQueue.add(task);
-    }
-
-    @Override
-    public void toSerial(Runnable task) {
-        serialQueue.add(task);
     }
 
     @Override
@@ -34,11 +27,6 @@ final class FakeTransports implements DeferredTransports {
     @Override
     public boolean holdsWindow() {
         return holdsWindow;
-    }
-
-    @Override
-    public boolean holdsSerial() {
-        return holdsSerial;
     }
 
     @Override
