@@ -13,7 +13,6 @@ public final class Region<R> {
 
     final LongOpenHashSet sectionKeys = new LongOpenHashSet();
     final LongOpenHashSet deadSectionKeys = new LongOpenHashSet();
-    /** Merge links: this region must merge into those / those will merge into this one. */
     final Set<Region<R>> mergeIntoLater = new LinkedHashSet<>();
     final Set<Region<R>> expectingMergeFrom = new LinkedHashSet<>();
 

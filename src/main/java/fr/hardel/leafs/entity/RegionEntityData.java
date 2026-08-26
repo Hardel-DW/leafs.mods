@@ -38,12 +38,11 @@ public final class RegionEntityData {
     public void splitInto(int sectionShift, LongFunction<RegionEntityData> targetBySection) {
         tickList.splitInto(sectionShift, section -> {
             RegionEntityData target = targetBySection.apply(section);
-
             return target == null ? null : target.tickList;
         });
+
         navigatingMobs.splitInto(sectionShift, section -> {
             RegionEntityData target = targetBySection.apply(section);
-
             return target == null ? null : target.navigatingMobs;
         });
     }
