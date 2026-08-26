@@ -1,12 +1,13 @@
 package fr.hardel.leafs.scheduler;
 
+import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ownership.OwnershipViolationException;
 
 import java.util.function.BooleanSupplier;
 
-// One deferred piece of work, immutable: destination, reason, revalidation, retry policy. The engine owns the bookkeeping: run inline when already at the destination, drop when revalidation fails, retry degraded with a synchronous last attempt.
+// One deferred piece of work: destination, reason, revalidation, retry budget. Inline when already at the destination, dropped when revalidation fails or the budget runs out.
 public record DeferredWork(
     Destination destination,
     DeferReason reason,
@@ -46,8 +47,8 @@ public record DeferredWork(
         return new DeferredWork(destination, reason, check, task, retryBudget, attempt, stats);
     }
 
-    // Attempts under the budget run degraded and an ABSENT refusal re-submits; the attempt past it runs raw, the one allowed synchronous load.
-    public DeferredWork degradedWithSyncNet(int budget) {
+    // Attempts read present chunks only, an ABSENT refusal re-submits on delivery; past the budget the work is dropped.
+    public DeferredWork degraded(int budget) {
         return new DeferredWork(destination, reason, revalidation, task, budget, attempt, stats);
     }
 
@@ -88,8 +89,15 @@ public record DeferredWork(
             return;
         }
 
-        if (attempt >= retryBudget) {
+        if (retryBudget == 0) {
             task.run();
+
+            return;
+        }
+
+        if (attempt >= retryBudget) {
+            stats.countDrop(reason);
+            Leafs.LOGGER.warn("{} dropped after {} refused attempts, its chunks never arrived", reason, attempt);
 
             return;
         }
