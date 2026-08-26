@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.Consumer;
 
-/** Hook only, global/ExecutionWindow moves any command or function execution triggered off the server thread into the barrier window. */
+/** Hook only, global/ExecutionWindow moves any command or function execution triggered off the server thread into the sync window. */
 @Mixin(Commands.class)
 public abstract class CommandsMixin {
 

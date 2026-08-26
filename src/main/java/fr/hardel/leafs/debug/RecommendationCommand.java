@@ -32,7 +32,7 @@ public final class RecommendationCommand {
         repeatingCommandBlocks(server).ifPresent(found::add);
 
         if (found.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("Nothing keeps the barrier window busy, no recommendation.").withStyle(ChatFormatting.GREEN), false);
+            source.sendSuccess(() -> Component.literal("Nothing keeps the sync window busy, no recommendation.").withStyle(ChatFormatting.GREEN), false);
             return 0;
         }
 
