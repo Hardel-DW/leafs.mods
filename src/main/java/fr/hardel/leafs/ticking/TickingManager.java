@@ -25,7 +25,6 @@ public final class TickingManager {
     private final MinecraftServer server;
     private final ServerMetrics metrics = new ServerMetrics();
     private final TickBarrier barrier = new TickBarrier();
-    private final PauseBatch pauseBatch = new PauseBatch(barrier, metrics.barrier().disconnectPauses());
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkWorkers chunkWorkers;
@@ -75,11 +74,6 @@ public final class TickingManager {
         if (unit != null) {
             unit.stages().mark(stage);
         }
-    }
-
-    /** The connection tick opens this so a disconnect wave shares one pause instead of one per player. */
-    public PauseBatch pauseBatch() {
-        return pauseBatch;
     }
 
     public GlobalScheduler globalScheduler() {
