@@ -58,7 +58,7 @@ public final class TicketTimeoutIndex {
         return expired;
     }
 
-    /** The serial fallback for the sections no region owns, under the level exclusion so no owner purges concurrently. */
+    /** The serial fallback for the sections no region owns. */
     public int purgeUnowned(LongPredicate sectionOwned) {
         int expired = 0;
         for (long key : sections.keySet())

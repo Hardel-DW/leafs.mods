@@ -23,19 +23,12 @@ public record DeferredWork(
         record Window() implements Destination {
         }
 
-        record Serial() implements Destination {
-        }
-
         record Owner(int chunkX, int chunkZ) implements Destination {
         }
     }
 
     public static DeferredWork window(DeferReason reason, DeferStats stats, Runnable task) {
         return new DeferredWork(new Destination.Window(), reason, () -> true, task, 0, 0, stats);
-    }
-
-    public static DeferredWork serial(DeferReason reason, DeferStats stats, Runnable task) {
-        return new DeferredWork(new Destination.Serial(), reason, () -> true, task, 0, 0, stats);
     }
 
     public static DeferredWork owner(DeferReason reason, DeferStats stats, int chunkX, int chunkZ, Runnable task) {
@@ -69,7 +62,6 @@ public record DeferredWork(
     private void enqueue(DeferredTransports transports) {
         switch (destination) {
             case Destination.Window _ -> transports.toWindow(() -> execute(transports));
-            case Destination.Serial _ -> transports.toSerial(() -> execute(transports));
             case Destination.Owner(int chunkX, int chunkZ) -> transports.toOwner(chunkX, chunkZ, () -> execute(transports));
         }
     }
@@ -77,7 +69,6 @@ public record DeferredWork(
     private boolean alreadyThere(DeferredTransports transports) {
         return switch (destination) {
             case Destination.Window _ -> transports.holdsWindow();
-            case Destination.Serial _ -> transports.holdsSerial();
             case Destination.Owner(int chunkX, int chunkZ) -> transports.owns(chunkX, chunkZ);
         };
     }

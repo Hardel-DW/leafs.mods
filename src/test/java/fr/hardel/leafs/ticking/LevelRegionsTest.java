@@ -189,12 +189,6 @@ class LevelRegionsTest {
         regions.chunkHolderDestroyed(32, 0);
         regions.chunkHolderDestroyed(64, 0);
 
-        regions.ownership().enterLevelSerial();
-        parentHandle.tick();
-        regions.ownership().exitLevelSerial();
-        assertEquals(1, regionCount(), "a handle must skip while the level-serial side is held");
-        assertEquals(0, regions.split());
-
         parentHandle.tick();
         assertEquals(2, regionCount(), "the handle's own release is what splits");
         assertEquals(1, regions.split());

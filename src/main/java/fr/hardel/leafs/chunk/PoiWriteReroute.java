@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-/** The POI write belongs to the level's single mutator; the global queue would run it concurrently with this level's regions. */
+/** The POI write runs on the owner of the block, like the block change that caused it. */
 public final class PoiWriteReroute {
 
     private PoiWriteReroute() {

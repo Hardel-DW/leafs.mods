@@ -133,19 +133,13 @@ public final class TickingManager {
     public void quiesce() {
         for (ServerLevel level : server.getAllLevels()) {
             LevelRegions regions = LevelRegions.of(level);
-            LevelOwnership ownership = regions.ownership();
-            ownership.enterLevelSerial();
-            try {
-                drainChunkBookkeeping(level);
-                RegionScheduler<RegionTickData> taskScheduler = regions.taskScheduler();
-                if (taskScheduler != null) {
-                    taskScheduler.completePending();
-                }
-
-                regions.rethrowFeedFailure();
-            } finally {
-                ownership.exitLevelSerial();
+            drainChunkBookkeeping(level);
+            RegionScheduler<RegionTickData> taskScheduler = regions.taskScheduler();
+            if (taskScheduler != null) {
+                taskScheduler.completePending();
             }
+
+            regions.rethrowFeedFailure();
         }
     }
 

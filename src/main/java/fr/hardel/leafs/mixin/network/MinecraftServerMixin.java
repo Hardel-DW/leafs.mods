@@ -4,7 +4,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import fr.hardel.leafs.network.OrphanNetworkSweep;
+import fr.hardel.leafs.ticking.TickBarrier;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
@@ -36,10 +39,23 @@ public abstract class MinecraftServerMixin {
         return List.of();
     }
 
-    /**
-     * The periodic autosave saves each region-owned player from his region's epoch walk; the global
-     * pass keeps only the players no region ticks. A flush or forced save keeps the vanilla full pass.
-     */
+    /** A flush or forced save reads every chunk and player: it pauses the regions for its duration. */
+    @WrapMethod(method = "saveEverything")
+    private boolean leafs$fullSaveUnderTheBarrier(boolean suppressLog, boolean flush, boolean force, Operation<Boolean> original) {
+        if (!flush && !force) {
+            return original.call(suppressLog, flush, force);
+        }
+
+        TickBarrier barrier = TickingManager.of((MinecraftServer) (Object) this).barrier();
+        barrier.raise();
+        try {
+            return original.call(suppressLog, flush, force);
+        } finally {
+            barrier.drop();
+        }
+    }
+
+    /** The periodic autosave saves each region-owned player from his region's epoch walk; the global pass keeps only the players no region ticks. */
     @WrapOperation(method = "saveEverything", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;saveAll()V"))
     private void leafs$autosavePlayersOnTheirRegions(PlayerList playerList, Operation<Void> original, @Local(argsOnly = true, ordinal = 1) boolean flush, @Local(argsOnly = true, ordinal = 2) boolean force) {
         if (flush || force) {

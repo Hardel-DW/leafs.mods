@@ -22,20 +22,18 @@ Les TPS en vanilla sont globaux sur Leafs ils sont par région. Chaque région a
 - L'heure de la journée reste globale. Gérée par le thread global commun. Donc la météo, le soleil se couche à la même vitesse pour tout le monde peu importe vos TPS.
 - Tout ce qui mesure une durée relative, la cuisson d'un four, les entités, redstone, sont gérés par l'horloge de la région. Un four ne cuira pas à la même vitesse dans deux régions. Tout dépend du TPS.
 
+Tous ce qui est liés a la téléportation c'est a dire, connexion/deconnexion/portail/respawn et autre. sont gérer avec les régions de départ et d'arriver, elles communique entre eux sans passer par le commun.
+
 ## Workers de Chunks
 Les workers de chunks, parfaitement indépendants des workers de régions. Il gère la lecture des chunks sur le disque, il génère, charge et décharge les chunks. Plusieurs chunks à la fois par dimension. Ces workers tournent en priorité système minimale sur le systémes d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
 - Un joueur qui explore ne fait plus laguer les autres joueurs, même de sa propre régions.
 - Une zones trés denses, avec un TPS bas n'affecte pas la vitesse de générations du mondes donc il peut continuer a se déplacer fluidement.
-- En théorie, ça veut dire que si il y'a qu'une seul régions et que vous avez plusieurs workers de chunks. ça charge plus de chunks simultanés ?
+- Si il y'a qu'une seul régions et que vous avez plusieurs workers de chunks. Les chunks charge proportionnellement plus vite au nombre de workers.
 
 # La fenêtre barrière.
-Un concept de Leafs. Pour vulgariser, cette fenêtre permet temporairement de synchroniser le monde. C'est surtout utilisée pour les téléportations, les commandes dans le chat. Un respawn, les portails. Les actions qui touchent plusieurs régions. Et les évenements Fabric.
+Ccette fenêtre permet temporairement de synchroniser le monde. C'est utilisée principalement pour les commandes et les évenements Fabric.
 Le thread global met toutes les régions en pause, imperceptible sans impact sur les performances ou l'expérience de jeu, exécute ces actions une par une avec l'accès complet au monde, puis relâche tout. Elle peut s'ouvrir au plus une fois par tick global, cette fenêtre doit s'ouvrir le moins possible.
 Deux gamerules existe pour désactiver le tag `#minecraft:tick` et les command blocks à répétition. Car ils détruisent un peu le parallélisme des régions et resynchronisent à chaque tick les régions.
-
-> Note de développeur: 
-> WIP Tous ce qui est liés a la connexion/deconnexion/teleportations doit être retirer de cette fenêtre. Les deux régions arrivé et départ. actifs ou non actifs doivent communiquer pour résoudre la téléportatio, (Donc indirectement le respawn, le portail, le changement de dimensions)
-> Une téléportation dans la même régions doit lui aussi ne pas ouvrir cette B arriére.
 
 # Connexion et déconnexion
 La connexion et déconnexion sont partiellement modifier, elles sont asynchrones de manière à ce que ces deux tâches n'aient aucun impact de lag sur le serveur. L'objectif est qu'aucun joueur ne ressente le moindre tick de différence dans son expérience.

@@ -4,8 +4,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import net.minecraft.server.level.ChunkHolder;
 
 /**
- * ChunkMap's pendingUnloads with its four vanilla access points made atomic: the serial side decides
- * and revives while the owning region's teardown claims. The conditional remove is the claim and must
+ * ChunkMap's pendingUnloads with its four vanilla access points made atomic: a drain revives while
+ * the owning region's teardown claims. The conditional remove is the claim and must
  * not tear against a revive, hence the override of the non-atomic Map default.
  */
 public final class PendingUnloadClaims extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
