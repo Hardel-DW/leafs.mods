@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,22 +41,13 @@ class LeafsConfigTest {
         assertEquals(5, config.sectionShift());
         assertTrue(config.debug().perRegionLogs());
         assertEquals(defaults.regionMergeDistance(), config.regionMergeDistance());
-        assertEquals(defaults.debug().watchdogKillSeconds(), config.debug().watchdogKillSeconds());
+        assertEquals(defaults.debug().watchdogWarnSeconds(), config.debug().watchdogWarnSeconds());
     }
 
     @Test
     void absentThreadsResolveToEveryProcessor() {
         assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().maxThreads());
         assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveThreads());
-    }
-
-    /** 0 sits below warn yet must boot: it is the disable escape hatch, not a threshold, and only this test guards it. */
-    @Test
-    void zeroKillSecondsIsAcceptedAsTheDisableValue(@TempDir Path directory) throws IOException {
-        Path file = directory.resolve("leafs.json");
-        Files.writeString(file, "{\"debug\": {\"watchdog_kill_seconds\": 0}}");
-
-        assertDoesNotThrow(() -> LeafsConfig.load(file));
     }
 
     @Test
@@ -70,7 +60,7 @@ class LeafsConfigTest {
             new Invalid("{\"chunk_threads\": 4}", "chunk_threads"),
             new Invalid("{\"debug\": {\"metrics\": 10}}", "metrics"),
             new Invalid("{\"max_threads\": 0}", "max_threads"),
-            new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 30, \"watchdog_kill_seconds\": 30}}", "watchdog_kill_seconds"),
+            new Invalid("{\"debug\": {\"watchdog_kill_seconds\": 60}}", "watchdog_kill_seconds"),
             new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 0}}", null),
             new Invalid("{\"section_size\": 20}", "section_size"),
             new Invalid("{\"section_size\": 512}", null),
