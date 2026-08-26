@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Timeout(10)
-class BarrierWindowTest {
+class SyncWindowTest {
     private final TickBarrier barrier = new TickBarrier();
     private final BarrierStats stats = new BarrierStats();
-    private final BarrierWindow window = new BarrierWindow(barrier, stats, new DeferStats());
+    private final SyncWindow window = new SyncWindow(barrier, stats, new DeferStats());
     private final List<String> executed = new ArrayList<>();
 
     private void enqueue(Runnable task) {

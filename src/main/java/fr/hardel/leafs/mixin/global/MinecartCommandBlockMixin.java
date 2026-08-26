@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MinecartCommandBlockMixin {
 
     @Inject(method = "activateMinecart", at = @At("HEAD"), cancellable = true)
-    private void leafs$deferToBarrierWindow(ServerLevel level, int x, int y, int z, boolean powered, CallbackInfo callbackInfo) {
+    private void leafs$deferToSyncWindow(ServerLevel level, int x, int y, int z, boolean powered, CallbackInfo callbackInfo) {
         if (CommandBlockWindow.deferMinecartActivation(level, (MinecartCommandBlock) (Object) this, x, y, z, powered)) {
             callbackInfo.cancel();
         }
