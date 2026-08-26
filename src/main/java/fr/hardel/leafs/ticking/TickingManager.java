@@ -9,6 +9,7 @@ import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ServerLevel;
 
 import java.nio.file.Path;
@@ -37,7 +38,7 @@ public final class TickingManager {
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
-        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), Duration.ofSeconds(config.debug().watchdogKillSeconds()), Leafs.LOGGER::error, new WatchdogKill(server));
+        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), killAfter(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
         this.chunkWorkers = new ChunkWorkers(config.effectiveThreads());
@@ -45,6 +46,11 @@ public final class TickingManager {
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and as many chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads());
+    }
+
+    /** Vanilla's {@code max-tick-time}: only a dedicated server kills, and -1 disables it. */
+    private static Duration killAfter(MinecraftServer server) {
+        return server instanceof DedicatedServer dedicated && dedicated.getMaxTickLength() > 0 ? Duration.ofMillis(dedicated.getMaxTickLength()) : Duration.ZERO;
     }
 
     public static TickingManager of(MinecraftServer server) {

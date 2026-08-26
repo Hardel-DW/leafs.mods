@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-/** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill runs once; the same killer covers a shutdown that never finishes. */
+/** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill (vanilla's max-tick-time, zero disables) runs once; the same killer covers a shutdown that never finishes. */
 public final class LeafsWatchdog {
     /** Generous next to the kill threshold: a legitimate final save of a large world must never be cut short. */
     public static final Duration SHUTDOWN_DEADLINE = Duration.ofMinutes(5);
