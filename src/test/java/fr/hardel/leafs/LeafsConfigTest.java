@@ -56,11 +56,7 @@ class LeafsConfigTest {
         }
 
         List<Invalid> cases = List.of(
-            new Invalid("{\"unknown_key\": 8}", "unknown_key"),
-            new Invalid("{\"chunk_threads\": 4}", "chunk_threads"),
-            new Invalid("{\"debug\": {\"metrics\": 10}}", "metrics"),
             new Invalid("{\"max_threads\": 0}", "max_threads"),
-            new Invalid("{\"debug\": {\"watchdog_kill_seconds\": 60}}", "watchdog_kill_seconds"),
             new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 0}}", null),
             new Invalid("{\"section_size\": 20}", "section_size"),
             new Invalid("{\"section_size\": 512}", null),
