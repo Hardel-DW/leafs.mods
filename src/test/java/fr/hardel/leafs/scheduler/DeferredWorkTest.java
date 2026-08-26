@@ -63,7 +63,7 @@ class DeferredWorkTest {
             }
 
             ran.add("landed");
-        }).degradedWithSyncNet(10).submit(transports);
+        }).degraded(10).submit(transports);
 
         transports.drainWindow();
         assertEquals(List.of(), ran);
@@ -77,20 +77,18 @@ class DeferredWorkTest {
     }
 
     @Test
-    void theAttemptPastTheBudgetRunsRawAsTheSyncNet() {
+    void theAttemptPastTheBudgetIsDroppedNeverSyncLoaded() {
         AtomicInteger attempts = new AtomicInteger();
         DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
-            if (attempts.incrementAndGet() == 1) {
-                throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "first pass refused");
-            }
-
-            ran.add("net");
-        }).degradedWithSyncNet(1).submit(transports);
+            attempts.incrementAndGet();
+            throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "refused");
+        }).degraded(1).submit(transports);
 
         transports.drainWindow();
         transports.drainWindow();
 
-        assertEquals(List.of("net"), ran, "attempt == budget runs raw and must not retry again");
+        assertEquals(1, attempts.get(), "the attempt past the budget never runs");
+        assertEquals(1, transports.stats.drops(DeferReason.PORTAL).perMinute());
         assertTrue(transports.windowQueue.isEmpty());
     }
 
@@ -105,7 +103,7 @@ class DeferredWorkTest {
             if (attempts.incrementAndGet() <= 2) {
                 throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "chunk not there yet");
             }
-        }).degradedWithSyncNet(10).submit(transports);
+        }).degraded(10).submit(transports);
 
         transports.drainWindow();
         transports.drainWindow();
@@ -130,7 +128,7 @@ class DeferredWorkTest {
             }
 
             ran.add("landed");
-        }).degradedWithSyncNet(10).submit(transports);
+        }).degraded(10).submit(transports);
 
         transports.drainWindow();
         assertTrue(transports.windowQueue.isEmpty(), "the retry must wait for the delivery, never poll the next pass");
@@ -145,7 +143,7 @@ class DeferredWorkTest {
     void aForeignRefusalIsNeverSwallowed() {
         DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
             throw new OwnershipViolationException(OwnershipViolationException.Kind.FOREIGN, "a genuine bug under the window");
-        }).degradedWithSyncNet(10).submit(transports);
+        }).degraded(10).submit(transports);
 
         assertThrows(OwnershipViolationException.class, transports::drainWindow);
     }
