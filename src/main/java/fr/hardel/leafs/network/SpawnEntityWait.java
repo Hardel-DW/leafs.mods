@@ -5,11 +5,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * Vanilla blocks the global thread at the flip until the spawn entities are loaded. Leafs makes that
- * a completion condition of the configuration phase, where vanilla already polls chunk loading, so
- * the flip never blocks while serial phases run. On an empty server the vanilla wait works inline.
- */
+/** Vanilla blocks the global thread at the flip until the spawn entities load; here it is a completion condition of the configuration phase. */
 public final class SpawnEntityWait {
 
     private SpawnEntityWait() {

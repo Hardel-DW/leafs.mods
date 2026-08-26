@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-/** Writes region-scoped crash files; never throws - a crash path must not crash. */
+/** Writes region-scoped crash files; never throws, a crash path must not crash. */
 public final class RegionCrashWriter {
     private static final DateTimeFormatter FILE_STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss");
 

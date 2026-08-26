@@ -10,14 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
-/**
- * Spatial exclusion of the generation steps that cross chunk boundaries, one AreaLock per level at
- * chunk granularity. FEATURES writes one chunk out and reads two (sculk patches), the light steps
- * read two through the engine, SPAWN and INITIALIZE_LIGHT read their own blocks that a neighbouring
- * FEATURES may be writing. Steps that only touch their own chunk stay free, the layer protocol of
- * ChunkGenerationTask already orders their readers. Async steps are joined under the lock, because
- * the exclusion must cover the work, not the scheduling of the work.
- */
+/** Spatial exclusion of the generation steps that cross chunk borders. FEATURES and LIGHT reach two chunks out, SPAWN and INITIALIZE_LIGHT read what a neighbour FEATURES may write. */
 public final class GenerationExclusion {
 
     /** FULL runs on the owning region and takes this radius there, never on a pool worker. */
@@ -36,7 +29,7 @@ public final class GenerationExclusion {
             try {
                 future.join();
             } catch (CompletionException | CancellationException failure) {
-                // completion is what the lock must cover; the failure stays in the future for the vanilla handlers
+                // the lock must cover completion; the failure stays in the future for vanilla
             }
 
             return future;

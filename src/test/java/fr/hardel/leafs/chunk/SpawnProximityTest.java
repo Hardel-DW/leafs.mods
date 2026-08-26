@@ -8,10 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The direct replacement of vanilla's naturalSpawnChunkCounter: a player marks the chunks within
- * Chebyshev distance 8, the inscribed square within 5 answers TRUE without the exact euclidean test.
- */
+/** A player marks the chunks within Chebyshev 8; the inscribed square within 5 answers TRUE without the euclidean test. */
 class SpawnProximityTest {
 
     private final SpawnProximity proximity = new SpawnProximity();

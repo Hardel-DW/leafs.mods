@@ -1,9 +1,6 @@
 package fr.hardel.leafs.ownership;
 
-/**
- * What the current thread is, from the region system's point of view. Threads without a context
- * (Netty, worker pools, external mod threads) own nothing and must go through the schedulers.
- */
+/** What the current thread is for the region system. A thread without context (Netty, pools, mods) owns nothing. */
 public sealed interface RegionContext {
 
     record Region(long id, String dimension) implements RegionContext {

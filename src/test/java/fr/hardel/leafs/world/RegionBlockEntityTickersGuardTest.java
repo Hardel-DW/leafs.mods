@@ -11,11 +11,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * The hopper-at-the-border regression: a block entity whose neighbour chunk is absent refuses its
- * own tick and the phase continues, instead of the refusal escaping the region tick body and
- * halting the server.
- */
+/** Hopper at the border: a refused block entity skips its own tick, the phase continues. */
 class RegionBlockEntityTickersGuardTest {
 
     private record FakeTicker(String name, List<String> ticked, boolean refuses) implements TickingBlockEntity {

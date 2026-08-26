@@ -17,10 +17,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.List;
 
-/**
- * The send-chunks section: a region-owned player sends and flushes from his region's tick, the
- * global loop keeps only the orphans, grouped by level under one exclusion each.
- */
+/** The send-chunks section: a region-owned player sends and flushes from his region, the global loop keeps only the orphans. */
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin {
 

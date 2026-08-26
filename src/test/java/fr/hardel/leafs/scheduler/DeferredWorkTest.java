@@ -92,10 +92,7 @@ class DeferredWorkTest {
         assertTrue(transports.windowQueue.isEmpty());
     }
 
-    /**
-     * 2026-08-20: a portal retry used to count once as a retry in the engine AND once as a fresh
-     * deferral at the transport, so /leafs metrics showed inflated deferral rates under convergence.
-     */
+    /** 2026-08-20: a retry counted as a fresh deferral too, inflating /leafs metrics. */
     @Test
     void aRetriedDeferralCountsOneDeferralAndItsRetries() {
         AtomicInteger attempts = new AtomicInteger();
@@ -113,11 +110,7 @@ class DeferredWorkTest {
         assertEquals(2, transports.stats.retries(DeferReason.PORTAL).perMinute());
     }
 
-    /**
-     * 2026-08-20: a first portal travel demanded hundreds of chunks and the retry re-queued every
-     * window, opening the barrier 20 times a second for the whole generation. A refusal that carries
-     * the readiness of its demand replays exactly once, when the chunks are delivered.
-     */
+    /** 2026-08-20: a retry re-queued every window during generation; a refusal with readiness replays once, at delivery. */
     @Test
     void aRefusalCarryingReadinessReplaysOnDeliveryNotEveryPass() {
         CompletableFuture<Void> delivery = new CompletableFuture<>();

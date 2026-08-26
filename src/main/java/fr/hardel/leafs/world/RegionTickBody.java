@@ -44,11 +44,7 @@ import java.util.function.BiConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 
-/**
- * The region tick body: every chunk-anchored phase of the vanilla level tick, run over one region's
- * owned chunks in vanilla order. This is world/ code calling vanilla per-chunk primitives, never a
- * re-entry of {@code ServerLevel.tick}; the level-serial remainder keeps everything level-wide.
- */
+/** Every chunk-anchored phase of the level tick, over one region's chunks, in vanilla order. Level-wide work stays on the server thread. */
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
@@ -227,8 +223,7 @@ public final class RegionTickBody {
         return spawnable[0];
     }
 
-    /** Activation hand-off: vanilla's level-wide ticker list re-buckets to the owning regions, strays stay level-serial. */
-    // A ticker already asleep answers no position (Lithium); it stays level-serial where the sleeping guard applies.
+    /** Activation: the vanilla ticker list re-buckets to the owning regions; a Lithium-sleeping ticker answers no position and stays. */
     public void migrateVanillaBlockEntityTickers(LongFunction<RegionWorldData> regionByChunk) {
         List<TickingBlockEntity> vanilla = level.blockEntityTickers;
         List<TickingBlockEntity> kept = new ArrayList<>();

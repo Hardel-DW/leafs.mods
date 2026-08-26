@@ -18,11 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.IntSupplier;
 
-/**
- * Groups loaded chunks into independently tickable {@link Region}s, one per level. Non-empty sections
- * are always surrounded by owned buffer sections, so two regions stay at least one full section apart:
- * that spatial invariant, not locks, is what lets a region touch chunks slightly beyond its own.
- */
+/** Groups loaded chunks into {@link Region}s. Non-empty sections carry a buffer ring, so two regions stay one full section apart. */
 public final class Regionizer<R> {
     private static final int DEAD_SECTION_DIVISOR = 6;
 
@@ -192,10 +188,7 @@ public final class Regionizer<R> {
         }
     }
 
-    /**
-     * The section becomes non-empty before the buffer ring is walked, so a buffer section created here
-     * already counts it and only the pre-existing ones need an increment.
-     */
+    /** The section is non-empty before the ring walk: a buffer section created here already counts it. */
     private void addChunkToEmptySection(int chunkX, int chunkZ, long key) {
         RegionSection<R> section = sections.get(key);
         List<RegionSection<R>> created = new ArrayList<>();
@@ -313,11 +306,7 @@ public final class Regionizer<R> {
         }
     }
 
-    /**
-     * Executes every pending merge around {@code region} whose two sides are not ticking, following
-     * the surviving region as merges chain. A ticking region resolves nothing now and everything at
-     * its release. Without this, two non-ticking regions could be left owing each other a merge that the ticking gate would block forever.
-     */
+    /** Runs every pending merge around {@code region} whose two sides are idle, following the survivor as merges chain. */
     private Region<R> resolvePendingMerges(Region<R> region) {
         boolean progress = true;
         while (progress && region.state() != RegionState.DEAD && region.state() != RegionState.TICKING) {
@@ -499,10 +488,7 @@ public final class Regionizer<R> {
         return section;
     }
 
-    /**
-     * A ticking neighbour is a legal target: sections only ever arrive, never leave, and every reader
-     * of the live set walks a snapshot. Preferring an idle one keeps an immediate adoption immediate.
-     */
+    /** A ticking neighbour is a legal target (sections only ever arrive); an idle one is preferred. */
     private Region<R> preferredTarget(Collection<Region<R>> nearby) {
         Region<R> chosen = null;
         for (Region<R> candidate : nearby) {

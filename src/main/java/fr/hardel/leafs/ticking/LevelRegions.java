@@ -20,10 +20,7 @@ import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
-/**
- * One per {@code ServerLevel}, owning the regionizer and the region tick handle lifecycle. Callback
- * methods may never add or remove a ticket or call back into the regionizer: the feed already holds its write lock, and re-entering it throws.
- */
+/** One per level, owns the regionizer and the handle lifecycle. Callbacks run under the regionizer's write lock: no tickets, no re-entry. */
 public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     /** Mutated only by {@link #chunkHolderCreated} / {@link #chunkHolderDestroyed}; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
@@ -40,7 +37,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     /** Bumped by the global autosave trigger only; each region compares it against the epoch it last walked. */
     private volatile long autosaveEpoch;
 
-    /** Written only from the callbacks, which run under the regionizer write lock - hence plain increments. */
+    /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
     private volatile long created;
     private volatile long merged;
     private volatile long split;
@@ -64,11 +61,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return dimension;
     }
 
-    /**
-     * Runs once on the server thread, under the level exclusion, before the level's first tick.
-     * Regions are equipped first, the caller's migration then re-buckets the attached payloads, and
-     * only then are the handles scheduled, so no region can tick against a half-migrated level.
-     */
+    /** Once, on the server thread, before the level's first tick. Regions equip, the payloads migrate, then the handles schedule. */
     public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
         if (this.scheduler != null)
             return;
@@ -163,10 +156,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
     }
 
-    /**
-     * Marks every region ticking then releases it with an empty body, which is what triggers splits,
-     * destroys and reclaims. Regions normally handshake through their own tick handle; this covers the shutdown drain and levels whose pool never bound.
-     */
+    /** An empty tick on every region triggers splits, destroys and reclaims; for the shutdown drain and levels whose pool never bound. */
     public void settle() {
         rethrowFeedFailure();
 
@@ -327,10 +317,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return total;
     }
 
-    /**
-     * The feed can run on a thread that swallows exceptions ({@code ServerChunkCache.getChunkFuture}
-     * drops them silently), so the first failure is kept here and rethrown later by quiesce or settle, on a thread that owns the level.
-     */
+    /** The feed can run where exceptions are swallowed, so the first failure is kept and rethrown by quiesce or settle. */
     private RuntimeException recordFeedFailure(String operation, int chunkX, int chunkZ, RuntimeException exception) {
         Leafs.LOGGER.error("Leafs region feed failed to {} chunk [{}, {}]", operation, chunkX, chunkZ, exception);
         if (feedFailure == null) {

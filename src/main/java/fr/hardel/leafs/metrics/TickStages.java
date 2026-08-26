@@ -11,13 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * The stage catalogue of the three tick families. Declaration order is execution order and assigns
- * each stage's dense slot; the per-family lists feed the console display and the companion mod's
- * wire schema, so no stage list exists anywhere else. The catalogue is intrinsic and lives at class
- * init; {@link #register} publishes it into {@code LeafsBuiltInRegistries.TICK_STAGE} at mod init,
- * like ticket types.
- */
+/** Stage catalogue of the three tick families. Declaration order is execution order and slot; the only stage list, published to the registry at mod init. */
 public final class TickStages {
     public enum TickFamily {
         GLOBAL,

@@ -18,7 +18,7 @@ public final class PoiWriteReroute {
     private PoiWriteReroute() {
     }
 
-    public static void onBlockStateChange(ServerLevel level, BlockPos pos, BlockState oldState, BlockState newState, Consumer<Runnable> levelSerial) {
+    public static void onBlockStateChange(ServerLevel level, BlockPos pos, BlockState oldState, BlockState newState, Consumer<Runnable> owner) {
         Optional<Holder<PoiType>> oldType = PoiTypes.forState(oldState);
         Optional<Holder<PoiType>> newType = PoiTypes.forState(newState);
         if (Objects.equals(oldType, newType)) {
@@ -26,11 +26,11 @@ public final class PoiWriteReroute {
         }
 
         BlockPos immutable = pos.immutable();
-        oldType.ifPresent(_ -> levelSerial.accept(() -> {
+        oldType.ifPresent(_ -> owner.accept(() -> {
             level.getPoiManager().remove(immutable);
             level.debugSynchronizers().dropPoi(immutable);
         }));
-        newType.ifPresent(type -> levelSerial.accept(() -> {
+        newType.ifPresent(type -> owner.accept(() -> {
             PoiRecord record = level.getPoiManager().add(immutable, type);
             if (record != null) {
                 level.debugSynchronizers().registerPoi(record);

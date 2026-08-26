@@ -1,9 +1,6 @@
 package fr.hardel.leafs.metrics;
 
-/**
- * What the barrier costs: the opening ring is written by the global thread alone and read tolerating
- * a torn sample, like {@link StageTimings}. Why work entered the window lives in {@link DeferStats}.
- */
+/** What the barrier costs. Ring written by the global thread only, read tolerating a torn sample, like {@link StageTimings}. */
 public final class BarrierStats {
     private static final int CAPACITY = 256;
     private static final long WINDOW_NANOS = 60_000_000_000L;

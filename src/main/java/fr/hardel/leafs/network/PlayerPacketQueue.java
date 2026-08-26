@@ -75,11 +75,7 @@ public final class PlayerPacketQueue {
         drain(() -> true);
     }
 
-    /**
-     * Stops when the caller loses the player mid-drain (respawn, teleport): the rest waits for the
-     * new owner. Returns false without draining when another thread holds the queue, so two units
-     * racing a handover never run handlers concurrently.
-     */
+    /** Stops when the caller loses the player mid-drain, the rest waits for the new owner. False when another thread holds the queue. */
     public boolean drain(BooleanSupplier ownerHolds) {
         if (handledByCurrentThread()) {
             drainLoop(ownerHolds);

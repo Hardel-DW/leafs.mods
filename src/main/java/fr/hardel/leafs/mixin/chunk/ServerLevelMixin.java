@@ -44,7 +44,7 @@ public abstract class ServerLevelMixin {
     }
 
     @Inject(method = "updatePOIOnBlockStateChange", at = @At("HEAD"), cancellable = true)
-    private void leafs$poiWriteToLevelSerial(BlockPos pos, BlockState oldState, BlockState newState, CallbackInfo callbackInfo) {
+    private void leafs$poiWriteOnTheOwner(BlockPos pos, BlockState oldState, BlockState newState, CallbackInfo callbackInfo) {
         ServerLevel self = (ServerLevel) (Object) this;
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());

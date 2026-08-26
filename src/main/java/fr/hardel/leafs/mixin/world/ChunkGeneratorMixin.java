@@ -19,8 +19,7 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.Set;
 
-// A structure search must load the start to write its reference, which an off-owner thread may not: presence answers from
-// placement and disk knowledge, the position returns now, and the reference write lands on the owner at chunk delivery.
+// Off the owner a search answers from placement and disk knowledge; the reference write lands on the owner at delivery.
 @Mixin(ChunkGenerator.class)
 public abstract class ChunkGeneratorMixin {
 

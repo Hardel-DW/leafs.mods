@@ -4,12 +4,7 @@ import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 
-/**
- * The level authority for chunk tickets: fed inline by the ticket listener under the table monitor,
- * drained by any thread that staged work. Each drained section reports its level batch to the
- * scheduling layer under the ticket area, and starts the generation tasks the batch built once the
- * locks are released. Its shadow ran six hours at 550 players against vanilla without one disagreement.
- */
+/** The level's ticket authority: fed by the ticket listener, drained by whoever staged work. Generation tasks built by a batch start after the locks release. */
 public final class LevelTicketPropagator extends LeafsTicketPropagator {
 
     private final AreaLock ticketLock = new AreaLock(SECTION_SHIFT);

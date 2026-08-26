@@ -10,8 +10,8 @@ Un dossier est une responsabilité. Une brique indépendante. Le code vit dans `
 - `network/` gère les files de paquets par joueur, le routage, le tick réseau par région, la déconnexion et la préparation de la connexion.
 - `ownership/` dit qui possède quoi avec le contexte de thread courant, le refus typé `OwnershipViolationException`, le garde `TickGuard` qui saute une unité refusée et le crash report par région.
 - `region/` découpe le monde en sections et en régions avec la fusion, la scission et le `Regionizer`, sans aucune dépendance Minecraft.
-- `scheduler/` expose les schedulers publics par région et global, les tickets de rétention de chunks et le moteur du travail différé `DeferredWork` avec ses trois destinations, la fenêtre, le sériel de la dimension et la région d'une position.
-- `ticking/` orchestre les régions avec le pool de workers, l'unité de tick sérielle par dimension, le verrou par dimension, la barrière, le budget sériel, le watchdog et les timings.
+- `scheduler/` expose les schedulers publics par région et global, les tickets de rétention de chunks et le moteur du travail différé `DeferredWork` avec ses deux destinations, la fenêtre barrière et la région propriétaire d'une position.
+- `ticking/` orchestre les régions avec le pool de workers, l'unité de tick sérielle par dimension, la barrière, le budget sériel, le watchdog et les timings.
 - `world/` porte le corps du tick de région et les états de monde par région, ticks programmés, évènements de blocs, horloge, aléatoire, block entities, mises à jour de voisinage et autosave.
 
 `LeafsConfig` et les registres du mod sont à la racine du paquet. Le parsing de la config est strict, une clé inconnue est refusée.

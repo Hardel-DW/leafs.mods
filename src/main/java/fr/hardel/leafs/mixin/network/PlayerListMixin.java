@@ -82,12 +82,7 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         this.advancements = new ConcurrentHashMap<>();
     }
 
-    /**
-     * The placement runs on the region that owns the spawn chunk, which the queue materialises if
-     * needed: sixty joins land on their sixty spawn regions instead of serialising on the server
-     * thread under the level exclusion. The concurrent player maps, the routed entity structures and
-     * the serialized {@code ServerLevel.addPlayer} are what make the body safe on a region thread.
-     */
+    /** The placement runs on the region owning the spawn chunk, materialised by the queue if needed. */
     @Inject(method = "placeNewPlayer", at = @At("HEAD"), cancellable = true)
     private void leafs$placeOnSpawnOwner(Connection connection, ServerPlayer player, CommonListenerCookie cookie, CallbackInfo callbackInfo) {
         if (!(player.level() instanceof ServerLevel level)) {

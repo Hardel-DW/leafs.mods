@@ -8,11 +8,7 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.TicketStorage;
 
-/**
- * Refcounts the view stages into at most one real ticket per chunk and stage, because vanilla
- * dedupes tickets by type and level and the first leaver would strip every other player's. A release
- * swaps to a delayed ticket that expires on its own, against border-walking churn.
- */
+/** Refcounts view stages into one real ticket per chunk and stage (vanilla dedupes tickets). A release swaps to a delayed ticket against border churn. */
 public final class StageTickets {
 
     public static final int LOADED = 0;

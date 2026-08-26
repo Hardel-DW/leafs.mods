@@ -14,14 +14,7 @@ import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-/**
- * Region-side autosave, driven by the level's epoch. The global trigger only bumps the epoch; each
- * region notices it on its own tick, saves its players, snapshots its chunks and walks a few per
- * tick: the terrain snapshot at vanilla's per-chunk cadence, the entity chunk stored like vanilla's
- * entity autosave. Saving twice is harmless and skipping is the only real bug, so a shape change
- * rewalks: a merge keeps done-ness only when both parts had finished, a split's children inherit it
- * only from a parent that had finished.
- */
+/** Region autosave driven by the level's epoch: players first, then twenty chunks per tick. A merge or split rewalks, saving twice is harmless. */
 public final class RegionAutosave {
     private static final int CHUNKS_PER_TICK = 20;
 

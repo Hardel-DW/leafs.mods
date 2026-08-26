@@ -21,10 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.Locale;
 
-/**
- * {@code /leafs timings}: the per-stage cost of one tick unit, averaged over the last five seconds.
- * The console reading of the stage instrumentation, one line per stage.
- */
+/** {@code /leafs timings}: per-stage cost of one tick unit, averaged over the last five seconds. */
 public final class TimingsCommand {
     private static final int AVERAGE_WINDOW_TICKS = 100;
 

@@ -15,11 +15,7 @@ import net.minecraft.network.chat.MutableComponent;
 
 import java.util.Locale;
 
-/**
- * {@code /leafs metrics}: the last minute of the server's counters. The barrier's openings, every
- * deferral reason with its retries and drops, the chunk contract's refusals split by kind and
- * source, and the flow counters. A FOREIGN rate above zero on a quiet server names an ownership leak.
- */
+/** {@code /leafs metrics}: last minute of counters. A FOREIGN refusal rate above zero on a quiet server names an ownership leak. */
 public final class MetricsCommand {
 
     private MetricsCommand() {

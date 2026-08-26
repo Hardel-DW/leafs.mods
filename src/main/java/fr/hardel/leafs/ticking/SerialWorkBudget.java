@@ -1,11 +1,6 @@
 package fr.hardel.leafs.ticking;
 
-/**
- * The shared time window of the global tick's deferrable serial work. Every dimension's task drain
- * and unload-decision loop consumes the same window, so the worst case stays constant no matter how
- * many dimensions the server or its mods run. Each consumer guarantees its own minimum progress, so
- * an exhausted window defers work to later ticks instead of starving a lane.
- */
+/** One time window per global tick, shared by every dimension's deferrable work; each consumer keeps a floor of progress. */
 public final class SerialWorkBudget {
     private static final long WINDOW_NANOS = 10_000_000L;
 

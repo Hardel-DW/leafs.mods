@@ -17,11 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/**
- * The contract of roadmap point 2: block states read from any thread while the owner writes.
- * Reads are safe by the volatile data snapshot; these tests pin what vanilla lacks, the writers
- * and serializers racing each other through the crashing ThreadingDetector.
- */
+/** Block states read from any thread while the owner writes; writers and serializers must not crash each other. */
 class PalettedContainerConcurrencyTest {
 
     @BeforeAll
@@ -43,11 +39,7 @@ class PalettedContainerConcurrencyTest {
         throw new IllegalStateException("Registry holds fewer than " + count + " block states");
     }
 
-    /**
-     * 2026-08-19: vanilla guards writers with a ThreadingDetector that crashes the second entrant
-     * instead of waiting. A region thread writing while the IO worker packs the same section for
-     * the autosave is a legitimate pair under Leafs, so both must serialize instead of crashing.
-     */
+    /** 2026-08-19: vanilla's ThreadingDetector crashes the second entrant; a region writing while IO packs must serialize instead. */
     @Test
     void writerAndSerializerShareTheContainerWithoutCrashing() throws InterruptedException {
         List<BlockState> states = states(64);
@@ -77,11 +69,7 @@ class PalettedContainerConcurrencyTest {
         }
     }
 
-    /**
-     * 2026-08-19: vanilla idFor adds the overflowing value into the palette before asking for the
-     * resize, so the palette a concurrent reader still snapshots grows in place for nothing. The
-     * overflow must resize without touching the published palette.
-     */
+    /** 2026-08-19: an overflow must resize without growing the palette a reader still snapshots. */
     @Test
     void overflowResizesWithoutTouchingThePublishedPalette() {
         HashMapPalette<String> palette = new HashMapPalette<>(2, List.of("a", "b", "c", "d"));

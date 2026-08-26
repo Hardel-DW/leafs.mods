@@ -5,12 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-/**
- * Per-tick-unit deadlines, the only watchdog left since the vanilla {@code ServerWatchdog} is
- * neutralized by mixin. Past the warn threshold a stall is reported with the stuck thread's stack;
- * past the kill threshold the killer runs once, and {@link #armShutdownDeadline} points the same
- * killer at a shutdown that never finishes.
- */
+/** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill runs once; the same killer covers a shutdown that never finishes. */
 public final class LeafsWatchdog {
     /** Generous next to the kill threshold: a legitimate final save of a large world must never be cut short. */
     public static final Duration SHUTDOWN_DEADLINE = Duration.ofMinutes(5);
@@ -49,10 +44,7 @@ public final class LeafsWatchdog {
         }
     }
 
-    /**
-     * Armed when {@code stopServer} begins, on the stopping thread: a JVM still alive past the
-     * deadline gets the same dump and kill as a stuck tick. No-op when the kill threshold is disabled.
-     */
+    /** Armed at stopServer: a JVM alive past the deadline gets the stuck-tick dump and kill. No-op when kill is disabled. */
     public void armShutdownDeadline(Duration deadline) {
         if (killNanos == 0) {
             return;

@@ -17,12 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-/**
- * The FULL step publishes the chunk into the live world (LevelChunk construction, block entity and
- * tick container registration), which belongs to the position's owner, not the pump. The body also
- * takes the FULL exclusion radius, so a neighbouring FEATURES cannot write into the proto chunk
- * while the LevelChunk copies it.
- */
+/** The FULL step publishes the chunk into the live world, so it runs on the position's owner, under the FULL exclusion radius. */
 @Mixin(ChunkStatusTasks.class)
 public abstract class ChunkStatusTasksMixin {
 

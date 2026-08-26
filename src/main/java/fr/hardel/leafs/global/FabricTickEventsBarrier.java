@@ -7,11 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 import java.util.function.Predicate;
 
-/**
- * Single-thread contract for the Fabric API server tick events: with at least one subscriber, the
- * emission runs with every region paused, and a server without subscribers pays nothing. Server
- * thread only, like the emissions it brackets.
- */
+/** Fabric server tick events emit with every region paused when subscribed; no subscriber, no pause. Server thread only. */
 public final class FabricTickEventsBarrier {
     private final TickBarrier barrier;
     private final MinuteCounter pauses;
