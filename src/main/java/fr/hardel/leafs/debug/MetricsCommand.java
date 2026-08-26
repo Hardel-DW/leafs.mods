@@ -39,8 +39,7 @@ public final class MetricsCommand {
             .append(CommandText.stat("min", formatMillis(barrier.minMs())))
             .append(CommandText.stat("max", formatMillis(barrier.maxMs())))
             .append(CommandText.stat("queue", barrier.deepestQueue()))
-            .append(CommandText.stat("fabric", perMinute(metrics.barrier().fabricEventPauses().perMinute())))
-            .append(CommandText.stat("disconnects", perMinute(metrics.barrier().disconnectPauses().perMinute()))), false);
+            .append(CommandText.stat("fabric", perMinute(metrics.barrier().fabricEventPauses().perMinute()))), false);
 
         DeferStats defers = metrics.deferStats();
         for (DeferReason reason : DeferReason.values()) {

@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.network;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
@@ -17,6 +18,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerAdvancements;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.stats.ServerStatsCounter;
@@ -124,9 +127,21 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
         }
     }
 
-    /** The vanilla removal body runs whole under the pause of every region; disk writes leave on the deferred thread. */
+    /** A direct call from elsewhere than the disconnect still lands on the player's owner. */
     @WrapMethod(method = "remove")
-    private void leafs$teardownUnderRegionPause(ServerPlayer player, Operation<Void> original) {
-        PlayerTeardown.remove((PlayerList) (Object) this, player, () -> original.call(player));
+    private void leafs$removeOnTheOwner(ServerPlayer player, Operation<Void> original) {
+        PlayerTeardown.run(player, () -> original.call(player));
+    }
+
+    /** A pearl may fly in another region or dimension: its removal runs on that owner. */
+    @WrapOperation(method = "remove", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl;setRemoved(Lnet/minecraft/world/entity/Entity$RemovalReason;)V"))
+    private void leafs$removePearlOnItsOwner(ThrownEnderpearl pearl, Entity.RemovalReason reason, Operation<Void> original) {
+        if (!(pearl.level() instanceof ServerLevel level)) {
+            original.call(pearl, reason);
+            return;
+        }
+
+        ChunkPos chunk = pearl.chunkPosition();
+        TickingBinding.of(level).toOwner(chunk.x(), chunk.z(), () -> original.call(pearl, reason));
     }
 }
