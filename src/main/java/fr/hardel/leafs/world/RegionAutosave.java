@@ -5,12 +5,14 @@ import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
 
 /**
  * Region-side autosave, driven by the level's epoch. The global trigger only bumps the epoch; each
@@ -29,6 +31,7 @@ public final class RegionAutosave {
 
     /** Runs while TICKING on the owner, where the chunk iteration and the tick list are legal. */
     public void tick(ServerLevel level, Region<?> region, RegionEntityData entityData, long epoch) {
+        saveEagerly(level, region);
         if (epoch == savedEpoch) {
             return;
         }
@@ -53,6 +56,28 @@ public final class RegionAutosave {
                 level.getServer().getPlayerList().save(player);
             }
         });
+    }
+
+    /** Vanilla's saveChunksEagerly over the region's own chunks: the dirty ones whose save cadence elapsed, twenty per tick. */
+    private void saveEagerly(ServerLevel level, Region<?> region) {
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        long now = Util.getMillis();
+        int saved = 0;
+        for (LongIterator iterator = chunkMap.chunksToEagerlySave.iterator(); saved < CHUNKS_PER_TICK && iterator.hasNext(); ) {
+            long chunkKey = iterator.nextLong();
+            if (!region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey))) {
+                continue;
+            }
+
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
+            ChunkAccess chunk = holder == null ? null : holder.getLatestChunk();
+            if (chunk == null || !chunk.isUnsaved()) {
+                iterator.remove();
+            } else if (chunkMap.saveChunkIfNeeded(holder, now)) {
+                saved++;
+                iterator.remove();
+            }
+        }
     }
 
     private void drain(ServerLevel level) {

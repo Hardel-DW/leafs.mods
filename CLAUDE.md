@@ -1,7 +1,7 @@
 # Project Overview
 Fabric 26.2 mod in Java 25, server side. Goal: Regionised multithreading to Fabric.
 The mod adds only the multithreading, nothing else. No extra features, no gameplay change, no API bloat with own architecture
-The documentation entry point is docs\README.md.
+You can only write in `docs\ia` not `docs\` all files in "ai" folder, have not been reviewed by humans, so their information has not been verified and may therefore be factually incorrect do not take them as a source of truth.
 
 # Reference Code
 Decompiled and reference sources are in the "repository" folder outside the workspace, just ask if you need permissions:
@@ -44,7 +44,7 @@ Avoid implementing too many safety nets. Code/Architecture and logic that is wel
 # Reponse
 Try to vulgarize, explain things in the simplest terms possible, I don't have every part of this codebase or repositories or patterns and mathematical concepts in my mind.
 Summarize, be simple, direct, concise, but complete. Try not to leave out any context, or any information that's useful for understanding. But be as concise as you can.
+This applies to the comment
 
-# Rules
-- You can only write in docs\ia not docs\ all files in ai folder, have not been reviewed by humans, so their information has not been verified and may therefore be factually incorrect do not take them as a source of truth.
-- Code is not a place for documentation. The comments are brief simple, just a few words to capture key information.
+# Comment
+Comments shouldn't be documentation, they're meant for development and should be quick to read. They should be one to two lines max. Simple and concise, a quick hint in a few words. Be brief. If you're too factual and exhaustive your comment will become wrong with every code change and you'll have to extend it every time. These tips also apply to comments you come across. On top of that if the code is well built, some comments aren't necessary, the code speaks for itself. It should actually add something, an important hint. Not tell a story.

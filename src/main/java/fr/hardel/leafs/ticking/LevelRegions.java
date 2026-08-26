@@ -27,7 +27,6 @@ import java.util.function.ToIntFunction;
 public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     /** Mutated only by {@link #chunkHolderCreated} / {@link #chunkHolderDestroyed}; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
-    private final LevelOwnership ownership = new LevelOwnership();
     private final RegionUnloads<RegionTickData> unloads = new RegionUnloads<>();
 
     private volatile String dimension;
@@ -58,10 +57,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public Regionizer<RegionTickData> regionizer() {
         return regionizer;
-    }
-
-    public LevelOwnership ownership() {
-        return ownership;
     }
 
     /** Null until the level activates; region contexts only exist after activation. */
@@ -129,21 +124,19 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return queued;
     }
 
-    /** Universal-owner drain: the exclusion is what grants that ownership, without it a task routed to an owner would queue itself back forever. */
+    /** Universal-owner drain, barrier held or pool stopped: nobody else can tick this level. */
     public int drainTasksInline() {
         RegionScheduler<RegionTickData> scheduler = taskScheduler;
         if (scheduler == null) {
             return 0;
         }
 
-        return ownership.callExclusive(() -> {
-            int drained = scheduler.drainPendingInline();
-            for (Region<RegionTickData> region : regionizer.regionsView()) {
-                drained += scheduler.drain(region);
-            }
+        int drained = scheduler.drainPendingInline();
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            drained += scheduler.drain(region);
+        }
 
-            return drained;
-        });
+        return drained;
     }
 
     /** Shutdown path, pool already stopped: every queued teardown runs inline so the final save misses nothing. */

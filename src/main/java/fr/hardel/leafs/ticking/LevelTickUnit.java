@@ -71,28 +71,23 @@ public final class LevelTickUnit extends TickHandle {
         }
 
         activated = true;
-        regions.ownership().enterLevelSerial();
-        try {
-            RegionTickBody body = new RegionTickBody(level);
-            Regionizer<RegionTickData> regionizer = regions.regionizer();
-            int sectionShift = regionizer.sectionShift();
-            WorldDataRouter router = ((ServerLevelWorldAccess) level).leafs$worldRouter();
-            LevelEntityLists entityLists = ((ServerLevelEntityAccess) level).leafs$entityLists();
-            SharedChunkHolds holds = new SharedChunkHolds(new ChunkTicketHolds(level));
-            RegionScheduler<RegionTickData> taskScheduler = new RegionScheduler<>(regionizer, holds);
-            LongFunction<RegionWorldData> regionWorldData = chunkKey -> resolve(regionizer, chunkKey, data -> data.worldData());
-            LongFunction<RegionEntityData> regionEntityData = chunkKey -> resolve(regionizer, chunkKey, data -> data.entityData());
-            regions.activate(dimension(), scheduler, taskScheduler, this::submit, level::getGameTime, time -> RegionWorldData.regional(level, time), body, () -> {
-                router.route(chunkKey -> orAttached(regionWorldData.apply(chunkKey), router.attached()));
-                entityLists.route(chunkKey -> orAttached(regionEntityData.apply(chunkKey), entityLists.attached()));
-                routeScheduledTicks(router, regionizer);
-                router.attached().migrateInto(sectionShift, sectionKey -> regionWorldData.apply(firstChunkOf(sectionKey, sectionShift)));
-                entityLists.migrateAttached(sectionShift, sectionKey -> regionEntityData.apply(firstChunkOf(sectionKey, sectionShift)));
-                body.migrateVanillaBlockEntityTickers(regionWorldData);
-            });
-        } finally {
-            regions.ownership().exitLevelSerial();
-        }
+        RegionTickBody body = new RegionTickBody(level);
+        Regionizer<RegionTickData> regionizer = regions.regionizer();
+        int sectionShift = regionizer.sectionShift();
+        WorldDataRouter router = ((ServerLevelWorldAccess) level).leafs$worldRouter();
+        LevelEntityLists entityLists = ((ServerLevelEntityAccess) level).leafs$entityLists();
+        SharedChunkHolds holds = new SharedChunkHolds(new ChunkTicketHolds(level));
+        RegionScheduler<RegionTickData> taskScheduler = new RegionScheduler<>(regionizer, holds);
+        LongFunction<RegionWorldData> regionWorldData = chunkKey -> resolve(regionizer, chunkKey, data -> data.worldData());
+        LongFunction<RegionEntityData> regionEntityData = chunkKey -> resolve(regionizer, chunkKey, data -> data.entityData());
+        regions.activate(dimension(), scheduler, taskScheduler, this::submit, level::getGameTime, time -> RegionWorldData.regional(level, time), body, () -> {
+            router.route(chunkKey -> orAttached(regionWorldData.apply(chunkKey), router.attached()));
+            entityLists.route(chunkKey -> orAttached(regionEntityData.apply(chunkKey), entityLists.attached()));
+            routeScheduledTicks(router, regionizer);
+            router.attached().migrateInto(sectionShift, sectionKey -> regionWorldData.apply(firstChunkOf(sectionKey, sectionShift)));
+            entityLists.migrateAttached(sectionShift, sectionKey -> regionEntityData.apply(firstChunkOf(sectionKey, sectionShift)));
+            body.migrateVanillaBlockEntityTickers(regionWorldData);
+        });
     }
 
     private <T> T resolve(Regionizer<RegionTickData> regionizer, long chunkKey, Function<RegionTickData, T> part) {
@@ -151,7 +146,6 @@ public final class LevelTickUnit extends TickHandle {
 
         pendingWork = null;
         LevelEntityLists entityLists = ((ServerLevelEntityAccess) level).leafs$entityLists();
-        regions.ownership().enterLevelSerial();
         WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), entityLists.attached());
         try {
             entityLists.rehomeStrays();
@@ -170,13 +164,11 @@ public final class LevelTickUnit extends TickHandle {
             stages.endTick(System.nanoTime());
         } finally {
             WorldTickContext.exit();
-            regions.ownership().exitLevelSerial();
         }
     }
 
     /** The pause-exempt pass, same framing as {@link #tick}: vanilla drains packets while paused, so the per-player queues must too - drain only, no listener tick. */
     void tickPausedNetwork() {
-        regions.ownership().enterLevelSerial();
         RegionContext.enter(context());
         WorldTickContext.enter(level, ((ServerLevelWorldAccess) level).leafs$worldData(), ((ServerLevelEntityAccess) level).leafs$entityLists().attached());
         try {
@@ -184,7 +176,6 @@ public final class LevelTickUnit extends TickHandle {
         } finally {
             WorldTickContext.exit();
             RegionContext.exit();
-            regions.ownership().exitLevelSerial();
         }
     }
 

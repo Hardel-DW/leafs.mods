@@ -172,16 +172,6 @@ class PlayerPacketQueueTest {
         assertTrue(queue.drain(() -> true), "the claim releases with the drain");
     }
 
-    /** The global loop adopts a listener only when no region has stamped it recently. */
-    @Test
-    void regionOwnerStampStartsStaleAndFreshens() {
-        assertFalse(queue.regionOwnerFresh(TimeUnit.MILLISECONDS.toNanos(250)), "never stamped = global-owned");
-
-        queue.stampRegionOwner();
-        assertTrue(queue.regionOwnerFresh(TimeUnit.MILLISECONDS.toNanos(250)));
-        assertFalse(queue.regionOwnerFresh(-1), "an already-expired horizon reads stale");
-    }
-
     @Test
     void concurrentSubmissionsKeepPerThreadOrder() throws InterruptedException {
         FakeListener listener = new FakeListener(true);

@@ -8,7 +8,7 @@ import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import net.minecraft.server.level.ServerLevel;
 
-/** The per-level implementation of the three deferral transports, resolved per call because the level activates later. */
+/** The per-level implementation of the deferral transports, resolved per call because the level activates later. */
 public record TickingBinding(ServerLevel level) implements DeferredTransports {
 
     public static DeferredTransports of(ServerLevel level) {
@@ -21,11 +21,6 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     }
 
     @Override
-    public void toSerial(Runnable task) {
-        TickingManager.of(level.getServer()).submitToLevel(level, task);
-    }
-
-    @Override
     public void toOwner(int chunkX, int chunkZ, Runnable task) {
         scheduling().runOnOwner(chunkX, chunkZ, task);
     }
@@ -33,11 +28,6 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     @Override
     public boolean holdsWindow() {
         return BarrierWindow.of(level.getServer()).isDraining();
-    }
-
-    @Override
-    public boolean holdsSerial() {
-        return regions().ownership().isLevelSerialHeldByCurrentThread();
     }
 
     @Override
@@ -59,7 +49,4 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
         return ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
     }
 
-    private LevelRegions regions() {
-        return LevelRegions.of(level);
-    }
 }
