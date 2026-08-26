@@ -53,6 +53,34 @@ public final class PlayerPacketQueue {
         return packets.size();
     }
 
+    /** Runs one handler as this listener's packet-handling thread; false when another thread is draining, the caller retries. */
+    public boolean handleAs(Runnable handler) {
+        if (handledByCurrentThread()) {
+            handler.run();
+            return true;
+        }
+
+        if (!claimed.compareAndSet(false, true)) {
+            return false;
+        }
+
+        PlayerPacketQueue outer = DRAINING.get();
+        DRAINING.set(this);
+        try {
+            handler.run();
+        } finally {
+            if (outer == null) {
+                DRAINING.remove();
+            } else {
+                DRAINING.set(outer);
+            }
+
+            claimed.set(false);
+        }
+
+        return true;
+    }
+
     /** Vanilla {@code processQueuedPackets} semantics: everything queued, including what handlers queue back. */
     public void drain() {
         drain(() -> true);

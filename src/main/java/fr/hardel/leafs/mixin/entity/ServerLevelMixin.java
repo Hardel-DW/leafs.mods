@@ -9,6 +9,7 @@ import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ticking.LevelOwnership;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingBinding;
@@ -74,7 +75,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.players = new CopyOnWriteArrayList<>();
         this.leafs$entityLists = new LevelEntityLists();
         ServerLevel self = (ServerLevel) (Object) this;
-        this.leafs$entityTeleports = new EntityTeleports(self, new TickingBinding(self));
+        this.leafs$entityTeleports = new EntityTeleports(self, TickingBinding::of);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
         this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainTasksInline());
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
@@ -86,21 +87,48 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return leafs$entityLists.containsTicking(entity);
     }
 
-    /** Serialized on top of the exclusion: two regions' read holds do not exclude each other on the level-wide player maps. */
+    /** From a region of another level the add hops to this level's owner of the position; here it is serialized on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
-    private void leafs$addPlayerUnderExclusion(ServerPlayer player, Operation<Void> original) {
+    private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
+        if (leafs$fromAnotherLevel()) {
+            leafs$onOwnerOf(player, () -> original.call(player));
+            return;
+        }
+
         leafs$ownership().runExclusiveSerialized(() -> original.call(player));
     }
 
+    /** A hop answers true: the duplicate-UUID check happens at delivery, on the owner. */
     @WrapMethod(method = "addEntity")
-    private boolean leafs$addEntityUnderExclusion(Entity entity, Operation<Boolean> original) {
+    private boolean leafs$addEntityOnTheOwner(Entity entity, Operation<Boolean> original) {
+        if (leafs$fromAnotherLevel()) {
+            leafs$onOwnerOf(entity, () -> original.call(entity));
+            return true;
+        }
+
         return leafs$ownership().callExclusive(() -> original.call(entity));
     }
 
-    /** Same serialization as {@code addPlayer}: a region-side teardown must not interleave with another region's. */
     @WrapMethod(method = "removePlayerImmediately")
-    private void leafs$removePlayerUnderExclusion(ServerPlayer player, Entity.RemovalReason reason, Operation<Void> original) {
+    private void leafs$removePlayerOnTheOwner(ServerPlayer player, Entity.RemovalReason reason, Operation<Void> original) {
+        if (leafs$fromAnotherLevel()) {
+            leafs$onOwnerOf(player, () -> original.call(player, reason));
+            return;
+        }
+
         leafs$ownership().runExclusiveSerialized(() -> original.call(player, reason));
+    }
+
+    @Unique
+    private boolean leafs$fromAnotherLevel() {
+        String here = ((ServerLevel) (Object) this).dimension().identifier().toString();
+        return RegionContext.current() instanceof RegionContext.Region(long _, String dimension) && !dimension.equals(here);
+    }
+
+    @Unique
+    private void leafs$onOwnerOf(Entity entity, Runnable task) {
+        ServerLevel self = (ServerLevel) (Object) this;
+        TickingBinding.of(self).toOwner(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
     }
 
     @Unique
