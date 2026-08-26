@@ -18,6 +18,7 @@ import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.dimension.end.EnderDragonFight;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.ticks.LevelTicks;
@@ -107,6 +108,11 @@ public abstract class ServerLevelMixin implements ServerLevelWorldAccess {
         ServerLevel self = (ServerLevel) (Object) this;
         LevelBlockUpdates.onBlockUpdated(self, leafs$worldRouter, ((ServerLevelEntityAccess) self).leafs$entityLists(), pos, old, current);
         callbackInfo.cancel();
+    }
+
+    /** The fight ticks as an anchored block entity; the level tick no longer calls it. */
+    @WrapOperation(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/dimension/end/EnderDragonFight;tick()V"))
+    private void leafs$dragonFightTicksAsAnchored(EnderDragonFight fight, Operation<Void> original) {
     }
 
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
