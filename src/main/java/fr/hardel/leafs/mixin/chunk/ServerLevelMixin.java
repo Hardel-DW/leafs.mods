@@ -1,27 +1,22 @@
 package fr.hardel.leafs.mixin.chunk;
 
-import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiWriteReroute;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
-import fr.hardel.leafs.ticking.TickBarrier;
 import fr.hardel.leafs.ticking.TickingBinding;
-import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProgressListener;
 import net.minecraft.world.level.CustomSpawner;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** A world save pauses the regions; a POI write hops to the owner of its block. */
+/** A POI write hops to the owner of its block; a custom spawner reads degraded. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 
@@ -30,17 +25,6 @@ public abstract class ServerLevelMixin {
     private void leafs$bindPoiStorageLevel(CallbackInfo callbackInfo) {
         ServerLevel self = (ServerLevel) (Object) this;
         ((SectionStorageAccess) self.getPoiManager()).leafs$bindLevel(self);
-    }
-
-    @WrapMethod(method = "save")
-    private void leafs$saveUnderExclusion(@Nullable ProgressListener progressListener, boolean flush, boolean noSave, Operation<Void> original) {
-        TickBarrier barrier = TickingManager.of(((ServerLevel) (Object) this).getServer()).barrier();
-        barrier.raise();
-        try {
-            original.call(progressListener, flush, noSave);
-        } finally {
-            barrier.drop();
-        }
     }
 
     @Inject(method = "updatePOIOnBlockStateChange", at = @At("HEAD"), cancellable = true)
