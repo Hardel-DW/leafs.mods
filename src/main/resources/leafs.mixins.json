@@ -27,6 +27,7 @@
 		"entity.EntitySectionStorageMixin",
 		"entity.EntityStorageMixin",
 		"entity.PersistentEntitySectionManagerMixin",
+		"entity.PlayerMapMixin",
 		"entity.SectionCallbackMixin",
 		"entity.ServerEntityMixin",
 		"entity.ServerLevelMixin",

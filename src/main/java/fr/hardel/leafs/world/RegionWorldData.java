@@ -177,17 +177,16 @@ public final class RegionWorldData {
         redistribute(sectionShift, childBySection, false);
     }
 
-    /** A tick container always has an owner, its chunk has a holder. */
     private void redistribute(int sectionShift, LongFunction<RegionWorldData> childBySection, boolean keepOrphans) {
         blockTicks.splitInto(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
             return child == null ? null : child.blockTicks;
-        });
+        }, keepOrphans);
 
         fluidTicks.splitInto(sectionShift, section -> {
             RegionWorldData child = childBySection.apply(section);
             return child == null ? null : child.fluidTicks;
-        });
+        }, keepOrphans);
 
         List<BlockEventData> orphans = new ArrayList<>();
         for (BlockEventData event : blockEvents) {
