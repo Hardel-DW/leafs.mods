@@ -30,7 +30,6 @@ final class CommandText {
         return Component.literal(String.format(Locale.ROOT, "%.1f TPS", value)).withStyle(color);
     }
 
-    /** The single home of the column separator every command line uses. */
     static Component sep() {
         return Component.literal(" ");
     }

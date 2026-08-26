@@ -19,9 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 /** Disk half of the player saves, one writer thread in submission order. Reads see the pending payload first; without an active instance callers write synchronously. */
 public final class DeferredFileWrites {
-
     private static volatile DeferredFileWrites active;
-
     private final ConcurrentHashMap<Path, Object> pending = new ConcurrentHashMap<>();
     private final ExecutorService executor;
 
