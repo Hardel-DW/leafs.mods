@@ -8,7 +8,7 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
-import fr.hardel.leafs.ticking.TickingManager;
+import fr.hardel.leafs.ticking.TickBarrier;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import net.minecraft.server.level.ChunkHolder;
@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 // Manages a level's chunks. Respect lock order, do heavy work outside locks, and route changes to the thread that owns the affected area.
@@ -31,7 +32,9 @@ public final class ChunkScheduling {
     private final ChunkMap chunkMap;
     private final DistanceManager distanceManager;
     private final LevelRegions regions;
-    private final TickingManager ticking;
+    private final TickBarrier barrier;
+    private final BooleanSupplier halted;
+    private final DeferStats deferStats;
     private final Executor pump;
     private final AreaLock schedulingLock = new AreaLock(LeafsTicketPropagator.SECTION_SHIFT);
     private final GenerationExclusion exclusion = new GenerationExclusion();
@@ -39,11 +42,13 @@ public final class ChunkScheduling {
 
     private record DeferredOwnerTask(int chunkX, int chunkZ, Runnable task) {}
 
-    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, TickingManager ticking, Executor pump) {
+    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, TickBarrier barrier, BooleanSupplier halted, DeferStats deferStats, Executor pump) {
         this.chunkMap = chunkMap;
         this.distanceManager = distanceManager;
         this.regions = regions;
-        this.ticking = ticking;
+        this.barrier = barrier;
+        this.halted = halted;
+        this.deferStats = deferStats;
         this.pump = pump;
     }
 
@@ -192,11 +197,7 @@ public final class ChunkScheduling {
         return task -> runOnOwner(chunkX, chunkZ, task);
     }
 
-    /**
-     * Runs the task on the owner of the position: inline for a universal owner or the owning region's
-     * own thread, queued through the region task lane otherwise. Before the level activates its
-     * regions, the pump plays vanilla's main thread, which is what drives the spawn preparation.
-     */
+    /** Inline on the owner, queued on the owning region's lane otherwise; before activation the pump plays vanilla's main thread. */
     public void runOnOwner(int chunkX, int chunkZ, Runnable task) {
         List<DeferredOwnerTask> deferred = deferredOwnerTasks.get();
         if (deferred != null) {
@@ -222,18 +223,18 @@ public final class ChunkScheduling {
         return isUniversalOwner() || currentRegionOwns(chunkX, chunkZ);
     }
 
-    // Universal ownership is the absence of rivals, not an identity: the exclusion, the barrier, a level whose regions have not started, and a halted pool all mean nobody else can tick this level.
+    // Universal ownership is the absence of rivals: the barrier, a level whose regions have not started, or a halted pool.
     public boolean isUniversalOwner() {
-        if (regions.ownership().isLevelSerialHeldByCurrentThread() || ticking.barrier().isHeldByCurrentThread()) {
+        if (barrier.isHeldByCurrentThread()) {
             return true;
         }
 
-        return (regions.body() == null || ticking.halted()) && chunkMap.level.getServer().isSameThread();
+        return (regions.body() == null || halted.getAsBoolean()) && chunkMap.level.getServer().isSameThread();
     }
 
     /** The refusal counters of this level's server; the chunk contract counts here at every throw. */
     public DeferStats deferStats() {
-        return ticking.metrics().deferStats();
+        return deferStats;
     }
 
     /** Strict region ownership, dimension included: region ids repeat across dimensions and would otherwise collide. */

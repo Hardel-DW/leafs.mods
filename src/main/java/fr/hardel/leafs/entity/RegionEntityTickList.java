@@ -98,7 +98,7 @@ public final class RegionEntityTickList<E> {
 
     /**
      * Iteration order is the owner's insertion order, as vanilla. A non-owner iterating here only
-     * ever reads the attached list, whose owner sits behind the exclusion while regions run, so the
+     * ever reads the attached list, which only the serial thread writes, so the
      * plain read is safe and skips the reentrancy guard.
      */
     public void forEach(Consumer<E> output) {

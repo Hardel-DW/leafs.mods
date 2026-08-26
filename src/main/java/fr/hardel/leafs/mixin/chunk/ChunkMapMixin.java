@@ -215,7 +215,8 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         this.toDrop = new ConcurrentLongSet();
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
         ChunkMap self = (ChunkMap) (Object) this;
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), TickingManager.of(self.level.getServer()), this.mainThreadExecutor);
+        TickingManager ticking = TickingManager.of(self.level.getServer());
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking.barrier(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor);
         ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
         this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
         this.leafs$unloads = new ChunkUnloads(self, this.toDrop, leafs$regions(), leafs$ticking().metrics().chunkUnloads());
@@ -318,6 +319,14 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     @WrapOperation(method = "processUnloads", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;iterator()Lit/unimi/dsi/fastutil/longs/LongIterator;"))
     private LongIterator leafs$noSerialDropLoop(LongSet instance, Operation<LongIterator> original) {
         return LongIterators.EMPTY_ITERATOR;
+    }
+
+    /** Each region saves its own eager chunks; the serial pass only saves once the pool stopped. */
+    @WrapOperation(method = "processUnloads", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;saveChunksEagerly(Ljava/util/function/BooleanSupplier;)V"))
+    private void leafs$eagerSavesOnTheRegions(ChunkMap instance, BooleanSupplier haveTime, Operation<Void> original) {
+        if (leafs$regions().body() == null || leafs$ticking().halted()) {
+            original.call(instance, haveTime);
+        }
     }
 
     /** The read half of a chunk load ran on the pump; it runs on the chunk workers now, the pump is no longer a funnel. */
@@ -433,7 +442,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
             return;
         }
 
-        if (!RegionNetworkTick.ownedByRegion(player.connection)) {
+        if (!RegionNetworkTick.ownedByRegion(player)) {
             original.call(player);
         }
     }

@@ -33,12 +33,12 @@ class DeferredWorkTest {
 
     @Test
     void aDeferredTaskQueuesAndRunsAtTheDestination() {
-        boolean deferred = DeferredWork.serial(DeferReason.TELEPORT, transports.stats, () -> ran.add("serial")).submit(transports);
+        boolean deferred = DeferredWork.owner(DeferReason.TELEPORT, transports.stats, 0, 0, () -> ran.add("owner")).submit(transports);
 
         assertTrue(deferred);
         assertEquals(List.of(), ran);
-        transports.serialQueue.getFirst().run();
-        assertEquals(List.of("serial"), ran);
+        transports.ownerQueue.getFirst().run();
+        assertEquals(List.of("owner"), ran);
         assertEquals(1, transports.stats.deferrals(DeferReason.TELEPORT).perMinute());
     }
 

@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
 
-/** Region workers answer thread-identity checks through ownership: mid-tick is a game thread for its level. */
+/** Region workers answer thread-identity checks through ownership. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin {
 

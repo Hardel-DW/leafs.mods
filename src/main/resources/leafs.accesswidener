@@ -49,3 +49,4 @@ accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLo
 accessible field net/minecraft/world/level/chunk/storage/SectionStorage levelHeightAccessor Lnet/minecraft/world/level/LevelHeightAccessor;
 accessible field net/minecraft/world/entity/ai/village/poi/PoiManager loadedChunks Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/world/ticks/LevelTicks allContainers Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;
+accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/unimi/dsi/fastutil/longs/LongSet;

@@ -1,7 +1,9 @@
 package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.TickBarrier;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -16,12 +18,13 @@ class ChunkSchedulingTest {
     @Test
     void anOwnedEffectStagesUntilTheAreaReleases() {
         LevelRegions regions = new LevelRegions(LeafsConfig.defaults());
-        ChunkScheduling scheduling = new ChunkScheduling(null, null, regions, null, null);
+        TickBarrier barrier = new TickBarrier();
+        ChunkScheduling scheduling = new ChunkScheduling(null, null, regions, barrier, () -> false, new DeferStats(), null);
         List<String> order = new ArrayList<>();
 
-        regions.ownership().enterLevelSerial();
+        barrier.raise();
         try {
-            assertTrue(scheduling.isOwner(0, 0), "the level-serial side owns every position of its level");
+            assertTrue(scheduling.isOwner(0, 0), "the barrier holder owns every position of every level");
             scheduling.runOnOwner(0, 0, () -> order.add("inline"));
             assertEquals(List.of("inline"), order, "outside any area, the owner still runs its effects on the spot");
 
@@ -31,7 +34,7 @@ class ChunkSchedulingTest {
                 order.add("underTheArea");
             });
         } finally {
-            regions.ownership().exitLevelSerial();
+            barrier.drop();
         }
 
         assertEquals(List.of("underTheArea", "effect"), order);
