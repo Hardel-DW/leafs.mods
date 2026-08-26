@@ -37,7 +37,7 @@ public final class RegionNetworkTick {
         queue.drain(() -> listener.player.level() == level);
     }
 
-    /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch. */
+    /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch; a chunk refusal is not an error and reaches the guard. */
     public static void tickListenerOnRegion(ServerPlayer player, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         PacketRouting.queueOf(listener).stampRegionOwner();
@@ -49,6 +49,10 @@ public final class RegionNetworkTick {
         try {
             listener.tick();
         } catch (Exception exception) {
+            if (TickGuard.isRefusal(exception)) {
+                throw exception;
+            }
+
             if (connection.isMemoryConnection()) {
                 throw new ReportedException(CrashReport.forThrowable(exception, "Ticking memory connection"));
             }

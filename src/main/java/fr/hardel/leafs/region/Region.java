@@ -70,6 +70,11 @@ public final class Region<R> {
         void accept(int chunkX, int chunkZ);
     }
 
+    /** Lock-free: the owner's own view of its chunks cannot change under it. */
+    public boolean owns(int chunkX, int chunkZ) {
+        return regionizer.regionAtUnsynchronised(chunkX, chunkZ) == this;
+    }
+
     /** Walks a snapshot of the sections, so the owner may call it mid-tick while the feed adopts more. */
     public void forEachChunk(ChunkConsumer consumer) {
         regionizer.forEachChunkOf(this, consumer);
