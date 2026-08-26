@@ -31,13 +31,10 @@ public abstract class EntityMixin {
         }
     }
 
-    // The search writes foreign-dimension blocks, so it belongs to the window; the window replays it in place when it is already the caller.
+    // The search and the teleport leave through the funnel; vanilla gets no destination here and does nothing more.
     @WrapOperation(method = "handlePortal", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/PortalProcessor;getPortalDestination(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;"))
-    private TeleportTransition leafs$deferPortalSearchOffOwner(PortalProcessor processor, ServerLevel level, Entity entity, Operation<TeleportTransition> original) {
-        if (!((ServerLevelEntityAccess) level).leafs$entityTeleports().deferPortal(entity, processor)) {
-            return original.call(processor, level, entity);
-        }
-
+    private TeleportTransition leafs$portalThroughTheFunnel(PortalProcessor processor, ServerLevel level, Entity entity, Operation<TeleportTransition> original) {
+        ((ServerLevelEntityAccess) level).leafs$entityTeleports().deferPortal(entity, processor);
         return null;
     }
 }

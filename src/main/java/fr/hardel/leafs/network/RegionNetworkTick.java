@@ -2,6 +2,7 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.ownership.OwnershipViolationException;
 import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
@@ -19,12 +20,15 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.storage.LevelData;
 
 import java.util.concurrent.TimeUnit;
 
 /** Player network split: owning region drains packets and runs the listener tick; global loop keeps transport. */
 public final class RegionNetworkTick {
     private static final long OWNER_STALE_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
+    private static final int RESPAWN_BUDGET = 100;
 
     private RegionNetworkTick() {
     }
@@ -86,20 +90,30 @@ public final class RegionNetworkTick {
         });
     }
 
-    
+        /** The respawn replays on the owner of the respawn spot, as that listener's packet-handling thread; the death level's removal hops back through the primitives. */
     public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
         if (packet.getAction() != ServerboundClientCommandPacket.Action.PERFORM_RESPAWN) {
             return false;
         }
 
-        DeferredTransports transports = TickingBinding.of((ServerLevel) listener.player.level());
-        if (transports.holdsWindow()) {
+        ServerPlayer player = listener.player;
+        MinecraftServer server = player.level().getServer();
+        ServerPlayer.RespawnConfig config = player.getRespawnConfig();
+        LevelData.RespawnData spot = config == null ? server.overworld().getRespawnData() : config.respawnData();
+        ServerLevel level = server.getLevel(spot.dimension());
+        ServerLevel target = level == null ? server.overworld() : level;
+        ChunkPos chunk = ChunkPos.containing(spot.pos());
+        DeferredTransports transports = TickingBinding.of(target);
+        if (transports.owns(chunk.x(), chunk.z()) && PacketRouting.queueOf(listener).handledByCurrentThread()) {
             return false;
         }
 
-        DeferredWork.window(DeferReason.RESPAWN, transports.stats(), () -> listener.handleClientCommand(packet))
-            .validIf(listener.connection::isConnected)
-            .submit(transports);
+        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
+        DeferredWork.owner(DeferReason.RESPAWN, transports.stats(), chunk.x(), chunk.z(), () -> {
+            if (!queue.handleAs(() -> listener.handleClientCommand(packet))) {
+                throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "Respawn of " + player.getPlainTextName() + " waits for its packet queue");
+            }
+        }).validIf(listener.connection::isConnected).degraded(RESPAWN_BUDGET).submit(transports);
 
         return true;
     }
