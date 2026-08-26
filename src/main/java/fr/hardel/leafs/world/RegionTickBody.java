@@ -104,7 +104,7 @@ public final class RegionTickBody {
 
         broadcastChangedChunks(worldData);
         stages.mark(TickStages.regionBroadcast);
-        RegionEntityTracking.tickRegion(level, entityData.tickList());
+        RegionEntityTracking.tickRegion(level, entityData);
         stages.mark(TickStages.regionTracking);
         ServerChunkCache chunkSource = level.getChunkSource();
         LongPredicate tickingChunk = chunkSource::isPositionTicking;

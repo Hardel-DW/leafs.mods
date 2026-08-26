@@ -6,6 +6,10 @@ import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.SpawnProximity;
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
 import fr.hardel.leafs.chunk.propagator.SimulationLevels;
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
+import net.minecraft.server.level.ServerPlayer;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.DistanceManager;
@@ -14,7 +18,10 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -28,6 +35,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(DistanceManager.class)
 public abstract class DistanceManagerMixin implements PropagatorAccess {
+
+    @Mutable
+    @Shadow
+    @Final
+    private Long2ObjectMap<ObjectSet<ServerPlayer>> playersPerChunk;
 
     @Unique
     private volatile LevelTicketPropagator leafs$propagator;
@@ -55,6 +67,7 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$createAuthorities(CallbackInfo callbackInfo) {
+        playersPerChunk = new ConcurrentLong2ObjectMap<>();
         leafs$propagator = new LevelTicketPropagator();
         leafs$simulation = new SimulationLevels();
         leafs$spawnProximity = new SpawnProximity();

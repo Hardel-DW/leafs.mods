@@ -13,7 +13,6 @@ public enum DeferReason {
     PORTAL,
     TELEPORT,
     PLAYER_TELEPORT,
-    PLAYER_MOVE,
     PLAYER_PLACEMENT,
     PLAYER_TEARDOWN
 }

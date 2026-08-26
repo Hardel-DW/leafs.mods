@@ -3,17 +3,15 @@ package fr.hardel.leafs.mixin.world;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
+import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.chunk.TicketTimeoutIndex;
-import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Regionizer;
-import fr.hardel.leafs.scheduler.DeferredTransports;
-import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.ChunkPumpAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
-import fr.hardel.leafs.ticking.TickingBinding;
+
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -34,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
 
-/** Per-chunk tick work moved to region bodies; broadcast marks route to the owning unit; player moves defer to serial. */
+/** Per-chunk tick work moved to region bodies; broadcast marks route to the owning unit. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin {
 
@@ -103,18 +101,9 @@ public abstract class ServerChunkCacheMixin {
         return data.broadcastHolders().add((ChunkHolder) holder);
     }
 
-    @Inject(method = "move", at = @At("HEAD"), cancellable = true)
-    private void leafs$deferPlayerMoveToLevelSerial(ServerPlayer player, CallbackInfo callbackInfo) {
-        LevelRegions regions = LevelRegions.of(this.level);
-        if (regions.body() == null || regions.ownership().isLevelSerialHeldByCurrentThread()) {
-            return;
-        }
-
-        ServerChunkCache self = (ServerChunkCache) (Object) this;
-        DeferredTransports transports = TickingBinding.of(this.level);
-        DeferredWork.serial(DeferReason.PLAYER_MOVE, transports.stats(), () -> self.move(player))
-            .validIf(() -> !player.isRemoved() && player.level() == this.level)
-            .submit(transports);
-        callbackInfo.cancel();
+    /** The move runs where it is called; the visibility pass it used to carry runs on every region's tracking tick. */
+    @Inject(method = "move", at = @At("HEAD"))
+    private void leafs$markPlayerMoved(ServerPlayer player, CallbackInfo callbackInfo) {
+        ((PlayerMoveAccess) player).leafs$markMoved();
     }
 }

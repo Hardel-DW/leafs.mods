@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RegionScheduledTicksTest {
     private static final int SECTION_SHIFT = 4;
@@ -114,7 +113,7 @@ class RegionScheduledTicksTest {
         children.put(CoordinateKey.pack(0, 0), new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L));
         children.put(CoordinateKey.pack(1, 0), new RegionScheduledTicks<>(_ -> true, () -> 0L, () -> 0L));
 
-        ticks.splitInto(SECTION_SHIFT, children::get);
+        ticks.splitInto(SECTION_SHIFT, children::get, false);
 
         drainAt(children.get(CoordinateKey.pack(0, 0)), 50);
         assertEquals(List.of("west"), drained);
@@ -123,11 +122,18 @@ class RegionScheduledTicksTest {
         assertEquals(List.of("east"), drained);
     }
 
+    /** The 2026-08-26 crash: a chunk unloading out of a dead section still had its container at the split. */
     @Test
-    void splitWithoutATargetCrashesEarly() {
+    void splitDropsTheContainerOfADeadSectionAndKeepsStraysWhenAsked() {
         newContainer(0, 0);
+        ticks.schedule(new ScheduledTick<>("dying", blockIn(0, 0, 0), 5, TickPriority.NORMAL, 0));
 
-        assertThrows(IllegalStateException.class, () -> ticks.splitInto(SECTION_SHIFT, _ -> null));
+        ticks.splitInto(SECTION_SHIFT, _ -> null, true);
+        assertEquals(1, ticks.count(), "activation keeps what has no owner yet");
+
+        ticks.splitInto(SECTION_SHIFT, _ -> null, false);
+        assertEquals(0, ticks.count(), "a split lets the dead section's container go");
+        ticks.removeContainer(new ChunkPos(0, 0));
     }
 
     @Test

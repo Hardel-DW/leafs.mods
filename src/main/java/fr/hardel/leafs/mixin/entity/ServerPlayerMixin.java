@@ -1,5 +1,6 @@
 package fr.hardel.leafs.mixin.entity;
 
+import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -9,6 +10,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -17,9 +19,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-// Player moves from region workers defer to the level-serial side. Pearl set goes concurrent for cross-region registration.
+/** Moves route through the teleport funnel; the pearl set goes concurrent for cross-region registration. */
 @Mixin(ServerPlayer.class)
-public abstract class ServerPlayerMixin {
+public abstract class ServerPlayerMixin implements PlayerMoveAccess {
+
+    @Unique
+    private volatile long leafs$movedNanos;
 
     @Mutable
     @Shadow
@@ -29,6 +34,16 @@ public abstract class ServerPlayerMixin {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$concurrentPearlSet(CallbackInfo callbackInfo) {
         this.enderPearls = ConcurrentHashMap.newKeySet();
+    }
+
+    @Override
+    public void leafs$markMoved() {
+        leafs$movedNanos = System.nanoTime();
+    }
+
+    @Override
+    public long leafs$movedNanos() {
+        return leafs$movedNanos;
     }
 
     // Every thread routes, including a mod's own pool: the funnel replays vanilla in place when the caller already holds the destination.

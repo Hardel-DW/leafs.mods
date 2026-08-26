@@ -38,19 +38,22 @@ public final class RegionScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    public void splitInto(int sectionShift, LongFunction<RegionScheduledTicks<T>> targetBySection) {
+    /** A container without a target sits in a dead section: its chunk is unloading, the index lets it go unless the caller keeps strays. */
+    public void splitInto(int sectionShift, LongFunction<RegionScheduledTicks<T>> targetBySection, boolean keepOrphans) {
         for (long chunkKey : allContainers.keySet().toLongArray()) {
             int chunkX = ChunkPos.getX(chunkKey);
             int chunkZ = ChunkPos.getZ(chunkKey);
             RegionScheduledTicks<T> target = targetBySection.apply(CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift));
-            if (target == null) {
-                throw new IllegalStateException("No target index for chunk [" + chunkX + ", " + chunkZ + "] while splitting scheduled ticks");
+            if (target == null && keepOrphans) {
+                continue;
             }
 
             ChunkPos pos = new ChunkPos(chunkX, chunkZ);
             LevelChunkTicks<T> container = allContainers.get(chunkKey);
             removeContainer(pos);
-            target.addContainer(pos, container);
+            if (target != null) {
+                target.addContainer(pos, container);
+            }
         }
     }
 
