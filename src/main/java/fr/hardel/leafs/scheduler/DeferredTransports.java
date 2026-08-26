@@ -14,10 +14,7 @@ public interface DeferredTransports {
     /** The full ownership test: a universal owner owns every position of its level. */
     boolean owns(int chunkX, int chunkZ);
 
-    /**
-     * Runs the task reading like a region: present chunks only, a typed refusal instead of a sync
-     * load. The engine's retry loop catches the ABSENT refusal this scope produces.
-     */
+    /** Runs the task on present chunks only, a typed refusal instead of a sync load; the engine retries on ABSENT. */
     void runDegraded(Runnable task);
 
     DeferStats stats();

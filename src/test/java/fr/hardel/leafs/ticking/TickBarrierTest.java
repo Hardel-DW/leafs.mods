@@ -165,7 +165,7 @@ class TickBarrierTest {
         barrier.drop();
     }
 
-    /** F-C2: the interrupt used to leave the barrier raised for ever, freezing every later tick. */
+    /** The interrupt used to leave the barrier raised for ever, freezing every later tick. */
     @Test
     void anInterruptedRaiseLeavesTheBarrierDown() throws InterruptedException {
         CountDownLatch tickStarted = new CountDownLatch(1);

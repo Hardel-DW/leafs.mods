@@ -12,13 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.LongPredicate;
 
-/**
- * The timeout side of the ticket table: only tickets that can expire live here, so a purge walks
- * what can actually die instead of the whole table. Entries shard by region section; the owning
- * region purges its sections each tick, and the level-serial phase purges the sections no region
- * owns. The countdown can race a concurrent reset of the same ticket, which costs at most one tick
- * of slack on timeouts measured in seconds.
- */
+/** Only the tickets that can expire, sharded by region section. Each region purges its sections, the server thread the sections no region owns. */
 public final class TicketTimeoutIndex {
 
     private record TrackedTicket(long chunkPos, Ticket ticket) {

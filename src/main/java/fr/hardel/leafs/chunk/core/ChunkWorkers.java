@@ -12,14 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * The server's chunk progression pool: it runs the generation layer resumptions, the disk reads and
- * the drain reactions that vanilla funneled through one consecutive worldgen lane. Priorities live in
- * the dispatcher's queue, so the pool itself is plain FIFO threads. The pool is sized like the
- * region pool, {@code max_threads} in the config, because an idle worker costs nothing. Under
- * contention the minimum thread priority lets the OS serve region ticks, which have a 50 ms
- * deadline, before generation, which is throughput work.
- */
+/** The chunk pool: generation, disk reads, drain reactions. Sized like the region pool, at minimum OS priority so region ticks win under contention. */
 public final class ChunkWorkers implements Executor {
 
     private final ThreadPoolExecutor pool;

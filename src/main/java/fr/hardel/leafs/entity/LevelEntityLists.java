@@ -8,7 +8,7 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 
-/** Unsynchronized: ownership already orders all mutators (region mid-tick or level-serial). */
+/** Unsynchronized: ownership already orders all mutators (a region mid-tick or the server thread). */
 public final class LevelEntityLists {
     private final RegionEntityData attached = new RegionEntityData();
     private volatile LongFunction<RegionEntityData> resolver = _ -> attached;

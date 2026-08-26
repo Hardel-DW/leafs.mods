@@ -1,9 +1,6 @@
 package fr.hardel.leafs.region;
 
-/**
- * One grid section of 2^shift x 2^shift chunks. Chunk bits are single-writer (chunk-system guarantee);
- * {@code nonEmptyNeighbours} and {@code region} are guarded by the regionizer's write lock.
- */
+/** One section of 2^shift chunks a side. Chunk bits are single-writer, the rest is under the regionizer's write lock. */
 final class RegionSection<R> {
     private final long key;
     private final int coordinateMask;

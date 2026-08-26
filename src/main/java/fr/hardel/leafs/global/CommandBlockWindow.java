@@ -18,12 +18,7 @@ public final class CommandBlockWindow {
     private CommandBlockWindow() {
     }
 
-    /**
-     * The block can change before the window runs, so its state re-reads there, and only if its
-     * chunk is still loaded: the window must never trigger a synchronous load. A repeating block
-     * skipped by the gamerule rearms exactly like vanilla's AUTO reschedule, so flipping the rule
-     * back on resumes every loop.
-     */
+    /** The state re-reads inside the window, only if the chunk is still loaded. A block cut by the gamerule rearms like vanilla's AUTO reschedule. */
     public static boolean deferBlockTick(ServerLevel level, BlockPos pos, BlockState state) {
         DeferredTransports transports = TickingBinding.of(level);
         if (transports.holdsWindow()) {

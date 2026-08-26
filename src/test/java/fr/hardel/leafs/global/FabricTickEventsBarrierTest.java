@@ -15,10 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/**
- * The barrier itself is exercised through {@link TickBarrier}'s own contract: a thread that holds it
- * cannot enter a tick, so {@code enterTick} throwing is the deterministic probe for "held".
- */
+/** A thread holding the barrier cannot enter a tick, so enterTick throwing probes held. */
 @Timeout(10)
 class FabricTickEventsBarrierTest {
 

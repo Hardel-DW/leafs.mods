@@ -3,11 +3,7 @@ package fr.hardel.leafs.metrics;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.function.LongSupplier;
 
-/**
- * Event counter with a sliding one-minute window, incrementable from any thread. Sixty one-second
- * buckets recycle in place; the reset of a stale bucket races benignly, a lost increment costs one
- * count in a debug metric and nothing else.
- */
+/** Sliding one-minute counter, any thread. Sixty buckets recycle in place; a bucket reset can lose one count, harmless for a debug metric. */
 public final class MinuteCounter {
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
     private final AtomicLongArray counts = new AtomicLongArray(60);

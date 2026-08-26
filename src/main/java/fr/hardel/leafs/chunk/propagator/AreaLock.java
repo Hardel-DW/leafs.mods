@@ -6,13 +6,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
 
-/**
- * Reentrant lock over rectangular areas, keyed by {@code coordinate >> shift} cells. Acquisition
- * inserts one node per cell and rolls back completely on conflict before parking on the owning
- * node, so a blocked thread never holds a cell and two areas cannot deadlock each other.
- * Re-locking cells already owned by the current thread returns an empty node whose unlock is a
- * no-op; an area may not partially overlap cells the thread already owns.
- */
+/** Reentrant lock over rectangular cell areas. A conflict rolls back fully before parking, so two areas never deadlock. No partial overlap with cells already owned. */
 public final class AreaLock {
 
     private final int shift;

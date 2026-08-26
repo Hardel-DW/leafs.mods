@@ -21,13 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
-/**
- * The one chunk holder table of a level, replacing vanilla's updating/visible double buffer: both
- * fields point at this instance, every thread reads it lock-free, and the promotion step reduces to
- * consuming the dirty flag. Extends the vanilla field type so the swap stays invisible to mods; the
- * superclass storage stays empty, so a surface that is not delegated below would answer from an
- * empty map instead of failing, and every such surface throws rather than lie.
- */
+/** The one holder table, both vanilla fields point here. The superclass stays empty, so every surface not delegated below throws rather than lie. */
 public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
 
     private final ConcurrentHashMap<Long, ChunkHolder> holders = new ConcurrentHashMap<>(1024);

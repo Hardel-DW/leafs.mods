@@ -20,11 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
-/**
- * The playerdata tag read once by {@code PrepareSpawnTask.start} is kept for {@code Ready.spawn},
- * stats and advancements read off-thread during configuration: the flip into the game touches no
- * disk. Reads consult the pending writes of {@link DeferredFileWrites} first, never a stale file.
- */
+/** The join's file reads happen during configuration, so the flip into the game touches no disk. Pending writes win over the disk. */
 public final class JoinPreload {
     private static final ConcurrentHashMap<UUID, Entry> ENTRIES = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Path, CompletableFuture<Optional<String>>> CONTENT_BY_FILE = new ConcurrentHashMap<>();
@@ -57,11 +53,7 @@ public final class JoinPreload {
         return entry == null ? fallback.get() : entry.playerData();
     }
 
-    /**
-     * The single read hook of the player JSON files. A pending deferred write wins, because it is
-     * newer than any preload; then a done preload for this file replaces the disk read, once; null
-     * lets vanilla read the disk itself.
-     */
+    /** Read hook of the player JSON files: pending write first, then a done preload once, null lets vanilla read the disk. */
     public static BufferedReader playerFileReader(Path file) {
         CompletableFuture<Optional<String>> content = CONTENT_BY_FILE.remove(file);
         DeferredFileWrites writes = DeferredFileWrites.active();

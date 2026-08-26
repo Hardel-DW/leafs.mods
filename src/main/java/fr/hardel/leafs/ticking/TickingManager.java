@@ -93,10 +93,7 @@ public final class TickingManager {
         return chunkWorkers;
     }
 
-    /**
-     * Once regions may be live, an off-thread {@code MinecraftServer.execute} lands in
-     * the global phase. A designed hot path since the listener-tick move (chunk acks, teardown, handler continuations), so it logs nothing.
-     */
+    /** Once regions may be live, an off-thread {@code MinecraftServer.execute} lands in the global phase. Hot path, logs nothing. */
     public boolean divertExecute(Runnable task) {
         if (!globalTicking || server.isSameThread() || server.isStopped()) {
             return false;
@@ -143,11 +140,7 @@ public final class TickingManager {
         }
     }
 
-    /**
-     * Time-boxed on the shared budget above a floor: churn bookkeeping defers to the next tick
-     * instead of following the wave. Synchronous waiters drain the pump themselves through
-     * {@code managedBlock}, so a leftover only delays offers, never blocks them. A shutdown drains whole.
-     */
+    /** Time-boxed on the shared budget above a floor; a synchronous waiter drains the pump itself, so a leftover never blocks. A shutdown drains whole. */
     private void drainChunkBookkeeping(ServerLevel level) {
         int drained = 0;
         boolean hasMore = true;
@@ -174,11 +167,7 @@ public final class TickingManager {
         } while (drained > 0);
     }
 
-    /**
-     * Head of {@code stopServer}, before the worlds save: the shutdown deadline arms first so a stop
-     * that wedges still dies, then the pool stops so the saves read settled state. A teleport still
-     * in flight is a barrier-window task, and the shutdown window places it before the saves.
-     */
+    /** Head of {@code stopServer}: the deadline arms first so a wedged stop still dies, then the pool stops and the region lanes drain before the saves. */
     public void haltTicking() {
         watchdog.armShutdownDeadline(LeafsWatchdog.SHUTDOWN_DEADLINE);
         scheduler.shutdown();
@@ -209,10 +198,7 @@ public final class TickingManager {
         server.halt(false);
     }
 
-    /**
-     * Walks {@code getAllLevels()} rather than the units, which only hold levels that ticked at least
-     * once. Never throws: this runs after the worlds are saved, where a crash would only misattribute the shutdown.
-     */
+    /** Walks every level, not only the ticked units. Never throws, the worlds are already saved. */
     private void drainRegions() {
         int regions = 0;
         int sections = 0;

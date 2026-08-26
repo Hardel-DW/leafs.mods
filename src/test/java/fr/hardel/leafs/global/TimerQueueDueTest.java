@@ -13,11 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * 2026-08-20: every Leafs server opened the barrier window each tick, empty worlds included,
- * because the hook deferred the whole queue drain instead of the due callback. The drain must stay
- * vanilla: nothing due runs no Leafs code at all, and a due callback still runs through the wrap.
- */
+/** 2026-08-20: the hook deferred the whole drain and opened the window every tick; only a due callback may. */
 class TimerQueueDueTest {
 
     private record RecordingCallback(List<Long> calls) implements TimerCallback<Object> {

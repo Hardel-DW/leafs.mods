@@ -170,10 +170,7 @@ class RegionWorldDataTest {
         assertEquals(1, untickable.ticks);
     }
 
-    /**
-     * The 2026-08-05 village crash: a Lithium-sleeping ticker answers a null position while staying
-     * non-removed, so the region list keys on the chunk captured at registration.
-     */
+    /** 2026-08-05 village crash: a Lithium-sleeping ticker answers a null position, the list keys on the captured chunk. */
     @Test
     void sleepingTickerKeepsItsBucketAndWakesUp() {
         RegionWorldData data = worldData(0);

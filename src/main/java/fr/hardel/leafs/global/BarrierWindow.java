@@ -68,10 +68,7 @@ public final class BarrierWindow {
         }
     }
 
-    /**
-     * Run before the worlds are saved so nothing queued by the final tick is lost. A failure here is
-     * caught rather than propagated, since aborting {@code stopServer} would take the world save down with it.
-     */
+    /** Before the worlds save, so the final tick's queue is not lost. A failure is caught, aborting stopServer would skip the save. */
     public void runShutdownPhase() {
         try {
             runGlobalPhase();

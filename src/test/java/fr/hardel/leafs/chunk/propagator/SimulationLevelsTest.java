@@ -13,10 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The sharded replacement of vanilla's SimulationChunkTracker: fed the simulation ticket level per
- * position, it publishes per chunk the same level vanilla's graph computed, 33 meaning not simulated.
- */
+/** Publishes per chunk the level vanilla's SimulationChunkTracker computed, 33 meaning not simulated. */
 class SimulationLevelsTest {
 
     private final SimulationLevels levels = new SimulationLevels();

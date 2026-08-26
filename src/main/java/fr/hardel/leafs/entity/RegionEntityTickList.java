@@ -11,14 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 
-/**
- * A tick unit's entity list. The owning unit reads and writes its ordered maps directly; any other
- * thread (a neighbour whose piston pushes an entity across the boundary, the global phase placing a
- * player) funnels its mutation through a concurrent per-id mailbox that the owner folds in at the
- * start of its tick. Cross-list arrivals always go through the mailbox, owner included, so an
- * entity is never ticked twice in one pass. Merge, split and migration run under the level's write
- * lock and fold the mailbox first, so a queued op never outlives an ownership change.
- */
+/** A tick unit's entity list. The owner writes directly, anyone else posts to a per-id mailbox the owner folds in at tick start. */
 public final class RegionEntityTickList<E> {
     private final RegionEntityData home;
     private final ConcurrentHashMap<Integer, PendingOp<E>> pending = new ConcurrentHashMap<>();
@@ -96,11 +89,7 @@ public final class RegionEntityTickList<E> {
         drainPending();
     }
 
-    /**
-     * Iteration order is the owner's insertion order, as vanilla. A non-owner iterating here only
-     * ever reads the attached list, which only the serial thread writes, so the
-     * plain read is safe and skips the reentrancy guard.
-     */
+    /** Insertion order, as vanilla. A non-owner only ever reads the attached list, so it skips the reentrancy guard. */
     public void forEach(Consumer<E> output) {
         if (!owned()) {
             for (E entity : active.values()) {

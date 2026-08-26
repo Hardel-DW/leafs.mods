@@ -2,11 +2,7 @@ package fr.hardel.leafs.metrics;
 
 import fr.hardel.leafs.ownership.OwnershipViolationException;
 
-/**
- * The deferred-work and chunk-refusal counters, one instance per server. Deferrals count at the
- * transport, so an inline execution counts nothing; refusals count at the chunk contract, so a
- * FOREIGN rate above zero on a quiet server names an ownership leak that was invisible before.
- */
+/** Deferral and chunk-refusal counters. Deferrals count at the transport (inline counts nothing), refusals at the chunk contract. */
 public final class DeferStats {
     public enum RefusalSource {
         REGION,

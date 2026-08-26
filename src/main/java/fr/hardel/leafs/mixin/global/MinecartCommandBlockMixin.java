@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Hook only - the rail-powered half of the same concern as {@link CommandBlockMixin}. */
+/** Hook only, the rail-powered half of the same concern as {@link CommandBlockMixin}. */
 @Mixin(MinecartCommandBlock.class)
 public abstract class MinecartCommandBlockMixin {
 

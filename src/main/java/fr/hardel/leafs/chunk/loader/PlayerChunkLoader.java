@@ -19,13 +19,7 @@ import net.minecraft.world.level.gamerules.GameRules;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * The per-player chunk loading pipeline, ticked by the thread that owns the player: the region for
- * its players, the serial pass for players no region ticks. Each player walks its view in ring order
- * through three stages, loaded at the view border ring, generated inside the view, ticking inside
- * the simulation distance, with a per-player pace on disk loads. The posting thread drains the
- * propagator itself, so a region grows its own players' views without any global coordinator.
- */
+/** Per-player view pipeline, ticked by the player's owner. Rings from near to far, three stages (loaded, generated, ticking), paced disk loads. */
 public final class PlayerChunkLoader {
 
     private static final double LOADS_PER_TICK = 5.0;

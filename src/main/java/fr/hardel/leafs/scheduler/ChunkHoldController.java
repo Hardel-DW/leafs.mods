@@ -1,11 +1,6 @@
 package fr.hardel.leafs.scheduler;
 
-/**
- * The per-level hold primitive, implemented by chunk/. Once {@code addHold} returns, the chunk must
- * have a holder - and therefore a region - covering it; {@code removeHold} gives that up. Vanilla
- * deduplicates tickets by (type, level), so a chunk carries at most ONE hold: {@link SharedChunkHolds}
- * is what lets several users share it.
- */
+/** Per-level hold primitive from chunk/. After addHold the chunk has a holder, hence a region. One hold per chunk (vanilla dedupes tickets), {@link SharedChunkHolds} shares it. */
 public interface ChunkHoldController {
 
     void addHold(int chunkX, int chunkZ);

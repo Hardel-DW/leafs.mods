@@ -8,13 +8,7 @@ import net.minecraft.world.level.NaturalSpawner;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * The direct replacement of vanilla's naturalSpawnChunkCounter graph: a player entering a chunk
- * marks the disk of radius 8 around it, leaving unmarks it. Readers are the regions' spawn census
- * and the spawning proximity checks; writers ride the call sites of vanilla's addPlayer and
- * removePlayer, which the level's ownership discipline already serializes. Each chunk carries two
- * refcounts in one int, players within the inscribed square of 5 high, players within 8 low.
- */
+/** Replaces vanilla's naturalSpawnChunkCounter: a player marks the disk of radius 8 on enter, unmarks on leave. One int per chunk, two refcounts (within 5 high, within 8 low). */
 public final class SpawnProximity {
 
     private static final int SPAWN_RADIUS = 8;

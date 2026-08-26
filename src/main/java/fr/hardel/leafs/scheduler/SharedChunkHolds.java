@@ -3,11 +3,7 @@ package fr.hardel.leafs.scheduler;
 import fr.hardel.leafs.region.CoordinateKey;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 
-/**
- * The one refcount table over a level's chunk holds. The ticket funnel is thread-safe, so the 0-to-1
- * and 1-to-0 transitions apply their ticket inline from any thread; the propagation reaction still
- * lands on the serial side through the routed listener.
- */
+/** Refcount table of a level's chunk holds; the 0-to-1 and 1-to-0 transitions post their ticket inline from any thread. */
 public final class SharedChunkHolds {
     private final ChunkHoldController controller;
     private final Long2IntOpenHashMap counts = new Long2IntOpenHashMap();

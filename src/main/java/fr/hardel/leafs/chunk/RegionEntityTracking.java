@@ -12,10 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Vanilla's tracking split by owner: the entity pass runs on the region that owns the entity, the
- * player-move pass with it, against every player that moved since the region's last pass.
- */
+/** Tracking split by owner: the entity pass runs on the owning region, against every player that moved since its last pass. */
 public final class RegionEntityTracking {
 
     private RegionEntityTracking() {

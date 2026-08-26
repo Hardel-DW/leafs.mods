@@ -5,11 +5,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * A cluster of nearby grid sections ticked as one unit. All mutable state is guarded by the
- * regionizer's write lock. While {@link RegionState#TICKING} the ownership is frozen: sections never
- * leave the region, and merges targeting it are deferred until {@link #markNotTicking()}.
- */
+/** Nearby sections ticked as one unit, guarded by the regionizer's write lock. While TICKING no section leaves and merges wait. */
 public final class Region<R> {
     private final long id;
     private final Regionizer<R> regionizer;
@@ -41,10 +37,7 @@ public final class Region<R> {
         return state;
     }
 
-    /**
-     * Succeeds only when READY with no pending merge - an awaited merge partner never ticks, which is
-     * what keeps the buffer invariant safe around deferred merges.
-     */
+    /** Only when READY with no pending merge; an awaited merge partner never ticks. */
     public boolean tryMarkTicking() {
         return regionizer.tryMarkTicking(this);
     }

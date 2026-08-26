@@ -9,16 +9,13 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 import java.util.concurrent.Executor;
 
-/**
- * Routes play packets to their player's queue, handled where that queue drains; login/config/handshake
- * listeners keep vanilla's global processor, drained by the global phase.
- */
+/** Play packets go to their player's queue; login, config and handshake keep vanilla's global processor. */
 public final class PacketRouting {
 
     private PacketRouting() {
     }
 
-    /** {@code PacketProcessor.scheduleIfPossible} hook - catches Fabric's direct submissions too. */
+    /** {@code PacketProcessor.scheduleIfPossible} hook, covers Fabric's direct submissions too. */
     public static <T extends PacketListener> boolean routeToPlayer(T listener, Packet<T> packet) {
         if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             return false;
@@ -29,10 +26,7 @@ public final class PacketRouting {
         return true;
     }
 
-    /**
-     * {@code PacketUtils.ensureRunningOnSameThread} hook: true when the current thread is already
-     * draining this listener's queue, so it is the owner by construction. Everything else falls through to vanilla's {@code scheduleIfPossible}.
-     */
+    /** {@code PacketUtils.ensureRunningOnSameThread} hook: the thread draining this queue is the owner. */
     public static boolean handledByCurrentDrain(PacketListener listener) {
         return listener instanceof ServerGamePacketListenerImpl game && queueOf(game).handledByCurrentThread();
     }

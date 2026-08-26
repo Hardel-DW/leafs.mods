@@ -10,10 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/**
- * The 2026-08-04 villager bed search and the 2026-08-05 disconnect-churn spawn crash: a read past
- * the loaded buffer refuses itself, and that one unit skips its tick instead of killing the region.
- */
+/** 2026-08-04 and 2026-08-05 crashes: a read past the buffer refuses, that one unit skips its tick. */
 class TickGuardTest {
 
     @Test
