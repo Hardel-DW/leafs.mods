@@ -10,21 +10,21 @@ import net.minecraft.server.MinecraftServer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 // Once-per-global-tick window: single-threaded work with full world access. An empty queue never raises the barrier.
-public final class BarrierWindow {
+public final class SyncWindow {
     private final TickBarrier barrier;
     private final BarrierStats stats;
     private final DeferStats deferStats;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private volatile Thread drainingThread;
 
-    public BarrierWindow(TickBarrier barrier, BarrierStats stats, DeferStats deferStats) {
+    public SyncWindow(TickBarrier barrier, BarrierStats stats, DeferStats deferStats) {
         this.barrier = barrier;
         this.stats = stats;
         this.deferStats = deferStats;
     }
 
-    public static BarrierWindow of(MinecraftServer server) {
-        return ((GlobalServerAccess) server).leafs$barrierWindow();
+    public static SyncWindow of(MinecraftServer server) {
+        return ((GlobalServerAccess) server).leafs$syncWindow();
     }
 
     // The direct callers outside the engine count their deferral here.
@@ -73,12 +73,12 @@ public final class BarrierWindow {
         try {
             runGlobalPhase();
         } catch (Throwable throwable) {
-            Leafs.LOGGER.error("A barrier-window task failed during shutdown; the remaining ones are dropped", throwable);
+            Leafs.LOGGER.error("A sync window task failed during shutdown; the remaining ones are dropped", throwable);
         }
 
         int stranded = pendingCount();
         if (stranded > 0) {
-            Leafs.LOGGER.warn("Dropping {} barrier-window task(s) left by the shutdown window", stranded);
+            Leafs.LOGGER.warn("Dropping {} sync window task(s) left by the shutdown window", stranded);
             tasks.clear();
         }
     }

@@ -7,8 +7,8 @@ Leafs créer un fichier de configuration au démarrage, `config/leafs.json`. Une
 
 # Debug
 - `debug.watchdog_warn_seconds` : Au delà de ce délai, un tick bloqué est loggé avec la pile de son thread.
-- Le tueur suit `max-tick-time` de `server.properties`, comme en vanilla. Au delà de ce délai sur un tick de région, Leafs écrit un crash report avec tous les threads puis tue la JVM. `-1` désactive, et en solo il n'y a pas de tueur.
 - `debug.per_region_logs` : Chaque worker prend le nom de sa région (R#id dimension) pendant son tick, donc chaque ligne de log dit quelle région l'a écrite.
+- L'arret forcer suit `max-tick-time` de `server.properties`, comme en vanilla. Au delà de ce délai sur une région, Leafs écrit un crash report avec tous les threads puis tue la JVM. `-1` désactive, et en solo il n'y a pas d'arret forcer.
 
 # Gamerule
 - `leafs:tick_functions_work` par défaut à false : Les mcfunctions en répétitions ne fonctionneront plus.

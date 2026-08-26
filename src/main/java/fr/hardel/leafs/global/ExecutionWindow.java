@@ -3,7 +3,7 @@ package fr.hardel.leafs.global;
 import fr.hardel.leafs.metrics.DeferReason;
 import net.minecraft.server.MinecraftServer;
 
-/** Every command and function passes {@code Commands.executeCommandInContext}; one triggered off the server thread moves whole into the barrier window. */
+/** Every command and function passes {@code Commands.executeCommandInContext}; one triggered off the server thread moves whole into the sync window. */
 public final class ExecutionWindow {
 
     private ExecutionWindow() {
@@ -14,7 +14,7 @@ public final class ExecutionWindow {
             return false;
         }
 
-        BarrierWindow.of(server).enqueue(DeferReason.COMMAND_EXECUTION, execution);
+        SyncWindow.of(server).enqueue(DeferReason.COMMAND_EXECUTION, execution);
         return true;
     }
 }

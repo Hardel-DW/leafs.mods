@@ -12,7 +12,7 @@ import net.minecraft.world.level.gamerules.GameRuleCategory;
 import net.minecraft.world.level.gamerules.GameRuleType;
 import net.minecraft.world.level.gamerules.GameRuleTypeVisitor;
 
-/** Gamerules that cut per-tick barrier-window content. Both default to true (full vanilla behaviour). */
+/** Gamerules that cut per-tick sync window content. Both default to true (full vanilla behaviour). */
 public final class LeafsGameRules {
     public static final GameRule<Boolean> tickFunctionsWork = createBoolean();
     public static final GameRule<Boolean> repeatingCommandBlocksWork = createBoolean();
