@@ -24,7 +24,7 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
 
-    public record Debug(int watchdogWarnSeconds, int watchdogKillSeconds, boolean perRegionLogs) {
+    public record Debug(int watchdogWarnSeconds, boolean perRegionLogs) {
     }
 
     private static final Codec<Integer> MAX_THREADS = Codec.intRange(ALL_CORES, 1024)
@@ -39,14 +39,10 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
 
     private static final MapCodec<Debug> DEBUG_MAP = RecordCodecBuilder.mapCodec(builder -> builder.group(
         Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(Debug::watchdogWarnSeconds),
-        Codec.intRange(0, 3600).optionalFieldOf("watchdog_kill_seconds", 60).forGetter(Debug::watchdogKillSeconds),
         Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs)
     ).apply(builder, Debug::new));
 
-    private static final Codec<Debug> DEBUG = DEBUG_MAP.codec()
-        .validate(debug -> debug.watchdogKillSeconds() != 0 && debug.watchdogKillSeconds() <= debug.watchdogWarnSeconds()
-            ? DataResult.error(() -> "watchdog_kill_seconds must be 0 to disable the kill, or above watchdog_warn_seconds")
-            : DataResult.success(debug));
+    private static final Codec<Debug> DEBUG = DEBUG_MAP.codec();
 
     private static final MapCodec<LeafsConfig> MAP_CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
         MAX_THREADS.optionalFieldOf("max_threads", ALL_CORES).forGetter(LeafsConfig::maxThreads),
