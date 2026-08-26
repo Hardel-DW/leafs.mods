@@ -76,7 +76,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         ServerLevel self = (ServerLevel) (Object) this;
         this.leafs$entityTeleports = new EntityTeleports(self, new TickingBinding(self));
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
-        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager);
+        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainTasksInline());
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 

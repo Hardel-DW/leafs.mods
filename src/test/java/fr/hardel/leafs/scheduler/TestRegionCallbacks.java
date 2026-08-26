@@ -46,6 +46,6 @@ final class TestRegionCallbacks implements RegionCallbacks<TestRegionData> {
             Region<TestRegionData> child = sectionToChild.get(sectionKey);
 
             return child == null ? null : child.data().taskQueues();
-        });
+        }, Runnable::run);
     }
 }
