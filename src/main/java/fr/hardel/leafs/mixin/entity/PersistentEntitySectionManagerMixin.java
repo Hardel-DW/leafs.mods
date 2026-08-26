@@ -31,12 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-/**
- * Hook only - the routing lives in entity/RegionEntityPersistence. Every region transitions its own
- * chunks through these maps, so they all go concurrent; arrival, unload and autosave leave the
- * global thread for the owner of the position. saveAll keeps its serial body, it only runs under
- * the level exclusion or with the pool stopped, where the caller is a universal owner.
- */
+/** Hook only, routing in entity/RegionEntityPersistence. The maps go concurrent; arrival, unload and autosave run on the owner, saveAll on the universal owner. */
 @Mixin(PersistentEntitySectionManager.class)
 public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess> implements EntityManagerAccess {
 

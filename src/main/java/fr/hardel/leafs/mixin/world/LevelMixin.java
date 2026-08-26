@@ -53,7 +53,7 @@ public abstract class LevelMixin {
         }
     }
 
-    /** A ticker in a region-owned chunk registers with that region; strays keep the vanilla list, ticked level-serial. */
+    /** A ticker in a region-owned chunk registers with that region; strays keep the vanilla list on the server thread. */
     @Inject(method = "addBlockEntityTicker", at = @At("HEAD"), cancellable = true)
     private void leafs$routeBlockEntityTicker(TickingBlockEntity ticker, CallbackInfo callbackInfo) {
         if (!(this instanceof ServerLevelWorldAccess host) || host.leafs$worldRouter() == null) {

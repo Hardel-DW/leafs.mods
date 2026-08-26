@@ -9,11 +9,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
-/**
- * Vanilla idFor adds the overflowing value before asking for the resize, so the palette a
- * concurrent reader still snapshots grows in place for nothing. A full palette skips the add and
- * answers with the first out-of-range id, which sends vanilla's own overflow check to onResize.
- */
+/** Vanilla adds the overflowing value before the resize, growing a palette a reader still snapshots. A full palette answers out of range instead, vanilla then resizes. */
 @Mixin(HashMapPalette.class)
 public abstract class HashMapPaletteMixin {
 

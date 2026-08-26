@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.Executor;
 
-/** Carries the player's inbound queue; handler continuations route back to it, respawn replays in the window. */
+/** Carries the player's inbound queue; handler continuations route back to it, respawn replays on the respawn spot's owner. */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class ServerGamePacketListenerImplMixin implements GameListenerNetworkAccess {
 
@@ -62,7 +62,7 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     }
 
     @Inject(method = "handleClientCommand", at = @At("HEAD"), cancellable = true)
-    private void leafs$respawnThroughTheWindow(ServerboundClientCommandPacket packet, CallbackInfo callbackInfo) {
+    private void leafs$respawnOnTheOwner(ServerboundClientCommandPacket packet, CallbackInfo callbackInfo) {
         if (RegionNetworkTick.divertRespawn((ServerGamePacketListenerImpl) (Object) this, packet)) {
             callbackInfo.cancel();
         }

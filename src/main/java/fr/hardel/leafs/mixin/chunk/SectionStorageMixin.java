@@ -57,12 +57,7 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
         this.storage = new ConcurrentLong2ObjectMap<>();
     }
 
-    /**
-     * The POI half of the chunk contract: off the server thread, and in degraded scopes, a section
-     * answers from what is unpacked, never from a synchronous disk read. The section of a loaded
-     * chunk was unpacked at its load, so this only truncates queries into genuinely unloaded terrain,
-     * where the vanilla contract's own answer is "no POI here".
-     */
+    /** Off the server thread a section answers from what is unpacked, never a disk read; unloaded terrain answers "no POI" like vanilla. */
     @Inject(method = "getOrLoad", at = @At("HEAD"), cancellable = true)
     private void leafs$presentOnlyOffOwner(long sectionPos, CallbackInfoReturnable<Optional<R>> callbackInfo) {
         ServerLevel level = leafs$level;

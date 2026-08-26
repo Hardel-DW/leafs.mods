@@ -17,14 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/**
- * The disk half of the per-player saves: playerdata NBT, stats and advancements JSON. The caller
- * serializes on its own thread, the one that owns the player, and
- * only the file write moves here, on one writer thread, in submission order. Reads consult the
- * pending payloads first, so a player who reconnects immediately never reads a stale file. The
- * server flushes everything at shutdown, after the world save; while no instance is active, the
- * callers fall back to their synchronous vanilla writes.
- */
+/** Disk half of the player saves, one writer thread in submission order. Reads see the pending payload first; without an active instance callers write synchronously. */
 public final class DeferredFileWrites {
 
     private static volatile DeferredFileWrites active;

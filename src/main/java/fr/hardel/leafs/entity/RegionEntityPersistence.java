@@ -8,10 +8,7 @@ import net.minecraft.world.level.entity.Visibility;
 
 import java.util.function.LongPredicate;
 
-/**
- * Region routing of the entity persistence pipeline: arrival, unload and autosave run on the region
- * that owns the chunk, because they feed the per-region tick lists. Retries ride vanilla's chunksToUnload set.
- */
+/** Entity persistence by owner: arrival, unload and autosave run on the region owning the chunk. Retries ride vanilla's chunksToUnload. */
 public final class RegionEntityPersistence {
     private final ServerLevel level;
     private final EntityManagerAccess manager;

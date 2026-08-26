@@ -7,11 +7,7 @@ import java.util.Iterator;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 
-/**
- * A closed queue rejects offers, making the scheduler re-resolve the owner - how tasks survive merges
- * and splits. Closing only ever happens under the regionizer's write lock, which is also what orders
- * the two nested monitors below: no two closures of the same pair can run in opposite directions.
- */
+/** A closed queue rejects offers so the scheduler re-resolves the owner. Closing runs under the regionizer's write lock, which orders the nested monitors. */
 public final class RegionTaskQueues {
     private final ArrayDeque<QueuedTask> tasks = new ArrayDeque<>();
     private boolean closed;

@@ -21,11 +21,7 @@ import org.spongepowered.asm.mixin.Unique;
 import java.util.List;
 import java.util.function.BiConsumer;
 
-/**
- * The ticket table takes writers from any thread under one monitor. The loading and simulation
- * listeners feed the Leafs authorities inline, thread-safe by their area locks; vanilla's graphs
- * only see pre-binding strays, routed to the level-serial side that owns them.
- */
+/** The ticket table takes writers from any thread under one monitor; the listeners feed the Leafs authorities inline. */
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
 

@@ -5,7 +5,7 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.function.LongFunction;
 
-/** Unresolved positions fall back to the attached payload, which the level-serial remainder drains. */
+/** Unresolved positions fall back to the attached payload, drained by the server thread. */
 public final class WorldDataRouter {
     private final RegionWorldData attached;
     private volatile LongFunction<RegionWorldData> resolver;

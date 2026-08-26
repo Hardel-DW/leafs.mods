@@ -8,11 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PacketRoutingFlushScopeTest {
 
-    /**
-     * The 2026-08-04 lost-GUI-packet bug: the level-serial unit carried a plain Region context, so
-     * every send from the packet-drain phase lost its per-packet flush. Only a pool region tick
-     * batches; the serial phase and unowned threads keep vanilla's flush cadence.
-     */
+    /** 2026-08-04 lost GUI packets: only a pool region tick batches sends, everyone else keeps vanilla's flush. */
     @Test
     void onlyARegionTickSuspendsTheFlush() {
         assertTrue(PacketRouting.scopedFlush(true));

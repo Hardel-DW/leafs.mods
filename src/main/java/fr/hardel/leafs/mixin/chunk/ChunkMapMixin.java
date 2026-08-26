@@ -80,12 +80,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.Queue;
 
-/**
- * Hook only - the chunk core wires here: the concurrent table, the pool-backed dispatcher, the
- * scheduling layer and the per-player loader are built at construction, and every routed effect
- * delegates to chunk/core. Holder creation feeds the regionizer from the drain threads, the unload
- * claims feed it from the serial decision, strictly alternating per position as the regionizer requires.
- */
+/** Hook only, the chunk core wires here at construction. Holder creation and unload claims feed the regionizer, strictly alternating per position. */
 @Mixin(ChunkMap.class)
 public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAccess {
 
@@ -198,12 +193,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         scheduleUnload(pos, holder);
     }
 
-    /**
-     * Every region marks its chunks unsaved concurrently with the serial phase (light, pump); the
-     * vanilla linked hash set corrupts under two writers (the 150-bot rehash AIOOBE). The scan order
-     * stops being insertion-aged, which only reorders the 20-per-tick eager-save budget.
-     * The unload claims and save clocks cross threads too, now that regions tear down their own chunks.
-     */
+    /** Regions, light and pump write these maps concurrently; the vanilla hash sets corrupt under two writers (150-bot rehash AIOOBE). */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$concurrentEagerSaves(CallbackInfo callbackInfo) {
         this.chunksToEagerlySave = new ConcurrentLongSet();
@@ -386,7 +376,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         leafs$ticking().metrics().chunkLoads().increment();
     }
 
-    /** The #20b tracking split: the per-entity pass moved to the region bodies, the serial call keeps the player view diffs. */
+    /** The per-entity pass moved to the region bodies, the serial call keeps the view diffs of the orphans. */
     @Inject(method = "tick()V", at = @At("HEAD"), cancellable = true)
     private void leafs$serialTrackingHalf(CallbackInfo callbackInfo) {
         if (leafs$regions().body() == null) {
@@ -415,11 +405,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return original.call(future, body, executor);
     }
 
-    /**
-     * The autosave leaves the global thread: the epoch bump replaces the holder walk, each region
-     * walks its own chunks on its own tick. An empty server keeps the vanilla inline walk, because
-     * its parked regions would consume no epoch before the pause.
-     */
+    /** The epoch bump replaces the holder walk, each region saves its own chunks. An empty server keeps the vanilla walk, its regions are parked. */
     @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
     private void leafs$epochAutosave(boolean flushStorage, CallbackInfo callbackInfo) {
         if (flushStorage || ((ChunkMap) (Object) this).level.getServer().getPlayerList().getPlayers().isEmpty()) {

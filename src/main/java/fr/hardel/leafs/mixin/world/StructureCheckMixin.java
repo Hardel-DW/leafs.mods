@@ -12,9 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.Map;
 
-// Vanilla confines these caches to the server thread (ServerLevel posts onStructureLoad through server.execute); under Leafs the
-// regions search structures too, so every entry point takes the instance monitor. The disk scan of a cold check serializes with it,
-// a bounded and rare cost.
+// Vanilla confines these caches to the server thread; regions search too, so every entry takes the instance monitor.
 @Mixin(StructureCheck.class)
 public abstract class StructureCheckMixin {
 

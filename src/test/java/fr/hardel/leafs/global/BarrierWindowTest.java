@@ -98,7 +98,7 @@ class BarrierWindowTest {
         barrier.exitTick();
     }
 
-    /** F-C2: raising used to happen outside the try, so a failure there froze every later tick. */
+    /** Raising used to happen outside the try, so a failure there froze every later tick. */
     @Test
     void aFailingRaiseLeavesTheBarrierDown() throws InterruptedException {
         enqueue(() -> executed.add("never"));
@@ -125,11 +125,7 @@ class BarrierWindowTest {
         assertEquals(List.of("never"), executed, "the window must still work after the failed raise");
     }
 
-    /**
-     * The command-block contract: a unit that defers itself outside the window replays itself once
-     * inside it, sees {@link BarrierWindow#isDraining()} and runs there instead of queueing again -
-     * the property that keeps a chain loop from filling the queue.
-     */
+    /** A deferred command block replays inside the window and sees isDraining, so a chain loop never fills the queue. */
     @Test
     void workDeferredFromInsideTheWindowRunsInline() {
         AtomicInteger executions = new AtomicInteger();

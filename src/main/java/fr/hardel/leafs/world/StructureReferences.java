@@ -17,8 +17,7 @@ import net.minecraft.world.level.levelgen.structure.StructureStart;
 
 import java.util.concurrent.CompletableFuture;
 
-// The reference write of a located structure needs the live start: the chunk is demanded, and the write runs on the
-// owning thread at delivery. A delivery that fails, or a shutdown in between, loses one reference, never a position.
+// The reference write needs the live start: the chunk is demanded, the write runs on the owner at delivery.
 public final class StructureReferences {
 
     private StructureReferences() {

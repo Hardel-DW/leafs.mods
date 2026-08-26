@@ -7,12 +7,7 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * The level authority for simulation: fed inline by the simulation ticket listener under the table
- * monitor, drained by any thread that posted simulation tickets, published as a concurrent map that
- * regions read without a lock. It replaces vanilla's SimulationChunkTracker, whose graph only the
- * serial phase could touch. Level 33 means not simulated, matching vanilla's tracker default.
- */
+/** Replaces vanilla's SimulationChunkTracker: fed by the simulation listener, published as a concurrent map regions read lock-free. 33 means not simulated. */
 public final class SimulationLevels extends LeafsTicketPropagator {
 
     public static final int NOT_SIMULATED = 33;

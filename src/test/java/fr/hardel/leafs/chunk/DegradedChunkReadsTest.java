@@ -7,10 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DegradedChunkReadsTest {
 
-    /**
-     * 2026-08-20: the portal task searches under the degraded scope but must teleport raw, or a
-     * refusal inside vanilla's teleport would cut the move after the entity left its origin.
-     */
+    /** 2026-08-20: the portal search is degraded but the teleport must run raw, or a refusal cuts the move mid-way. */
     @Test
     void escapeRunsRawAndRestoresTheScope() {
         DegradedChunkReads.run(() -> {

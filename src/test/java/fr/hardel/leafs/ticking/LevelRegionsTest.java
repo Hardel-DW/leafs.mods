@@ -33,10 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Drives {@link LevelRegions} the way the chunk-holder feed does: strictly alternating create/destroy
- * per position, with one {@link LevelRegions#settle()} per simulated level tick.
- */
+/** Drives LevelRegions like the holder feed: alternating create/destroy per position, one settle per tick. */
 class LevelRegionsTest {
     private static final int FEED_EVENTS = 100_000;
     private static final int EVENTS_PER_TICK = 50;

@@ -11,10 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * The serial side marks chunks ready to send while the owning region collects and sends them, so the
- * pending set takes writers from both. The sender's scalar state stays owner-thread only.
- */
+/** The pending set takes writers from the marking thread and the sending region; the scalar state stays owner only. */
 @Mixin(PlayerChunkSender.class)
 public abstract class PlayerChunkSenderMixin {
 

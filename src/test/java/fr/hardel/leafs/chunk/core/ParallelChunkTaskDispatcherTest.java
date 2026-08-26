@@ -14,11 +14,7 @@ import java.util.concurrent.Executor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-/**
- * The in-flight window of the dispatcher against a task that throws. Both executors run inline, so
- * one submit walks the whole dispatch chain before returning; the worker executor catches like the
- * chunk pool, whose threads hand an escaped throwable to their uncaught handler.
- */
+/** The in-flight window against a throwing task. Both executors run inline, the worker one catches like the chunk pool. */
 class ParallelChunkTaskDispatcherTest {
 
     private static final int TICKET_LEVEL = 31;

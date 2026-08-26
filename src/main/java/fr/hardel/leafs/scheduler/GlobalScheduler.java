@@ -4,7 +4,7 @@ import fr.hardel.leafs.Leafs;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** Global-phase tasks, submittable from any thread - where off-thread {@code MinecraftServer.execute} lands. */
+/** Global-phase tasks, submittable from any thread, where off-thread {@code MinecraftServer.execute} lands. */
 public final class GlobalScheduler {
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
 

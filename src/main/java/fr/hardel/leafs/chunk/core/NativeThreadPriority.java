@@ -9,11 +9,7 @@ import java.util.Locale;
 
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 
-/**
- * Linux ignores {@link Thread#setPriority}, so a worker lowers its own OS priority through the
- * libc {@code setpriority} call instead. Nice is per thread on Linux and lowering it needs no
- * privilege. Windows and macOS honour the Java priority natively and resolve nothing here.
- */
+/** Linux ignores {@link Thread#setPriority}, so a worker lowers its own nice through libc; no privilege needed. Other OSes honour the Java priority. */
 final class NativeThreadPriority {
     private static final int PRIO_PROCESS = 0;
     private static final int CALLING_THREAD = 0;

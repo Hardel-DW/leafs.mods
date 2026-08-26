@@ -5,11 +5,7 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.concurrent.TimeUnit;
 
-/**
- * A halted server that still reports chunk work names what holds it, once a second. Vanilla's stop
- * loop spins until every source is empty and says nothing when one never drains, which turns any
- * stuck source into a silent freeze.
- */
+/** A halted server still reporting chunk work names what holds it, once a second; vanilla's stop loop would freeze silently. */
 public final class StalledShutdown {
     private static final long INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1);
 

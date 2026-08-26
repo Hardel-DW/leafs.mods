@@ -19,11 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.Executor;
 
-/**
- * Entity chunk IO off the global thread: the deserializer lane dispatched to the server executor,
- * which lands in the global phase drain, so it moves to the chunk worker pool like the chunk reads.
- * The empty-chunk cache is read by loads on region threads and written by stores, so it goes concurrent.
- */
+/** Entity chunk deserialization moves to the chunk pool like the chunk reads; the empty-chunk cache goes concurrent. */
 @Mixin(EntityStorage.class)
 public abstract class EntityStorageMixin {
 

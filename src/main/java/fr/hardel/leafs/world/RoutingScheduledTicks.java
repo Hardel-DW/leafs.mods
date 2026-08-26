@@ -17,12 +17,7 @@ import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 import java.util.function.BiConsumer;
 
-/**
- * The level's scheduled-tick field: every position-keyed operation resolves to the owning index.
- * {@link #route} is the single flip switch; until it is called everything resolves to the attached
- * index, which is the vanilla shape. The copy-area family always targets the attached index: its
- * vanilla implementation reads private state that cannot be reached across instances.
- */
+/** The level's scheduled-tick field, resolved by position to the owning index. Before {@link #route} everything is attached. Copy-area always targets the attached index. */
 public final class RoutingScheduledTicks<T> extends LevelTicks<T> {
     private final RegionScheduledTicks<T> attached;
     private LongFunction<RegionScheduledTicks<T>> resolver;
