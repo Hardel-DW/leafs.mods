@@ -41,18 +41,20 @@ public final class LevelTickUnit extends TickHandle {
     private final LevelRegions regions;
     private final RegionTickScheduler scheduler;
     private final SerialWorkBudget serialBudget;
+    private final int slowTaskWarnMillis;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
     private boolean activated;
     private volatile int lastChunkCount;
     private volatile int lastViewChunks;
 
-    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, SerialWorkBudget serialBudget) {
+    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, SerialWorkBudget serialBudget, int slowTaskWarnMillis) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
         this.serialBudget = serialBudget;
+        this.slowTaskWarnMillis = slowTaskWarnMillis;
     }
 
     public LevelRegions regions() {
@@ -182,7 +184,7 @@ public final class LevelTickUnit extends TickHandle {
             task.run();
             long end = System.nanoTime();
             long millis = (end - start) / 1_000_000L;
-            if (millis > 50) {
+            if (slowTaskWarnMillis > 0 && millis > slowTaskWarnMillis) {
                 Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
             }
 
