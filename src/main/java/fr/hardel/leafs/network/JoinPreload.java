@@ -35,9 +35,13 @@ public final class JoinPreload {
     private JoinPreload() {
     }
 
-    /** Wraps the first {@code loadPlayerData} of the join: keeps its tag and kicks the two JSON reads. */
+    /** Keeps the first playerdata read and kicks the two JSON reads; a tag read while the previous session still tears down is not kept. */
     public static Optional<CompoundTag> captureAndPreload(PlayerList playerList, NameAndId nameAndId, Optional<CompoundTag> loaded) {
         discard(nameAndId);
+        if (PlayerTeardown.pending(nameAndId.id())) {
+            return loaded;
+        }
+
         Path statsFile = ((PlayerListFileAccess) playerList).leafs$statsFile(new GameProfile(nameAndId.id(), nameAndId.name()));
         Path advancementsFile = playerList.getServer().getWorldPath(LevelResource.PLAYER_ADVANCEMENTS_DIR).resolve(nameAndId.id() + ".json");
         Entry entry = new Entry(loaded, statsFile, readAsync(statsFile), advancementsFile, readAsync(advancementsFile));

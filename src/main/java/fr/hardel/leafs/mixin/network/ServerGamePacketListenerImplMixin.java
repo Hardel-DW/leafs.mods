@@ -8,7 +8,9 @@ import fr.hardel.leafs.network.ContainerClickGuard;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
+import fr.hardel.leafs.network.PlayerTeardown;
 import fr.hardel.leafs.network.RegionNetworkTick;
+import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
 import net.minecraft.server.MinecraftServer;
@@ -64,6 +66,12 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         if (RegionNetworkTick.divertRespawn((ServerGamePacketListenerImpl) (Object) this, packet)) {
             callbackInfo.cancel();
         }
+    }
+
+    /** Leave message, bed release and removal run as one block on the player's owner. */
+    @WrapMethod(method = "onDisconnect")
+    private void leafs$disconnectOnTheOwner(DisconnectionDetails details, Operation<Void> original) {
+        PlayerTeardown.run(this.player, () -> original.call(details));
     }
 
     @WrapMethod(method = "handleContainerClick")
