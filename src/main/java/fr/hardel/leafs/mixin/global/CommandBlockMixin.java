@@ -11,12 +11,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Hook only, global/CommandBlockWindow moves the whole scheduled tick into the barrier window. */
+/** Hook only, global/CommandBlockWindow moves the whole scheduled tick into the sync window. */
 @Mixin(CommandBlock.class)
 public abstract class CommandBlockMixin {
 
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
-    private void leafs$deferToBarrierWindow(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo callbackInfo) {
+    private void leafs$deferToSyncWindow(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo callbackInfo) {
         if (CommandBlockWindow.deferBlockTick(level, pos, state)) {
             callbackInfo.cancel();
         }
