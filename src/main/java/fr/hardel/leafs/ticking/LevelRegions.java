@@ -2,16 +2,18 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.scheduler.RegionUnloads;
+import fr.hardel.leafs.world.ChunkScheduledTicks;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -19,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -40,7 +43,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
 
-    /** Bumped by the global autosave trigger only; each region compares it against the epoch it last walked. */
+    /** Bumped by the global autosave trigger only; each chunk and player compares it against the epoch that last saved it. */
     private volatile long autosaveEpoch;
 
     /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
@@ -67,8 +70,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return dimension;
     }
 
-    /** Once, on the server thread, before the level's first tick. Regions equip, the payloads migrate, then the handles schedule. */
-    public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body, Runnable beforeScheduling) {
+    /** Once, on the server thread, before the level's first tick. Regions equip, then the handles schedule. */
+    public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
         if (this.scheduler != null)
             return;
 
@@ -85,7 +88,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
             }
         }
 
-        beforeScheduling.run();
         this.scheduler = scheduler;
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.data().handle() == null && (region.state() == RegionState.READY || region.state() == RegionState.TICKING)) {
@@ -104,6 +106,18 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public RegionUnloads<RegionTickData> unloads() {
         return unloads;
+    }
+
+    /** The owning region's payload, null for a chunk without a region or before activation. */
+    public RegionWorldData worldDataAt(int chunkX, int chunkZ) {
+        Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
+        return region == null ? null : region.data().worldData();
+    }
+
+    /** The clock a scheduled tick at this chunk lives on: the owning region's, or game time when nobody owns it. */
+    public long timeAt(int chunkX, int chunkZ, long gameTime) {
+        RegionWorldData data = worldDataAt(chunkX, chunkZ);
+        return data == null ? gameTime : data.currentTick();
     }
 
     public void bumpAutosaveEpoch() {
@@ -228,26 +242,26 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
             return false;
         }
 
-        int players = disconnectPlayers(data.entityData());
+        int players = disconnectPlayers(region);
         keepChunksAsSaved(region);
-        data.renewEntityData();
         equipWorld(data);
         scheduler.schedule(newHandle(region));
         Leafs.LOGGER.warn("Region #{} in {} restarted after a crash, {} players disconnected", region.id(), dimension, players);
         return true;
     }
 
-    private int disconnectPlayers(RegionEntityData entityData) {
+    private int disconnectPlayers(Region<RegionTickData> region) {
         Component reason = Component.literal("Your region crashed, please reconnect");
-        int[] count = new int[1];
-        entityData.tickList().forEach(entity -> {
-            if (entity instanceof ServerPlayer player) {
+        int count = 0;
+        for (ServerPlayer player : body.level().players()) {
+            ChunkPos chunk = player.chunkPosition();
+            if (region.owns(chunk.x(), chunk.z())) {
                 player.connection.disconnect(reason);
-                count[0]++;
+                count++;
             }
-        });
+        }
 
-        return count[0];
+        return count;
     }
 
     /** Only what changes after the crash reaches the disk; a restart of the server returns the area to its last save, as a vanilla crash would. */
@@ -317,21 +331,34 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
     }
 
+    /** The queues fold into the survivor; the moved chunks carry their scheduled ticks onto the survivor's clock. */
     @Override
-    public void merge(Region<RegionTickData> from, Region<RegionTickData> into) {
+    public void merge(Region<RegionTickData> from, Region<RegionTickData> into, LongList movedChunks) {
         from.data().taskQueues().closeInto(into.data().taskQueues());
         from.data().unloadQueues().closeInto(into.data().unloadQueues());
-        RegionWorldData fromWorld = from.data().worldData();
-        RegionWorldData intoWorld = into.data().worldData();
-        if (fromWorld != null && intoWorld != null) {
-            fromWorld.mergeInto(intoWorld);
+        RegionTickBody body = this.body;
+        if (body != null) {
+            rebaseTicks(body.level(), movedChunks, into.data().clock().currentTick() - from.data().clock().currentTick());
         }
 
-        from.data().entityData().mergeInto(into.data().entityData());
-        into.data().autosave().absorb(from.data().autosave());
         merged++;
     }
 
+    private static void rebaseTicks(ServerLevel level, LongList chunks, long tickOffset) {
+        if (tickOffset == 0) {
+            return;
+        }
+
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        for (long key : chunks) {
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(CoordinateKey.x(key), CoordinateKey.z(key)));
+            if (holder != null && holder.getLatestChunk() instanceof LevelChunk chunk) {
+                ChunkScheduledTicks.rebase(chunk, tickOffset);
+            }
+        }
+    }
+
+    /** Children start on the parent's clock once regions are equipped; everything positional already sits in the chunks. */
     @Override
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
         Consumer<Runnable> orphans = task -> serialUnloadSink.accept(new OrphanedUnload(task));
@@ -345,26 +372,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
             return child == null ? null : child.data().unloadQueues();
         }, orphans);
 
-        RegionWorldData parentWorld = parent.data().worldData();
-        if (parentWorld != null) {
+        if (worldDataFactory != null) {
             for (Region<RegionTickData> child : children) {
                 child.data().clock().resetTo(parent.data().clock().currentTick());
-                child.data().worldData().inheritCountersFrom(parentWorld);
             }
-
-            parentWorld.splitInto(regionizer.sectionShift(), sectionKey -> {
-                Region<RegionTickData> child = sectionToChild.get(sectionKey);
-                return child == null ? null : child.data().worldData();
-            });
-        }
-
-        parent.data().entityData().splitInto(regionizer.sectionShift(), sectionKey -> {
-            Region<RegionTickData> child = sectionToChild.get(sectionKey);
-            return child == null ? null : child.data().entityData();
-        });
-
-        for (Region<RegionTickData> child : children) {
-            child.data().autosave().inheritFrom(parent.data().autosave());
         }
 
         split++;

@@ -1,9 +1,7 @@
 accessWidener v2 official
 
 accessible field net/minecraft/world/level/Level neighborUpdater Lnet/minecraft/world/level/redstone/CollectingNeighborUpdater;
-accessible field net/minecraft/server/level/ServerLevel blockEvents Lit/unimi/dsi/fastutil/objects/ObjectLinkedOpenHashSet;
 accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
-accessible field net/minecraft/server/level/ServerChunkCache chunkHoldersToBroadcast Ljava/util/Set;
 accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/minecraft/world/level/TicketStorage;
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
 accessible field net/minecraft/server/level/ServerChunkCache level Lnet/minecraft/server/level/ServerLevel;
@@ -14,7 +12,6 @@ accessible method net/minecraft/server/level/ServerLevel tickFluid (Lnet/minecra
 accessible method net/minecraft/server/level/ServerLevel doBlockEvent (Lnet/minecraft/world/level/BlockEventData;)Z
 accessible field net/minecraft/server/level/ServerLevel emptyTime I
 accessible field net/minecraft/server/level/ServerLevel entityManager Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;
-accessible field net/minecraft/world/level/Level blockEntityTickers Ljava/util/List;
 accessible field net/minecraft/server/level/ServerChunkCache spawnEnemies Z
 accessible class net/minecraft/server/level/ServerChunkCache$MainThreadExecutor
 accessible field net/minecraft/server/level/ServerChunkCache mainThreadProcessor Lnet/minecraft/server/level/ServerChunkCache$MainThreadExecutor;
@@ -30,8 +27,6 @@ accessible field net/minecraft/server/level/ChunkMap$TrackedEntity lastSectionPo
 accessible class net/minecraft/server/level/DistanceManager$FixedPlayerDistanceChunkTracker
 accessible field net/minecraft/world/level/entity/PersistentEntitySectionManager sectionStorage Lnet/minecraft/world/level/entity/EntitySectionStorage;
 accessible class net/minecraft/world/level/entity/PersistentEntitySectionManager$ChunkLoadStatus
-accessible method net/minecraft/world/entity/Entity removeAfterChangingDimensions ()V
-accessible method net/minecraft/world/entity/Entity calculatePassengerTransition (Lnet/minecraft/world/level/portal/TeleportTransition;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;
 accessible field net/minecraft/server/ServerFunctionManager ticking Ljava/util/List;
 accessible field net/minecraft/server/ServerFunctionManager postReload Z
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
@@ -48,5 +43,6 @@ accessible method net/minecraft/server/players/PlayerList save (Lnet/minecraft/s
 accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLoad (J)Ljava/util/Optional;
 accessible field net/minecraft/world/level/chunk/storage/SectionStorage levelHeightAccessor Lnet/minecraft/world/level/LevelHeightAccessor;
 accessible field net/minecraft/world/entity/ai/village/poi/PoiManager loadedChunks Lit/unimi/dsi/fastutil/longs/LongSet;
-accessible field net/minecraft/world/ticks/LevelTicks allContainers Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;
 accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/unimi/dsi/fastutil/longs/LongSet;
+accessible field net/minecraft/world/level/chunk/LevelChunk blockTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
+accessible field net/minecraft/world/level/chunk/LevelChunk fluidTicks Lnet/minecraft/world/ticks/LevelChunkTicks;

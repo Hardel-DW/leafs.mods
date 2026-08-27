@@ -1,6 +1,6 @@
 package fr.hardel.leafs.network;
 
-import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.world.WorldTickContext;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
@@ -27,7 +27,7 @@ public final class PlayerTeardown {
     }
 
     public static void run(ServerPlayer player, Runnable vanilla) {
-        if (!(player.level() instanceof ServerLevel level) || TickingManager.of(level.getServer()).halted() || ((ServerLevelEntityAccess) level).leafs$entityLists().owns(player)) {
+        if (!(player.level() instanceof ServerLevel level) || TickingManager.of(level.getServer()).halted() || WorldTickContext.ownsChunk(level, player.chunkPosition().x(), player.chunkPosition().z())) {
             vanilla.run();
             return;
         }

@@ -1,7 +1,7 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.entity.PlayerMoveAccess;
-import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.entity.RegionEntities;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ChunkMap;
@@ -24,13 +24,13 @@ public final class RegionEntityTracking {
         }
     }
 
-    public static void tickRegion(ServerLevel level, RegionEntityData entityData) {
+    public static void tickRegion(ServerLevel level, RegionEntities entities) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         Int2ObjectMap<ChunkMap.TrackedEntity> entityMap = chunkMap.entityMap;
         List<ServerPlayer> players = level.players();
-        List<ServerPlayer> moved = movedSince(players, entityData.lastTrackingNanos());
-        entityData.markTracking(System.nanoTime());
-        entityData.tickList().forEach(entity -> {
+        List<ServerPlayer> moved = movedSince(players, entities.lastTrackingNanos());
+        entities.markTracking(System.nanoTime());
+        entities.forEach(entity -> {
             ChunkMap.TrackedEntity tracked = entityMap.get(entity.getId());
             if (tracked == null) {
                 return;
@@ -53,7 +53,7 @@ public final class RegionEntityTracking {
             }
         });
 
-        entityData.tickList().forEach(entity -> {
+        entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 chunkMap.updateChunkTracking(player);
             }

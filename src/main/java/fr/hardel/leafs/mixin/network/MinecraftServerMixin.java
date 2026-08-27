@@ -3,9 +3,9 @@ package fr.hardel.leafs.mixin.network;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import fr.hardel.leafs.network.OrphanNetworkSweep;
+import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ticking.TickBarrier;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
@@ -61,7 +61,7 @@ public abstract class MinecraftServerMixin {
         }
 
         for (ServerPlayer player : playerList.getPlayers()) {
-            if (!((ServerLevelEntityAccess) player.level()).leafs$entityLists().owns(player)) {
+            if (!RegionNetworkTick.ownedByRegion(player)) {
                 playerList.save(player);
             }
         }

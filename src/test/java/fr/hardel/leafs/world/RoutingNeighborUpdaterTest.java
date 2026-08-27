@@ -1,6 +1,5 @@
 package fr.hardel.leafs.world;
 
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -12,7 +11,6 @@ import net.minecraft.world.level.redstone.Orientation;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,7 +48,7 @@ class RoutingNeighborUpdaterTest {
     }
 
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
-        return new RegionWorldData(() -> 0L, () -> 0L, _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), updater, new HashSet<>(), new PathTypeCache());
+        return new RegionWorldData(() -> 0L, RandomSource.create(), updater, new PathTypeCache(), 0L);
     }
 
     private static void callAll(RoutingNeighborUpdater router) {
@@ -76,7 +74,7 @@ class RoutingNeighborUpdaterTest {
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback);
-        WorldTickContext.enter(null, dataWith(regional), null);
+        WorldTickContext.enter(null, null, dataWith(regional));
         try {
             callAll(router);
         } finally {
@@ -85,22 +83,6 @@ class RoutingNeighborUpdaterTest {
 
         assertEquals(List.of("shape", "simple", "full", "multi"), regional.calls);
         assertTrue(fallback.calls.isEmpty());
-    }
-
-    @Test
-    void foreignScopeFallsBack() {
-        RecordingUpdater fallback = new RecordingUpdater();
-        RecordingUpdater regional = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback);
-        WorldTickContext.enter(new Object(), dataWith(regional), null);
-        try {
-            router.neighborChanged(new BlockPos(0, 64, 0), null, null);
-        } finally {
-            WorldTickContext.exit();
-        }
-
-        assertEquals(List.of("simple"), fallback.calls);
-        assertTrue(regional.calls.isEmpty());
     }
 
     @Test
