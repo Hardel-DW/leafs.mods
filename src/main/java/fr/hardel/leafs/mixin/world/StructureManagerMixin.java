@@ -34,7 +34,7 @@ public abstract class StructureManagerMixin {
             return result;
         }
 
-        if (!(level instanceof ServerLevel serverLevel) || RegionChunkAccess.scheduling(serverLevel.getChunkSource().chunkMap).isUniversalOwner()) {
+        if (!(level instanceof ServerLevel serverLevel) || RegionChunkAccess.scheduling(serverLevel.getChunkSource().chunkMap).mayLoadSynchronously()) {
             return result;
         }
 

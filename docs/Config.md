@@ -10,12 +10,8 @@ Leafs créer un fichier de configuration au démarrage, `config/leafs.json`. Une
 - `debug.per_region_logs` : Chaque worker prend le nom de sa région (R#id dimension) pendant son tick, donc chaque ligne de log dit quelle région l'a écrite.
 - L'arret forcer suit `max-tick-time` de `server.properties`, comme en vanilla. Au delà de ce délai sur une région, Leafs écrit un crash report avec tous les threads puis tue la JVM. `-1` désactive, et en solo il n'y a pas d'arret forcer.
 
-# Gamerule
-- `leafs:tick_functions_work` par défaut à false : Les mcfunctions en répétitions ne fonctionneront plus.
-- `leafs:repeating_command_blocks_work` par défaut à false : les command blocks en repeat ne s'exécuteront plus.
 
 # Commandes
 - `/leafs regions [dimension]` : Affiches les régions par dimension. Avec id, TPS, durée de tick, chunks, entités.
 - `/leafs timings [dimension] [id]` : Le coût de chaque étape d'un tick, moyenné sur 5 secondes. Si aucun argument, ça affiche le thread serveur.
 - `/leafs metrics` : Affiches les informations de la dernière minute. Les ouvertures de la barrière, reports et abandons, refus de chunks, paquets, churn de chunks. Un refus "étranger".
-- `/leafs recommendation` : Des suggestions pour améliorer le parallélisme.

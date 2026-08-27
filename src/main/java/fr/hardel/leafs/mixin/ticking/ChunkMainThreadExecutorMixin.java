@@ -1,5 +1,7 @@
 package fr.hardel.leafs.mixin.ticking;
 
+import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.chunk.ChunkMailbox;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.ticking.ChunkPumpAccess;
@@ -9,7 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-/** A server thread waiting on a chunk while it holds the barrier, or after the pool stopped, runs the region-queued chunk tasks itself. */
+/** A server thread waiting on a chunk runs the mail nobody else may: every chunk's under the barrier or after the pool stopped, its borrowed regions' while borrowing. */
 @Mixin(targets = "net.minecraft.server.level.ServerChunkCache$MainThreadExecutor")
 public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
 
@@ -34,10 +36,12 @@ public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
         }
 
         TickingManager ticking = TickingManager.of(level.getServer());
+        ChunkMailbox mailbox = RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox();
         if (ticking.barrier().isHeldByCurrentThread() || ticking.halted()) {
-            return RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox().drainAll() > 0;
+            return mailbox.drainAll() > 0;
         }
 
-        return false;
+        RegionBorrow borrow = RegionBorrow.current();
+        return borrow != null && borrow.drainMail(mailbox, level.getChunkSource().chunkMap) > 0;
     }
 }

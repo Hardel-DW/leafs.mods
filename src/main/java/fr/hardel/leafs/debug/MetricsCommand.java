@@ -1,7 +1,6 @@
 package fr.hardel.leafs.debug;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import fr.hardel.leafs.metrics.BarrierStats;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.metrics.ServerMetrics;
@@ -27,15 +26,9 @@ public final class MetricsCommand {
 
     private static int report(CommandSourceStack source) {
         ServerMetrics metrics = TickingManager.of(source.getServer()).metrics();
-        BarrierStats.Sample barrier = metrics.barrier().sample(System.nanoTime());
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("barrier").withStyle(ChatFormatting.AQUA))
-            .append(CommandText.stat("opens/min", barrier.opensPerMinute()))
-            .append(CommandText.stat("avg", formatMillis(barrier.avgMs())))
-            .append(CommandText.stat("min", formatMillis(barrier.minMs())))
-            .append(CommandText.stat("max", formatMillis(barrier.maxMs())))
-            .append(CommandText.stat("queue", barrier.deepestQueue()))
-            .append(CommandText.stat("fabric", perMinute(metrics.barrier().fabricEventPauses().perMinute()))), false);
+            .append(CommandText.stat("fabric pauses", perMinute(metrics.barrier().fabricEventPauses().perMinute()))), false);
 
         DeferStats defers = metrics.deferStats();
         for (DeferReason reason : DeferReason.values()) {
@@ -82,14 +75,11 @@ public final class MetricsCommand {
             .append(CommandText.stat("chunk loads", perMinute(metrics.chunkLoads().perMinute())))
             .append(CommandText.stat("unloads", perMinute(metrics.chunkUnloads().perMinute()))), false);
 
-        return barrier.opensPerMinute();
+        return 1;
     }
 
     private static String perMinute(long count) {
         return count + "/min";
     }
 
-    private static String formatMillis(double millis) {
-        return String.format(Locale.ROOT, "%.2fms", millis);
-    }
 }

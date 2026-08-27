@@ -30,10 +30,16 @@ Les workers de chunks, parfaitement indépendants des workers de régions. Il g�
 - Une zones trés denses, avec un TPS bas n'affecte pas la vitesse de générations du mondes donc il peut continuer a se déplacer fluidement.
 - Si il y'a qu'une seul régions et que vous avez plusieurs workers de chunks. Les chunks charge proportionnellement plus vite au nombre de workers.
 
-# La fenêtre barrière.
-Ccette fenêtre permet temporairement de synchroniser le monde. C'est utilisée principalement pour les commandes et les évenements Fabric.
-Le thread global met toutes les régions en pause, imperceptible sans impact sur les performances ou l'expérience de jeu, exécute ces actions une par une avec l'accès complet au monde, puis relâche tout. Elle peut s'ouvrir au plus une fois par tick global, cette fenêtre doit s'ouvrir le moins possible.
-Deux gamerules existe pour désactiver le tag `#minecraft:tick` et les command blocks à répétition. Car ils détruisent un peu le parallélisme des régions et resynchronisent à chaque tick les régions.
+# Les commandes
+Toutes les commandes tournent sur le thread serveur, peu importe qui les lance.
+Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités, la garde jusqu'à la fin de la commande, puis la rend.
+
+Ce que la commande touche décide de ce qu'elle emprunte:
+- Un `/say` n'emprunte rien.
+- Un `/give @a` emprunte les régions où il y a des joueurs.
+- Un `/setblock` emprunte la région du chunk visé, et charge le chunk avant si besoin.
+- Un `/kill @e` emprunte toutes les régions, parce que c'est ce que la commande veut dire.
+Un datapack coûte donc exactement ce qu'il coûte en vanilla
 
 # Connexion et déconnexion
 La connexion et déconnexion sont partiellement modifier, elles sont asynchrones de manière à ce que ces deux tâches n'aient aucun impact de lag sur le serveur. L'objectif est qu'aucun joueur ne ressente le moindre tick de différence dans son expérience.

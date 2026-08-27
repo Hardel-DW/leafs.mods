@@ -1,5 +1,7 @@
 package fr.hardel.leafs.mixin.entity;
 
+import net.minecraft.world.level.entity.EntityLookup;
+import fr.hardel.leafs.entity.LevelBoundAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
@@ -58,6 +60,10 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     @Shadow
     @Final
     private EntitySectionStorage<T> sectionStorage;
+
+    @Shadow
+    @Final
+    private EntityLookup<T> visibleEntityStorage;
 
     @Shadow
     public abstract void addLegacyChunkEntities(Stream<T> entities);
@@ -133,6 +139,8 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     @Override
     public void leafs$bindPersistence(RegionEntityPersistence persistence) {
         this.leafs$persistence = persistence;
+        ((LevelBoundAccess) this.sectionStorage).leafs$bindLevel(persistence.level());
+        ((LevelBoundAccess) this.visibleEntityStorage).leafs$bindLevel(persistence.level());
     }
 
     @Override
