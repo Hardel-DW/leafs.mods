@@ -2,7 +2,7 @@ package fr.hardel.leafs.mixin.compat;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.global.FabricTickEventsBarrier;
+import fr.hardel.leafs.global.FabricTickEvents;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTickRateManager;
@@ -15,17 +15,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/** Brackets the two Fabric server tick events with the barrier when subscribed. Anchored on the vanilla calls around each emission, whatever the Fabric mixin priority. */
+/** Brackets the two Fabric server tick events with a borrow when subscribed. Anchored on the vanilla calls around each emission, whatever the Fabric mixin priority. */
 @Mixin(MinecraftServer.class)
 public abstract class ServerTickEventsShim {
 
     @Unique
-    private FabricTickEventsBarrier leafs$tickEvents;
+    private FabricTickEvents leafs$tickEvents;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void leafs$createTickEventsBarrier(CallbackInfo callbackInfo) {
-        TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);
-        leafs$tickEvents = new FabricTickEventsBarrier(ticking.barrier(), ticking.metrics().barrier().fabricEventPauses());
+    private void leafs$createTickEvents(CallbackInfo callbackInfo) {
+        leafs$tickEvents = new FabricTickEvents(TickingManager.of((MinecraftServer) (Object) this).metrics().fabricEventBorrows());
     }
 
     /** {@code START_SERVER_TICK} fires between the tick-rate manager tick and the {@code tickChildren} call. */

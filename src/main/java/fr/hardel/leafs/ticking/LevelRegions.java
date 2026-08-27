@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
@@ -37,8 +38,9 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
 
-    /** Bumped by the global autosave trigger only; each chunk and player compares it against the epoch that last saved it. */
+    /** Bumped by the global autosave trigger only; each chunk and player compares it against the epoch that last saved it. A forced epoch saves everything in one pass. */
     private volatile long autosaveEpoch;
+    private volatile boolean autosaveForced;
 
     /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
     private volatile long created;
@@ -104,12 +106,40 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return data == null ? gameTime : data.currentTick();
     }
 
-    public void bumpAutosaveEpoch() {
+    public void bumpAutosaveEpoch(boolean forced) {
+        autosaveForced = forced;
         autosaveEpoch++;
     }
 
     public long autosaveEpoch() {
         return autosaveEpoch;
+    }
+
+    public boolean autosaveForced() {
+        return autosaveForced;
+    }
+
+    /** Whether every chunk and player a live region owns has saved the epoch; what no live region owns is nobody's to wait for. */
+    public boolean autosaveReached(long epoch, Iterable<ChunkHolder> holders, List<ServerPlayer> players) {
+        for (ChunkHolder holder : holders) {
+            if (((SavedEpochAccess) holder).leafs$savedEpoch() < epoch && liveRegionOwns(holder.getPos().x(), holder.getPos().z())) {
+                return false;
+            }
+        }
+
+        for (ServerPlayer player : players) {
+            ChunkPos chunk = player.chunkPosition();
+            if (((SavedEpochAccess) player).leafs$savedEpoch() < epoch && liveRegionOwns(chunk.x(), chunk.z())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean liveRegionOwns(int chunkX, int chunkZ) {
+        Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
+        return region != null && region.data().handle() != null && !region.data().handle().isCancelled();
     }
 
     /** A chunk holder now exists at this position: the ticket level dropped to at most {@code ChunkLevel.MAX_LEVEL}. */

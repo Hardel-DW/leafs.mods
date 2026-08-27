@@ -4,7 +4,7 @@ import fr.hardel.leafs.metrics.TickStages.TickFamily;
 
 /** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
-    private final BarrierStats barrier = new BarrierStats();
+    private final MinuteCounter fabricEventBorrows = new MinuteCounter();
     private final DeferStats deferStats = new DeferStats();
     private final StageTimings globalStages = new StageTimings(TickStages.count(TickFamily.GLOBAL));
     private final MinuteCounter packetsIn = new MinuteCounter();
@@ -12,8 +12,9 @@ public final class ServerMetrics {
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
 
-    public BarrierStats barrier() {
-        return barrier;
+    /** Server tick events emitted with a subscriber, each one a borrow scope on the server thread. */
+    public MinuteCounter fabricEventBorrows() {
+        return fabricEventBorrows;
     }
 
     public DeferStats deferStats() {

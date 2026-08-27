@@ -12,15 +12,20 @@ public final class GlobalScheduler {
         tasks.add(task);
     }
 
-    public void drain() {
+    /** Runs what was queued before the call; true when anything ran. */
+    public boolean drain() {
         int budget = tasks.size();
+        boolean ran = false;
         Runnable task;
         while (budget-- > 0 && (task = tasks.poll()) != null) {
+            ran = true;
             try {
                 task.run();
             } catch (Throwable throwable) {
                 Leafs.LOGGER.error("Global task failed", throwable);
             }
         }
+
+        return ran;
     }
 }
