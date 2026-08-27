@@ -199,9 +199,9 @@ public final class TickingManager {
         }
     }
 
-    /** Region crashes stop the whole server cleanly; the region-scoped report was already written by the tick loop. */
+    /** Only an unrecoverable unit lands here, the server-thread unit or a region dead twice in a minute; the report is already written. */
     private void onRegionTickFailure(TickHandle handle, Throwable throwable) {
-        Leafs.LOGGER.error("Region tick failed on #{} in {} - stopping the server", handle.id(), handle.dimension(), throwable);
+        Leafs.LOGGER.error("Tick unit #{} in {} is not recoverable - stopping the server", handle.id(), handle.dimension(), throwable);
         handle.cancel();
         server.halt(false);
     }

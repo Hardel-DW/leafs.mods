@@ -12,7 +12,13 @@ import fr.hardel.leafs.scheduler.RegionUnloads;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -73,16 +79,17 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         this.worldDataFactory = worldDataFactory;
         this.body = body;
 
-        for (Region<RegionTickData> region : regionizer.regionsView())
-            if (region.data().worldData() == null)
-                attachWorld(region.data());
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            if (region.data().worldData() == null) {
+                equipWorld(region.data());
+            }
+        }
 
         beforeScheduling.run();
         this.scheduler = scheduler;
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.data().handle() == null && (region.state() == RegionState.READY || region.state() == RegionState.TICKING)) {
-                region.data().attachHandle(new RegionTickHandle(region, dimension, this));
-                scheduler.schedule(region.data().handle());
+                scheduler.schedule(newHandle(region));
             }
         }
     }
@@ -200,9 +207,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     @Override
     public RegionTickData createData(Region<RegionTickData> region) {
         RegionTickData data = new RegionTickData();
-        data.attachEntityData(new RegionEntityData());
         if (worldDataFactory != null) {
-            attachWorld(data);
+            equipWorld(data);
         }
 
         if (scheduler != null) {
@@ -212,10 +218,66 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return data;
     }
 
+    /**
+     * A crashed region: its players reconnect through the normal join, its chunks keep their in-memory
+     * state but count as saved, its tick payload is dropped and it reschedules. A second death within the window is not recoverable.
+     */
+    boolean restart(Region<RegionTickData> region) {
+        RegionTickData data = region.data();
+        if (!data.recordDeath(System.nanoTime())) {
+            return false;
+        }
+
+        int players = disconnectPlayers(data.entityData());
+        keepChunksAsSaved(region);
+        data.renewEntityData();
+        equipWorld(data);
+        scheduler.schedule(newHandle(region));
+        Leafs.LOGGER.warn("Region #{} in {} restarted after a crash, {} players disconnected", region.id(), dimension, players);
+        return true;
+    }
+
+    private int disconnectPlayers(RegionEntityData entityData) {
+        Component reason = Component.literal("Your region crashed, please reconnect");
+        int[] count = new int[1];
+        entityData.tickList().forEach(entity -> {
+            if (entity instanceof ServerPlayer player) {
+                player.connection.disconnect(reason);
+                count[0]++;
+            }
+        });
+
+        return count[0];
+    }
+
+    /** Only what changes after the crash reaches the disk; a restart of the server returns the area to its last save, as a vanilla crash would. */
+    private void keepChunksAsSaved(Region<RegionTickData> region) {
+        ChunkMap chunkMap = body.level().getChunkSource().chunkMap;
+        region.forEachChunk((chunkX, chunkZ) -> {
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+            ChunkAccess chunk = holder == null ? null : holder.getLatestChunk();
+            if (chunk != null) {
+                chunk.tryMarkSaved();
+            }
+        });
+    }
+
     /** A clock starts at game time, so ticks unpacked before the region existed keep their delays. */
-    private void attachWorld(RegionTickData data) {
+    private void equipWorld(RegionTickData data) {
         RegionClock clock = new RegionClock(gameTime.getAsLong());
-        data.attachWorld(clock, worldDataFactory.apply(clock::currentTick));
+        data.equipWorld(clock, worldDataFactory.apply(clock::currentTick));
+    }
+
+    /** The previous handle, if any, must never be requeued by the worker that ran it. */
+    private RegionTickHandle newHandle(Region<RegionTickData> region) {
+        RegionTickHandle previous = region.data().handle();
+        if (previous != null) {
+            previous.cancel();
+        }
+
+        RegionTickHandle handle = new RegionTickHandle(region, dimension, this);
+        region.data().attachHandle(handle);
+        return handle;
     }
 
     @Override

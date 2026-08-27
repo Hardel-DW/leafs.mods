@@ -53,5 +53,8 @@ public abstract class TickHandle {
 
     protected abstract void tick();
 
+    /** After a throwing tick, still holding whatever the tick held; true when the unit may be scheduled again. */
+    protected abstract boolean recover();
+
     protected abstract RegionCrashReport buildCrashReport();
 }
