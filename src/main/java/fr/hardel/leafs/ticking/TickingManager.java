@@ -2,12 +2,12 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.global.DeferredFileWrites;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
-import fr.hardel.leafs.scheduler.RegionScheduler;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ServerLevel;
@@ -139,11 +139,6 @@ public final class TickingManager {
         for (ServerLevel level : server.getAllLevels()) {
             LevelRegions regions = LevelRegions.of(level);
             drainChunkBookkeeping(level);
-            RegionScheduler<RegionTickData> taskScheduler = regions.taskScheduler();
-            if (taskScheduler != null) {
-                taskScheduler.completePending();
-            }
-
             regions.rethrowFeedFailure();
         }
     }
@@ -164,13 +159,13 @@ public final class TickingManager {
         scheduler.setPeriodNanos(periodNanos);
     }
 
-    /** Queued region tasks run inline, looped because a draining task can queue a follow-up on another level (cross-dimension teleport). */
+    /** Every chunk's mail runs inline, looped because a mail can post a follow-up on another level (cross-dimension teleport). */
     private void drainRegionTasks() {
         int drained;
         do {
             drained = 0;
             for (ServerLevel level : server.getAllLevels()) {
-                drained += LevelRegions.of(level).drainTasksInline();
+                drained += RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox().drainAll();
             }
         } while (drained > 0);
     }
@@ -182,9 +177,6 @@ public final class TickingManager {
         halted = true;
         drainRegionTasks();
         globalScheduler.drain();
-        for (ServerLevel level : server.getAllLevels()) {
-            LevelRegions.of(level).drainUnloadsForShutdown();
-        }
     }
 
     /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. */

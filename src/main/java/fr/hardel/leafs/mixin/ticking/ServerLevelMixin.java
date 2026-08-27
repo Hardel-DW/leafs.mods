@@ -5,6 +5,7 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.world.AnchoredTickers;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,9 +23,17 @@ public abstract class ServerLevelMixin implements ServerLevelRegionAccess {
     @Unique
     private final LevelRegions leafs$regions = new LevelRegions(LeafsConfig.get());
 
+    @Unique
+    private final AnchoredTickers leafs$anchors = new AnchoredTickers();
+
     @Override
     public LevelRegions leafs$regions() {
         return leafs$regions;
+    }
+
+    @Override
+    public AnchoredTickers leafs$anchors() {
+        return leafs$anchors;
     }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/border/WorldBorder;tick()V", shift = At.Shift.AFTER), require = 0)

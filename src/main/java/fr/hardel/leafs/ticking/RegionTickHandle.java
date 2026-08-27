@@ -52,14 +52,12 @@ public final class RegionTickHandle extends TickHandle {
             RegionWorldData worldData = data.worldData();
             RegionTickBody body = regions.body();
             if (worldData == null || body == null) {
-                regions.taskScheduler().drain(region);
-
                 return;
             }
 
-            // Paused solo: the task lane still drains, like vanilla's main-thread queue.
+            // Paused solo: the mail still drains, like vanilla's main-thread queue.
             if (body.level().getServer().isPaused()) {
-                regions.taskScheduler().drain(region);
+                body.drainMail(region, worldData);
                 return;
             }
 
@@ -67,8 +65,6 @@ public final class RegionTickHandle extends TickHandle {
             try {
                 StageTimings stages = stages();
                 stages.beginTick(System.nanoTime());
-                regions.taskScheduler().drain(region);
-                stages.mark(TickStages.regionTasks);
                 unloadOwnChunks(body.level());
                 stages.mark(TickStages.regionUnloads);
                 body.tick(region, data.clock(), worldData, stages, regions.autosaveEpoch());
@@ -98,11 +94,10 @@ public final class RegionTickHandle extends TickHandle {
         }
     }
 
-    /** The region lets its own chunks go: hidden entity chunks first, then the chunk decisions, then the teardowns queued so far. */
+    /** The region lets its own chunks go: hidden entity chunks first, then the chunk decisions; the teardowns run on the chunk workers after the save. */
     private void unloadOwnChunks(ServerLevel level) {
         ((ServerLevelEntityAccess) level).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
         ((ChunkUnloadAccess) level.getChunkSource().chunkMap).leafs$unloads().decideFor(region);
-        regions.unloads().drain(region);
     }
 
     @Override

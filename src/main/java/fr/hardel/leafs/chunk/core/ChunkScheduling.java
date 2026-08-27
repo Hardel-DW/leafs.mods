@@ -1,11 +1,11 @@
 package fr.hardel.leafs.chunk.core;
 
+import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.propagator.AreaLock;
 import fr.hardel.leafs.chunk.propagator.LeafsTicketPropagator;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
-import fr.hardel.leafs.scheduler.RegionScheduler;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.TickBarrier;
@@ -39,10 +39,11 @@ public final class ChunkScheduling {
     private final AreaLock schedulingLock = new AreaLock(LeafsTicketPropagator.SECTION_SHIFT);
     private final GenerationExclusion exclusion = new GenerationExclusion();
     private final ThreadLocal<List<DeferredOwnerTask>> deferredOwnerTasks = new ThreadLocal<>();
+    private final ChunkMailbox mailbox;
 
     private record DeferredOwnerTask(int chunkX, int chunkZ, Runnable task) {}
 
-    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, TickBarrier barrier, BooleanSupplier halted, DeferStats deferStats, Executor pump) {
+    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, TickBarrier barrier, BooleanSupplier halted, DeferStats deferStats, Executor pump, ChunkMailbox mailbox) {
         this.chunkMap = chunkMap;
         this.distanceManager = distanceManager;
         this.regions = regions;
@@ -50,6 +51,11 @@ public final class ChunkScheduling {
         this.halted = halted;
         this.deferStats = deferStats;
         this.pump = pump;
+        this.mailbox = mailbox;
+    }
+
+    public ChunkMailbox mailbox() {
+        return mailbox;
     }
 
     public GenerationExclusion exclusion() {
@@ -197,7 +203,7 @@ public final class ChunkScheduling {
         return task -> runOnOwner(chunkX, chunkZ, task);
     }
 
-    /** Inline on the owner, queued on the owning region's lane otherwise; before activation the pump plays vanilla's main thread. */
+    /** Inline on the owner, mailed to the chunk otherwise; before activation the pump plays vanilla's main thread. */
     public void runOnOwner(int chunkX, int chunkZ, Runnable task) {
         List<DeferredOwnerTask> deferred = deferredOwnerTasks.get();
         if (deferred != null) {
@@ -210,13 +216,12 @@ public final class ChunkScheduling {
             return;
         }
 
-        RegionScheduler<RegionTickData> scheduler = regions.taskScheduler();
-        if (scheduler == null) {
+        if (regions.body() == null) {
             pump.execute(task);
             return;
         }
 
-        scheduler.queue(chunkX, chunkZ, task);
+        mailbox.post(chunkX, chunkZ, task);
     }
 
     public boolean isOwner(int chunkX, int chunkZ) {

@@ -1,28 +1,14 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.scheduler.RegionTaskHost;
-import fr.hardel.leafs.scheduler.RegionTaskQueues;
 import fr.hardel.leafs.world.RegionWorldData;
 
-/** The per-region composite: queues for life, a clock and a tick payload that a crash renews, a handle once the level activated. */
-public final class RegionTickData implements RegionTaskHost {
+/** The per-region composite: a clock and a tick payload that a crash renews, a handle once the level activated. */
+public final class RegionTickData {
     private static final long DEATH_WINDOW_NANOS = 60_000_000_000L;
-    private final RegionTaskQueues taskQueues = new RegionTaskQueues();
-    private final RegionTaskQueues unloadQueues = new RegionTaskQueues();
     private volatile RegionTickHandle handle;
     private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
     private long lastDeathNanos;
-
-    @Override
-    public RegionTaskQueues taskQueues() {
-        return taskQueues;
-    }
-
-    @Override
-    public RegionTaskQueues unloadQueues() {
-        return unloadQueues;
-    }
 
     public RegionTickHandle handle() {
         return handle;

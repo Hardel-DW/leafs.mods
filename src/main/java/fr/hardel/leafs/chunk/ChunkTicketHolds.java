@@ -1,6 +1,5 @@
 package fr.hardel.leafs.chunk;
 
-import fr.hardel.leafs.scheduler.ChunkHoldController;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
