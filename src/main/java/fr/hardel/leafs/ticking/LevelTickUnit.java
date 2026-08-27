@@ -1,7 +1,6 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
@@ -10,8 +9,6 @@ import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.ownership.RegionCrashReport;
 import fr.hardel.leafs.region.Region;
-import fr.hardel.leafs.scheduler.RegionScheduler;
-import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import net.minecraft.server.level.ServerLevel;
@@ -53,9 +50,7 @@ public final class LevelTickUnit extends TickHandle {
         }
 
         activated = true;
-        SharedChunkHolds holds = new SharedChunkHolds(new ChunkTicketHolds(level));
-        RegionScheduler<RegionTickData> taskScheduler = new RegionScheduler<>(regions.regionizer(), holds);
-        regions.activate(dimension(), scheduler, taskScheduler, this::submit, level::getGameTime, time -> RegionWorldData.regional(level, time), new RegionTickBody(level));
+        regions.activate(dimension(), scheduler, level::getGameTime, time -> RegionWorldData.regional(level, time), new RegionTickBody(level));
     }
 
     void prepareAttached(Runnable work) {

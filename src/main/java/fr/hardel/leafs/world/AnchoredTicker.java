@@ -1,30 +1,23 @@
 package fr.hardel.leafs.world;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.entity.TickingBlockEntity;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.function.BooleanSupplier;
 
-/** Level-wide work with a position, ticked as a block entity of that position: the owner of the chunk runs it. */
-public record AnchoredTicker(BlockPos pos, String type, Runnable body, BooleanSupplier finished) implements TickingBlockEntity {
+/** Level-wide work with a position, run by the owner of that position's chunk while it ticks. */
+public record AnchoredTicker(BlockPos pos, String type, Runnable body, BooleanSupplier finished) {
 
-    @Override
     public void tick() {
         body.run();
     }
 
-    @Override
-    public boolean isRemoved() {
-        return finished.getAsBoolean();
+    public long chunkKey() {
+        return ChunkPos.pack(pos);
     }
 
     @Override
-    public BlockPos getPos() {
-        return pos;
-    }
-
-    @Override
-    public String getType() {
-        return type;
+    public String toString() {
+        return type + " at " + pos;
     }
 }

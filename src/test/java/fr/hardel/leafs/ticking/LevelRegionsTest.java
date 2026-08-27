@@ -5,9 +5,6 @@ import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.RegionizerAssertions;
-import fr.hardel.leafs.scheduler.ChunkHoldController;
-import fr.hardel.leafs.scheduler.RegionScheduler;
-import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -230,17 +227,7 @@ class LevelRegionsTest {
         });
         RegionTickScheduler scheduler = new RegionTickScheduler(1, false, new TickBarrier(), watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports")), (_, _) -> {
         });
-        SharedChunkHolds holds = new SharedChunkHolds(new ChunkHoldController() {
-            @Override
-            public void addHold(int chunkX, int chunkZ) {
-            }
-
-            @Override
-            public void removeHold(int chunkX, int chunkZ) {
-            }
-        });
-        regions.activate("leafs:test", scheduler, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run, () -> 0L,
-            time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache(), 0L), null);
+        regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache(), 0L), null);
     }
 
     private int regionCount() {

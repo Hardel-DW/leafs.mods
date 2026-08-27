@@ -9,6 +9,8 @@ import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.StalledShutdown;
+import fr.hardel.leafs.chunk.ChunkMailbox;
+import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.chunk.ChunkUnloadAccess;
 import fr.hardel.leafs.chunk.ChunkUnloads;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
@@ -22,7 +24,6 @@ import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
-import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -202,7 +203,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
         ChunkMap self = (ChunkMap) (Object) this;
         TickingManager ticking = TickingManager.of(self.level.getServer());
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking.barrier(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor);
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking.barrier(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor, new ChunkMailbox(new ChunkTicketHolds(self.level)));
         ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
         this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
         this.leafs$unloads = new ChunkUnloads(self, this.toDrop, leafs$regions(), leafs$ticking().metrics().chunkUnloads());
@@ -287,7 +288,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
                 .holding("worldgen", worldgenTaskDispatcher.hasWork())
                 .holding("lightTasks", lightTaskDispatcher.hasWork())
                 .holding("tickets", self.getDistanceManager().hasTickets())
-                .holding("regionLanes", leafs$regions().queuedWork())
+                .holding("mail", leafs$scheduling.mailbox().size())
                 .report(self.level);
         }
 
@@ -385,20 +386,10 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         callbackInfo.cancel();
     }
 
-    /** The teardown runs on the chunk's owner at scheduling time; a dead owner or an unactivated level keeps vanilla's serial queue. */
+    /** A claimed chunk belongs to no region any more; its teardown after the save runs on the chunk workers, like its load did. */
     @WrapOperation(method = "scheduleUnload", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenRunAsync(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
-    private CompletableFuture<Void> leafs$teardownOnTheOwner(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original, @Local(argsOnly = true, ordinal = 0) long pos) {
-        LevelRegions regions = leafs$regions();
-        int chunkX = ChunkPos.getX(pos);
-        int chunkZ = ChunkPos.getZ(pos);
-        Region<RegionTickData> owner = regions.body() == null ? null : regions.regionizer().regionAtUnsynchronised(chunkX, chunkZ);
-        Executor executor = task -> {
-            if (!regions.unloads().offer(owner, chunkX, chunkZ, task)) {
-                serialQueue.execute(task);
-            }
-        };
-
-        return original.call(future, body, executor);
+    private CompletableFuture<Void> leafs$teardownOnTheChunkWorkers(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original) {
+        return original.call(future, body, leafs$chunkWorkers());
     }
 
     /** The epoch bump replaces the holder walk, each region saves its own chunks. An empty server keeps the vanilla walk, its regions are parked. */
