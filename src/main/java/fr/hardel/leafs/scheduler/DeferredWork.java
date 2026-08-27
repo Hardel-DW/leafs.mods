@@ -7,9 +7,10 @@ import fr.hardel.leafs.ownership.OwnershipViolationException;
 
 import java.util.function.BooleanSupplier;
 
-// One deferred piece of work: destination, reason, revalidation, retry budget. Inline when already at the destination, dropped when revalidation fails or the budget runs out.
+// One piece of work for the owner of a chunk: reason, revalidation, retry budget. Inline when already there, dropped when revalidation fails or the budget runs out.
 public record DeferredWork(
-    Destination destination,
+    int chunkX,
+    int chunkZ,
     DeferReason reason,
     BooleanSupplier revalidation,
     Runnable task,
@@ -18,36 +19,23 @@ public record DeferredWork(
     DeferStats stats
 ) {
 
-    public sealed interface Destination {
-
-        record Window() implements Destination {
-        }
-
-        record Owner(int chunkX, int chunkZ) implements Destination {
-        }
-    }
-
-    public static DeferredWork window(DeferReason reason, DeferStats stats, Runnable task) {
-        return new DeferredWork(new Destination.Window(), reason, () -> true, task, 0, 0, stats);
-    }
-
     public static DeferredWork owner(DeferReason reason, DeferStats stats, int chunkX, int chunkZ, Runnable task) {
-        return new DeferredWork(new Destination.Owner(chunkX, chunkZ), reason, () -> true, task, 0, 0, stats);
+        return new DeferredWork(chunkX, chunkZ, reason, () -> true, task, 0, 0, stats);
     }
 
     // The "entity still alive, player still connected" test, checked at the destination.
     public DeferredWork validIf(BooleanSupplier check) {
-        return new DeferredWork(destination, reason, check, task, retryBudget, attempt, stats);
+        return new DeferredWork(chunkX, chunkZ, reason, check, task, retryBudget, attempt, stats);
     }
 
     // Attempts read present chunks only, an ABSENT refusal re-submits on delivery; past the budget the work is dropped.
     public DeferredWork degraded(int budget) {
-        return new DeferredWork(destination, reason, revalidation, task, budget, attempt, stats);
+        return new DeferredWork(chunkX, chunkZ, reason, revalidation, task, budget, attempt, stats);
     }
 
-    // Inline when the caller already holds the destination's guarantees, queued otherwise; true means deferred, so the injector cancels vanilla. The deferral counts here only, a replay is a retry.
+    // Inline when the caller already owns the chunk, queued otherwise; true means deferred, so the injector cancels vanilla. The deferral counts here only, a replay is a retry.
     public boolean submit(DeferredTransports transports) {
-        if (alreadyThere(transports)) {
+        if (transports.owns(chunkX, chunkZ)) {
             execute(transports);
 
             return false;
@@ -60,17 +48,7 @@ public record DeferredWork(
     }
 
     private void enqueue(DeferredTransports transports) {
-        switch (destination) {
-            case Destination.Window _ -> transports.toWindow(() -> execute(transports));
-            case Destination.Owner(int chunkX, int chunkZ) -> transports.toOwner(chunkX, chunkZ, () -> execute(transports));
-        }
-    }
-
-    private boolean alreadyThere(DeferredTransports transports) {
-        return switch (destination) {
-            case Destination.Window _ -> transports.holdsWindow();
-            case Destination.Owner(int chunkX, int chunkZ) -> transports.owns(chunkX, chunkZ);
-        };
+        transports.toOwner(chunkX, chunkZ, () -> execute(transports));
     }
 
     private void execute(DeferredTransports transports) {
@@ -102,7 +80,7 @@ public record DeferredWork(
 
             // The retry queues even from inside the destination: waiting for the delivery lets the pool load.
             stats.countRetry(reason);
-            DeferredWork retry = new DeferredWork(destination, reason, revalidation, task, retryBudget, attempt + 1, stats);
+            DeferredWork retry = new DeferredWork(chunkX, chunkZ, reason, revalidation, task, retryBudget, attempt + 1, stats);
             if (refusal.readiness() == null) {
                 retry.enqueue(transports);
                 return;

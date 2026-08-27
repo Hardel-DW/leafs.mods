@@ -45,7 +45,7 @@ public final class AreaPreload {
 
     // The write square of createPortal, resident at FULL before a single block is placed: no partial frame.
     public static void ensurePortalWriteSquare(ServerLevel level, BlockPos origin) {
-        if (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).isUniversalOwner()) {
+        if (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mayLoadSynchronously()) {
             return;
         }
 
@@ -67,7 +67,7 @@ public final class AreaPreload {
     // A search that loads chunks on its own future: the server thread waits as vanilla, a region refuses and the deferred work replays when it completes.
     public static void awaitOrRefuse(ServerLevel level, CompletableFuture<?> search, String what) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        if (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(chunkMap).isUniversalOwner()) {
+        if (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(chunkMap).mayLoadSynchronously()) {
             level.getServer().managedBlock(search::isDone);
             return;
         }

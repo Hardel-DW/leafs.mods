@@ -1,8 +1,12 @@
 package fr.hardel.leafs.chunk;
 
+import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayDeque;
@@ -38,6 +42,24 @@ public final class ChunkMailbox {
         int ran = 0;
         for (ChunkHolder holder : holders) {
             ran += drainChunk(holder.getPos().pack());
+        }
+
+        return ran;
+    }
+
+    /** A borrowed region's chunks, for the server thread that holds it. */
+    public int drain(Region<?> region, ChunkMap chunkMap) {
+        if (pending == 0) {
+            return 0;
+        }
+
+        LongList keys = new LongArrayList();
+        region.forEachChunk((chunkX, chunkZ) -> keys.add(ChunkPos.pack(chunkX, chunkZ)));
+        int ran = 0;
+        for (long key : keys) {
+            if (chunkMap.getVisibleChunkIfPresent(key) != null) {
+                ran += drainChunk(key);
+            }
         }
 
         return ran;
