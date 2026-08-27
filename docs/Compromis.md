@@ -14,3 +14,4 @@ Ces compromis sont un peu des fonctionnalités. En réalités ils sont même bé
 6. Un joueur qui se déconnecte pendant qu'il écrit un livre ou une pancarte perd le texte.
 7. Si la machine s'éteint brutalement, peut perdre les dernières écritures de fichiers joueurs encore en attente sur le thread d'écriture. Sans corruptions.
 8. Deux joueurs qui localise une structure au même moment peuvent recevoir la même.
+9. `END_SERVER_TICK` Les mods qui font leur travail "une fois par tick" via la Fabric API tournent toujours 20 fois par seconde, mais le monde autour n'a pas forcément avancé d'un tick entre deux appels. Une région à 10 TPS a fait un tick sur deux. Un mod qui suppose que tout le monde a tické exactement une fois depuis son dernier appel peut se tromper.

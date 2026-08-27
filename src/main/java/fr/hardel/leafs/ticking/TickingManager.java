@@ -25,7 +25,6 @@ public final class TickingManager {
 
     private final MinecraftServer server;
     private final ServerMetrics metrics = new ServerMetrics();
-    private final TickBarrier barrier = new TickBarrier();
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkWorkers chunkWorkers;
@@ -42,7 +41,7 @@ public final class TickingManager {
         this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
-        this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
+        this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.chunkWorkers = new ChunkWorkers(config.effectiveThreads());
         DeferredFileWrites.start();
         watchdog.start();
@@ -57,10 +56,6 @@ public final class TickingManager {
 
     public static TickingManager of(MinecraftServer server) {
         return ((LeafsServerAccess) server).leafs$ticking();
-    }
-
-    public TickBarrier barrier() {
-        return barrier;
     }
 
     public ServerMetrics metrics() {
@@ -102,6 +97,11 @@ public final class TickingManager {
     }
 
     /** Once regions may be live, an off-thread {@code MinecraftServer.execute} lands in the global phase. Hot path, logs nothing. */
+    /** The server thread pumping while it waits (managedBlock) also runs the diverted tasks, or a wait on one of them never ends. */
+    public boolean pumpDiverted() {
+        return globalTicking && server.isSameThread() && globalScheduler.drain();
+    }
+
     public boolean divertExecute(Runnable task) {
         if (!globalTicking || server.isSameThread() || server.isStopped()) {
             return false;
