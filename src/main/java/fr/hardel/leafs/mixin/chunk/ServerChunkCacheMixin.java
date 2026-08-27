@@ -1,6 +1,9 @@
 package fr.hardel.leafs.mixin.chunk;
 
+import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.ticking.LevelRegions;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PropagatorAccess;
@@ -56,13 +59,21 @@ public abstract class ServerChunkCacheMixin {
         }
     }
 
-    /** The contract's full form, for every thread that is not a universal owner and every opted-in degraded scope. */
-    @Inject(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;", at = @At("HEAD"), cancellable = true)
-    private void leafs$contractedGetChunkPath(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, CallbackInfoReturnable<ChunkAccess> callbackInfo) {
-        if (DegradedChunkReads.active() || !leafs$scheduling().isUniversalOwner()) {
-            ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.contractedChunk(self.chunkMap, x, z, targetStatus, loadOrGenerate));
+    /** The contract's full form for every thread that may not load; a thread that may loads as vanilla, and a borrower takes the chunk's region before reading it. */
+    @WrapMethod(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;")
+    private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
+        ServerChunkCache self = (ServerChunkCache) (Object) this;
+        if (DegradedChunkReads.active() || !leafs$scheduling().mayLoadSynchronously()) {
+            return RegionChunkAccess.contractedChunk(self.chunkMap, x, z, targetStatus, loadOrGenerate);
         }
+
+        ChunkAccess chunk = original.call(x, z, targetStatus, loadOrGenerate);
+        RegionBorrow borrow = RegionBorrow.current();
+        if (chunk != null && borrow != null) {
+            borrow.borrow(LevelRegions.of(this.level), x, z);
+        }
+
+        return chunk;
     }
 
     /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree or a correct hasChunk-then-read sequence crashes. */

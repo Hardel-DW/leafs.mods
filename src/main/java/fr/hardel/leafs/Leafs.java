@@ -2,7 +2,6 @@ package fr.hardel.leafs;
 
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.debug.LeafsCommand;
-import fr.hardel.leafs.global.LeafsGameRules;
 import fr.hardel.leafs.metrics.TickStages;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
@@ -17,7 +16,6 @@ public final class Leafs implements ModInitializer {
         LeafsConfig.register();
         LeafsTicketTypes.register();
         TickStages.register();
-        LeafsGameRules.register();
         LeafsCommand.register();
 
         LeafsConfig config = LeafsConfig.get();

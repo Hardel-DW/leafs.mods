@@ -1,0 +1,84 @@
+package fr.hardel.leafs.global;
+
+import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.ticking.TickingManager;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+/** Every command runs on the server thread, which borrows a region the moment it touches one of its chunks or entities and returns them all when the head execution ends. */
+public final class CommandEngine {
+
+    private CommandEngine() {
+    }
+
+    /** True when the execution moved: off the server thread it is posted whole to the global phase, one tick later. */
+    public static boolean divert(MinecraftServer server, Runnable execution) {
+        if (server.isSameThread()) {
+            return false;
+        }
+
+        TickingManager.of(server).globalScheduler().run(execution);
+        return true;
+    }
+
+    /** A nested execution shares the head's borrow. */
+    public static boolean inHead() {
+        return RegionBorrow.current() != null;
+    }
+
+    /** The head of a command: the source entity is taken first, the rest at contact. */
+    public static void runHead(CommandSourceStack source, Runnable execution) {
+        head(borrow -> borrowEntity(borrow, source.getEntity()), () -> {
+            execution.run();
+            return null;
+        });
+    }
+
+    /** A command block's whole run, output writes included, with its chunk taken; a block whose chunk left in the meantime stays silent. */
+    public static boolean runCommandBlock(ServerLevel level, Vec3 position, BooleanSupplier vanilla) {
+        ChunkPos chunk = ChunkPos.containing(BlockPos.containing(position));
+        if (divert(level.getServer(), () -> {
+            if (level.getChunkSource().hasChunk(chunk.x(), chunk.z())) {
+                runCommandBlock(level, position, vanilla);
+            }
+        })) {
+            return false;
+        }
+
+        if (inHead()) {
+            RegionBorrow.current().borrow(LevelRegions.of(level), chunk.x(), chunk.z());
+            return vanilla.getAsBoolean();
+        }
+
+        return head(borrow -> borrow.borrow(LevelRegions.of(level), chunk.x(), chunk.z()), vanilla::getAsBoolean);
+    }
+
+    /** Borrowing is a property of the server thread, in the global phase or inside a level's serial unit alike; the region context stays what it is. */
+    private static <T> T head(Consumer<RegionBorrow> firstContact, Supplier<T> body) {
+        RegionBorrow borrow = RegionBorrow.enter();
+        try {
+            firstContact.accept(borrow);
+            return body.get();
+        } finally {
+            borrow.releaseAll();
+            RegionBorrow.exit();
+        }
+    }
+
+    private static void borrowEntity(RegionBorrow borrow, Entity entity) {
+        if (entity != null && entity.level() instanceof ServerLevel level) {
+            ChunkPos chunk = entity.chunkPosition();
+            borrow.borrow(LevelRegions.of(level), chunk.x(), chunk.z());
+        }
+    }
+}
