@@ -1,7 +1,9 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.SpawnProximity;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
@@ -14,6 +16,7 @@ import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionClock;
+import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
 import net.minecraft.server.level.ChunkHolder;
@@ -52,6 +55,7 @@ public final class RegionTickBody {
     }
 
     private final ServerLevel level;
+    private final ChunkMailbox mailbox;
     private final RegionAutosave autosave;
     private final BiConsumer<BlockPos, Block> guardedBlockTick;
     private final BiConsumer<BlockPos, Fluid> guardedFluidTick;
@@ -59,6 +63,7 @@ public final class RegionTickBody {
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
+        this.mailbox = RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox();
         this.autosave = new RegionAutosave(level);
         this.guardedBlockTick = TickGuard.guardingWithRetry(level::tickBlock, (pos, block) -> level.scheduleTick(pos, block, 1));
         this.guardedFluidTick = TickGuard.guardingWithRetry(level::tickFluid, (pos, fluid) -> level.scheduleTick(pos, fluid, 1));
@@ -76,10 +81,10 @@ public final class RegionTickBody {
         }
 
         purgeTimedOutTickets(region);
+        RegionChunks chunks = drainMail(region, worldData);
+        stages.mark(TickStages.regionTasks);
         ServerChunkCache chunkSource = level.getChunkSource();
-        RegionChunks chunks = worldData.chunks();
         RegionEntities entities = worldData.entities();
-        chunks.refresh(region, chunkSource.chunkMap);
         entities.refresh(level.entityManager.sectionStorage, chunks.holders());
         stages.mark(TickStages.regionTickets);
         entities.forEach(entity -> {
@@ -110,7 +115,7 @@ public final class RegionTickBody {
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
             tickEntities(tickRateManager, entities);
             stages.mark(TickStages.regionEntities);
-            tickBlockEntities(runs, chunks);
+            tickBlockEntities(region, runs, chunks);
             stages.mark(TickStages.regionBlockEntities);
         }
 
@@ -126,6 +131,14 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionPlayers);
         autosave.tick(region, chunks, entities, autosaveEpoch);
         stages.mark(TickStages.regionAutosave);
+    }
+
+    /** The photo of the region's chunks, then the mail of every chunk in it; the entity photo comes after, so an arrival ticks this pass. */
+    public RegionChunks drainMail(Region<?> region, RegionWorldData worldData) {
+        RegionChunks chunks = worldData.chunks();
+        chunks.refresh(region, level.getChunkSource().chunkMap);
+        mailbox.drain(chunks.holders());
+        return chunks;
     }
 
     /** The region's own timeout tickets count down here; an expiry retires its holder level, so the propagator drains right after. */
@@ -291,12 +304,16 @@ public final class RegionTickBody {
         });
     }
 
-    private void tickBlockEntities(boolean runsNormally, RegionChunks chunks) {
+    private void tickBlockEntities(Region<?> region, boolean runsNormally, RegionChunks chunks) {
         ServerChunkCache chunkSource = level.getChunkSource();
         for (LevelChunk chunk : chunks.ticking()) {
             if (chunkSource.isPositionTicking(chunk.getPos().pack())) {
                 ((ChunkTickAccess) chunk).leafs$tickers().tickAll(runsNormally);
             }
+        }
+
+        if (runsNormally) {
+            ((ServerLevelRegionAccess) level).leafs$anchors().tick(region, chunkSource::isPositionTicking);
         }
     }
 }
