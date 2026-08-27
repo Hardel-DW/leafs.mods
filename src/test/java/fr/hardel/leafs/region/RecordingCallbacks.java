@@ -1,6 +1,7 @@
 package fr.hardel.leafs.region;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,7 @@ class RecordingCallbacks implements RegionCallbacks<Object> {
     }
 
     @Override
-    public void merge(Region<Object> from, Region<Object> into) {
+    public void merge(Region<Object> from, Region<Object> into, LongList movedChunks) {
         events.add("merge #" + from.id() + "->#" + into.id());
     }
 

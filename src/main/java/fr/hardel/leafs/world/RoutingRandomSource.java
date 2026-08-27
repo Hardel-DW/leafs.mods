@@ -1,16 +1,17 @@
 package fr.hardel.leafs.world;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.jspecify.annotations.NonNull;
 
 /** Swapped into the level's random field: resolves per call to the ticking unit's random, vanilla otherwise. */
 public final class RoutingRandomSource implements RandomSource {
-    private final Object scope;
+    private final ServerLevel level;
     private final RandomSource vanilla;
 
-    public RoutingRandomSource(Object scope, RandomSource vanilla) {
-        this.scope = scope;
+    public RoutingRandomSource(ServerLevel level, RandomSource vanilla) {
+        this.level = level;
         this.vanilla = vanilla;
     }
 
@@ -19,7 +20,7 @@ public final class RoutingRandomSource implements RandomSource {
     }
 
     private RandomSource resolve() {
-        RegionWorldData data = WorldTickContext.activeFor(scope);
+        RegionWorldData data = WorldTickContext.activeFor(level);
         return data == null ? vanilla : data.random();
     }
 

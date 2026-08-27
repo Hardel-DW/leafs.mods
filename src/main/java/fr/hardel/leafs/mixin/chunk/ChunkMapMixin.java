@@ -18,7 +18,6 @@ import fr.hardel.leafs.chunk.core.ParallelChunkTaskDispatcher;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.chunk.loader.StageTickets;
 import fr.hardel.excess.ConcurrentLongSet;
-import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
@@ -26,8 +25,6 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
-import fr.hardel.leafs.world.RegionWorldData;
-import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
@@ -48,7 +45,6 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskDispatcher;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.GenerationChunkHolder;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.server.level.ServerPlayer;
@@ -421,7 +417,8 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     @WrapMethod(method = "updateChunkTracking")
     private void leafs$viewDiffsOnTheOwner(ServerPlayer player, Operation<Void> original) {
         if (RegionContext.current() instanceof RegionContext.Region) {
-            if (((ServerLevelEntityAccess) ((ChunkMap) (Object) this).level).leafs$entityLists().owns(player)) {
+            ChunkPos chunk = player.chunkPosition();
+            if (WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunk.x(), chunk.z())) {
                 original.call(player);
             }
 
@@ -441,10 +438,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
             return chunk;
         }
 
-        ServerLevel level = ((ChunkMap) (Object) this).level;
-        RegionWorldData active = WorldTickContext.activeFor(level);
-
-        return active != null && ((ServerLevelWorldAccess) level).leafs$worldRouter().atChunk(ChunkPos.getX(pos), ChunkPos.getZ(pos)) == active ? chunk : null;
+        return WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, ChunkPos.getX(pos), ChunkPos.getZ(pos)) ? chunk : null;
     }
 
     @Unique

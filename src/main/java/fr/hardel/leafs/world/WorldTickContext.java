@@ -1,37 +1,37 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.region.Region;
+import net.minecraft.server.level.ServerLevel;
 
-/** The tick unit's payload whose tick body runs on this thread, scoped to its level by identity. */
+/** The region whose tick body runs on this thread, and its level. Absent on the server thread, where vanilla's own state serves. */
 public final class WorldTickContext {
     private static final ThreadLocal<WorldTickContext> CURRENT = new ThreadLocal<>();
 
-    private final Object scope;
+    private final ServerLevel level;
+    private final Region<?> region;
     private final RegionWorldData worldData;
-    private final RegionEntityData entityData;
 
-    private WorldTickContext(Object scope, RegionWorldData worldData, RegionEntityData entityData) {
-        this.scope = scope;
+    private WorldTickContext(ServerLevel level, Region<?> region, RegionWorldData worldData) {
+        this.level = level;
+        this.region = region;
         this.worldData = worldData;
-        this.entityData = entityData;
     }
 
-    public static void enter(Object scope, RegionWorldData worldData, RegionEntityData entityData) {
-        CURRENT.set(new WorldTickContext(scope, worldData, entityData));
+    public static void enter(ServerLevel level, Region<?> region, RegionWorldData worldData) {
+        CURRENT.set(new WorldTickContext(level, region, worldData));
     }
 
     public static void exit() {
         CURRENT.remove();
     }
 
-    public static RegionWorldData activeFor(Object scope) {
+    public static RegionWorldData activeFor(ServerLevel level) {
         WorldTickContext context = CURRENT.get();
-        return context != null && context.scope == scope ? context.worldData : null;
+        return context != null && context.level == level ? context.worldData : null;
     }
 
-    /** Identity is scope enough here: an entity payload belongs to exactly one unit of one level. */
-    public static boolean ownsEntityData(RegionEntityData entityData) {
+    public static boolean ownsChunk(ServerLevel level, int chunkX, int chunkZ) {
         WorldTickContext context = CURRENT.get();
-        return context != null && context.entityData == entityData;
+        return context != null && context.level == level && context.region.owns(chunkX, chunkZ);
     }
 }

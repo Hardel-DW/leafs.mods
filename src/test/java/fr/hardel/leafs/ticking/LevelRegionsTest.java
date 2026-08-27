@@ -11,7 +11,6 @@ import fr.hardel.leafs.scheduler.SharedChunkHolds;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +20,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.HashSet;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -196,34 +194,38 @@ class LevelRegionsTest {
         }
     }
 
+    /** Nothing positional moves any more: a merge keeps the survivor's clock, a split hands the parent's clock to every child. */
     @Test
-    void mergeAndSplitFoldTheWorldPayloadThroughTheRegionizer() {
+    void mergeKeepsTheSurvivorClockAndSplitChildrenStartOnTheParentClock() {
         activateRegions();
         regions.chunkHolderCreated(0, 0);
         regions.chunkHolderCreated(96, 0);
         regions.settle();
         assertEquals(2, regionCount());
-        RegionWorldData west = regions.regionizer().regionAt(0, 0).data().worldData();
-        west.nextSubTick();
-        west.nextSubTick();
-        west.nextSubTick();
+        RegionClock west = regions.regionizer().regionAt(0, 0).data().clock();
+        RegionClock east = regions.regionizer().regionAt(96, 0).data().clock();
+        west.advance();
+        west.advance();
+        east.advance();
 
         regions.chunkHolderCreated(32, 0);
         regions.chunkHolderCreated(64, 0);
         regions.settle();
         assertEquals(1, regionCount());
-        assertEquals(3, regions.regionizer().regionAt(0, 0).data().worldData().nextSubTick(), "the merge folds the sub-tick counter into the survivor");
+        RegionClock survivor = regions.regionizer().regionAt(0, 0).data().clock();
+        assertTrue(survivor == west || survivor == east, "the survivor keeps one of the two clocks untouched");
 
+        survivor.advance();
         regions.chunkHolderDestroyed(32, 0);
         regions.chunkHolderDestroyed(64, 0);
         regions.settle();
         assertEquals(2, regionCount());
-        assertEquals(4, regions.regionizer().regionAt(0, 0).data().worldData().nextSubTick(), "split children inherit the parent's counters");
-        assertEquals(4, regions.regionizer().regionAt(96, 0).data().worldData().nextSubTick(), "split children inherit the parent's counters");
+        assertEquals(survivor.currentTick(), regions.regionizer().regionAt(0, 0).data().clock().currentTick());
+        assertEquals(survivor.currentTick(), regions.regionizer().regionAt(96, 0).data().clock().currentTick());
     }
 
     private void activateRegions() {
-        LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60), Duration.ZERO, _ -> {
+        LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> {
         }, _ -> {
         });
         RegionTickScheduler scheduler = new RegionTickScheduler(1, false, new TickBarrier(), watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports")), (_, _) -> {
@@ -238,8 +240,7 @@ class LevelRegionsTest {
             }
         });
         regions.activate("leafs:test", scheduler, new RegionScheduler<>(regions.regionizer(), holds), Runnable::run, () -> 0L,
-            time -> new RegionWorldData(() -> 0L, time, _ -> true, new ObjectLinkedOpenHashSet<>(), RandomSource.create(), null, new HashSet<>(), new PathTypeCache()), null, () -> {
-            });
+            time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache(), 0L), null);
     }
 
     private int regionCount() {

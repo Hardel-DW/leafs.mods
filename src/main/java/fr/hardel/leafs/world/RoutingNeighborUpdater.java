@@ -2,6 +2,7 @@ package fr.hardel.leafs.world;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -14,10 +15,10 @@ import java.util.function.Consumer;
 
 /** {@code Level.neighborUpdater} swap: a reentrancy stack of the current execution, resolved by tick context, never by position. */
 public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
-    private final Level level;
+    private final ServerLevel level;
     private final CollectingNeighborUpdater fallback;
 
-    public RoutingNeighborUpdater(Level level, CollectingNeighborUpdater fallback) {
+    public RoutingNeighborUpdater(ServerLevel level, CollectingNeighborUpdater fallback) {
         super(level, 0);
         this.level = level;
         this.fallback = fallback;

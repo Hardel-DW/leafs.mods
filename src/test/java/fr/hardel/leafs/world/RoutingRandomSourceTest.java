@@ -1,23 +1,20 @@
 package fr.hardel.leafs.world;
 
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class RoutingRandomSourceTest {
-    private final Object scope = new Object();
     private final RandomSource vanilla = fixed(1);
     private final RandomSource unitRandom = fixed(2);
-    private final RoutingRandomSource routing = new RoutingRandomSource(scope, vanilla);
-    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, () -> 0L, _ -> true, new ObjectLinkedOpenHashSet<>(), unitRandom, null, new HashSet<>(), new PathTypeCache());
+    private final RoutingRandomSource routing = new RoutingRandomSource(null, vanilla);
+    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache(), 0L);
 
     @AfterEach
     void exitContext() {
@@ -25,15 +22,8 @@ class RoutingRandomSourceTest {
     }
 
     @Test
-    void contextForAnotherScopeResolvesVanilla() {
-        WorldTickContext.enter(new Object(), worldData, null);
-
-        assertEquals(1, routing.nextInt());
-    }
-
-    @Test
-    void contextForTheScopeResolvesTheUnitRandom() {
-        WorldTickContext.enter(scope, worldData, null);
+    void contextForTheLevelResolvesTheRegionRandom() {
+        WorldTickContext.enter(null, null, worldData);
 
         assertEquals(2, routing.nextInt());
         WorldTickContext.exit();

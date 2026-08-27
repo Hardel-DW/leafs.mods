@@ -6,9 +6,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import fr.hardel.leafs.entity.EntityManagerAccess;
 import fr.hardel.leafs.entity.EntityTeleports;
-import fr.hardel.leafs.entity.LevelEntityLists;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.WorldTickContext;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -31,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Facade swap (dragonParts, players COW), per-region entity lists, teleport routing. */
+/** Facade swap (dragonParts, players COW), teleport routing, passenger membership from the region photo. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
@@ -46,18 +47,10 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
     private List<ServerPlayer> players;
 
     @Unique
-    private LevelEntityLists leafs$entityLists;
-
-    @Unique
     private EntityTeleports leafs$entityTeleports;
 
     @Unique
     private RegionEntityPersistence leafs$entityPersistence;
-
-    @Override
-    public LevelEntityLists leafs$entityLists() {
-        return leafs$entityLists;
-    }
 
     @Override
     public EntityTeleports leafs$entityTeleports() {
@@ -73,7 +66,6 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
     private void leafs$swapForConcurrentFacade(CallbackInfo callbackInfo) {
         this.dragonParts = new ConcurrentInt2ObjectMap<>();
         this.players = new CopyOnWriteArrayList<>();
-        this.leafs$entityLists = new LevelEntityLists();
         ServerLevel self = (ServerLevel) (Object) this;
         this.leafs$entityTeleports = new EntityTeleports(self, TickingBinding::of);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
@@ -81,10 +73,11 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 
-    /** Riding passengers are looked up in the owning unit's list; the vanilla list stays empty by routing. */
+    /** A passenger ticks with its vehicle when the region's photo holds it; the vanilla list stays empty by routing. */
     @WrapOperation(method = "tickPassenger", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/EntityTickList;contains(Lnet/minecraft/world/entity/Entity;)Z"))
-    private boolean leafs$containsInOwningUnit(EntityTickList instance, Entity entity, Operation<Boolean> original) {
-        return leafs$entityLists.containsTicking(entity);
+    private boolean leafs$containsInRegionPhoto(EntityTickList instance, Entity entity, Operation<Boolean> original) {
+        RegionWorldData data = WorldTickContext.activeFor((ServerLevel) (Object) this);
+        return data != null && data.entities().contains(entity);
     }
 
     /** From a region of another level the add hops to this level's owner of the position; here two regions serialize on the level-wide player maps. */

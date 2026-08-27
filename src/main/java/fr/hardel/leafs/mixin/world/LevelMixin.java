@@ -1,13 +1,14 @@
 package fr.hardel.leafs.mixin.world;
 
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
-import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
-import fr.hardel.leafs.world.ServerLevelWorldAccess;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
@@ -38,9 +39,9 @@ public abstract class LevelMixin {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$routeUnitState(CallbackInfo callbackInfo) {
-        if (this instanceof ServerLevelWorldAccess) {
-            this.random = new RoutingRandomSource(this, this.random);
-            this.neighborUpdater = new RoutingNeighborUpdater((Level) (Object) this, this.neighborUpdater);
+        if ((Object) this instanceof ServerLevel level) {
+            this.random = new RoutingRandomSource(level, this.random);
+            this.neighborUpdater = new RoutingNeighborUpdater(level, this.neighborUpdater);
         }
     }
 
@@ -53,21 +54,20 @@ public abstract class LevelMixin {
         }
     }
 
-    /** A ticker in a region-owned chunk registers with that region; strays keep the vanilla list on the server thread. */
+    /** Every ticker, the chunk's own at load and an anchored one from outside, joins its chunk; an unloaded position keeps vanilla's serial list. */
     @Inject(method = "addBlockEntityTicker", at = @At("HEAD"), cancellable = true)
     private void leafs$routeBlockEntityTicker(TickingBlockEntity ticker, CallbackInfo callbackInfo) {
-        if (!(this instanceof ServerLevelWorldAccess host) || host.leafs$worldRouter() == null) {
+        if (!(this instanceof ServerLevelRegionAccess)) {
             return;
         }
 
         BlockPos pos = ticker.getPos();
-        long chunkKey = ChunkPos.pack(pos);
-        RegionWorldData data = host.leafs$worldRouter().at(chunkKey);
-        if (data == host.leafs$worldRouter().attached()) {
+        LevelChunk chunk = RegionChunkAccess.levelChunkOrNull(((ServerLevel) (Object) this).getChunkSource().chunkMap, SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+        if (chunk == null) {
             return;
         }
 
-        data.blockEntityTickers().add(ticker, chunkKey);
+        ((ChunkTickAccess) chunk).leafs$tickers().add(ticker);
         callbackInfo.cancel();
     }
 }
