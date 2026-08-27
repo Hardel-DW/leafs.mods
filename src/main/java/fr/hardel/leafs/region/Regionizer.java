@@ -3,7 +3,9 @@ package fr.hardel.leafs.region;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayList;
@@ -340,9 +342,12 @@ public final class Regionizer<R> {
         from.mergeIntoLater.remove(into);
         into.expectingMergeFrom.remove(from);
 
+        LongList movedChunks = new LongArrayList();
         for (LongIterator iterator = from.sectionKeys.iterator(); iterator.hasNext(); ) {
             long key = iterator.nextLong();
-            sections.get(key).setRegion(into);
+            RegionSection<R> section = sections.get(key);
+            section.forEachChunk((chunkX, chunkZ) -> movedChunks.add(CoordinateKey.pack(chunkX, chunkZ)));
+            section.setRegion(into);
             into.sectionKeys.add(key);
         }
         into.deadSectionKeys.addAll(from.deadSectionKeys);
@@ -368,7 +373,7 @@ public final class Regionizer<R> {
         if (fromWasSchedulable) {
             callbacks.onRegionInactive(from);
         }
-        callbacks.merge(from, into);
+        callbacks.merge(from, into, movedChunks);
         regionsById.remove(from.id());
         callbacks.onRegionDestroy(from);
     }

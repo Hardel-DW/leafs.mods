@@ -1,5 +1,6 @@
 package fr.hardel.leafs.mixin.entity;
 
+import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import net.minecraft.server.level.ServerLevel;
@@ -21,10 +22,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Moves route through the teleport funnel; the pearl set goes concurrent for cross-region registration. */
 @Mixin(ServerPlayer.class)
-public abstract class ServerPlayerMixin implements PlayerMoveAccess {
+public abstract class ServerPlayerMixin implements PlayerMoveAccess, SavedEpochAccess {
 
     @Unique
     private volatile long leafs$movedNanos;
+
+    @Unique
+    private long leafs$savedEpoch;
 
     @Mutable
     @Shadow
@@ -44,6 +48,16 @@ public abstract class ServerPlayerMixin implements PlayerMoveAccess {
     @Override
     public long leafs$movedNanos() {
         return leafs$movedNanos;
+    }
+
+    @Override
+    public long leafs$savedEpoch() {
+        return leafs$savedEpoch;
+    }
+
+    @Override
+    public void leafs$markSaved(long epoch) {
+        leafs$savedEpoch = epoch;
     }
 
     // Every thread routes, including a mod's own pool: the funnel replays vanilla in place when the caller already holds the destination.

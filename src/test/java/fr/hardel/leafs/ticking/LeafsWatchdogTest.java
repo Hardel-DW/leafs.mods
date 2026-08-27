@@ -22,7 +22,7 @@ class LeafsWatchdogTest {
     private final CountDownLatch killed = new CountDownLatch(1);
 
     private LeafsWatchdog watchdog(Duration warnAfter, Duration killAfter) {
-        return new LeafsWatchdog(warnAfter, killAfter, message -> {
+        return new LeafsWatchdog(warnAfter, () -> killAfter.toNanos(), message -> {
             reports.add(message);
             reported.countDown();
         }, stall -> {

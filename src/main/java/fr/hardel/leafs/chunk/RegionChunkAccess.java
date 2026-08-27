@@ -9,6 +9,7 @@ import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
@@ -25,13 +26,23 @@ public final class RegionChunkAccess {
         return fullChunkOrNull(chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ)));
     }
 
+    // The chunk a block entity registers into: published full, or still inside its FULL step behind the imposter.
+    public static LevelChunk levelChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
+        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+        ChunkAccess latest = holder == null ? null : holder.getLatestChunk();
+        return switch (latest) {
+            case LevelChunk chunk -> chunk;
+            case ImposterProtoChunk imposter -> imposter.getWrapped();
+            case null, default -> null;
+        };
+    }
+
     // Presence, never the ticket level: a ticket only says the chunk is DUE, vanilla hasChunk's lie.
     public static LevelChunk fullChunkOrNull(ChunkHolder holder) {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
-    // The full form: a published chunk serves every thread, an absent one is demanded whatever the
-    // caller, because a demand posts a ticket and mutates nothing. Refusing it would strand the reader.
+    // The full form: a published chunk serves every thread, an absent one is demanded whatever the caller, because a demand posts a ticket and mutates nothing. Refusing it would strand the reader.
     public static ChunkAccess contractedChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);

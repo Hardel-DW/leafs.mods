@@ -7,13 +7,11 @@ import fr.hardel.leafs.chunk.SpawnProximity;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
-import fr.hardel.leafs.entity.RegionEntityData;
-import fr.hardel.leafs.metrics.TickStages;
+import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.metrics.StageTimings;
+import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.TickGuard;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.material.Fluid;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionClock;
 import net.minecraft.core.BlockPos;
@@ -25,53 +23,52 @@ import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Util;
-import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LocalMobCapCalculator;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.NaturalSpawner;
-import net.minecraft.world.level.block.entity.TickingBlockEntity;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.entity.EntitySectionStorage;
-import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.TickRateManager;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.LongFunction;
-import java.util.function.LongPredicate;
 
 /** Every chunk-anchored phase of the level tick, over one region's chunks, in vanilla order. Level-wide work stays on the server thread. */
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
+    private static final Comparator<SequencedBlockEvent> BLOCK_EVENT_ORDER = Comparator.comparingLong(SequencedBlockEvent::sequence);
+
+    /** A block event with the level-wide sequence it was posted at, so a region replays vanilla's FIFO across its chunks. */
+    private record SequencedBlockEvent(long sequence, BlockEventData event) {
+    }
 
     private final ServerLevel level;
+    private final RegionAutosave autosave;
     private final BiConsumer<BlockPos, Block> guardedBlockTick;
     private final BiConsumer<BlockPos, Fluid> guardedFluidTick;
+    private final List<SequencedBlockEvent> blockEventBatch = new ArrayList<>();
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
-        this.guardedBlockTick = TickGuard.guardingWithRetry(level::tickBlock, this::requeueBlockTick);
-        this.guardedFluidTick = TickGuard.guardingWithRetry(level::tickFluid, this::requeueFluidTick);
-    }
-
-    private void requeueBlockTick(BlockPos pos, Block block) {
-        WorldTickContext.activeFor(level).requeueBlockTick(pos, block);
-    }
-
-    private void requeueFluidTick(BlockPos pos, Fluid fluid) {
-        WorldTickContext.activeFor(level).requeueFluidTick(pos, fluid);
+        this.autosave = new RegionAutosave(level);
+        this.guardedBlockTick = TickGuard.guardingWithRetry(level::tickBlock, (pos, block) -> level.scheduleTick(pos, block, 1));
+        this.guardedFluidTick = TickGuard.guardingWithRetry(level::tickFluid, (pos, fluid) -> level.scheduleTick(pos, fluid, 1));
     }
 
     public ServerLevel level() {
         return level;
     }
 
-    public void tick(Region<?> region, RegionClock clock, RegionWorldData worldData, RegionEntityData entityData, StageTimings stages) {
+    public void tick(Region<?> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, long autosaveEpoch) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         if (runs) {
@@ -79,45 +76,46 @@ public final class RegionTickBody {
         }
 
         purgeTimedOutTickets(region);
+        ServerChunkCache chunkSource = level.getChunkSource();
+        RegionChunks chunks = worldData.chunks();
+        RegionEntities entities = worldData.entities();
+        chunks.refresh(region, chunkSource.chunkMap);
+        entities.refresh(level.entityManager.sectionStorage, chunks.holders());
         stages.mark(TickStages.regionTickets);
-        entityData.tickList().beginTick();
-        entityData.navigatingMobs().beginTick();
-        entityData.tickList().forEach(entity -> {
+        entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 RegionNetworkTick.drainOnRegion(player, level);
             }
         });
         stages.mark(TickStages.regionPackets);
-        boolean debug = level.isDebug();
-        if (runs && !debug) {
-            worldData.drainBlockTicks(guardedBlockTick);
+        if (runs && !level.isDebug()) {
+            long currentTick = clock.currentTick();
+            worldData.blockTicks().drain(chunks.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, guardedBlockTick);
             stages.mark(TickStages.regionBlockTicks);
-            worldData.drainFluidTicks(guardedFluidTick);
+            worldData.fluidTicks().drain(chunks.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, guardedFluidTick);
             stages.mark(TickStages.regionFluidTicks);
-            tickChunks(region, worldData, stages);
+            tickChunks(chunks, worldData, stages);
             stages.mark(TickStages.regionChunkTick);
         }
 
-        broadcastChangedChunks(worldData);
+        broadcastChangedChunks(chunks);
         stages.mark(TickStages.regionBroadcast);
-        RegionEntityTracking.tickRegion(level, entityData);
+        RegionEntityTracking.tickRegion(level, entities);
         stages.mark(TickStages.regionTracking);
-        ServerChunkCache chunkSource = level.getChunkSource();
-        LongPredicate tickingChunk = chunkSource::isPositionTicking;
         if (runs) {
-            worldData.runBlockEvents(pos -> tickingChunk.test(ChunkPos.pack(pos)), this::runBlockEvent);
+            runBlockEvents(chunks);
         }
 
         stages.mark(TickStages.regionBlockEvents);
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
-            tickEntities(tickRateManager, entityData);
+            tickEntities(tickRateManager, entities);
             stages.mark(TickStages.regionEntities);
-            worldData.blockEntityTickers().tickAll(runs, tickingChunk);
+            tickBlockEntities(runs, chunks);
             stages.mark(TickStages.regionBlockEntities);
         }
 
         PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkSource.chunkMap).leafs$playerLoader();
-        entityData.tickList().forEach(entity -> {
+        entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 loader.tick(player);
                 TickGuard.tickOrSkip(ticked -> RegionNetworkTick.tickListenerOnRegion(ticked, level.getServer()), player);
@@ -126,6 +124,8 @@ public final class RegionTickBody {
             }
         });
         stages.mark(TickStages.regionPlayers);
+        autosave.tick(region, chunks, entities, autosaveEpoch);
+        stages.mark(TickStages.regionAutosave);
     }
 
     /** The region's own timeout tickets count down here; an expiry retires its holder level, so the propagator drains right after. */
@@ -157,7 +157,7 @@ public final class RegionTickBody {
         }
     }
 
-    private void tickChunks(Region<?> region, RegionWorldData worldData, StageTimings stages) {
+    private void tickChunks(RegionChunks chunks, RegionWorldData worldData, StageTimings stages) {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
         DistanceManager distanceManager = chunkMap.getDistanceManager();
@@ -166,8 +166,8 @@ public final class RegionTickBody {
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
-        int spawnableChunks = countAndCollect(region, chunkMap, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, collectRegionEntities(region), (chunkKey, output) -> {
+        int spawnableChunks = countAndCollect(chunks, chunkMap, spawningChunks, randomTickingChunks);
+        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, collectAccessibleEntities(chunks), (chunkKey, output) -> {
             ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
             if (holder != null) {
                 holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
@@ -195,21 +195,15 @@ public final class RegionTickBody {
         }
     }
 
-    /** One pass over the owned chunks: the spawnable census, the spawning list and the random-tick list. */
-    private int countAndCollect(Region<?> region, ChunkMap chunkMap, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
+    /** One pass over the ticking chunks: the spawnable census, the spawning list and the random-tick list. */
+    private int countAndCollect(RegionChunks chunks, ChunkMap chunkMap, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
         DistanceManager distanceManager = chunkMap.getDistanceManager();
         SpawnProximity proximity = ((PropagatorAccess) distanceManager).leafs$spawnProximity();
-        int[] spawnable = new int[1];
-        region.forEachChunk((chunkX, chunkZ) -> {
-            long chunkKey = ChunkPos.pack(chunkX, chunkZ);
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
-            LevelChunk chunk = holder == null ? null : holder.getTickingChunk();
-            if (chunk == null) {
-                return;
-            }
-
+        int spawnable = 0;
+        for (LevelChunk chunk : chunks.ticking()) {
+            long chunkKey = chunk.getPos().pack();
             if (proximity.covered(chunkKey)) {
-                spawnable[0]++;
+                spawnable++;
                 if (chunkMap.anyPlayerCloseEnoughForSpawningInternal(chunk.getPos())) {
                     spawningChunks.add(chunk);
                 }
@@ -218,57 +212,52 @@ public final class RegionTickBody {
             if (distanceManager.inEntityTickingRange(chunkKey)) {
                 randomTickingChunks.add(chunk);
             }
-        });
-
-        return spawnable[0];
-    }
-
-    /** Activation: the vanilla ticker list re-buckets to the owning regions; a Lithium-sleeping ticker answers no position and stays. */
-    public void migrateVanillaBlockEntityTickers(LongFunction<RegionWorldData> regionByChunk) {
-        List<TickingBlockEntity> vanilla = level.blockEntityTickers;
-        List<TickingBlockEntity> kept = new ArrayList<>();
-        for (TickingBlockEntity ticker : vanilla) {
-            BlockPos pos = ticker.getPos();
-            long chunkKey = ChunkPos.pack(pos);
-            RegionWorldData owner = regionByChunk.apply(chunkKey);
-            if (owner != null) {
-                owner.blockEntityTickers().add(ticker, chunkKey);
-            } else {
-                kept.add(ticker);
-            }
         }
 
-        vanilla.clear();
-        vanilla.addAll(kept);
+        return spawnable;
     }
 
     /** The census matches vanilla's {@code getAllEntities()} (accessible entities), restricted to owned chunks. */
-    private List<Entity> collectRegionEntities(Region<?> region) {
+    private List<Entity> collectAccessibleEntities(RegionChunks chunks) {
         EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
         List<Entity> entities = new ArrayList<>();
-        region.forEachChunk((chunkX, chunkZ) -> storage.getExistingSectionsInChunk(ChunkPos.pack(chunkX, chunkZ)).forEach(section -> {
-            if (section.getStatus().isAccessible()) {
-                section.getEntities().forEach(entities::add);
-            }
-        }));
+        for (ChunkHolder holder : chunks.holders()) {
+            storage.getExistingSectionsInChunk(holder.getPos().pack()).forEach(section -> {
+                if (section.getStatus().isAccessible()) {
+                    section.getEntities().forEach(entities::add);
+                }
+            });
+        }
 
         return entities;
     }
 
-    private void broadcastChangedChunks(RegionWorldData worldData) {
-        Set<ChunkHolder> holders = worldData.broadcastHolders();
-        if (holders.isEmpty()) {
-            return;
-        }
-
-        for (ChunkHolder holder : holders) {
-            LevelChunk chunk = holder.getTickingChunk();
+    private static void broadcastChangedChunks(RegionChunks chunks) {
+        for (ChunkHolder holder : chunks.holders()) {
+            LevelChunk chunk = holder.hasChangesToBroadcast() ? holder.getTickingChunk() : null;
             if (chunk != null) {
                 holder.broadcastChanges(chunk);
             }
         }
+    }
 
-        holders.clear();
+    /** Vanilla's runBlockEvents: every ticking chunk's events in posting order, cascades replayed until nothing is left. */
+    private void runBlockEvents(RegionChunks chunks) {
+        ServerChunkCache chunkSource = level.getChunkSource();
+        do {
+            blockEventBatch.clear();
+            for (LevelChunk chunk : chunks.ticking()) {
+                ChunkBlockEvents events = ((ChunkTickAccess) chunk).leafs$blockEvents();
+                if (!events.isEmpty() && chunkSource.isPositionTicking(chunk.getPos().pack())) {
+                    events.drainTo((event, sequence) -> blockEventBatch.add(new SequencedBlockEvent(sequence, event)));
+                }
+            }
+
+            blockEventBatch.sort(BLOCK_EVENT_ORDER);
+            for (SequencedBlockEvent sequenced : blockEventBatch) {
+                runBlockEvent(sequenced.event());
+            }
+        } while (!blockEventBatch.isEmpty());
     }
 
     private void runBlockEvent(BlockEventData event) {
@@ -278,10 +267,10 @@ public final class RegionTickBody {
     }
 
     // A player in a still-loading chunk waits for the 1-radius FULL completion; vanilla would sync-load under it, a worker cannot.
-    private void tickEntities(TickRateManager tickRateManager, RegionEntityData entityData) {
+    private void tickEntities(TickRateManager tickRateManager, RegionEntities entities) {
         ServerChunkCache chunkSource = level.getChunkSource();
         DistanceManager distanceManager = chunkSource.chunkMap.getDistanceManager();
-        entityData.tickList().forEach(entity -> {
+        entities.forEach(entity -> {
             if (entity.isRemoved() || tickRateManager.isEntityFrozen(entity)) {
                 return;
             }
@@ -300,5 +289,14 @@ public final class RegionTickBody {
                 level.guardEntityTick(guarded -> TickGuard.tickOrSkip(level::tickNonPassenger, guarded), entity);
             }
         });
+    }
+
+    private void tickBlockEntities(boolean runsNormally, RegionChunks chunks) {
+        ServerChunkCache chunkSource = level.getChunkSource();
+        for (LevelChunk chunk : chunks.ticking()) {
+            if (chunkSource.isPositionTicking(chunk.getPos().pack())) {
+                ((ChunkTickAccess) chunk).leafs$tickers().tickAll(runsNormally);
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@ package fr.hardel.leafs.scheduler;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongList;
 
 import java.util.List;
 
@@ -36,7 +37,7 @@ final class TestRegionCallbacks implements RegionCallbacks<TestRegionData> {
     }
 
     @Override
-    public void merge(Region<TestRegionData> from, Region<TestRegionData> into) {
+    public void merge(Region<TestRegionData> from, Region<TestRegionData> into, LongList movedChunks) {
         from.data().taskQueues().closeInto(into.data().taskQueues());
     }
 

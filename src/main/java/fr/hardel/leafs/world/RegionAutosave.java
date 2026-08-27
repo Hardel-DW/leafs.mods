@@ -1,10 +1,10 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.entity.RegionEntityData;
+import fr.hardel.leafs.chunk.SavedEpochAccess;
+import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.region.Region;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -14,45 +14,25 @@ import net.minecraft.util.Util;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-/** Region autosave driven by the level's epoch: players first, then twenty chunks per tick. A merge or split rewalks, saving twice is harmless. */
+/** Region autosave driven by the level's epoch: players and chunks behind the epoch save on their owner, twenty chunks per tick, plus vanilla's eager saves. */
 public final class RegionAutosave {
     private static final int CHUNKS_PER_TICK = 20;
 
-    private long savedEpoch;
-    private long walkingEpoch;
-    private final LongArrayList backlog = new LongArrayList();
+    private final ServerLevel level;
 
-    /** Runs while TICKING on the owner, where the chunk iteration and the tick list are legal. */
-    public void tick(ServerLevel level, Region<?> region, RegionEntityData entityData, long epoch) {
-        saveEagerly(level, region);
-        if (epoch == savedEpoch) {
-            return;
-        }
-
-        if (walkingEpoch != epoch) {
-            begin(level, region, entityData, epoch);
-        }
-
-        drain(level);
-        if (backlog.isEmpty()) {
-            savedEpoch = epoch;
-            walkingEpoch = 0;
-        }
+    public RegionAutosave(ServerLevel level) {
+        this.level = level;
     }
 
-    private void begin(ServerLevel level, Region<?> region, RegionEntityData entityData, long epoch) {
-        walkingEpoch = epoch;
-        backlog.clear();
-        region.forEachChunk((chunkX, chunkZ) -> backlog.add(ChunkPos.pack(chunkX, chunkZ)));
-        entityData.tickList().forEach(entity -> {
-            if (entity instanceof ServerPlayer player) {
-                level.getServer().getPlayerList().save(player);
-            }
-        });
+    /** Runs while TICKING on the owner, where the chunk walk and the entity photo are legal. */
+    public void tick(Region<?> region, RegionChunks chunks, RegionEntities entities, long epoch) {
+        saveEagerly(region);
+        savePlayers(entities, epoch);
+        saveChunks(chunks, epoch);
     }
 
     /** Vanilla's saveChunksEagerly over the region's own chunks: the dirty ones whose save cadence elapsed, twenty per tick. */
-    private void saveEagerly(ServerLevel level, Region<?> region) {
+    private void saveEagerly(Region<?> region) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         long now = Util.getMillis();
         int saved = 0;
@@ -73,34 +53,33 @@ public final class RegionAutosave {
         }
     }
 
-    private void drain(ServerLevel level) {
+    private void savePlayers(RegionEntities entities, long epoch) {
+        entities.forEach(entity -> {
+            if (entity instanceof ServerPlayer player && ((SavedEpochAccess) player).leafs$savedEpoch() < epoch) {
+                level.getServer().getPlayerList().save(player);
+                ((SavedEpochAccess) player).leafs$markSaved(epoch);
+            }
+        });
+    }
+
+    /** Vanilla's chunk and entity-chunk autosave, over the region's chunks still behind the epoch. */
+    private void saveChunks(RegionChunks chunks, long epoch) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
         long now = Util.getMillis();
-        for (int walked = 0; walked < CHUNKS_PER_TICK && !backlog.isEmpty(); walked++) {
-            long chunkKey = backlog.popLong();
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
-            if (holder != null) {
-                chunkMap.saveChunkIfNeeded(holder, now);
+        int saved = 0;
+        for (ChunkHolder holder : chunks.holders()) {
+            SavedEpochAccess access = (SavedEpochAccess) holder;
+            if (access.leafs$savedEpoch() >= epoch) {
+                continue;
             }
 
-            if (persistence != null) {
-                persistence.saveChunkOnOwner(chunkKey);
+            chunkMap.saveChunkIfNeeded(holder, now);
+            persistence.saveChunkOnOwner(holder.getPos().pack());
+            access.leafs$markSaved(epoch);
+            if (++saved == CHUNKS_PER_TICK) {
+                return;
             }
-        }
-    }
-
-    /** Merge target: the union rewalks unless both parts had finished the epoch. */
-    public void absorb(RegionAutosave other) {
-        savedEpoch = Math.min(savedEpoch, other.savedEpoch);
-        walkingEpoch = 0;
-        backlog.clear();
-    }
-
-    /** Split child: a mid-walk parent leaves the child unsaved, so the child rewalks its share. */
-    public void inheritFrom(RegionAutosave parent) {
-        if (parent.walkingEpoch == 0) {
-            savedEpoch = parent.savedEpoch;
         }
     }
 }
