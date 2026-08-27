@@ -7,6 +7,7 @@ import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.TickBarrier;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
@@ -226,6 +227,11 @@ public final class ChunkScheduling {
 
     public boolean isOwner(int chunkX, int chunkZ) {
         return isUniversalOwner() || currentRegionOwns(chunkX, chunkZ);
+    }
+
+    /** Sync loads: the universal owner as vanilla, and the borrowing server thread, which takes the chunk's region right after. */
+    public boolean mayLoadSynchronously() {
+        return isUniversalOwner() || RegionBorrow.current() != null;
     }
 
     // Universal ownership is the absence of rivals: the barrier, a level whose regions have not started, or a halted pool.

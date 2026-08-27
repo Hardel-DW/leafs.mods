@@ -21,14 +21,14 @@ class DeferredWorkTest {
 
     @Test
     void aThreadAlreadyHoldingTheDestinationRunsInline() {
-        transports.holdsWindow = true;
+        transports.owner = true;
 
-        boolean deferred = DeferredWork.window(DeferReason.COMMAND_BLOCK, transports.stats, () -> ran.add("inline")).submit(transports);
+        boolean deferred = DeferredWork.owner(DeferReason.PLAYER_PLACEMENT, transports.stats, 0, 0, () -> ran.add("inline")).submit(transports);
 
         assertFalse(deferred, "nothing was deferred, the caller must not cancel vanilla");
         assertEquals(List.of("inline"), ran);
-        assertTrue(transports.windowQueue.isEmpty());
-        assertEquals(0, transports.stats.deferrals(DeferReason.COMMAND_BLOCK).perMinute(), "an inline run is not a deferral");
+        assertTrue(transports.ownerQueue.isEmpty());
+        assertEquals(0, transports.stats.deferrals(DeferReason.PLAYER_PLACEMENT).perMinute(), "an inline run is not a deferral");
     }
 
     @Test
@@ -44,11 +44,11 @@ class DeferredWorkTest {
 
     @Test
     void aFailedRevalidationDropsTheWorkWithoutRunningIt() {
-        DeferredWork.window(DeferReason.RESPAWN, transports.stats, () -> ran.add("never"))
+        DeferredWork.owner(DeferReason.RESPAWN, transports.stats, 0, 0, () -> ran.add("never"))
             .validIf(() -> false)
             .submit(transports);
 
-        transports.drainWindow();
+        transports.drainOwner();
 
         assertEquals(List.of(), ran);
         assertEquals(1, transports.stats.drops(DeferReason.RESPAWN).perMinute());
@@ -57,7 +57,7 @@ class DeferredWorkTest {
     @Test
     void anAbsentRefusalUnderTheBudgetRequeuesForTheNextPass() {
         AtomicInteger attempts = new AtomicInteger();
-        DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
+        DeferredWork.owner(DeferReason.PORTAL, transports.stats, 0, 0, () -> {
             if (attempts.incrementAndGet() <= 2) {
                 throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "chunk not there yet");
             }
@@ -65,12 +65,12 @@ class DeferredWorkTest {
             ran.add("landed");
         }).degraded(10).submit(transports);
 
-        transports.drainWindow();
+        transports.drainOwner();
         assertEquals(List.of(), ran);
-        assertEquals(1, transports.windowQueue.size(), "the retry waits for the next window, never the same drain");
+        assertEquals(1, transports.ownerQueue.size(), "the retry waits for the next pass, never the same drain");
 
-        transports.drainWindow();
-        transports.drainWindow();
+        transports.drainOwner();
+        transports.drainOwner();
 
         assertEquals(List.of("landed"), ran);
         assertEquals(2, transports.stats.retries(DeferReason.PORTAL).perMinute());
@@ -79,32 +79,32 @@ class DeferredWorkTest {
     @Test
     void theAttemptPastTheBudgetIsDroppedNeverSyncLoaded() {
         AtomicInteger attempts = new AtomicInteger();
-        DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
+        DeferredWork.owner(DeferReason.PORTAL, transports.stats, 0, 0, () -> {
             attempts.incrementAndGet();
             throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "refused");
         }).degraded(1).submit(transports);
 
-        transports.drainWindow();
-        transports.drainWindow();
+        transports.drainOwner();
+        transports.drainOwner();
 
         assertEquals(1, attempts.get(), "the attempt past the budget never runs");
         assertEquals(1, transports.stats.drops(DeferReason.PORTAL).perMinute());
-        assertTrue(transports.windowQueue.isEmpty());
+        assertTrue(transports.ownerQueue.isEmpty());
     }
 
     /** 2026-08-20: a retry counted as a fresh deferral too, inflating /leafs metrics. */
     @Test
     void aRetriedDeferralCountsOneDeferralAndItsRetries() {
         AtomicInteger attempts = new AtomicInteger();
-        DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
+        DeferredWork.owner(DeferReason.PORTAL, transports.stats, 0, 0, () -> {
             if (attempts.incrementAndGet() <= 2) {
                 throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "chunk not there yet");
             }
         }).degraded(10).submit(transports);
 
-        transports.drainWindow();
-        transports.drainWindow();
-        transports.drainWindow();
+        transports.drainOwner();
+        transports.drainOwner();
+        transports.drainOwner();
 
         assertEquals(1, transports.stats.deferrals(DeferReason.PORTAL).perMinute(), "a replay is a retry, never a second deferral");
         assertEquals(2, transports.stats.retries(DeferReason.PORTAL).perMinute());
@@ -115,7 +115,7 @@ class DeferredWorkTest {
     void aRefusalCarryingReadinessReplaysOnDeliveryNotEveryPass() {
         CompletableFuture<Void> delivery = new CompletableFuture<>();
         AtomicInteger attempts = new AtomicInteger();
-        DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
+        DeferredWork.owner(DeferReason.PORTAL, transports.stats, 0, 0, () -> {
             if (attempts.incrementAndGet() == 1) {
                 throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "area demanded in one pass", delivery);
             }
@@ -123,21 +123,21 @@ class DeferredWorkTest {
             ran.add("landed");
         }).degraded(10).submit(transports);
 
-        transports.drainWindow();
-        assertTrue(transports.windowQueue.isEmpty(), "the retry must wait for the delivery, never poll the next pass");
+        transports.drainOwner();
+        assertTrue(transports.ownerQueue.isEmpty(), "the retry must wait for the delivery, never poll the next pass");
 
         delivery.complete(null);
-        assertEquals(1, transports.windowQueue.size());
-        transports.drainWindow();
+        assertEquals(1, transports.ownerQueue.size());
+        transports.drainOwner();
         assertEquals(List.of("landed"), ran);
     }
 
     @Test
     void aForeignRefusalIsNeverSwallowed() {
-        DeferredWork.window(DeferReason.PORTAL, transports.stats, () -> {
-            throw new OwnershipViolationException(OwnershipViolationException.Kind.FOREIGN, "a genuine bug under the window");
+        DeferredWork.owner(DeferReason.PORTAL, transports.stats, 0, 0, () -> {
+            throw new OwnershipViolationException(OwnershipViolationException.Kind.FOREIGN, "a genuine bug on the owner");
         }).degraded(10).submit(transports);
 
-        assertThrows(OwnershipViolationException.class, transports::drainWindow);
+        assertThrows(OwnershipViolationException.class, transports::drainOwner);
     }
 }

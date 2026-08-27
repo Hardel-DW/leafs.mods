@@ -3,7 +3,7 @@ Dans un serveur classique, tout les couts sont partager. Leafs découpe le monde
 
 ## Lire cette documentation
 1. [Methodologie.md](Methodologie.md) - Dicte comment penser, tester, développer.
-2. [Architecture.md](Architecture.md) - Explique le modèle : les threads, les régions, les horloges, la fenêtre barrière.
+2. [Architecture.md](Architecture.md) - Explique le modèle : les threads, les régions, les horloges, les commandes.
 3. [Compromis.md](Compromis.md) - Liste chaque écart avec vanilla et pourquoi il existe.
 4. [Arborescence.md](Arborescence.md) - Décrit les dossiers du code, un dossier égale une responsabilité.
-5. [Config](Config.md) - Affiches les options de config, les commandes et les gamerules
+5. [Config](Config.md) - Affiche les options de config et les commandes

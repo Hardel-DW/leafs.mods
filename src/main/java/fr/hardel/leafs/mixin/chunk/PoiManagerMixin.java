@@ -71,7 +71,7 @@ public abstract class PoiManagerMixin {
     @WrapMethod(method = "ensureLoadedAndValid")
     private void leafs$forceLoadsOnlyAsUniversalOwner(LevelReader reader, BlockPos center, int radius, Operation<Void> original) {
         ServerLevel level = ((SectionStorageAccess) this).leafs$level();
-        if (level == null || (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).isUniversalOwner())) {
+        if (level == null || (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mayLoadSynchronously())) {
             original.call(reader, center, radius);
             return;
         }

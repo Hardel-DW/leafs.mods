@@ -3,7 +3,6 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
-import fr.hardel.leafs.global.SyncWindow;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import net.minecraft.server.level.ServerLevel;
@@ -16,18 +15,8 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     }
 
     @Override
-    public void toWindow(Runnable task) {
-        SyncWindow.of(level.getServer()).enqueue(task);
-    }
-
-    @Override
     public void toOwner(int chunkX, int chunkZ, Runnable task) {
         scheduling().runOnOwner(chunkX, chunkZ, task);
-    }
-
-    @Override
-    public boolean holdsWindow() {
-        return SyncWindow.of(level.getServer()).isDraining();
     }
 
     @Override
