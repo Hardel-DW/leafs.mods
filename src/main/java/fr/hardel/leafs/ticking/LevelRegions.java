@@ -7,8 +7,6 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
-import fr.hardel.leafs.scheduler.RegionScheduler;
-import fr.hardel.leafs.scheduler.RegionUnloads;
 import fr.hardel.leafs.world.ChunkScheduledTicks;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -24,7 +22,6 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -33,11 +30,8 @@ import java.util.function.ToIntFunction;
 public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     /** Mutated only by {@link #chunkHolderCreated} / {@link #chunkHolderDestroyed}; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
-    private final RegionUnloads<RegionTickData> unloads = new RegionUnloads<>();
 
     private volatile String dimension;
-    private volatile Consumer<Runnable> serialUnloadSink;
-    private volatile RegionScheduler<RegionTickData> taskScheduler;
     private volatile LongSupplier gameTime;
     private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
@@ -71,13 +65,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     }
 
     /** Once, on the server thread, before the level's first tick. Regions equip, then the handles schedule. */
-    public void activate(String dimension, RegionTickScheduler scheduler, RegionScheduler<RegionTickData> taskScheduler, Consumer<Runnable> serialUnloadSink, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
+    public void activate(String dimension, RegionTickScheduler scheduler, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
         if (this.scheduler != null)
             return;
 
         this.dimension = dimension;
-        this.serialUnloadSink = serialUnloadSink;
-        this.taskScheduler = taskScheduler;
         this.gameTime = gameTime;
         this.worldDataFactory = worldDataFactory;
         this.body = body;
@@ -100,14 +92,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return body;
     }
 
-    public RegionScheduler<RegionTickData> taskScheduler() {
-        return taskScheduler;
-    }
-
-    public RegionUnloads<RegionTickData> unloads() {
-        return unloads;
-    }
-
     /** The owning region's payload, null for a chunk without a region or before activation. */
     public RegionWorldData worldDataAt(int chunkX, int chunkZ) {
         Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
@@ -126,38 +110,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     public long autosaveEpoch() {
         return autosaveEpoch;
-    }
-
-    /** What the region lanes still owe: a shutdown that cannot finish needs to know whether the work waits on a lane nobody drains. */
-    public int queuedWork() {
-        int queued = 0;
-        for (Region<RegionTickData> region : regionizer.regionsView()) {
-            queued += region.data().taskQueues().size() + region.data().unloadQueues().size();
-        }
-
-        return queued;
-    }
-
-    /** Universal-owner drain, barrier held or pool stopped: nobody else can tick this level. */
-    public int drainTasksInline() {
-        RegionScheduler<RegionTickData> scheduler = taskScheduler;
-        if (scheduler == null) {
-            return 0;
-        }
-
-        int drained = scheduler.drainPendingInline();
-        for (Region<RegionTickData> region : regionizer.regionsView()) {
-            drained += scheduler.drain(region);
-        }
-
-        return drained;
-    }
-
-    /** Shutdown path, pool already stopped: every queued teardown runs inline so the final save misses nothing. */
-    public void drainUnloadsForShutdown() {
-        for (Region<RegionTickData> region : regionizer.regionsView()) {
-            region.data().unloadQueues().closeDraining(Runnable::run);
-        }
     }
 
     /** A chunk holder now exists at this position: the ticket level dropped to at most {@code ChunkLevel.MAX_LEVEL}. */
@@ -301,18 +253,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
 
     @Override
     public void onRegionDestroy(Region<RegionTickData> region) {
-        Consumer<Runnable> sink = serialUnloadSink;
-        if (sink != null) {
-            region.data().unloadQueues().closeDraining(task -> sink.accept(new OrphanedUnload(task)));
-        }
-    }
-
-    /** Names the serial-fallback teardown of a dead region's chunk, so the slow-task tracer attributes it. */
-    private record OrphanedUnload(Runnable task) implements Runnable {
-        @Override
-        public void run() {
-            task.run();
-        }
     }
 
     @Override
@@ -331,11 +271,9 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         }
     }
 
-    /** The queues fold into the survivor; the moved chunks carry their scheduled ticks onto the survivor's clock. */
+    /** The moved chunks carry their scheduled ticks onto the survivor's clock; their mail stays on them. */
     @Override
     public void merge(Region<RegionTickData> from, Region<RegionTickData> into, LongList movedChunks) {
-        from.data().taskQueues().closeInto(into.data().taskQueues());
-        from.data().unloadQueues().closeInto(into.data().unloadQueues());
         RegionTickBody body = this.body;
         if (body != null) {
             rebaseTicks(body.level(), movedChunks, into.data().clock().currentTick() - from.data().clock().currentTick());
@@ -361,17 +299,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
     /** Children start on the parent's clock once regions are equipped; everything positional already sits in the chunks. */
     @Override
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
-        Consumer<Runnable> orphans = task -> serialUnloadSink.accept(new OrphanedUnload(task));
-        parent.data().taskQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
-            Region<RegionTickData> child = sectionToChild.get(sectionKey);
-            return child == null ? null : child.data().taskQueues();
-        }, orphans);
-
-        parent.data().unloadQueues().closeAndReroute(regionizer.sectionShift(), sectionKey -> {
-            Region<RegionTickData> child = sectionToChild.get(sectionKey);
-            return child == null ? null : child.data().unloadQueues();
-        }, orphans);
-
         if (worldDataFactory != null) {
             for (Region<RegionTickData> child : children) {
                 child.data().clock().resetTo(parent.data().clock().currentTick());

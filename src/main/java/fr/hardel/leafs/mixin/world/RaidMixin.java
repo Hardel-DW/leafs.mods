@@ -2,14 +2,13 @@ package fr.hardel.leafs.mixin.world;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.ticking.TickingBinding;
+import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.world.AnchoredTicker;
 import fr.hardel.leafs.world.RaidTickerAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.raid.Raid;
 import net.minecraft.world.entity.raid.Raider;
-import net.minecraft.world.level.ChunkPos;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -64,9 +63,6 @@ public abstract class RaidMixin implements RaidTickerAccess {
         }
 
         leafs$ticker = true;
-        BlockPos center = getCenter();
-        ChunkPos chunk = ChunkPos.containing(center);
-        AnchoredTicker ticker = new AnchoredTicker(center, "raid", () -> tick(level), this::isStopped);
-        TickingBinding.of(level).toOwner(chunk.x(), chunk.z(), () -> level.addBlockEntityTicker(ticker));
+        ((ServerLevelRegionAccess) level).leafs$anchors().add(new AnchoredTicker(getCenter(), "raid", () -> tick(level), this::isStopped));
     }
 }

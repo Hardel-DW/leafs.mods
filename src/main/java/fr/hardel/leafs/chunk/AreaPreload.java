@@ -1,6 +1,5 @@
 package fr.hardel.leafs.chunk;
 
-import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.ownership.OwnershipViolationException;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
@@ -65,6 +64,19 @@ public final class AreaPreload {
         refuseIfMissing(chunkMap, ChunkStatus.FULL, missing, "portal write square around " + origin);
     }
 
+    // A search that loads chunks on its own future: the server thread waits as vanilla, a region refuses and the deferred work replays when it completes.
+    public static void awaitOrRefuse(ServerLevel level, CompletableFuture<?> search, String what) {
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        if (!DegradedChunkReads.active() && RegionChunkAccess.scheduling(chunkMap).isUniversalOwner()) {
+            level.getServer().managedBlock(search::isDone);
+            return;
+        }
+
+        if (!search.isDone()) {
+            refuse(chunkMap, search, "the " + what + " has not completed: this thread cannot block on it");
+        }
+    }
+
     private static boolean present(ChunkMap chunkMap, long position, ChunkStatus status) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(position);
         return holder != null && holder.getChunkIfPresent(status) != null;
@@ -75,12 +87,11 @@ public final class AreaPreload {
             return;
         }
 
-        ChunkScheduling scheduling = RegionChunkAccess.scheduling(chunkMap);
-        CompletableFuture<?> readiness = ChunkDemands.demand(chunkMap, status, missing);
-        scheduling.deferStats().countRefusal(OwnershipViolationException.Kind.ABSENT, RegionChunkAccess.sourceOfCurrentThread());
+        refuse(chunkMap, ChunkDemands.demand(chunkMap, status, missing), missing.size() + " chunk(s) of the " + area + " not present at " + status + ": demanded in one pass, this thread cannot sync-load them");
+    }
 
-        throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT,
-            missing.size() + " chunk(s) of the " + area + " not present at " + status + ": demanded in one pass, this thread cannot sync-load them",
-            readiness);
+    private static void refuse(ChunkMap chunkMap, CompletableFuture<?> readiness, String message) {
+        RegionChunkAccess.scheduling(chunkMap).deferStats().countRefusal(OwnershipViolationException.Kind.ABSENT, RegionChunkAccess.sourceOfCurrentThread());
+        throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, message, readiness);
     }
 }
