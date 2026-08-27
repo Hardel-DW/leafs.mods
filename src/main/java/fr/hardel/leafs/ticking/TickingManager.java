@@ -40,7 +40,7 @@ public final class TickingManager {
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
         this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
-        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), killAfter(server), Leafs.LOGGER::error, new WatchdogKill(server));
+        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"));
         this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), barrier, watchdog, crashWriter, this::onRegionTickFailure);
         this.chunkWorkers = new ChunkWorkers(config.effectiveThreads());
@@ -50,9 +50,9 @@ public final class TickingManager {
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and as many chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads());
     }
 
-    /** Vanilla's {@code max-tick-time}: only a dedicated server kills, and -1 disables it. */
-    private static Duration killAfter(MinecraftServer server) {
-        return server instanceof DedicatedServer dedicated && dedicated.getMaxTickLength() > 0 ? Duration.ofMillis(dedicated.getMaxTickLength()) : Duration.ZERO;
+    /** Vanilla's {@code max-tick-time}, read late: the dedicated settings bind after this manager is built. Only a dedicated server kills, -1 disables. */
+    private static long killAfterNanos(MinecraftServer server) {
+        return server instanceof DedicatedServer dedicated && dedicated.getMaxTickLength() > 0 ? Duration.ofMillis(dedicated.getMaxTickLength()).toNanos() : 0L;
     }
 
     public static TickingManager of(MinecraftServer server) {

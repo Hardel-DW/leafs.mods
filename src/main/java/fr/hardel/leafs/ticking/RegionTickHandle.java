@@ -63,7 +63,7 @@ public final class RegionTickHandle extends TickHandle {
                 return;
             }
 
-            WorldTickContext.enter(body.level(), worldData, data.entityData());
+            WorldTickContext.enter(body.level(), region, worldData);
             try {
                 StageTimings stages = stages();
                 stages.beginTick(System.nanoTime());
@@ -71,11 +71,9 @@ public final class RegionTickHandle extends TickHandle {
                 stages.mark(TickStages.regionTasks);
                 unloadOwnChunks(body.level());
                 stages.mark(TickStages.regionUnloads);
-                body.tick(region, data.clock(), worldData, data.entityData(), stages);
-                data.autosave().tick(body.level(), region, data.entityData(), regions.autosaveEpoch());
-                stages.mark(TickStages.regionAutosave);
+                body.tick(region, data.clock(), worldData, stages, regions.autosaveEpoch());
                 chunkCensus = region.chunkCount();
-                entityCensus = data.entityData().tickList().size();
+                entityCensus = worldData.entities().size();
                 stages.endTick(System.nanoTime());
             } finally {
                 WorldTickContext.exit();
@@ -109,6 +107,6 @@ public final class RegionTickHandle extends TickHandle {
 
     @Override
     protected RegionCrashReport buildCrashReport() {
-        return new RegionCrashReport(id(), dimension(), currentTick(), region.chunkCount(), region.data().entityData().tickList().size());
+        return new RegionCrashReport(id(), dimension(), currentTick(), region.chunkCount(), entityCensus);
     }
 }

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 /** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill (vanilla's max-tick-time, zero disables) runs once; the same killer covers a shutdown that never finishes. */
 public final class LeafsWatchdog {
@@ -11,7 +12,7 @@ public final class LeafsWatchdog {
     public static final Duration SHUTDOWN_DEADLINE = Duration.ofMinutes(5);
 
     private final long warnNanos;
-    private final long killNanos;
+    private final LongSupplier killNanos;
     private final Consumer<String> reporter;
     private final Consumer<Stall> killer;
     private final ConcurrentHashMap<TickHandle, RunningTick> running = new ConcurrentHashMap<>();
@@ -23,9 +24,9 @@ public final class LeafsWatchdog {
     public record Stall(String summary, Thread thread) {
     }
 
-    public LeafsWatchdog(Duration warnAfter, Duration killAfter, Consumer<String> reporter, Consumer<Stall> killer) {
+    public LeafsWatchdog(Duration warnAfter, LongSupplier killNanos, Consumer<String> reporter, Consumer<Stall> killer) {
         this.warnNanos = warnAfter.toNanos();
-        this.killNanos = killAfter.toNanos();
+        this.killNanos = killNanos;
         this.reporter = reporter;
         this.killer = killer;
     }
@@ -46,7 +47,7 @@ public final class LeafsWatchdog {
 
     /** Armed at stopServer: a JVM alive past the deadline gets the stuck-tick dump and kill. No-op when kill is disabled. */
     public void armShutdownDeadline(Duration deadline) {
-        if (killNanos == 0) {
+        if (killNanos.getAsLong() == 0) {
             return;
         }
 
@@ -87,7 +88,7 @@ public final class LeafsWatchdog {
             long now = System.nanoTime();
             for (var entry : running.entrySet()) {
                 RunningTick tick = entry.getValue();
-                if (killNanos > 0 && now - tick.startNanos >= killNanos && !tick.killed) {
+                if (killNanos.getAsLong() > 0 && now - tick.startNanos >= killNanos.getAsLong() && !tick.killed) {
                     tick.killed = true;
                     killer.accept(new Stall(headerLine(entry.getKey(), tick, now), tick.thread));
                 } else if (now - Math.max(tick.startNanos, tick.lastReportNanos) >= warnNanos) {
