@@ -14,4 +14,4 @@ Leafs créer un fichier de configuration au démarrage, `config/leafs.json`. Une
 # Commandes
 - `/leafs regions [dimension]` : Affiches les régions par dimension. Avec id, TPS, durée de tick, chunks, entités.
 - `/leafs timings [dimension] [id]` : Le coût de chaque étape d'un tick, moyenné sur 5 secondes. Si aucun argument, ça affiche le thread serveur.
-- `/leafs metrics` : Affiches les informations de la dernière minute. Les ouvertures de la barrière, reports et abandons, refus de chunks, paquets, churn de chunks. Un refus "étranger".
+- `/leafs metrics` : Affiche les informations de la dernière minute. Les emprunts pour les évènements Fabric, reports et abandons, refus de chunks, paquets, churn de chunks. Un refus "étranger".

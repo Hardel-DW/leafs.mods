@@ -67,7 +67,7 @@ public final class RegionTickHandle extends TickHandle {
                 stages.beginTick(System.nanoTime());
                 unloadOwnChunks(body.level());
                 stages.mark(TickStages.regionUnloads);
-                body.tick(region, data.clock(), worldData, stages, regions.autosaveEpoch());
+                body.tick(region, data.clock(), worldData, stages, regions);
                 chunkCensus = region.chunkCount();
                 entityCensus = worldData.entities().size();
                 stages.endTick(System.nanoTime());

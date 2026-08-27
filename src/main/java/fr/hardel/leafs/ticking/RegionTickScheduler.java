@@ -17,17 +17,15 @@ public final class RegionTickScheduler {
     private final List<Thread> workers = new ArrayList<>();
     private final int threadCount;
     private final boolean regionThreadNames;
-    private final TickBarrier barrier;
     private final LeafsWatchdog watchdog;
     private final RegionCrashWriter crashWriter;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
     private volatile long periodNanos = TICK_PERIOD_NANOS;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(int threadCount, boolean regionThreadNames, TickBarrier barrier, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(int threadCount, boolean regionThreadNames, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.threadCount = threadCount;
         this.regionThreadNames = regionThreadNames;
-        this.barrier = barrier;
         this.watchdog = watchdog;
         this.crashWriter = crashWriter;
         this.failurePolicy = failurePolicy;
@@ -109,30 +107,24 @@ public final class RegionTickScheduler {
         }
     }
 
-    /** One finally per acquisition, a failed entry must never strand an active tick. */
     private void executeTick(TickHandle handle) {
-        barrier.enterTick();
+        RegionContext.enter(handle.context());
         try {
-            RegionContext.enter(handle.context());
+            watchdog.beginTick(handle);
+            handle.tick();
+        } catch (Throwable throwable) {
             try {
-                watchdog.beginTick(handle);
-                handle.tick();
-            } catch (Throwable throwable) {
-                try {
-                    crashWriter.write(handle.buildCrashReport(), throwable);
-                } catch (Throwable reportFailure) {
-                    throwable.addSuppressed(reportFailure);
-                }
+                crashWriter.write(handle.buildCrashReport(), throwable);
+            } catch (Throwable reportFailure) {
+                throwable.addSuppressed(reportFailure);
+            }
 
-                if (!handle.recover()) {
-                    throw throwable;
-                }
-            } finally {
-                watchdog.endTick(handle);
-                RegionContext.exit();
+            if (!handle.recover()) {
+                throw throwable;
             }
         } finally {
-            barrier.exitTick();
+            watchdog.endTick(handle);
+            RegionContext.exit();
         }
     }
 

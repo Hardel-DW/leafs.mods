@@ -1,5 +1,6 @@
 package fr.hardel.leafs.mixin.chunk;
 
+import net.minecraft.server.MinecraftServer;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -25,6 +26,7 @@ import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ownership.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -203,7 +205,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
         ChunkMap self = (ChunkMap) (Object) this;
         TickingManager ticking = TickingManager.of(self.level.getServer());
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking.barrier(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor, new ChunkMailbox(new ChunkTicketHolds(self.level)));
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor, new ChunkMailbox(new ChunkTicketHolds(self.level)));
         ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
         this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
         this.leafs$unloads = new ChunkUnloads(self, this.toDrop, leafs$regions(), leafs$ticking().metrics().chunkUnloads());
@@ -392,16 +394,35 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return original.call(future, body, leafs$chunkWorkers());
     }
 
-    /** The epoch bump replaces the holder walk, each region saves its own chunks. An empty server keeps the vanilla walk, its regions are parked. */
+    /**
+     * The epoch bump replaces the holder walk, each region saves its own chunks. A flush waits for every live region to reach the epoch,
+     * then flushes the storage. An empty server or a stopped pool keeps the vanilla walk, the server thread is then the universal owner.
+     */
     @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
     private void leafs$epochAutosave(boolean flushStorage, CallbackInfo callbackInfo) {
-        if (flushStorage || ((ChunkMap) (Object) this).level.getServer().getPlayerList().getPlayers().isEmpty()) {
+        ChunkMap self = (ChunkMap) (Object) this;
+        MinecraftServer server = self.level.getServer();
+        if (server.getPlayerList().getPlayers().isEmpty() || leafs$ticking().halted()) {
             return;
         }
 
         this.nextChunkSaveTime.clear();
-        leafs$regions().bumpAutosaveEpoch();
+        LevelRegions regions = leafs$regions();
+        regions.bumpAutosaveEpoch(flushStorage);
         callbackInfo.cancel();
+        if (!flushStorage) {
+            return;
+        }
+
+        RegionBorrow borrow = RegionBorrow.current();
+        if (borrow != null) {
+            borrow.releaseAll();
+        }
+
+        long epoch = regions.autosaveEpoch();
+        server.managedBlock(() -> regions.autosaveReached(epoch, this.visibleChunkMap.values(), self.level.players()));
+        self.level.getPoiManager().flushAll();
+        self.synchronize(true).join();
     }
 
     /** View diffs run on the player's owner: the region for its own players, the serial pass only for players no region ticks. */

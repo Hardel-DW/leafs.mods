@@ -1,26 +1,24 @@
 package fr.hardel.leafs.global;
 
 import fr.hardel.leafs.metrics.MinuteCounter;
-import fr.hardel.leafs.ticking.TickBarrier;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 import java.util.function.Predicate;
 
-/** Fabric server tick events emit with every region paused when subscribed; no subscriber, no pause. Server thread only. */
-public final class FabricTickEventsBarrier {
-    private final TickBarrier barrier;
-    private final MinuteCounter pauses;
+/** A subscribed Fabric server tick event runs with the server thread borrowing: a mod that touches nothing stops nobody, one that touches a chunk or an entity takes its region at contact. Server thread only. */
+public final class FabricTickEvents {
+    private final MinuteCounter borrows;
     private final Predicate<Event<?>> subscribed;
-    private boolean held;
+    private boolean open;
 
-    public FabricTickEventsBarrier(TickBarrier barrier, MinuteCounter pauses) {
-        this(barrier, pauses, FabricTickEventsBarrier::hasSubscribers);
+    public FabricTickEvents(MinuteCounter borrows) {
+        this(borrows, FabricTickEvents::hasSubscribers);
     }
 
-    FabricTickEventsBarrier(TickBarrier barrier, MinuteCounter pauses, Predicate<Event<?>> subscribed) {
-        this.barrier = barrier;
-        this.pauses = pauses;
+    FabricTickEvents(MinuteCounter borrows, Predicate<Event<?>> subscribed) {
+        this.borrows = borrows;
         this.subscribed = subscribed;
     }
 
@@ -36,19 +34,21 @@ public final class FabricTickEventsBarrier {
 
     /** After the emission point; without a matching open this is a no-op, so skipped-tick branches close safely. */
     public void close() {
-        if (held) {
-            held = false;
-            barrier.drop();
+        if (open) {
+            open = false;
+            RegionBorrow.current().releaseAll();
+            RegionBorrow.exit();
         }
     }
 
     private void openFor(Event<?> event) {
-        if (held || !subscribed.test(event))
+        if (open || !subscribed.test(event)) {
             return;
+        }
 
-        pauses.increment();
-        barrier.raise();
-        held = true;
+        borrows.increment();
+        RegionBorrow.enter();
+        open = true;
     }
 
     private static boolean hasSubscribers(Event<?> event) {

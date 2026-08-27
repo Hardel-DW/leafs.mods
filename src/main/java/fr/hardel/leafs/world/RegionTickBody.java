@@ -13,6 +13,7 @@ import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionClock;
@@ -73,7 +74,7 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<?> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, long autosaveEpoch) {
+    public void tick(Region<?> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         if (runs) {
@@ -129,7 +130,7 @@ public final class RegionTickBody {
             }
         });
         stages.mark(TickStages.regionPlayers);
-        autosave.tick(region, chunks, entities, autosaveEpoch);
+        autosave.tick(region, chunks, entities, regions.autosaveEpoch(), regions.autosaveForced());
         stages.mark(TickStages.regionAutosave);
     }
 

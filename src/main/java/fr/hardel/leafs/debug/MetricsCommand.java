@@ -27,8 +27,8 @@ public final class MetricsCommand {
     private static int report(CommandSourceStack source) {
         ServerMetrics metrics = TickingManager.of(source.getServer()).metrics();
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal("barrier").withStyle(ChatFormatting.AQUA))
-            .append(CommandText.stat("fabric pauses", perMinute(metrics.barrier().fabricEventPauses().perMinute()))), false);
+            .append(Component.literal("borrows").withStyle(ChatFormatting.AQUA))
+            .append(CommandText.stat("fabric events", perMinute(metrics.fabricEventBorrows().perMinute()))), false);
 
         DeferStats defers = metrics.deferStats();
         for (DeferReason reason : DeferReason.values()) {
