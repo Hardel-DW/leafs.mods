@@ -46,3 +46,4 @@ accessible field net/minecraft/world/entity/ai/village/poi/PoiManager loadedChun
 accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/world/level/chunk/LevelChunk blockTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
 accessible field net/minecraft/world/level/chunk/LevelChunk fluidTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
+accessible class net/minecraft/server/MinecraftServer$ReloadableResources

@@ -24,11 +24,11 @@ public final class RegionAutosave {
         this.level = level;
     }
 
-    /** Runs while TICKING on the owner, where the chunk walk and the entity photo are legal. */
-    public void tick(Region<?> region, RegionChunks chunks, RegionEntities entities, long epoch) {
+    /** Runs while TICKING on the owner, where the chunk walk and the entity photo are legal. A forced epoch saves every chunk behind it in this pass. */
+    public void tick(Region<?> region, RegionChunks chunks, RegionEntities entities, long epoch, boolean forced) {
         saveEagerly(region);
         savePlayers(entities, epoch);
-        saveChunks(chunks, epoch);
+        saveChunks(chunks, epoch, forced ? Integer.MAX_VALUE : CHUNKS_PER_TICK);
     }
 
     /** Vanilla's saveChunksEagerly over the region's own chunks: the dirty ones whose save cadence elapsed, twenty per tick. */
@@ -63,7 +63,7 @@ public final class RegionAutosave {
     }
 
     /** Vanilla's chunk and entity-chunk autosave, over the region's chunks still behind the epoch. */
-    private void saveChunks(RegionChunks chunks, long epoch) {
+    private void saveChunks(RegionChunks chunks, long epoch, int budget) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
         long now = Util.getMillis();
@@ -77,7 +77,7 @@ public final class RegionAutosave {
             chunkMap.saveChunkIfNeeded(holder, now);
             persistence.saveChunkOnOwner(holder.getPos().pack());
             access.leafs$markSaved(epoch);
-            if (++saved == CHUNKS_PER_TICK) {
+            if (++saved == budget) {
                 return;
             }
         }

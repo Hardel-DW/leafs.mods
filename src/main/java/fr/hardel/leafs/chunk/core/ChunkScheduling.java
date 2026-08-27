@@ -9,7 +9,6 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickData;
-import fr.hardel.leafs.ticking.TickBarrier;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import net.minecraft.server.level.ChunkHolder;
@@ -33,7 +32,6 @@ public final class ChunkScheduling {
     private final ChunkMap chunkMap;
     private final DistanceManager distanceManager;
     private final LevelRegions regions;
-    private final TickBarrier barrier;
     private final BooleanSupplier halted;
     private final DeferStats deferStats;
     private final Executor pump;
@@ -44,11 +42,10 @@ public final class ChunkScheduling {
 
     private record DeferredOwnerTask(int chunkX, int chunkZ, Runnable task) {}
 
-    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, TickBarrier barrier, BooleanSupplier halted, DeferStats deferStats, Executor pump, ChunkMailbox mailbox) {
+    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, BooleanSupplier halted, DeferStats deferStats, Executor pump, ChunkMailbox mailbox) {
         this.chunkMap = chunkMap;
         this.distanceManager = distanceManager;
         this.regions = regions;
-        this.barrier = barrier;
         this.halted = halted;
         this.deferStats = deferStats;
         this.pump = pump;
@@ -226,7 +223,7 @@ public final class ChunkScheduling {
     }
 
     public boolean isOwner(int chunkX, int chunkZ) {
-        return isUniversalOwner() || currentRegionOwns(chunkX, chunkZ);
+        return currentRegionOwns(chunkX, chunkZ) || isUniversalOwner();
     }
 
     /** Sync loads: the universal owner as vanilla, and the borrowing server thread, which takes the chunk's region right after. */
@@ -234,12 +231,8 @@ public final class ChunkScheduling {
         return isUniversalOwner() || RegionBorrow.current() != null;
     }
 
-    // Universal ownership is the absence of rivals: the barrier, a level whose regions have not started, or a halted pool.
+    // Universal ownership is the absence of rivals: a level whose regions have not started, or a halted pool.
     public boolean isUniversalOwner() {
-        if (barrier.isHeldByCurrentThread()) {
-            return true;
-        }
-
         return (regions.body() == null || halted.getAsBoolean()) && chunkMap.level.getServer().isSameThread();
     }
 

@@ -64,6 +64,26 @@ public final class CommandEngine {
     }
 
     /** Borrowing is a property of the server thread, in the global phase or inside a level's serial unit alike; the region context stays what it is. */
+    /** A reload swaps data every region reads each tick: the server thread takes every region of every level first, or extends the borrow it already holds. */
+    public static void runBorrowingAll(MinecraftServer server, Runnable body) {
+        if (inHead()) {
+            borrowEverything(server, RegionBorrow.current());
+            body.run();
+            return;
+        }
+
+        head(borrow -> borrowEverything(server, borrow), () -> {
+            body.run();
+            return null;
+        });
+    }
+
+    private static void borrowEverything(MinecraftServer server, RegionBorrow borrow) {
+        for (ServerLevel level : server.getAllLevels()) {
+            borrow.borrowAll(LevelRegions.of(level));
+        }
+    }
+
     private static <T> T head(Consumer<RegionBorrow> firstContact, Supplier<T> body) {
         RegionBorrow borrow = RegionBorrow.enter();
         try {

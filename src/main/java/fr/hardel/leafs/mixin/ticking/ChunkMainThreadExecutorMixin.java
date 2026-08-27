@@ -11,7 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-/** A server thread waiting on a chunk runs the mail nobody else may: every chunk's under the barrier or after the pool stopped, its borrowed regions' while borrowing. */
+/** A server thread waiting on a chunk runs the mail nobody else may: every chunk's after the pool stopped, its borrowed regions' while borrowing. */
 @Mixin(targets = "net.minecraft.server.level.ServerChunkCache$MainThreadExecutor")
 public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
 
@@ -37,7 +37,7 @@ public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
 
         TickingManager ticking = TickingManager.of(level.getServer());
         ChunkMailbox mailbox = RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox();
-        if (ticking.barrier().isHeldByCurrentThread() || ticking.halted()) {
+        if (ticking.halted()) {
             return mailbox.drainAll() > 0;
         }
 
