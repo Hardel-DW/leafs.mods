@@ -25,7 +25,7 @@ import fr.hardel.leafs.chunk.loader.StageTickets;
 import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
-import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
@@ -216,7 +216,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         ChunkMap self = (ChunkMap) (Object) this;
         TickingManager ticking = TickingManager.of(self.level.getServer());
         ChunkMailbox mailbox = new ChunkMailbox(new ChunkTicketHolds(self.level));
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor, mailbox);
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, this.mainThreadExecutor, mailbox);
         PropagatorAccess authorities = (PropagatorAccess) self.getDistanceManager();
         authorities.leafs$propagator().bindScheduling(leafs$scheduling);
         authorities.leafs$simulation().listen(leafs$regions());

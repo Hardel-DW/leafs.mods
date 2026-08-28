@@ -4,11 +4,9 @@ import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.MailHold;
 import fr.hardel.leafs.chunk.propagator.AreaLock;
 import fr.hardel.leafs.chunk.propagator.LeafsTicketPropagator;
-import fr.hardel.leafs.metrics.DeferStats;
-import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickData;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
@@ -34,7 +32,6 @@ public final class ChunkScheduling {
     private final DistanceManager distanceManager;
     private final LevelRegions regions;
     private final BooleanSupplier halted;
-    private final DeferStats deferStats;
     private final Executor pump;
     private final AreaLock schedulingLock = new AreaLock(LeafsTicketPropagator.SECTION_SHIFT);
     private final GenerationExclusion exclusion = new GenerationExclusion();
@@ -43,12 +40,11 @@ public final class ChunkScheduling {
 
     private record DeferredOwnerTask(int chunkX, int chunkZ, MailHold hold, Runnable task) {}
 
-    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, BooleanSupplier halted, DeferStats deferStats, Executor pump, ChunkMailbox mailbox) {
+    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, BooleanSupplier halted, Executor pump, ChunkMailbox mailbox) {
         this.chunkMap = chunkMap;
         this.distanceManager = distanceManager;
         this.regions = regions;
         this.halted = halted;
-        this.deferStats = deferStats;
         this.pump = pump;
         this.mailbox = mailbox;
     }
@@ -138,23 +134,16 @@ public final class ChunkScheduling {
     /** A request path (getChunkFuture, addTicketAndLoadWithRadius) locks its area, then starts what it built. */
     public <T> T requestArea(int chunkX, int chunkZ, int radius, Supplier<T> request) {
         boolean stagedHere = openStagingFrame();
-        T result;
-        AreaLock.Node node = schedulingLock.lock(chunkX, chunkZ, radius + SCHEDULING_MARGIN);
         try {
-            result = request.get();
+            T result = locked(chunkX, chunkZ, radius + SCHEDULING_MARGIN, request);
+            chunkMap.runGenerationTasks();
+            return result;
         } finally {
-            schedulingLock.unlock(node);
+            closeStagingFrame(stagedHere);
         }
-
-        chunkMap.runGenerationTasks();
-        if (stagedHere) {
-            flushStagedTasks();
-        }
-
-        return result;
     }
 
-    // The one way to ask a position for a status; null when no ticket reached it yet. The future completes at delivery, letting a deferred retry replay on readiness instead of polling.
+    /** The one way to ask a position for a status; null when no ticket reached it yet, complete at delivery. */
     public CompletableFuture<?> requestStatus(int chunkX, int chunkZ, ChunkStatus status) {
         ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         if (holder == null) {
@@ -167,13 +156,27 @@ public final class ChunkScheduling {
     /** Holder mutation outside a drain, like the send dependencies a player placement adds. */
     public void mutateArea(int chunkX, int chunkZ, int radius, Runnable mutation) {
         boolean stagedHere = openStagingFrame();
+        try {
+            locked(chunkX, chunkZ, radius, () -> {
+                mutation.run();
+                return null;
+            });
+        } finally {
+            closeStagingFrame(stagedHere);
+        }
+    }
+
+    private <T> T locked(int chunkX, int chunkZ, int radius, Supplier<T> body) {
         AreaLock.Node node = schedulingLock.lock(chunkX, chunkZ, radius);
         try {
-            mutation.run();
+            return body.get();
         } finally {
             schedulingLock.unlock(node);
         }
+    }
 
+    /** The frame closes on failure too, or the thread keeps staging every later owner task into a list nobody runs. */
+    private void closeStagingFrame(boolean stagedHere) {
         if (stagedHere) {
             flushStagedTasks();
         }
@@ -241,19 +244,9 @@ public final class ChunkScheduling {
         return chunkMap.level.getServer().isSameThread() && regions.regionizer().regionAt(chunkX, chunkZ) == null;
     }
 
-    /** Sync loads: the universal owner as vanilla, and the borrowing server thread, which takes the chunk's region right after. */
-    public boolean mayLoadSynchronously() {
-        return isUniversalOwner() || RegionBorrow.current() != null;
-    }
-
     // Universal ownership is the absence of rivals: a level whose regions have not started, or a halted pool.
     public boolean isUniversalOwner() {
         return (regions.body() == null || halted.getAsBoolean()) && chunkMap.level.getServer().isSameThread();
-    }
-
-    /** The refusal counters of this level's server; the chunk contract counts here at every throw. */
-    public DeferStats deferStats() {
-        return deferStats;
     }
 
     /** Strict region ownership, dimension included: region ids repeat across dimensions and would otherwise collide. */

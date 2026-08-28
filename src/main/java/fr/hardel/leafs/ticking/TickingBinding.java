@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.metrics.DeferStats;
@@ -22,11 +21,6 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     @Override
     public boolean owns(int chunkX, int chunkZ) {
         return scheduling().isOwner(chunkX, chunkZ);
-    }
-
-    @Override
-    public void runDegraded(Runnable task) {
-        DegradedChunkReads.run(task);
     }
 
     @Override
