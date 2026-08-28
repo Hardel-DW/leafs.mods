@@ -1,9 +1,8 @@
 package fr.hardel.leafs.network;
 
+import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.ownership.OwnershipViolationException;
-import fr.hardel.leafs.ownership.TickGuard;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -20,14 +19,11 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelData;
 
 
 /** Player network split: owning region drains packets and runs the listener tick; global loop keeps transport. */
 public final class RegionNetworkTick {
-    private static final int RESPAWN_BUDGET = 100;
-
     private RegionNetworkTick() {
     }
 
@@ -37,7 +33,7 @@ public final class RegionNetworkTick {
         PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
     }
 
-    /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch; a chunk refusal is not an error and reaches the guard. */
+    /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch. */
     public static void tickListenerOnRegion(ServerPlayer player, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
@@ -48,10 +44,6 @@ public final class RegionNetworkTick {
         try {
             listener.tick();
         } catch (Exception exception) {
-            if (TickGuard.isRefusal(exception)) {
-                throw exception;
-            }
-
             if (connection.isMemoryConnection()) {
                 throw new ReportedException(CrashReport.forThrowable(exception, "Ticking memory connection"));
             }
@@ -86,10 +78,10 @@ public final class RegionNetworkTick {
         }
 
         PacketRouting.queueOf(game).drain();
-        TickGuard.tickOrSkip(ignored -> original.run(), game.player);
+        original.run();
     }
 
-        /** The respawn replays on the owner of the respawn spot, as that listener's packet-handling thread; the death level's removal hops back through the primitives. */
+    /** The respawn runs on the owner of the respawn spot as that listener's packet-handling thread; this drain ends here, the rest of the queue follows the player. */
     public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
         if (packet.getAction() != ServerboundClientCommandPacket.Action.PERFORM_RESPAWN) {
             return false;
@@ -108,11 +100,10 @@ public final class RegionNetworkTick {
         }
 
         PlayerPacketQueue queue = PacketRouting.queueOf(listener);
-        DeferredWork.owner(DeferReason.RESPAWN, transports.stats(), chunk.x(), chunk.z(), () -> {
-            if (!queue.handleAs(() -> listener.handleClientCommand(packet))) {
-                throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "Respawn of " + player.getPlainTextName() + " waits for its packet queue");
-            }
-        }).validIf(listener.connection::isConnected).degraded(RESPAWN_BUDGET).submit(transports);
+        queue.handOver();
+        DeferredWork.owner(DeferReason.RESPAWN, transports.stats(), chunk.x(), chunk.z(), () -> queue.handleAs(() -> listener.handleClientCommand(packet)))
+            .validIf(listener.connection::isConnected)
+            .submit(transports);
 
         return true;
     }

@@ -2,7 +2,7 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.chunk.DegradedChunkReads;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.chunk.PoiWriteReroute;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
 import fr.hardel.leafs.ticking.TickingBinding;
@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** A POI write hops to the owner of its block; a custom spawner reads degraded. */
+/** A POI write hops to the owner of its block; a custom spawner borrows what it touches. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 
@@ -36,9 +36,12 @@ public abstract class ServerLevelMixin {
         callbackInfo.cancel();
     }
 
-    /** A custom spawner probes terrain near a random player; on the serial thread that must refuse, never sync-load. */
+    /** A custom spawner probes terrain near a random player and spawns there: the server thread takes the regions it touches, like a command. */
     @WrapOperation(method = "tickCustomSpawners", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/CustomSpawner;tick(Lnet/minecraft/server/level/ServerLevel;Z)V"))
-    private void leafs$refusableSpawner(CustomSpawner spawner, ServerLevel level, boolean spawnEnemies, Operation<Void> original) {
-        DegradedChunkReads.run(() -> original.call(spawner, level, spawnEnemies));
+    private void leafs$borrowingSpawner(CustomSpawner spawner, ServerLevel level, boolean spawnEnemies, Operation<Void> original) {
+        RegionBorrow.hold(null, _ -> {
+            original.call(spawner, level, spawnEnemies);
+            return null;
+        });
     }
 }

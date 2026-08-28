@@ -1,6 +1,6 @@
 package fr.hardel.leafs.network;
 
-import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;

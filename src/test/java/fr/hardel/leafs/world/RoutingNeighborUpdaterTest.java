@@ -65,11 +65,6 @@ class RoutingNeighborUpdaterTest {
         }
 
         @Override
-        public void runDegraded(Runnable task) {
-            task.run();
-        }
-
-        @Override
         public DeferStats stats() {
             return new DeferStats();
         }

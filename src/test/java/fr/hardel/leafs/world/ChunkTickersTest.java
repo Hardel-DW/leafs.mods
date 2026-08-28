@@ -1,6 +1,5 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.ownership.OwnershipViolationException;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import org.junit.jupiter.api.Test;
@@ -8,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChunkTickersTest {
@@ -17,7 +15,6 @@ class ChunkTickersTest {
         private final String name;
         private final List<String> ticked;
         private boolean removed;
-        private boolean refuses;
         private Runnable onTick;
 
         private FakeTicker(String name, List<String> ticked) {
@@ -27,10 +24,6 @@ class ChunkTickersTest {
 
         @Override
         public void tick() {
-            if (refuses) {
-                throw new OwnershipViolationException(OwnershipViolationException.Kind.ABSENT, "neighbour chunk not present");
-            }
-
             ticked.add(name);
             if (onTick != null) {
                 onTick.run();
@@ -87,19 +80,4 @@ class ChunkTickersTest {
     }
 
     /** Hopper at the border: a refused block entity skips its own tick, the phase continues. */
-    @Test
-    void aRefusedBlockEntitySkipsItselfAndTheRestOfThePhaseTicks() {
-        List<String> ticked = new ArrayList<>();
-        ChunkTickers tickers = new ChunkTickers();
-        FakeTicker border = new FakeTicker("border hopper", ticked);
-        border.refuses = true;
-        tickers.add(new FakeTicker("first", ticked));
-        tickers.add(border);
-        tickers.add(new FakeTicker("third", ticked));
-
-        assertDoesNotThrow(() -> tickers.tickAll(true));
-
-        assertEquals(List.of("first", "third"), ticked);
-        assertEquals(3, tickers.size(), "a refusal removes nothing, the next tick retries");
-    }
 }

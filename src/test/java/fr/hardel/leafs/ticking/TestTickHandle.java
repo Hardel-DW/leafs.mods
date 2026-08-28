@@ -1,7 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.ownership.RegionContext;
-import fr.hardel.leafs.ownership.RegionCrashReport;
 
 
 final class TestTickHandle extends TickHandle {

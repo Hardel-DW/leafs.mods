@@ -1,4 +1,4 @@
-package fr.hardel.leafs.ownership;
+package fr.hardel.leafs.ticking;
 
 /** What the current thread is for the region system. A thread without context (Netty, pools, mods) owns nothing. */
 public sealed interface RegionContext {
