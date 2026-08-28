@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug) {
+public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, Debug debug) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -35,7 +35,8 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
         MAX_THREADS("max_threads", LeafsConfig::maxThreads),
         SECTION_SIZE("section_size", LeafsConfig::sectionSize),
         REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance),
-        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance);
+        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance),
+        PLAYER_CHUNK_LOADS_PER_TICK("player_chunk_loads_per_tick", LeafsConfig::playerChunkLoadsPerTick);
 
         private final String key;
         private final ToIntFunction<LeafsConfig> getter;
@@ -76,9 +77,10 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
 
     private static final Codec<LeafsConfig> CODEC = RecordCodecBuilder.create(builder -> builder.group(
         MAX_THREADS.optionalFieldOf(Setting.MAX_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::maxThreads),
-        SECTION_SIZE.optionalFieldOf(Setting.SECTION_SIZE.key(), 16).forGetter(LeafsConfig::sectionSize),
+        SECTION_SIZE.optionalFieldOf(Setting.SECTION_SIZE.key(), 2).forGetter(LeafsConfig::sectionSize),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
+        Codec.intRange(1, 1000).optionalFieldOf(Setting.PLAYER_CHUNK_LOADS_PER_TICK.key(), 5).forGetter(LeafsConfig::playerChunkLoadsPerTick),
         DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug)
     ).apply(builder, LeafsConfig::new));
 

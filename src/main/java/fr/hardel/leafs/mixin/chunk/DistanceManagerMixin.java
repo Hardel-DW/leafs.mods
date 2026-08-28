@@ -100,8 +100,8 @@ public abstract class DistanceManagerMixin implements PropagatorAccess {
     /** The serial net: both Leafs authorities drain here too, covering tickets posted where no loader ticks. */
     @WrapOperation(method = "runAllUpdates", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/LoadingChunkTracker;runDistanceUpdates(I)I"))
     private int leafs$drainAuthorities(LoadingChunkTracker tracker, int toProcess, Operation<Integer> original) {
-        leafs$propagator.drain();
         leafs$simulation.drain();
+        leafs$propagator.drain();
 
         return original.call(tracker, toProcess);
     }

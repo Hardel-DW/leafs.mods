@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.leafs.chunk.ChunkMailbox;
+import fr.hardel.leafs.chunk.MailHold;
 import fr.hardel.leafs.chunk.propagator.AreaLock;
 import fr.hardel.leafs.chunk.propagator.LeafsTicketPropagator;
 import fr.hardel.leafs.metrics.DeferStats;
@@ -40,7 +41,7 @@ public final class ChunkScheduling {
     private final ThreadLocal<List<DeferredOwnerTask>> deferredOwnerTasks = new ThreadLocal<>();
     private final ChunkMailbox mailbox;
 
-    private record DeferredOwnerTask(int chunkX, int chunkZ, Runnable task) {}
+    private record DeferredOwnerTask(int chunkX, int chunkZ, MailHold hold, Runnable task) {}
 
     public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, BooleanSupplier halted, DeferStats deferStats, Executor pump, ChunkMailbox mailbox) {
         this.chunkMap = chunkMap;
@@ -130,7 +131,7 @@ public final class ChunkScheduling {
 
         deferredOwnerTasks.remove();
         for (DeferredOwnerTask task : deferred) {
-            runOnOwner(task.chunkX(), task.chunkZ(), task.task());
+            runOnOwner(task.chunkX(), task.chunkZ(), task.hold(), task.task());
         }
     }
 
@@ -201,11 +202,20 @@ public final class ChunkScheduling {
         return task -> runOnOwner(chunkX, chunkZ, task);
     }
 
-    /** Inline on the owner, mailed to the chunk otherwise; before activation the pump plays vanilla's main thread. */
+    /** The ticking promotion reads its 3x3 (fluid post processing crosses the chunk edge): what the range future verified stays FULL until the mail ran. */
+    public Executor tickingPromotionExecutor(int chunkX, int chunkZ) {
+        return task -> runOnOwner(chunkX, chunkZ, MailHold.FULL_NEIGHBOURHOOD, task);
+    }
+
     public void runOnOwner(int chunkX, int chunkZ, Runnable task) {
+        runOnOwner(chunkX, chunkZ, MailHold.CHUNK, task);
+    }
+
+    /** Inline on the owner, mailed to the chunk otherwise; before activation the pump plays vanilla's main thread. */
+    private void runOnOwner(int chunkX, int chunkZ, MailHold hold, Runnable task) {
         List<DeferredOwnerTask> deferred = deferredOwnerTasks.get();
         if (deferred != null) {
-            deferred.add(new DeferredOwnerTask(chunkX, chunkZ, task));
+            deferred.add(new DeferredOwnerTask(chunkX, chunkZ, hold, task));
             return;
         }
 
@@ -219,11 +229,16 @@ public final class ChunkScheduling {
             return;
         }
 
-        mailbox.post(chunkX, chunkZ, task);
+        mailbox.post(chunkX, chunkZ, hold, task);
     }
 
+    /** The owning region on its worker, the server thread for a chunk no region owns, or a universal owner. */
     public boolean isOwner(int chunkX, int chunkZ) {
-        return currentRegionOwns(chunkX, chunkZ) || isUniversalOwner();
+        return currentRegionOwns(chunkX, chunkZ) || serverThreadOwns(chunkX, chunkZ) || isUniversalOwner();
+    }
+
+    private boolean serverThreadOwns(int chunkX, int chunkZ) {
+        return chunkMap.level.getServer().isSameThread() && regions.regionizer().regionAt(chunkX, chunkZ) == null;
     }
 
     /** Sync loads: the universal owner as vanilla, and the borrowing server thread, which takes the chunk's region right after. */

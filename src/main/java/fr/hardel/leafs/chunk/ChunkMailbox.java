@@ -10,26 +10,39 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayDeque;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.function.LongPredicate;
 
-/** One mail queue per chunk, drained by whichever region owns the chunk at its tick start. Every post holds the chunk until its mail ran, so a holder and a region exist to drain it. */
+/** One mail queue per chunk, drained by whichever region owns the chunk at its tick start, by the server thread for a chunk no region owns. Every post holds what its mail needs until it ran, its chunk at least, so a holder exists to drain it. */
 public final class ChunkMailbox {
     private final ChunkHoldController holds;
-    private final Long2ObjectOpenHashMap<ArrayDeque<Runnable>> mail = new Long2ObjectOpenHashMap<>();
-    private final Long2IntOpenHashMap heldChunks = new Long2IntOpenHashMap();
+    private final Long2ObjectOpenHashMap<ArrayDeque<Mail>> mail = new Long2ObjectOpenHashMap<>();
+    private final EnumMap<MailHold.Level, Long2IntOpenHashMap> heldChunks = new EnumMap<>(MailHold.Level.class);
     private volatile int pending;
+
+    private record Mail(int chunkX, int chunkZ, MailHold hold, Runnable task) {}
 
     public ChunkMailbox(ChunkHoldController holds) {
         this.holds = holds;
+        for (MailHold.Level level : MailHold.Level.values()) {
+            heldChunks.put(level, new Long2IntOpenHashMap());
+        }
     }
 
-    public synchronized void post(int chunkX, int chunkZ, Runnable task) {
-        long key = ChunkPos.pack(chunkX, chunkZ);
-        if (heldChunks.addTo(key, 1) == 0) {
-            holds.addHold(chunkX, chunkZ);
-        }
+    public void post(int chunkX, int chunkZ, Runnable task) {
+        post(chunkX, chunkZ, MailHold.CHUNK, task);
+    }
 
-        mail.computeIfAbsent(key, _ -> new ArrayDeque<>()).addLast(task);
+    public synchronized void post(int chunkX, int chunkZ, MailHold hold, Runnable task) {
+        Mail posted = new Mail(chunkX, chunkZ, hold, task);
+        forEachHeld(posted, (x, z) -> {
+            if (heldChunks.get(hold.level()).addTo(ChunkPos.pack(x, z), 1) == 0) {
+                holds.addHold(x, z, hold.level());
+            }
+        });
+
+        mail.computeIfAbsent(ChunkPos.pack(chunkX, chunkZ), _ -> new ArrayDeque<>()).addLast(posted);
         pending++;
     }
 
@@ -65,6 +78,22 @@ public final class ChunkMailbox {
         return ran;
     }
 
+    /** The chunks no region owns, for the server thread. */
+    public int drainOrphans(LongPredicate orphan) {
+        if (pending == 0) {
+            return 0;
+        }
+
+        int ran = 0;
+        for (long key : keys()) {
+            if (orphan.test(key)) {
+                ran += drainChunk(key);
+            }
+        }
+
+        return ran;
+    }
+
     /** Every chunk, for the thread that owns them all: the shutdown, or the server thread pumping while nothing else may run. */
     public int drainAll() {
         int ran = 0;
@@ -83,13 +112,13 @@ public final class ChunkMailbox {
     private int drainChunk(long key) {
         int budget = queued(key);
         int ran = 0;
-        Runnable task;
-        while (ran < budget && (task = poll(key)) != null) {
+        Mail next;
+        while (ran < budget && (next = poll(key)) != null) {
             ran++;
             try {
-                task.run();
+                next.task().run();
             } finally {
-                release(key);
+                release(next);
             }
         }
 
@@ -97,29 +126,42 @@ public final class ChunkMailbox {
     }
 
     private synchronized int queued(long key) {
-        ArrayDeque<Runnable> queue = mail.get(key);
+        ArrayDeque<Mail> queue = mail.get(key);
         return queue == null ? 0 : queue.size();
     }
 
-    private synchronized Runnable poll(long key) {
-        ArrayDeque<Runnable> queue = mail.get(key);
+    private synchronized Mail poll(long key) {
+        ArrayDeque<Mail> queue = mail.get(key);
         if (queue == null) {
             return null;
         }
 
-        Runnable task = queue.pollFirst();
+        Mail next = queue.pollFirst();
         if (queue.isEmpty()) {
             mail.remove(key);
         }
 
-        return task;
+        return next;
     }
 
-    private synchronized void release(long key) {
+    private synchronized void release(Mail ran) {
         pending--;
-        if (heldChunks.addTo(key, -1) == 1) {
-            heldChunks.remove(key);
-            holds.removeHold(ChunkPos.getX(key), ChunkPos.getZ(key));
+        Long2IntOpenHashMap held = heldChunks.get(ran.hold().level());
+        forEachHeld(ran, (x, z) -> {
+            long key = ChunkPos.pack(x, z);
+            if (held.addTo(key, -1) == 1) {
+                held.remove(key);
+                holds.removeHold(x, z, ran.hold().level());
+            }
+        });
+    }
+
+    private static void forEachHeld(Mail mail, Region.ChunkConsumer consumer) {
+        int radius = mail.hold().radius();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                consumer.accept(mail.chunkX() + dx, mail.chunkZ() + dz);
+            }
         }
     }
 

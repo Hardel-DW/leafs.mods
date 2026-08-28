@@ -2,6 +2,7 @@ package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
+import fr.hardel.leafs.chunk.ChunkUnloadAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
@@ -151,14 +152,15 @@ public final class RegionTickBody {
 
         if (timeouts.purgeSections(region.sectionKeySnapshot()) > 0) {
             PropagatorAccess access = (PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager();
-            access.leafs$propagator().drain();
             access.leafs$simulation().drain();
+            access.leafs$propagator().drain();
         }
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the loaders of players no region ticks, then the custom spawners. */
+    /** What is left of the serial {@code tickChunks} pass: the orphan chunks, the loaders of players no region ticks, then the custom spawners. */
     public void tickSerialRemainder(boolean spawnEnemies) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        ((ChunkUnloadAccess) chunkMap).leafs$orphans().tick();
         PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkMap).leafs$playerLoader();
         for (ServerPlayer player : chunkMap.playerMap.getAllPlayers()) {
             if (!RegionNetworkTick.ownedByRegion(player)) {
