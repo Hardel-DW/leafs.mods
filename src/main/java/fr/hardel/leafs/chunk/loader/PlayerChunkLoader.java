@@ -19,22 +19,24 @@ import net.minecraft.world.level.gamerules.GameRules;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Per-player view pipeline, ticked by the player's owner. Rings from near to far, three stages (loaded, generated, ticking), paced disk loads. */
+/** Per-player view pipeline, ticked by the player's owner. Rings from near to far, three stages (loaded, generated, ticking), paced disk loads. Simulation drains first: a chunk's region exists before its promotion is mailed. */
 public final class PlayerChunkLoader {
 
-    private static final double LOADS_PER_TICK = 5.0;
-    private static final double LOAD_BURST_CAP = 40.0;
+    /** A burst of a few seconds of loads, for a teleport or a join. */
+    private static final int BURST_TICKS = 8;
     private static final int MIN_CONCURRENT_LOADS = 5;
 
     private final ChunkMap chunkMap;
     private final StageTickets tickets;
+    private final int loadsPerTick;
     private final LevelTicketPropagator propagator;
     private final SimulationLevels simulation;
     private final Map<ServerPlayer, PlayerViewState> states = new ConcurrentHashMap<>();
 
-    public PlayerChunkLoader(ChunkMap chunkMap, StageTickets tickets) {
+    public PlayerChunkLoader(ChunkMap chunkMap, StageTickets tickets, int loadsPerTick) {
         this.chunkMap = chunkMap;
         this.tickets = tickets;
+        this.loadsPerTick = loadsPerTick;
         PropagatorAccess access = (PropagatorAccess) chunkMap.getDistanceManager();
         this.propagator = access.leafs$propagator();
         this.simulation = access.leafs$simulation();
@@ -50,16 +52,16 @@ public final class PlayerChunkLoader {
         boolean posted = refreshView(player, state);
         LongArrayList newLoads = startLoads(state);
         if (posted || !newLoads.isEmpty()) {
-            propagator.drain();
             simulation.drain();
+            propagator.drain();
         }
 
         requestLoads(newLoads);
         boolean progressed = progressLoading(state);
         progressed |= progressGenerating(state);
         if (progressed) {
-            propagator.drain();
             simulation.drain();
+            propagator.drain();
         }
     }
 
@@ -184,7 +186,7 @@ public final class PlayerChunkLoader {
     }
 
     private LongArrayList startLoads(PlayerViewState state) {
-        state.loadBudget = Math.min(state.loadBudget + LOADS_PER_TICK, LOAD_BURST_CAP);
+        state.loadBudget = Math.min(state.loadBudget + loadsPerTick, (double) loadsPerTick * BURST_TICKS);
         int concurrentCap = Math.max(MIN_CONCURRENT_LOADS, Mth.square(2 * state.loadDistance + 1) / 5);
         LongArrayList started = new LongArrayList();
         while (state.loadBudget >= 1.0 && state.loading.size() < concurrentCap && !state.pending.isEmpty()) {

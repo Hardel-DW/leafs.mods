@@ -25,7 +25,6 @@ public final class TickStages {
     private static final Map<TickFamily, List<TickStage>> byFamily = new EnumMap<>(TickFamily.class);
     public static final TickStage globalLevels = create(TickFamily.GLOBAL, "levels");
     public static final TickStage globalDrain = create(TickFamily.GLOBAL, "drain");
-    public static final TickStage globalWindow = create(TickFamily.GLOBAL, "window");
     public static final TickStage globalConnections = create(TickFamily.GLOBAL, "connections");
     public static final TickStage globalPlayers = create(TickFamily.GLOBAL, "players");
     public static final TickStage globalSendChunks = create(TickFamily.GLOBAL, "send_chunks");

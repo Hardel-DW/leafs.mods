@@ -97,7 +97,7 @@ public final class RegionTickHandle extends TickHandle {
     /** The region lets its own chunks go: hidden entity chunks first, then the chunk decisions; the teardowns run on the chunk workers after the save. */
     private void unloadOwnChunks(ServerLevel level) {
         ((ServerLevelEntityAccess) level).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
-        ((ChunkUnloadAccess) level.getChunkSource().chunkMap).leafs$unloads().decideFor(region);
+        ((ChunkUnloadAccess) level.getChunkSource().chunkMap).leafs$unloads().decide(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
     }
 
     @Override

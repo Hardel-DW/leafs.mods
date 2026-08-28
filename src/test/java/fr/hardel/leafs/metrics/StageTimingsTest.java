@@ -100,4 +100,36 @@ class StageTimingsTest {
 
         assertEquals(7, timings.averageNanos(StageTimings.CAPACITY)[0]);
     }
+
+    @Test
+    void rowsSinceHandsEveryTickEndedAfterTheGivenCount() {
+        StageTimings timings = new StageTimings(3);
+        for (int tick = 1; tick <= 3; tick++) {
+            timings.beginTick(0);
+            timings.mark(FIRST, tick);
+            timings.endTick(tick);
+        }
+
+        long[][] rows = timings.rowsSince(1);
+
+        assertEquals(2, rows.length);
+        assertEquals(2, rows[0][FIRST.index()]);
+        assertEquals(3, rows[1][FIRST.index()]);
+        assertEquals(0, timings.rowsSince(3).length);
+    }
+
+    @Test
+    void rowsSinceStopsAtWhatTheRingStillHolds() {
+        StageTimings timings = new StageTimings(1);
+        for (int tick = 0; tick < StageTimings.CAPACITY + 10; tick++) {
+            timings.beginTick(0);
+            timings.mark(FIRST, tick);
+            timings.endTick(tick);
+        }
+
+        long[][] rows = timings.rowsSince(0);
+
+        assertEquals(StageTimings.CAPACITY - 1, rows.length);
+        assertEquals(11, rows[0][0]);
+    }
 }

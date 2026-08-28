@@ -3,6 +3,7 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
+import fr.hardel.leafs.chunk.propagator.SimulationListener;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
@@ -28,8 +29,8 @@ import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
 /** One per level, owns the regionizer and the handle lifecycle. Callbacks run under the regionizer's write lock: no tickets, no re-entry. */
-public final class LevelRegions implements RegionCallbacks<RegionTickData> {
-    /** Mutated only by {@link #chunkHolderCreated} / {@link #chunkHolderDestroyed}; every other method just reads it. */
+public final class LevelRegions implements RegionCallbacks<RegionTickData>, SimulationListener {
+    /** Mutated only by the simulation feed; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
 
     private volatile String dimension;
@@ -142,20 +143,21 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData> {
         return region != null && region.data().handle() != null && !region.data().handle().isCancelled();
     }
 
-    /** A chunk holder now exists at this position: the ticket level dropped to at most {@code ChunkLevel.MAX_LEVEL}. */
-    public void chunkHolderCreated(int chunkX, int chunkZ) {
+    @Override
+    public void simulated(int chunkX, int chunkZ) {
         try {
             regionizer.addChunk(chunkX, chunkZ);
         } catch (RuntimeException exception) {
-            throw recordFeedFailure("create", chunkX, chunkZ, exception);
+            throw recordFeedFailure("simulate", chunkX, chunkZ, exception);
         }
     }
 
-    public void chunkHolderDestroyed(int chunkX, int chunkZ) {
+    @Override
+    public void unsimulated(int chunkX, int chunkZ) {
         try {
             regionizer.removeChunk(chunkX, chunkZ);
         } catch (RuntimeException exception) {
-            throw recordFeedFailure("destroy", chunkX, chunkZ, exception);
+            throw recordFeedFailure("unsimulate", chunkX, chunkZ, exception);
         }
     }
 

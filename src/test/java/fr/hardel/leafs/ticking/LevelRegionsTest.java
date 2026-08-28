@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Drives LevelRegions like the holder feed: alternating create/destroy per position, one settle per tick. */
+/** Drives LevelRegions like the simulation feed: a chunk alternates entering and leaving simulation, one settle per tick. */
 class LevelRegionsTest {
     private static final int FEED_EVENTS = 100_000;
     private static final int EVENTS_PER_TICK = 50;
@@ -41,7 +41,7 @@ class LevelRegionsTest {
 
     @BeforeEach
     void createRegions() {
-        regions = new LevelRegions(LeafsConfig.defaults());
+        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, 16, 1, 1, 5, LeafsConfig.defaults().debug()));
     }
 
     @ParameterizedTest
@@ -83,16 +83,16 @@ class LevelRegionsTest {
 
     @Test
     void aBridgeOnlySplitsOnSettleAndMergesBackOnRefill() {
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(32, 0);
-        regions.chunkHolderCreated(64, 0);
-        regions.chunkHolderCreated(96, 0);
+        regions.simulated(0, 0);
+        regions.simulated(32, 0);
+        regions.simulated(64, 0);
+        regions.simulated(96, 0);
         regions.settle();
         assertEquals(1, regionCount());
         assertEquals(1, regions.created());
 
-        regions.chunkHolderDestroyed(32, 0);
-        regions.chunkHolderDestroyed(64, 0);
+        regions.unsimulated(32, 0);
+        regions.unsimulated(64, 0);
 
         assertEquals(1, regionCount(), "splitting is what settle() exists for - the feed alone never splits");
         assertEquals(0, regions.split());
@@ -107,8 +107,8 @@ class LevelRegionsTest {
         }
         assertNotSame(regions.regionizer().regionAt(0, 0), regions.regionizer().regionAt(96, 0));
 
-        regions.chunkHolderCreated(32, 0);
-        regions.chunkHolderCreated(64, 0);
+        regions.simulated(32, 0);
+        regions.simulated(64, 0);
         regions.settle();
 
         assertEquals(1, regionCount());
@@ -119,16 +119,16 @@ class LevelRegionsTest {
 
     @Test
     void drainingEveryChunkReclaimsSectionsAndRegions() {
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(1, 0);
-        regions.chunkHolderCreated(200, 200);
+        regions.simulated(0, 0);
+        regions.simulated(1, 0);
+        regions.simulated(200, 200);
         regions.settle();
         assertEquals(2, regionCount());
         assertTrue(regions.sections() > 0);
 
-        regions.chunkHolderDestroyed(0, 0);
-        regions.chunkHolderDestroyed(1, 0);
-        regions.chunkHolderDestroyed(200, 200);
+        regions.unsimulated(0, 0);
+        regions.unsimulated(1, 0);
+        regions.unsimulated(200, 200);
         regions.settle();
 
         assertEquals(0, regionCount());
@@ -139,9 +139,9 @@ class LevelRegionsTest {
 
     @Test
     void aFeedFailureIsRethrownOnceByTheNextSettle() {
-        regions.chunkHolderCreated(0, 0);
+        regions.simulated(0, 0);
 
-        assertThrows(IllegalStateException.class, () -> regions.chunkHolderDestroyed(500, 500));
+        assertThrows(IllegalStateException.class, () -> regions.unsimulated(500, 500));
         assertThrows(IllegalStateException.class, regions::settle, "the recorded failure must reach the game thread");
 
         regions.settle();
@@ -150,8 +150,8 @@ class LevelRegionsTest {
 
     @Test
     void activationBindsHandlesAndRegionDeathCancelsThem() {
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(200, 200);
+        regions.simulated(0, 0);
+        regions.simulated(200, 200);
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             assertNull(region.data().handle(), "no handle may exist before the pool binds");
         }
@@ -163,7 +163,7 @@ class LevelRegionsTest {
         }
 
         RegionTickHandle doomed = regions.regionizer().regionAt(200, 200).data().handle();
-        regions.chunkHolderDestroyed(200, 200);
+        regions.unsimulated(200, 200);
         regions.settle();
         assertTrue(doomed.isCancelled());
         assertEquals(1, regionCount());
@@ -172,14 +172,14 @@ class LevelRegionsTest {
     @Test
     void aHandleTickSplitsAndItsChildrenCarryFreshHandles() {
         activateRegions();
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(32, 0);
-        regions.chunkHolderCreated(64, 0);
-        regions.chunkHolderCreated(96, 0);
+        regions.simulated(0, 0);
+        regions.simulated(32, 0);
+        regions.simulated(64, 0);
+        regions.simulated(96, 0);
         RegionTickHandle parentHandle = regions.regionizer().regionAt(0, 0).data().handle();
 
-        regions.chunkHolderDestroyed(32, 0);
-        regions.chunkHolderDestroyed(64, 0);
+        regions.unsimulated(32, 0);
+        regions.unsimulated(64, 0);
 
         parentHandle.tick();
         assertEquals(2, regionCount(), "the handle's own release is what splits");
@@ -195,8 +195,8 @@ class LevelRegionsTest {
     @Test
     void mergeKeepsTheSurvivorClockAndSplitChildrenStartOnTheParentClock() {
         activateRegions();
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(96, 0);
+        regions.simulated(0, 0);
+        regions.simulated(96, 0);
         regions.settle();
         assertEquals(2, regionCount());
         RegionClock west = regions.regionizer().regionAt(0, 0).data().clock();
@@ -205,16 +205,16 @@ class LevelRegionsTest {
         west.advance();
         east.advance();
 
-        regions.chunkHolderCreated(32, 0);
-        regions.chunkHolderCreated(64, 0);
+        regions.simulated(32, 0);
+        regions.simulated(64, 0);
         regions.settle();
         assertEquals(1, regionCount());
         RegionClock survivor = regions.regionizer().regionAt(0, 0).data().clock();
         assertTrue(survivor == west || survivor == east, "the survivor keeps one of the two clocks untouched");
 
         survivor.advance();
-        regions.chunkHolderDestroyed(32, 0);
-        regions.chunkHolderDestroyed(64, 0);
+        regions.unsimulated(32, 0);
+        regions.unsimulated(64, 0);
         regions.settle();
         assertEquals(2, regionCount());
         assertEquals(survivor.currentTick(), regions.regionizer().regionAt(0, 0).data().clock().currentTick());
@@ -241,7 +241,7 @@ class LevelRegionsTest {
         } while (!present.add(key));
 
         presentList.add(key);
-        regions.chunkHolderCreated(CoordinateKey.x(key), CoordinateKey.z(key));
+        regions.simulated(CoordinateKey.x(key), CoordinateKey.z(key));
     }
 
     private void feedDestroy(Random random, LongOpenHashSet present, LongArrayList presentList) {
@@ -250,7 +250,7 @@ class LevelRegionsTest {
         presentList.set(index, presentList.getLong(presentList.size() - 1));
         presentList.removeLong(presentList.size() - 1);
         present.remove(key);
-        regions.chunkHolderDestroyed(CoordinateKey.x(key), CoordinateKey.z(key));
+        regions.unsimulated(CoordinateKey.x(key), CoordinateKey.z(key));
     }
 
     private static int randomCoordinate(Random random) {

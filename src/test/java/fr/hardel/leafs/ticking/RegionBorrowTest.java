@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionBorrowTest {
-    private final LevelRegions regions = new LevelRegions(LeafsConfig.defaults());
+    private final LevelRegions regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, 16, 1, 1, 5, LeafsConfig.defaults().debug()));
 
     @AfterEach
     void exitBorrow() {
@@ -26,7 +26,7 @@ class RegionBorrowTest {
 
     @Test
     void aBorrowedRegionTicksForNobodyElseUntilReleased() {
-        regions.chunkHolderCreated(0, 0);
+        regions.simulated(0, 0);
         Region<RegionTickData> region = regions.regionizer().regionAt(0, 0);
         RegionBorrow borrow = RegionBorrow.enter();
 
@@ -45,8 +45,8 @@ class RegionBorrowTest {
 
     @Test
     void aBorrowWaitsForTheTickInFlightAndNothingElse() throws InterruptedException {
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(200, 200);
+        regions.simulated(0, 0);
+        regions.simulated(200, 200);
         Region<RegionTickData> ticking = regions.regionizer().regionAt(0, 0);
         assertTrue(ticking.tryMarkTicking());
         CountDownLatch borrowed = new CountDownLatch(1);
@@ -72,8 +72,8 @@ class RegionBorrowTest {
     /** A merge between a held region and the one being taken can only run once the held one is returned; the borrower returns everything and takes the survivor. */
     @Test
     void aPendingMergeWithAHeldRegionIsFoldedByReleasingAndTakingTheSurvivor() {
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(96, 0);
+        regions.simulated(0, 0);
+        regions.simulated(96, 0);
         regions.settle();
         Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
         Region<RegionTickData> east = regions.regionizer().regionAt(96, 0);
@@ -81,8 +81,8 @@ class RegionBorrowTest {
         RegionBorrow borrow = RegionBorrow.enter();
         borrow.borrow(regions, 0, 0);
 
-        regions.chunkHolderCreated(32, 0);
-        regions.chunkHolderCreated(64, 0);
+        regions.simulated(32, 0);
+        regions.simulated(64, 0);
         borrow.borrow(regions, 96, 0);
 
         Region<RegionTickData> survivor = regions.regionizer().regionAt(96, 0);
@@ -95,9 +95,9 @@ class RegionBorrowTest {
 
     @Test
     void borrowAllTakesEveryLiveRegion() {
-        regions.chunkHolderCreated(0, 0);
-        regions.chunkHolderCreated(200, 200);
-        regions.chunkHolderCreated(-200, -200);
+        regions.simulated(0, 0);
+        regions.simulated(200, 200);
+        regions.simulated(-200, -200);
         RegionBorrow borrow = RegionBorrow.enter();
 
         borrow.borrowAll(regions);

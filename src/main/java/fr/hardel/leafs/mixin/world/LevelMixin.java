@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.world;
 
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
+import fr.hardel.leafs.ticking.TickingBinding;
 import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
@@ -41,17 +42,20 @@ public abstract class LevelMixin {
     private void leafs$routeUnitState(CallbackInfo callbackInfo) {
         if ((Object) this instanceof ServerLevel level) {
             this.random = new RoutingRandomSource(level, this.random);
-            this.neighborUpdater = new RoutingNeighborUpdater(level, this.neighborUpdater);
+            this.neighborUpdater = new RoutingNeighborUpdater(level, this.neighborUpdater, TickingBinding.of(level));
         }
     }
 
-    /** Vanilla answers null off its one game thread; the chunk contract already decides what any thread may read, so the read follows it. */
+    /** The chunk contract decides what any thread may read; only the chunk's owner creates a block entity, another thread reads what exists. */
     @Inject(method = "getBlockEntity(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/entity/BlockEntity;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionBlockEntityPath(BlockPos pos, CallbackInfoReturnable<BlockEntity> callbackInfo) {
-        Level self = (Level) (Object) this;
-        if (self.isInValidBounds(pos) && this instanceof ServerLevelRegionAccess) {
-            callbackInfo.setReturnValue(self.getChunkAt(pos).getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE));
+        if (!((Object) this instanceof ServerLevel level) || !level.isInValidBounds(pos)) {
+            return;
         }
+
+        LevelChunk chunk = level.getChunkAt(pos);
+        boolean owner = TickingBinding.of(level).owns(chunk.getPos().x(), chunk.getPos().z());
+        callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : ((ChunkTickAccess) chunk).leafs$existingBlockEntity(pos));
     }
 
     /** Every ticker, the chunk's own at load and an anchored one from outside, joins its chunk; an unloaded position keeps vanilla's serial list. */
