@@ -1,4 +1,4 @@
-package fr.hardel.leafs.ownership;
+package fr.hardel.leafs.ticking;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

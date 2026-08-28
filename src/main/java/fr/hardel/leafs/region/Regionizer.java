@@ -125,10 +125,11 @@ public final class Regionizer<R> {
         return regionsView;
     }
 
-    boolean tryMarkTicking(Region<R> region) {
+    boolean tryMarkTicking(Region<R> region, Region<R> by) {
         long stamp = writeLock();
         try {
-            if (region.state() != RegionState.READY || !region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty()) {
+            RegionState state = region.state();
+            if (state == RegionState.TICKING || state == RegionState.DEAD || !mergesOnlyWith(region, by)) {
                 return false;
             }
 
@@ -138,6 +139,22 @@ public final class Regionizer<R> {
         } finally {
             unlockWrite(stamp);
         }
+    }
+
+    /** No merge pending, or every pending one is with the taker; a null taker tolerates none. */
+    private static <R> boolean mergesOnlyWith(Region<R> region, Region<R> by) {
+        for (Region<R> target : region.mergeIntoLater) {
+            if (target != by) {
+                return false;
+            }
+        }
+        for (Region<R> source : region.expectingMergeFrom) {
+            if (source != by) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     void markNotTicking(Region<R> region) {

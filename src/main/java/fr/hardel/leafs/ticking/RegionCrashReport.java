@@ -1,4 +1,4 @@
-package fr.hardel.leafs.ownership;
+package fr.hardel.leafs.ticking;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

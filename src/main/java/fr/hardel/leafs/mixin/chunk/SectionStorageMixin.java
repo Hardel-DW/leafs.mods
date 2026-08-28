@@ -2,7 +2,6 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PoiLockAccess;
 import fr.hardel.leafs.chunk.PoiVillageLock;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
@@ -61,7 +60,7 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
     @Inject(method = "getOrLoad", at = @At("HEAD"), cancellable = true)
     private void leafs$presentOnlyOffOwner(long sectionPos, CallbackInfoReturnable<Optional<R>> callbackInfo) {
         ServerLevel level = leafs$level;
-        if (level == null || (!DegradedChunkReads.active() && level.getServer().isSameThread())) {
+        if (level == null || level.getServer().isSameThread()) {
             return;
         }
 

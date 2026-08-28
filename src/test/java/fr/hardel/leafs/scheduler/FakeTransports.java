@@ -23,11 +23,6 @@ final class FakeTransports implements DeferredTransports {
     }
 
     @Override
-    public void runDegraded(Runnable task) {
-        task.run();
-    }
-
-    @Override
     public DeferStats stats() {
         return stats;
     }

@@ -66,7 +66,6 @@
 		"ticking.ServerTickRateManagerMixin",
 		"ticking.ServerWatchdogMixin",
 		"world.ChunkAccessMixin",
-		"world.ChunkGeneratorMixin",
 		"world.EnderDragonFightMixin",
 		"world.LevelChunkMixin",
 		"world.LevelMixin",
@@ -75,8 +74,7 @@
 		"world.SerializableChunkDataMixin",
 		"world.ServerChunkCacheMixin",
 		"world.ServerLevelMixin",
-		"world.StructureCheckMixin",
-		"world.StructureManagerMixin"
+		"world.StructureCheckMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

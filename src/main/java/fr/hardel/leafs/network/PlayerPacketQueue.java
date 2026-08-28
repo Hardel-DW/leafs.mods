@@ -1,7 +1,6 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.ownership.OwnershipViolationException;
 import net.minecraft.ReportedException;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
@@ -9,15 +8,18 @@ import net.minecraft.network.protocol.PacketUtils;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
-/** One player's inbound packets, drained by the owning unit. The draining thread is the packet-handling thread for that listener. */
+/** One player's inbound packets, drained by the owning unit. The draining thread is the packet-handling thread for that listener, and there is never more than one. */
 public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();
     private static final long QUEUE_AGE_WARN_NANOS = 250_000_000L;
+    private static final long CLAIM_WAIT_NANOS = 10_000L;
 
     private final ConcurrentLinkedDeque<Entry> packets = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean claimed = new AtomicBoolean();
+    private volatile boolean handedOver;
 
     /** Vanilla's "am I the packet-handling thread", asked without a listener in scope (Fabric's receive-thread check). */
     public static boolean handlingPackets() {
@@ -42,32 +44,19 @@ public final class PlayerPacketQueue {
         return packets.size();
     }
 
-    /** Runs one handler as this listener's packet-handling thread; false when another thread is draining, the caller retries. */
-    public boolean handleAs(Runnable handler) {
+    /** The handler in flight moved the player to another owner: this drain ends after it, the rest waits for the new owner. */
+    public void handOver() {
+        handedOver = true;
+    }
+
+    /** Runs one handler as this listener's packet-handling thread, once the drain in flight, if any, let go. */
+    public void handleAs(Runnable handler) {
         if (handledByCurrentThread()) {
             handler.run();
-            return true;
+            return;
         }
 
-        if (!claimed.compareAndSet(false, true)) {
-            return false;
-        }
-
-        PlayerPacketQueue outer = DRAINING.get();
-        DRAINING.set(this);
-        try {
-            handler.run();
-        } finally {
-            if (outer == null) {
-                DRAINING.remove();
-            } else {
-                DRAINING.set(outer);
-            }
-
-            claimed.set(false);
-        }
-
-        return true;
+        asDrainer(handler);
     }
 
     /** Vanilla {@code processQueuedPackets} semantics: everything queued, including what handlers queue back. */
@@ -75,21 +64,25 @@ public final class PlayerPacketQueue {
         drain(() -> true);
     }
 
-    /** Stops when the caller loses the player mid-drain, the rest waits for the new owner. False when another thread holds the queue. */
-    public boolean drain(BooleanSupplier ownerHolds) {
+    /** Stops when the caller loses the player mid-drain, the rest waits for the new owner. */
+    public void drain(BooleanSupplier ownerHolds) {
         if (handledByCurrentThread()) {
             drainLoop(ownerHolds);
-            return true;
+            return;
         }
 
-        if (!claimed.compareAndSet(false, true)) {
-            return false;
+        asDrainer(() -> drainLoop(ownerHolds));
+    }
+
+    private void asDrainer(Runnable body) {
+        while (!claimed.compareAndSet(false, true)) {
+            LockSupport.parkNanos(CLAIM_WAIT_NANOS);
         }
 
         PlayerPacketQueue outer = DRAINING.get();
         DRAINING.set(this);
         try {
-            drainLoop(ownerHolds);
+            body.run();
         } finally {
             if (outer == null) {
                 DRAINING.remove();
@@ -99,27 +92,21 @@ public final class PlayerPacketQueue {
 
             claimed.set(false);
         }
-
-        return true;
     }
 
     private void drainLoop(BooleanSupplier ownerHolds) {
+        handedOver = false;
         long slowestAge = 0;
         String slowestEntry = null;
         Entry next;
-        while (ownerHolds.getAsBoolean() && (next = packets.poll()) != null) {
+        while (!handedOver && ownerHolds.getAsBoolean() && (next = packets.poll()) != null) {
             long age = System.nanoTime() - next.enqueuedNanos();
             if (age > slowestAge) {
                 slowestAge = age;
                 slowestEntry = next.describe();
             }
 
-            try {
-                next.handle();
-            } catch (OwnershipViolationException _) {
-                packets.addFirst(next);
-                break;
-            }
+            next.handle();
         }
 
         if (slowestAge > QUEUE_AGE_WARN_NANOS) {
@@ -163,10 +150,6 @@ public final class PlayerPacketQueue {
             try {
                 packet.handle(listener);
             } catch (Exception exception) {
-                if (exception instanceof OwnershipViolationException refusal) {
-                    throw refusal;
-                }
-
                 if (exception instanceof ReportedException reported && reported.getCause() instanceof OutOfMemoryError) {
                     throw PacketUtils.makeReportedException(exception, packet, listener);
                 }

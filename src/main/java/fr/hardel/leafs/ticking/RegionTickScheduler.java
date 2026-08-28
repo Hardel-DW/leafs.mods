@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.ownership.RegionContext;
 
 import java.util.ArrayList;
 import java.util.Collections;

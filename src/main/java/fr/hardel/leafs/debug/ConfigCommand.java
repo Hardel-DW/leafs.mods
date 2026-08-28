@@ -15,7 +15,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.Arrays;
 
-/** {@code /leafs config [key value]}: reads the tunable keys, or rewrites one in the file for the next start. */
+/** {@code /leafs config [key [value]]}: reads the tunable keys, one of them, or rewrites one in the file for the next start. */
 public final class ConfigCommand {
 
     private ConfigCommand() {
@@ -26,6 +26,7 @@ public final class ConfigCommand {
             .executes(context -> show(context.getSource()))
             .then(Commands.argument("key", StringArgumentType.word())
                 .suggests((_, builder) -> SharedSuggestionProvider.suggest(Arrays.stream(Setting.values()).map(Setting::key), builder))
+                .executes(context -> show(context.getSource(), StringArgumentType.getString(context, "key")))
                 .then(Commands.argument("value", IntegerArgumentType.integer())
                     .executes(context -> set(context.getSource(), StringArgumentType.getString(context, "key"), IntegerArgumentType.getInteger(context, "value")))));
     }
@@ -39,8 +40,14 @@ public final class ConfigCommand {
         return Setting.values().length;
     }
 
+    private static int show(CommandSourceStack source, String key) throws CommandSyntaxException {
+        Setting setting = setting(key);
+        source.sendSuccess(() -> CommandText.stat(setting.key(), setting.read(LeafsConfig.get())), false);
+        return 1;
+    }
+
     private static int set(CommandSourceStack source, String key, int value) throws CommandSyntaxException {
-        Setting setting = Setting.byKey(key).orElseThrow(() -> new SimpleCommandExceptionType(Component.literal("Unknown key " + key)).create());
+        Setting setting = setting(key);
         try {
             LeafsConfig.rewrite(setting, value);
         } catch (IllegalArgumentException exception) {
@@ -49,5 +56,9 @@ public final class ConfigCommand {
 
         source.sendSuccess(() -> Component.literal(key + " = " + value + ", applied on the next start").withStyle(ChatFormatting.GREEN), true);
         return 1;
+    }
+
+    private static Setting setting(String key) throws CommandSyntaxException {
+        return Setting.byKey(key).orElseThrow(() -> new SimpleCommandExceptionType(Component.literal("Unknown key " + key)).create());
     }
 }
