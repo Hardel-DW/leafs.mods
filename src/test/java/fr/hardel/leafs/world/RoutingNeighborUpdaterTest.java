@@ -1,5 +1,7 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.metrics.DeferStats;
+import fr.hardel.leafs.scheduler.DeferredTransports;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -47,6 +49,32 @@ class RoutingNeighborUpdaterTest {
         }
     }
 
+    /** Owns everything or nothing; a foreign update piles up until the test drains it as the owner would. */
+    private static final class FakeTransports implements DeferredTransports {
+        final List<Runnable> mail = new ArrayList<>();
+        boolean owner = true;
+
+        @Override
+        public void toOwner(int chunkX, int chunkZ, Runnable task) {
+            mail.add(task);
+        }
+
+        @Override
+        public boolean owns(int chunkX, int chunkZ) {
+            return owner;
+        }
+
+        @Override
+        public void runDegraded(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public DeferStats stats() {
+            return new DeferStats();
+        }
+    }
+
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
         return new RegionWorldData(() -> 0L, RandomSource.create(), updater, new PathTypeCache(), 0L);
     }
@@ -62,7 +90,7 @@ class RoutingNeighborUpdaterTest {
     @Test
     void offTickCallsKeepTheLevelCollector() {
         RecordingUpdater fallback = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback);
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback, new FakeTransports());
 
         callAll(router);
 
@@ -73,7 +101,7 @@ class RoutingNeighborUpdaterTest {
     void activeContextRoutesEveryEntryPointToItsCollector() {
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback);
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback, new FakeTransports());
         WorldTickContext.enter(null, null, dataWith(regional));
         try {
             callAll(router);
@@ -85,11 +113,28 @@ class RoutingNeighborUpdaterTest {
         assertTrue(fallback.calls.isEmpty());
     }
 
+    /** A redstone line crossing a seam: the update on the other side waits in the owner's mail and runs there, a tick later. */
+    @Test
+    void aForeignChunkUpdateIsMailedToItsOwner() {
+        RecordingUpdater fallback = new RecordingUpdater();
+        FakeTransports transports = new FakeTransports();
+        transports.owner = false;
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback, transports);
+
+        callAll(router);
+        assertTrue(fallback.calls.isEmpty(), "nothing runs on the thread that does not own the chunk");
+        assertEquals(4, transports.mail.size());
+
+        transports.owner = true;
+        transports.mail.forEach(Runnable::run);
+        assertEquals(List.of("shape", "simple", "full", "multi"), fallback.calls);
+    }
+
     @Test
     void unwrapReturnsTheWrappedCollector() {
         RecordingUpdater fallback = new RecordingUpdater();
 
-        assertSame(fallback, RoutingNeighborUpdater.unwrap(new RoutingNeighborUpdater(null, fallback)));
+        assertSame(fallback, RoutingNeighborUpdater.unwrap(new RoutingNeighborUpdater(null, fallback, new FakeTransports())));
         assertSame(fallback, RoutingNeighborUpdater.unwrap(fallback));
     }
 }

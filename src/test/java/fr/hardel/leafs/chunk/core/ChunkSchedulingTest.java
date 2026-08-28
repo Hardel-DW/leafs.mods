@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.ChunkHoldController;
+import fr.hardel.leafs.chunk.MailHold;
 import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -39,16 +40,16 @@ class ChunkSchedulingTest {
         LevelRegions regions = new LevelRegions(LeafsConfig.defaults());
         ChunkScheduling scheduling = new ChunkScheduling(null, null, regions, () -> false, new DeferStats(), null, new ChunkMailbox(new ChunkHoldController() {
             @Override
-            public void addHold(int chunkX, int chunkZ) {
+            public void addHold(int chunkX, int chunkZ, MailHold.Level level) {
             }
 
             @Override
-            public void removeHold(int chunkX, int chunkZ) {
+            public void removeHold(int chunkX, int chunkZ, MailHold.Level level) {
             }
         }));
         List<String> order = new ArrayList<>();
 
-        regions.chunkHolderCreated(0, 0);
+        regions.simulated(0, 0);
         regions.activate("leafs:test", new RegionTickScheduler(1, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> {
         }, _ -> {
         }), new RegionCrashWriter(Path.of("build", "test-crash-reports")), (_, _) -> {

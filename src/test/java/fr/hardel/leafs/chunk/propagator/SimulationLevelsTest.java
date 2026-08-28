@@ -3,10 +3,14 @@ package fr.hardel.leafs.chunk.propagator;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,6 +21,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SimulationLevelsTest {
 
     private final SimulationLevels levels = new SimulationLevels();
+    private final List<String> feed = new CopyOnWriteArrayList<>();
+
+    {
+        levels.listen(new SimulationListener() {
+            @Override
+            public void simulated(int chunkX, int chunkZ) {
+                feed.add("+" + chunkX + "," + chunkZ);
+            }
+
+            @Override
+            public void unsimulated(int chunkX, int chunkZ) {
+                feed.add("-" + chunkX + "," + chunkZ);
+            }
+        });
+    }
 
     /** Reads MAX_LEVEL after the bootstrap: the chunk pyramid behind it needs the registries. */
     private static int noTicket() {
@@ -108,5 +127,20 @@ class SimulationLevelsTest {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** The regions hear each chunk once on entry and once on exit, whatever the ticket radius does in between. */
+    @Test
+    void theFeedTellsEachChunkOnceOnEntryAndOnceOnExit() {
+        levels.feed(ChunkPos.pack(0, 0), ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING));
+        levels.drain();
+        levels.feed(ChunkPos.pack(0, 0), ChunkLevel.byStatus(FullChunkStatus.BLOCK_TICKING));
+        levels.drain();
+        levels.feed(ChunkPos.pack(0, 0), SimulationLevels.NOT_SIMULATED);
+        levels.drain();
+
+        assertEquals(1, feed.stream().filter(event -> event.equals("+0,0")).count());
+        assertEquals(1, feed.stream().filter(event -> event.equals("-0,0")).count());
+        assertTrue(feed.indexOf("+0,0") < feed.indexOf("-0,0"));
     }
 }

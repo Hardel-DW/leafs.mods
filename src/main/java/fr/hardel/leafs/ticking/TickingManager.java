@@ -217,7 +217,7 @@ public final class TickingManager {
         if (regions == 0 && sections == 0) {
             Leafs.LOGGER.info("Leafs regions drained: 0 regions, 0 sections");
         } else {
-            Leafs.LOGGER.error("Leafs regions NOT drained: {} regions and {} sections outlived the chunk holders that feed them", regions, sections);
+            Leafs.LOGGER.error("Leafs regions NOT drained: {} regions and {} sections outlived the simulation that feeds them", regions, sections);
         }
     }
 

@@ -7,13 +7,19 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Replaces vanilla's SimulationChunkTracker: fed by the simulation listener, published as a concurrent map regions read lock-free. 33 means not simulated. */
+/** Replaces vanilla's SimulationChunkTracker: fed by the simulation listener, published as a concurrent map regions read lock-free. 33 means not simulated. A chunk entering or leaving simulation is what shapes the regions. */
 public final class SimulationLevels extends LeafsTicketPropagator {
 
     public static final int NOT_SIMULATED = 33;
 
     private final AreaLock ticketLock = new AreaLock(SECTION_SHIFT);
     private final ConcurrentHashMap<Long, Byte> levels = new ConcurrentHashMap<>();
+    private volatile SimulationListener listener;
+
+    /** Bound once the level's regions exist; before that nothing simulates. */
+    public void listen(SimulationListener listener) {
+        this.listener = listener;
+    }
 
     /** Rides the listener call under the table monitor; a level of 33 or above simulates nothing anywhere. */
     public void feed(long chunkKey, int ticketLevel) {
@@ -48,12 +54,18 @@ public final class SimulationLevels extends LeafsTicketPropagator {
         for (Iterator<Long2ByteMap.Entry> iterator = updates.long2ByteEntrySet().fastIterator(); iterator.hasNext(); ) {
             Long2ByteMap.Entry entry = iterator.next();
             int level = convertBetweenTicketLevels(entry.getByteValue());
+            long key = entry.getLongKey();
             if (entry.getByteValue() == 0 || level >= NOT_SIMULATED) {
-                levels.remove(entry.getLongKey());
+                if (levels.remove(key) != null) {
+                    listener.unsimulated(ChunkPos.getX(key), ChunkPos.getZ(key));
+                }
+
                 continue;
             }
 
-            levels.put(entry.getLongKey(), (byte) level);
+            if (levels.put(key, (byte) level) == null) {
+                listener.simulated(ChunkPos.getX(key), ChunkPos.getZ(key));
+            }
         }
     }
 }
