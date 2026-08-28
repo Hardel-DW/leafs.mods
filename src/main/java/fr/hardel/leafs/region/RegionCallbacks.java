@@ -19,7 +19,7 @@ public interface RegionCallbacks<R> {
 
     void onRegionInactive(Region<R> region);
 
-    /** {@code from} is already dead and its sections belong to {@code into}; {@code movedChunks} are its chunk keys, for whatever the implementor rebases. */
+    /** {@code from} is already dead and its sections belong to {@code into}; {@code movedChunks} are every position of them, for whatever the implementor rebases. */
     void merge(Region<R> from, Region<R> into, LongList movedChunks);
 
     /** Sections are already reassigned: {@code sectionToChild} re-buckets position-keyed state. */

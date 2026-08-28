@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/** Nearby sections ticked as one unit, guarded by the regionizer's write lock. While TICKING no section leaves and merges wait. */
+/** Nearby ticking sections and their ring, owned as one unit, guarded by the regionizer's write lock. While TICKING no section leaves and merges wait. */
 public final class Region<R> {
     private final long id;
     private final Regionizer<R> regionizer;
@@ -49,6 +49,7 @@ public final class Region<R> {
         return regionizer.sectionCountOf(this);
     }
 
+    /** The chunks that tick, not the ring around them. */
     public int chunkCount() {
         return regionizer.chunkCountOf(this);
     }
@@ -62,12 +63,12 @@ public final class Region<R> {
         void accept(int chunkX, int chunkZ);
     }
 
-    /** Lock-free: the owner's own view of its chunks cannot change under it. */
+    /** Ticking or in the ring alike; lock-free, the owner's own view of its chunks cannot change under it. */
     public boolean owns(int chunkX, int chunkZ) {
         return regionizer.regionAtUnsynchronised(chunkX, chunkZ) == this;
     }
 
-    /** Walks a snapshot of the sections, so the owner may call it mid-tick while the feed adopts more. */
+    /** Every owned position, ticking or in the ring, loaded or not; a snapshot of the sections, so the owner may call it mid-tick while the feed adopts more. */
     public void forEachChunk(ChunkConsumer consumer) {
         regionizer.forEachChunkOf(this, consumer);
     }
@@ -75,6 +76,10 @@ public final class Region<R> {
     /** Copy of the section keys, safe to walk from any thread while the live set keeps moving. */
     public long[] sectionKeySnapshot() {
         return regionizer.sectionKeysOf(this);
+    }
+
+    public long[] tickingSectionKeySnapshot() {
+        return regionizer.tickingSectionKeysOf(this);
     }
 
     void setState(RegionState state) {

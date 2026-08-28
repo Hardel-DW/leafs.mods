@@ -1,6 +1,6 @@
 package fr.hardel.leafs.region;
 
-/** One section of 2^shift chunks a side. Chunk bits are single-writer, the rest is under the regionizer's write lock. */
+/** One section of 2^shift chunks a side. The bits are the chunks that tick; every position of the section is owned. Bits are single-writer, the rest is under the regionizer's write lock. */
 final class RegionSection<R> {
     private final long key;
     private final int coordinateMask;
@@ -79,6 +79,17 @@ final class RegionSection<R> {
 
     void clearRegion() {
         this.region = null;
+    }
+
+    void forEachPosition(Region.ChunkConsumer consumer) {
+        int baseX = CoordinateKey.x(key) << indexShift;
+        int baseZ = CoordinateKey.z(key) << indexShift;
+        int side = 1 << indexShift;
+        for (int dz = 0; dz < side; dz++) {
+            for (int dx = 0; dx < side; dx++) {
+                consumer.accept(baseX + dx, baseZ + dz);
+            }
+        }
     }
 
     void forEachChunk(Region.ChunkConsumer consumer) {

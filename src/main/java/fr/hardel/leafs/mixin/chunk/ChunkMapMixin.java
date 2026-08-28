@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.PendingUnloadClaims;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
@@ -14,6 +15,7 @@ import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.ChunkTicketHolds;
 import fr.hardel.leafs.chunk.ChunkUnloadAccess;
 import fr.hardel.leafs.chunk.ChunkUnloads;
+import fr.hardel.leafs.chunk.OrphanChunks;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
@@ -79,7 +81,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.Queue;
 
-/** Hook only, the chunk core wires here at construction. Holder creation and unload claims feed the regionizer, strictly alternating per position. */
+/** Hook only, the chunk core wires here at construction; the simulation authority feeds the regionizer. */
 @Mixin(ChunkMap.class)
 public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAccess {
 
@@ -172,6 +174,9 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     private ChunkUnloads leafs$unloads;
 
     @Unique
+    private OrphanChunks leafs$orphans;
+
+    @Unique
     private ChunkScheduling leafs$scheduling;
 
     @Unique
@@ -185,6 +190,11 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     @Override
     public ChunkUnloads leafs$unloads() {
         return leafs$unloads;
+    }
+
+    @Override
+    public OrphanChunks leafs$orphans() {
+        return leafs$orphans;
     }
 
     @Override
@@ -205,10 +215,14 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
         ChunkMap self = (ChunkMap) (Object) this;
         TickingManager ticking = TickingManager.of(self.level.getServer());
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor, new ChunkMailbox(new ChunkTicketHolds(self.level)));
-        ((PropagatorAccess) self.getDistanceManager()).leafs$propagator().bindScheduling(leafs$scheduling);
-        this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage));
-        this.leafs$unloads = new ChunkUnloads(self, this.toDrop, leafs$regions(), leafs$ticking().metrics().chunkUnloads());
+        ChunkMailbox mailbox = new ChunkMailbox(new ChunkTicketHolds(self.level));
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, ticking.metrics().deferStats(), this.mainThreadExecutor, mailbox);
+        PropagatorAccess authorities = (PropagatorAccess) self.getDistanceManager();
+        authorities.leafs$propagator().bindScheduling(leafs$scheduling);
+        authorities.leafs$simulation().listen(leafs$regions());
+        this.leafs$playerLoader = new PlayerChunkLoader(self, new StageTickets(this.ticketStorage), LeafsConfig.get().playerChunkLoadsPerTick());
+        this.leafs$unloads = new ChunkUnloads(self, this.toDrop, ticking.metrics().chunkUnloads());
+        this.leafs$orphans = new OrphanChunks(self.level, leafs$regions().regionizer(), mailbox);
     }
 
     /** The visibility pass of a move runs on the regions, against every player that moved; the rest of the move stays. */
@@ -238,11 +252,11 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return leafs$scheduling.exclusion().runStep(step.targetStatus(), chunk.getPos(), () -> original.call(step, context, cache, chunk));
     }
 
-    /** The ticking promotion body (postProcessGeneration, startTickingChunk) runs on the position's owner, not the pump. */
+    /** The ticking promotion body (postProcessGeneration, startTickingChunk) runs on the position's owner, not the pump, with its 3x3 held at FULL meanwhile. */
     @WrapOperation(method = "prepareTickingChunk", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<?> leafs$tickingPromotionOnTheOwner(CompletableFuture<?> future, Function<?, ?> body, Executor pump, Operation<CompletableFuture<?>> original, @Local(argsOnly = true) ChunkHolder chunk) {
         ChunkPos pos = chunk.getPos();
-        return original.call(future, body, leafs$scheduling.ownerExecutor(pos.x(), pos.z()));
+        return original.call(future, body, leafs$scheduling.tickingPromotionExecutor(pos.x(), pos.z()));
     }
 
     /** Reached by the promotion body on the owner and by the light-sync continuation on the pump; the latter re-routes. */
@@ -297,12 +311,11 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return hasWork;
     }
 
-    /** Regions decide their own unloads; vanilla's drop loop sees nothing, and the server thread decides for everyone once the pool stopped. */
+    /** Regions decide their own unloads; vanilla's drop loop sees nothing, the server thread decides for the orphans, and for everyone once the pool stopped. */
     @Inject(method = "processUnloads", at = @At("HEAD"))
-    private void leafs$decideAllOnShutdown(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        if (leafs$ticking().halted()) {
-            leafs$unloads.decideAll();
-        }
+    private void leafs$decideOrphanUnloads(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
+        boolean everyone = leafs$ticking().halted() || leafs$regions().body() == null;
+        leafs$unloads.decide(everyone ? _ -> true : leafs$orphans::owns);
     }
 
     @WrapOperation(method = "processUnloads", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;iterator()Lit/unimi/dsi/fastutil/longs/LongIterator;"))
@@ -310,7 +323,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return LongIterators.EMPTY_ITERATOR;
     }
 
-    /** Each region saves its own eager chunks; the serial pass only saves once the pool stopped. */
+    /** Each region saves its own eager chunks and the orphans save theirs; vanilla's pass only survives before activation and once the pool stopped. */
     @WrapOperation(method = "processUnloads", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;saveChunksEagerly(Ljava/util/function/BooleanSupplier;)V"))
     private void leafs$eagerSavesOnTheRegions(ChunkMap instance, BooleanSupplier haveTime, Operation<Void> original) {
         if (leafs$regions().body() == null || leafs$ticking().halted()) {
@@ -370,8 +383,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     @Inject(method = "updateChunkScheduling",
         at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;modified:Z", opcode = Opcodes.PUTFIELD, shift = At.Shift.AFTER),
         require = 1, allow = 1)
-    private void leafs$onChunkHolderCreated(long node, int level, ChunkHolder chunk, int oldLevel, CallbackInfoReturnable<ChunkHolder> callbackInfo) {
-        leafs$regions().chunkHolderCreated(ChunkPos.getX(node), ChunkPos.getZ(node));
+    private void leafs$countChunkHolderCreated(long node, int level, ChunkHolder chunk, int oldLevel, CallbackInfoReturnable<ChunkHolder> callbackInfo) {
         leafs$ticking().metrics().chunkLoads().increment();
     }
 
@@ -409,6 +421,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         this.nextChunkSaveTime.clear();
         LevelRegions regions = leafs$regions();
         regions.bumpAutosaveEpoch(flushStorage);
+        leafs$orphans.beginEpoch(this.visibleChunkMap.values(), regions.autosaveEpoch(), flushStorage);
         callbackInfo.cancel();
         if (!flushStorage) {
             return;
@@ -442,15 +455,17 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         }
     }
 
-    /** A region serializes only chunks it owns; a foreign pending chunk stays pending and converges with ownership. */
+    /** A region serializes the chunks it owns and the orphans; another region's chunk stays pending and converges with ownership. */
     @WrapMethod(method = "getChunkToSend")
-    private LevelChunk leafs$sendOnlyOwnedChunks(long pos, Operation<LevelChunk> original) {
+    private LevelChunk leafs$sendOwnedOrOrphanChunks(long pos, Operation<LevelChunk> original) {
         LevelChunk chunk = original.call(pos);
         if (chunk == null || !(RegionContext.current() instanceof RegionContext.Region)) {
             return chunk;
         }
 
-        return WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, ChunkPos.getX(pos), ChunkPos.getZ(pos)) ? chunk : null;
+        int chunkX = ChunkPos.getX(pos);
+        int chunkZ = ChunkPos.getZ(pos);
+        return WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunkX, chunkZ) || leafs$orphans.owns(pos) ? chunk : null;
     }
 
     @Unique

@@ -20,8 +20,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.IntSupplier;
 
-/** Groups loaded chunks into {@link Region}s. Non-empty sections carry a buffer ring, so two regions stay one full section apart. */
+/** Groups the chunks that tick into {@link Region}s. A ticking section carries a buffer ring the region owns without ticking it, so two regions' rings never overlap. */
 public final class Regionizer<R> {
+    /** Dead sections are reclaimed, and a split looked for, once they make up this share of the region. */
     private static final int DEAD_SECTION_DIVISOR = 6;
 
     private final int sectionShift;
@@ -29,7 +30,6 @@ public final class Regionizer<R> {
     private final int bufferRadius;
     private final int searchRadius;
     private final int connectivityRadius;
-    private final int recalcSectionCount;
     private final RegionCallbacks<R> callbacks;
 
     private final StampedLock lock = new StampedLock();
@@ -48,11 +48,10 @@ public final class Regionizer<R> {
         this.bufferRadius = bufferRadius;
         this.searchRadius = mergeRadius + bufferRadius;
         this.connectivityRadius = Math.max(mergeRadius, bufferRadius);
-        this.recalcSectionCount = Math.max(2, 2048 >> (2 * sectionShift));
         this.callbacks = Objects.requireNonNull(callbacks, "callbacks");
     }
 
-    /** Lock-free bit set while the section stays non-empty; a section becoming non-empty reshapes regions under the write lock. */
+    /** A chunk starts ticking. Lock-free bit set while the section already ticks; a section starting to tick reshapes regions under the write lock. */
     public void addChunk(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         RegionSection<R> section = sections.get(key);
@@ -69,7 +68,7 @@ public final class Regionizer<R> {
         }
     }
 
-    /** A section becoming empty marks isolated sections dead; their removal is deferred to the owner's release. */
+    /** A chunk stops ticking. A section left without any marks isolated sections dead; their removal is deferred to the owner's release. */
     public void removeChunk(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         RegionSection<R> section = sections.get(key);
@@ -174,6 +173,20 @@ public final class Regionizer<R> {
         } finally {
             lock.unlockRead(stamp);
         }
+    }
+
+    /** The sections that tick, without the ring; a debug read for the map. */
+    long[] tickingSectionKeysOf(Region<R> region) {
+        long[] keys = sectionKeysOf(region);
+        LongArrayList ticking = new LongArrayList(keys.length);
+        for (long key : keys) {
+            RegionSection<R> section = sections.get(key);
+            if (section != null && !section.isEmpty()) {
+                ticking.add(key);
+            }
+        }
+
+        return ticking.toLongArray();
     }
 
     /** The bypass is what lets a callback read a count: taking the read lock while owning the write lock deadlocks a {@link StampedLock}. */
@@ -291,8 +304,7 @@ public final class Regionizer<R> {
             return;
         }
 
-        boolean allDead = dead == total;
-        if (!allDead && (total < recalcSectionCount || dead * DEAD_SECTION_DIVISOR < total)) {
+        if (dead * DEAD_SECTION_DIVISOR < total) {
             return;
         }
 
@@ -346,7 +358,7 @@ public final class Regionizer<R> {
         for (LongIterator iterator = from.sectionKeys.iterator(); iterator.hasNext(); ) {
             long key = iterator.nextLong();
             RegionSection<R> section = sections.get(key);
-            section.forEachChunk((chunkX, chunkZ) -> movedChunks.add(CoordinateKey.pack(chunkX, chunkZ)));
+            section.forEachPosition((chunkX, chunkZ) -> movedChunks.add(CoordinateKey.pack(chunkX, chunkZ)));
             section.setRegion(into);
             into.sectionKeys.add(key);
         }
@@ -545,12 +557,12 @@ public final class Regionizer<R> {
         owner.deadSectionKeys.add(section.key());
     }
 
-    /** Walks a snapshot: the feed adopts sections into a region while it ticks, and a dead section may vanish under another region's release. */
+    /** Every position of a snapshot of the sections, ring included: the feed adopts sections while the region ticks, a dead one may vanish under another's release. */
     void forEachChunkOf(Region<R> region, Region.ChunkConsumer consumer) {
         for (long key : sectionKeysOf(region)) {
             RegionSection<R> section = sections.get(key);
             if (section != null) {
-                section.forEachChunk(consumer);
+                section.forEachPosition(consumer);
             }
         }
     }

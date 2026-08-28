@@ -55,6 +55,23 @@ public final class StageTimings {
         return ring[0].length;
     }
 
+    /** Ticks ended so far; a sampler reads from the last count it saw. */
+    public int completedTicks() {
+        return cursor;
+    }
+
+    /** Copies of the rows of the ticks ended since {@code fromTick}, oldest first; the ring bounds how far back that reaches. */
+    public long[][] rowsSince(int fromTick) {
+        int end = cursor;
+        int start = Math.max(fromTick, end - (CAPACITY - 1));
+        long[][] rows = new long[Math.max(0, end - start)][];
+        for (int index = start; index < end; index++) {
+            rows[index - start] = ring[Math.floorMod(index, CAPACITY)].clone();
+        }
+
+        return rows;
+    }
+
     /** Average nanos per stage over the last ticks. */
     public long[] averageNanos(int ticks) {
         int end = cursor;
