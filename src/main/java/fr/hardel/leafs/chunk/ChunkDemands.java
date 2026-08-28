@@ -13,13 +13,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-// The demand sequence behind an ABSENT refusal: file the tickets, drain the propagator once so the holders exist, request the status so the pool delivers. Readiness completes at delivery.
+/** The request behind a chunk wait: file the tickets, drain the propagator once so the holders exist, request the status so the pool delivers. The future completes at delivery. */
 public final class ChunkDemands {
 
     private ChunkDemands() {
     }
 
-    // Null readiness when no holder accepted a request yet.
+    /** Null when no holder accepted a request yet. */
     public static CompletableFuture<?> demand(ChunkMap chunkMap, ChunkStatus status, LongList positions) {
         TicketStorage tickets = chunkMap.level.getChunkSource().ticketStorage;
         for (int index = 0; index < positions.size(); index++) {

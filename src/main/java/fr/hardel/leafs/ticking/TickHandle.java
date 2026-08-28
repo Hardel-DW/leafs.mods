@@ -1,8 +1,6 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.metrics.StageTimings;
-import fr.hardel.leafs.ownership.RegionContext;
-import fr.hardel.leafs.ownership.RegionCrashReport;
 
 /** One schedulable tick unit, subclassed by the whole-level attached tick and by a real region. */
 public abstract class TickHandle {

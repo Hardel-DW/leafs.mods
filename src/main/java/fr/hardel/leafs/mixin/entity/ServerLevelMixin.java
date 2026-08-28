@@ -11,7 +11,7 @@ import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
-import fr.hardel.leafs.ownership.RegionContext;
+import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.TickingBinding;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;

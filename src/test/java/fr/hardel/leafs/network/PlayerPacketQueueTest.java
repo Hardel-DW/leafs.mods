@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -142,9 +143,9 @@ class PlayerPacketQueueTest {
         assertEquals(1, listener.errors.size());
     }
 
-    /** Two units racing a handover must never run handlers concurrently: the loser skips, the queue survives. */
+    /** Two units racing a handover never run handlers concurrently: the second waits for the first to let go. */
     @Test
-    void aClaimedQueueRefusesASecondDrainer() throws InterruptedException {
+    void aSecondDrainerWaitsForTheFirst() throws InterruptedException {
         FakeListener listener = new FakeListener(true);
         CountDownLatch insideDrain = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -161,11 +162,19 @@ class PlayerPacketQueueTest {
         regionDrainer.start();
         assertTrue(insideDrain.await(5, TimeUnit.SECONDS));
 
-        assertFalse(queue.drain(() -> true), "the global loop must back off while the region drains");
+        AtomicBoolean drainedSecond = new AtomicBoolean();
+        Thread secondDrainer = new Thread(() -> {
+            queue.drain();
+            drainedSecond.set(true);
+        });
+        secondDrainer.start();
+        secondDrainer.join(200);
+        assertFalse(drainedSecond.get(), "the second drainer waits while the first handles");
+
         release.countDown();
         regionDrainer.join();
-
-        assertTrue(queue.drain(() -> true), "the claim releases with the drain");
+        secondDrainer.join();
+        assertTrue(drainedSecond.get());
     }
 
     @Test

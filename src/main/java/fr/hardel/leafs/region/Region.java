@@ -36,9 +36,14 @@ public final class Region<R> {
         return state;
     }
 
-    /** Only when READY with no pending merge; an awaited merge partner never ticks. */
+    /** Only when idle with no pending merge; an awaited merge partner never ticks on its own. */
     public boolean tryMarkTicking() {
-        return regionizer.tryMarkTicking(this);
+        return regionizer.tryMarkTicking(this, null);
+    }
+
+    /** Taken by {@code by}: a merge pending with the taker is no obstacle, the taker ticking is what that merge waits for. */
+    public boolean tryMarkTicking(Region<R> by) {
+        return regionizer.tryMarkTicking(this, by);
     }
 
     public void markNotTicking() {

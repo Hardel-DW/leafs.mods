@@ -8,19 +8,28 @@ import net.minecraft.server.level.ChunkMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.Function;
 
-/** The regions the server thread holds for one piece of head work: taken at first contact, kept until released. A worker never waits for a region, this thread does. */
+/** The regions a thread holds for one piece of work: taken at first contact, kept until released. The server thread borrows for a command, a ticking region for a chunk it waits on. */
 public final class RegionBorrow {
     private static final ThreadLocal<RegionBorrow> CURRENT = new ThreadLocal<>();
     private static final long WAIT_NANOS = 50_000L;
 
+    private final Region<RegionTickData> by;
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
 
-    private RegionBorrow() {
+    private RegionBorrow(Region<RegionTickData> by) {
+        this.by = by;
     }
 
+    /** The server thread borrows in its own name. */
     public static RegionBorrow enter() {
-        RegionBorrow borrow = new RegionBorrow();
+        return enter(null);
+    }
+
+    /** A ticking region borrows in its name: a partner owed to it by a pending merge is taken instead of waited for. */
+    public static RegionBorrow enter(Region<RegionTickData> by) {
+        RegionBorrow borrow = new RegionBorrow(by);
         CURRENT.set(borrow);
         return borrow;
     }
@@ -29,19 +38,32 @@ public final class RegionBorrow {
         CURRENT.remove();
     }
 
+    /** Reuses the borrow open on this thread, or opens one in {@code by}'s name and returns everything at the end. */
+    public static <T> T hold(Region<RegionTickData> by, Function<RegionBorrow, T> body) {
+        RegionBorrow current = CURRENT.get();
+        if (current != null) {
+            return body.apply(current);
+        }
+
+        RegionBorrow borrow = enter(by);
+        try {
+            return body.apply(borrow);
+        } finally {
+            borrow.releaseAll();
+            exit();
+        }
+    }
+
     /** Null on every thread that is not borrowing. */
     public static RegionBorrow current() {
         return CURRENT.get();
     }
 
-    /**
-     * Waits for the region's tick in flight. A refusal for a pending merge while this thread holds regions means the merge waits for one of
-     * them: everything is returned, the regionizer folds, and the survivors are taken again at their next contact.
-     */
+    /** Waits for the region's tick in flight. A merge pending with a region this thread holds waits for that one: everything is returned, the regionizer folds, the survivor is taken again. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
         Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
         while (region != null && !held.contains(region)) {
-            if (region.tryMarkTicking()) {
+            if (region.tryMarkTicking(by)) {
                 held.add(region);
                 return;
             }
@@ -71,7 +93,7 @@ public final class RegionBorrow {
 
     private void borrowRegion(Region<RegionTickData> region) {
         while (!held.contains(region) && region.state() != RegionState.DEAD) {
-            if (region.tryMarkTicking()) {
+            if (region.tryMarkTicking(by)) {
                 held.add(region);
                 return;
             }

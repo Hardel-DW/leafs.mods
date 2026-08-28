@@ -1,16 +1,13 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.ownership.TickGuard;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.Consumer;
 
 /** Vanilla's ticker list, per chunk: registration order, adds during the pass wait for the next one. */
 public final class ChunkTickers {
-    private static final Consumer<TickingBlockEntity> TICK = TickingBlockEntity::tick;
     private final List<TickingBlockEntity> tickers = new ArrayList<>();
     private final List<TickingBlockEntity> pending = new ArrayList<>();
     private boolean ticking;
@@ -32,7 +29,7 @@ public final class ChunkTickers {
             if (ticker.isRemoved()) {
                 iterator.remove();
             } else if (runsNormally) {
-                TickGuard.tickOrSkip(TICK, ticker);
+                ticker.tick();
             }
         }
 

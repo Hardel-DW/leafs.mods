@@ -5,7 +5,6 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.chunk.DegradedChunkReads;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
@@ -53,21 +52,19 @@ public abstract class ServerChunkCacheMixin {
     /** Off the main thread the concurrent table answers, with the contract's peek rule: presence serves every thread. */
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
-        if (DegradedChunkReads.active() || Thread.currentThread() != this.mainThread) {
+        if (Thread.currentThread() != this.mainThread) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
             callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z));
         }
     }
 
-    /** The contract's full form for every thread that may not load; a thread that may loads as vanilla, and a borrower takes the chunk's region before reading it. */
+    /** The contract for every thread once regions run, vanilla for the universal owner; a borrower takes the chunk's region before reading it. */
     @WrapMethod(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;")
     private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
         ServerChunkCache self = (ServerChunkCache) (Object) this;
-        if (DegradedChunkReads.active() || !leafs$scheduling().mayLoadSynchronously()) {
-            return RegionChunkAccess.contractedChunk(self.chunkMap, x, z, targetStatus, loadOrGenerate);
-        }
-
-        ChunkAccess chunk = original.call(x, z, targetStatus, loadOrGenerate);
+        ChunkAccess chunk = leafs$scheduling().isUniversalOwner()
+            ? original.call(x, z, targetStatus, loadOrGenerate)
+            : RegionChunkAccess.contractedChunk(self.chunkMap, x, z, targetStatus, loadOrGenerate);
         RegionBorrow borrow = RegionBorrow.current();
         if (chunk != null && borrow != null) {
             borrow.borrow(LevelRegions.of(this.level), x, z);
@@ -79,7 +76,7 @@ public abstract class ServerChunkCacheMixin {
     /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree or a correct hasChunk-then-read sequence crashes. */
     @Inject(method = "hasChunk(II)Z", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
-        if (DegradedChunkReads.active() || Thread.currentThread() != this.mainThread) {
+        if (Thread.currentThread() != this.mainThread) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
             callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
         }

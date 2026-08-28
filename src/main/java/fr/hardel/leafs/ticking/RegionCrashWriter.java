@@ -1,7 +1,6 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.ownership.RegionCrashReport;
 
 import java.io.IOException;
 import java.nio.file.Files;
