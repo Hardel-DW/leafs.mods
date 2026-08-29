@@ -10,6 +10,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import fr.hardel.leafs.ticking.LeafsWatchdog;
+import fr.hardel.leafs.metrics.CrashTelemetry;
 import fr.hardel.leafs.ticking.RegionCrashWriter;
 import fr.hardel.leafs.ticking.RegionTickScheduler;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -50,7 +51,7 @@ class ChunkSchedulingTest {
         regions.simulated(0, 0);
         regions.activate("leafs:test", new RegionTickScheduler(1, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> {
         }, _ -> {
-        }), new RegionCrashWriter(Path.of("build", "test-crash-reports")), (_, _) -> {
+        }), new RegionCrashWriter(Path.of("build", "test-crash-reports"), CrashTelemetry.off()), (_, _) -> {
         }), () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache(), 0L), null);
         RegionContext.enter(new RegionContext.Region(regions.regionizer().regionAt(0, 0).id(), "leafs:test"));
         return scheduling;

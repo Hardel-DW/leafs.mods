@@ -1,6 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.metrics.CrashTelemetry;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
@@ -41,7 +42,7 @@ class LevelRegionsTest {
 
     @BeforeEach
     void createRegions() {
-        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, 16, 1, 1, 5, LeafsConfig.defaults().debug()));
+        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, 16, 1, 1, 5, false, LeafsConfig.defaults().debug()));
     }
 
     @ParameterizedTest
@@ -225,7 +226,7 @@ class LevelRegionsTest {
         LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> {
         }, _ -> {
         });
-        RegionTickScheduler scheduler = new RegionTickScheduler(1, false, watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports")), (_, _) -> {
+        RegionTickScheduler scheduler = new RegionTickScheduler(1, false, watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports"), CrashTelemetry.off()), (_, _) -> {
         });
         regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache(), 0L), null);
     }
