@@ -14,6 +14,7 @@ import fr.hardel.leafs.ticking.RegionCrashWriter;
 import fr.hardel.leafs.ticking.RegionTickScheduler;
 import fr.hardel.leafs.world.RegionWorldData;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -45,7 +46,7 @@ class ChunkSchedulingTest {
             @Override
             public void removeHold(int chunkX, int chunkZ, MailHold.Level level) {
             }
-        }));
+        }, Runnable::run));
         regions.simulated(0, 0);
         regions.activate("leafs:test", new RegionTickScheduler(1, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> {
         }, _ -> {
@@ -86,6 +87,22 @@ class ChunkSchedulingTest {
                 throw new IllegalStateException("mutation failed");
             }));
             scheduling.runOnOwner(0, 0, () -> order.add("inline"));
+        } finally {
+            RegionContext.exit();
+        }
+
+        assertEquals(List.of("inline"), order);
+    }
+
+    /** 2026-08-30: a worker draining a chunk no region owns must be its owner, or every task that re-posts to the chunk loops forever. */
+    @Test
+    void theClaimerOfAChunkNoRegionOwnsRunsInLine() {
+        ChunkScheduling scheduling = ownedScheduling();
+        List<String> order = new ArrayList<>();
+        try {
+            assertTrue(scheduling.mailbox().tryClaim(ChunkPos.pack(100, 100)));
+            assertTrue(scheduling.isOwner(100, 100), "the claim is the ownership of a chunk no region owns");
+            scheduling.runOnOwner(100, 100, () -> order.add("inline"));
         } finally {
             RegionContext.exit();
         }

@@ -7,6 +7,7 @@ import fr.hardel.leafs.chunk.propagator.LeafsTicketPropagator;
 import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickData;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
@@ -233,15 +234,19 @@ public final class ChunkScheduling {
         }
 
         mailbox.post(chunkX, chunkZ, hold, task);
+        if (regions.regionizer().regionAt(chunkX, chunkZ) == null) {
+            mailbox.drainOnWorkers(ChunkPos.pack(chunkX, chunkZ));
+        }
     }
 
-    /** The owning region on its worker, the server thread for a chunk no region owns, or a universal owner. */
+    /** The owning region on its worker, the thread holding the chunk's claim or borrowing its region, or a universal owner. */
     public boolean isOwner(int chunkX, int chunkZ) {
-        return currentRegionOwns(chunkX, chunkZ) || serverThreadOwns(chunkX, chunkZ) || isUniversalOwner();
+        return currentRegionOwns(chunkX, chunkZ) || mailbox.claimedByCurrentThread(ChunkPos.pack(chunkX, chunkZ)) || borrowHoldsRegion(chunkX, chunkZ) || isUniversalOwner();
     }
 
-    private boolean serverThreadOwns(int chunkX, int chunkZ) {
-        return chunkMap.level.getServer().isSameThread() && regions.regionizer().regionAt(chunkX, chunkZ) == null;
+    private boolean borrowHoldsRegion(int chunkX, int chunkZ) {
+        RegionBorrow borrow = RegionBorrow.current();
+        return borrow != null && borrow.holds(regions, chunkX, chunkZ);
     }
 
     // Universal ownership is the absence of rivals: a level whose regions have not started, or a halted pool.

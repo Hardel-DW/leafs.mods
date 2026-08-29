@@ -143,17 +143,9 @@ public final class RegionTickBody {
         }
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the orphan chunks, the loaders of players no region ticks, then the custom spawners. */
-    public void tickSerialRemainder(boolean spawnEnemies) {
-        ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        ((ChunkUnloadAccess) chunkMap).leafs$orphans().tick();
-        PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkMap).leafs$playerLoader();
-        for (ServerPlayer player : chunkMap.playerMap.getAllPlayers()) {
-            if (!RegionNetworkTick.ownedByRegion(player)) {
-                loader.tick(player);
-            }
-        }
-
+    /** What is left of the serial {@code tickChunks} pass: the ask for the workers' sweep, then the custom spawners. */
+    public void tickSerial(boolean spawnEnemies) {
+        ((ChunkUnloadAccess) level.getChunkSource().chunkMap).leafs$workerChunks().sweepSoon();
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
         }
