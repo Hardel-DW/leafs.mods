@@ -13,34 +13,35 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-/** {@code Level.neighborUpdater} swap: an update on a chunk this thread owns joins its collector, one on a chunk it does not goes to the owner's mail, a tick later. */
+/** {@code Level.neighborUpdater} swap: an update on a chunk this thread owns joins its collector, one on a chunk it does not goes to the owner's mail, a tick later. A region collects in its world data; any other owner, a chunk worker or the server thread, collects in its own thread's. */
 public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
     private final ServerLevel level;
-    private final CollectingNeighborUpdater fallback;
     private final DeferredTransports transports;
+    private final ThreadLocal<CollectingNeighborUpdater> threadCollector;
 
-    public RoutingNeighborUpdater(ServerLevel level, CollectingNeighborUpdater fallback, DeferredTransports transports) {
+    public RoutingNeighborUpdater(ServerLevel level, Supplier<CollectingNeighborUpdater> collectors, DeferredTransports transports) {
         super(level, 0);
         this.level = level;
-        this.fallback = fallback;
         this.transports = transports;
-    }
-
-    public static CollectingNeighborUpdater unwrap(CollectingNeighborUpdater updater) {
-        return updater instanceof RoutingNeighborUpdater routing ? routing.fallback : updater;
+        this.threadCollector = ThreadLocal.withInitial(collectors);
     }
 
     private void route(BlockPos pos, Consumer<CollectingNeighborUpdater> update) {
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
         if (transports.owns(chunkX, chunkZ)) {
-            RegionWorldData data = WorldTickContext.activeFor(level);
-            update.accept(data == null ? fallback : data.neighborUpdater());
+            update.accept(collector());
             return;
         }
 
         transports.toOwner(chunkX, chunkZ, () -> update.accept(this));
+    }
+
+    private CollectingNeighborUpdater collector() {
+        RegionWorldData data = WorldTickContext.activeFor(level);
+        return data == null ? threadCollector.get() : data.neighborUpdater();
     }
 
     @Override
@@ -65,6 +66,6 @@ public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
 
     @Override
     public void setDebugListener(@Nullable Consumer<BlockPos> debugListener) {
-        fallback.setDebugListener(debugListener);
+        collector().setDebugListener(debugListener);
     }
 }

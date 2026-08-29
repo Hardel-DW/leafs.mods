@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
-/** A required chunk that is not there: the ticket goes in, then the thread waits for the delivery the way it may. A region takes the chunk's region first and drains mail meanwhile, the server thread pumps as vanilla, any other thread just waits. */
+/** A required chunk that is not there: the ticket goes in, then the thread waits for the delivery the way it may. A region takes the chunk's region first and drains mail meanwhile, the server thread pumps as vanilla, any other thread just waits. A chunk no region owns is delivered by the workers. */
 public final class ChunkWait {
     private static final long PARK_NANOS = 50_000L;
 
@@ -41,10 +41,7 @@ public final class ChunkWait {
     public static void until(ServerLevel level, BooleanSupplier done) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         if (level.getServer().isSameThread()) {
-            level.getServer().managedBlock(() -> {
-                drainOrphans(chunkMap);
-                return done.getAsBoolean();
-            });
+            level.getServer().managedBlock(done);
             return;
         }
 
@@ -77,11 +74,5 @@ public final class ChunkWait {
         if (borrow != null) {
             borrow.drainMail(RegionChunkAccess.scheduling(chunkMap).mailbox(), chunkMap);
         }
-    }
-
-    /** The pump drains what the server thread holds; a chunk no region owns is mailed to the server thread and drained here. */
-    private static void drainOrphans(ChunkMap chunkMap) {
-        OrphanChunks orphans = ((ChunkUnloadAccess) chunkMap).leafs$orphans();
-        RegionChunkAccess.scheduling(chunkMap).mailbox().drainOrphans(orphans::owns);
     }
 }

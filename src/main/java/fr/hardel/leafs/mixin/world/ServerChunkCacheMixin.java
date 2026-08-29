@@ -2,15 +2,10 @@ package fr.hardel.leafs.mixin.world;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
-import fr.hardel.leafs.chunk.TicketTimeoutIndex;
 import fr.hardel.leafs.metrics.TickStages;
-import fr.hardel.leafs.region.CoordinateKey;
-import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.ticking.ChunkPumpAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.RegionTickData;
 
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionTickBody;
@@ -48,23 +43,12 @@ public abstract class ServerChunkCacheMixin {
         ((ChunkPumpAccess) (Object) self.mainThreadProcessor).leafs$bindLevel(this.level);
     }
 
-    /** Once regions tick, each purges its own sections; the serial phase keeps only the sections no region owns, never the whole table. */
+    /** Once regions tick, each purges its own sections and the workers' sweep the rest; vanilla's purge only survives before activation. */
     @WrapOperation(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/TicketStorage;purgeStaleTickets(Lnet/minecraft/server/level/ChunkMap;)V"))
-    private void leafs$purgeUnownedTimeouts(TicketStorage storage, ChunkMap chunkMap, Operation<Void> original) {
-        LevelRegions regions = LevelRegions.of(this.level);
-        if (regions.body() == null) {
+    private void leafs$purgeAsUniversalOwner(TicketStorage storage, ChunkMap chunkMap, Operation<Void> original) {
+        if (LevelRegions.of(this.level).body() == null) {
             original.call(storage, chunkMap);
-            return;
         }
-
-        TicketTimeoutIndex timeouts = ((TicketStorageAccess) storage).leafs$timeouts();
-        if (timeouts == null || timeouts.isEmpty()) {
-            return;
-        }
-
-        Regionizer<RegionTickData> regionizer = regions.regionizer();
-        int chunkShift = regionizer.sectionShift();
-        timeouts.purgeUnowned(section -> regionizer.regionAt(CoordinateKey.x(section) << chunkShift, CoordinateKey.z(section) << chunkShift) != null);
     }
 
     @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;tickChunks(Lnet/minecraft/util/profiling/ProfilerFiller;J)V"))
@@ -76,7 +60,7 @@ public abstract class ServerChunkCacheMixin {
             return;
         }
 
-        body.tickSerialRemainder(this.spawnEnemies);
+        body.tickSerial(this.spawnEnemies);
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialView);
     }
 

@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.network.PlayerListFileAccess;
 import fr.hardel.leafs.network.PlayerTeardown;
@@ -90,6 +91,7 @@ public abstract class PlayerListMixin implements PlayerListFileAccess {
             return;
         }
 
+        ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().follow(player);
         ChunkPos spawnChunk = player.chunkPosition();
         DeferredTransports transports = TickingBinding.of(level);
         if (transports.owns(spawnChunk.x(), spawnChunk.z())) {

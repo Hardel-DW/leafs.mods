@@ -120,27 +120,21 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         return autosaveForced;
     }
 
-    /** Whether every chunk and player a live region owns has saved the epoch; what no live region owns is nobody's to wait for. */
+    /** Whether every loaded chunk and every player saved the epoch: each belongs to a region or to the workers, so each gets there. */
     public boolean autosaveReached(long epoch, Iterable<ChunkHolder> holders, List<ServerPlayer> players) {
         for (ChunkHolder holder : holders) {
-            if (((SavedEpochAccess) holder).leafs$savedEpoch() < epoch && liveRegionOwns(holder.getPos().x(), holder.getPos().z())) {
+            if (((SavedEpochAccess) holder).leafs$savedEpoch() < epoch) {
                 return false;
             }
         }
 
         for (ServerPlayer player : players) {
-            ChunkPos chunk = player.chunkPosition();
-            if (((SavedEpochAccess) player).leafs$savedEpoch() < epoch && liveRegionOwns(chunk.x(), chunk.z())) {
+            if (((SavedEpochAccess) player).leafs$savedEpoch() < epoch) {
                 return false;
             }
         }
 
         return true;
-    }
-
-    private boolean liveRegionOwns(int chunkX, int chunkZ) {
-        Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
-        return region != null && region.data().handle() != null && !region.data().handle().isCancelled();
     }
 
     @Override
