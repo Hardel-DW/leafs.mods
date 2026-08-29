@@ -27,8 +27,6 @@ public final class TickStages {
     public static final TickStage globalDrain = create(TickFamily.GLOBAL, "drain");
     public static final TickStage globalConnections = create(TickFamily.GLOBAL, "connections");
     public static final TickStage globalPlayers = create(TickFamily.GLOBAL, "players");
-    public static final TickStage globalSendChunks = create(TickFamily.GLOBAL, "send_chunks");
-    public static final TickStage globalQuiesce = create(TickFamily.GLOBAL, "quiesce");
     public static final TickStage globalAutosave = create(TickFamily.GLOBAL, "autosave");
 
     public static final TickStage serialTasks = create(TickFamily.SERIAL, "tasks");

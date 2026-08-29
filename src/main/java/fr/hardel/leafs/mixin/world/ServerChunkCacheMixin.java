@@ -9,7 +9,6 @@ import fr.hardel.leafs.ticking.LevelRegions;
 
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.RegionTickBody;
-import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerChunkCache;
@@ -74,10 +73,10 @@ public abstract class ServerChunkCacheMixin {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialUnloads);
     }
 
-    /** A region walks the broadcast flags of its holders itself; only the serial thread still feeds the level set. */
+    /** Every owner walks the broadcast flags of its holders itself, region or workers; the level set stays empty. */
     @WrapOperation(method = {"blockChanged", "onChunkReadyToSend"}, at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))
     private boolean leafs$broadcastFlagsOnly(Set<ChunkHolder> instance, Object holder, Operation<Boolean> original) {
-        return WorldTickContext.activeFor(this.level) != null || original.call(instance, holder);
+        return true;
     }
 
     /** The move runs where it is called; the visibility pass it used to carry runs on every region's tracking tick. */
