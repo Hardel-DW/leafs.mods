@@ -65,6 +65,32 @@ public final class PlayerChunkLoader {
         }
     }
 
+    /** The chunk under the player takes its ticking ticket now, on the thread that moved him, so his region exists before anyone asks who owns him. Cheap once the chunk is at the ticking stage. */
+    public void follow(ServerPlayer player) {
+        if (skip(player)) {
+            return;
+        }
+
+        PlayerViewState state = states.computeIfAbsent(player, ignored -> new PlayerViewState());
+        long chunk = player.chunkPosition().pack();
+        byte stage = state.stages.get(chunk);
+        if (stage == PlayerViewState.STAGE_TICK) {
+            return;
+        }
+
+        if (stage == 0) {
+            tickets.acquire(chunk, StageTickets.TICK);
+        } else {
+            tickets.swap(chunk, PlayerViewState.heldTicketStage(stage), StageTickets.TICK);
+            state.loading.remove(chunk);
+            state.generating.remove(chunk);
+        }
+
+        state.stages.put(chunk, PlayerViewState.STAGE_TICK);
+        simulation.drain();
+        propagator.drain();
+    }
+
     public void removePlayer(ServerPlayer player) {
         PlayerViewState state = states.remove(player);
         if (state == null) {

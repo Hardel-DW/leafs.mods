@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ChunkMailboxTest {
@@ -34,7 +35,7 @@ class ChunkMailboxTest {
     @Test
     void aChunkIsHeldOncePerChunkUntilItsLastMailRan() {
         RecordingHolds holds = new RecordingHolds();
-        ChunkMailbox mailbox = new ChunkMailbox(holds);
+        ChunkMailbox mailbox = new ChunkMailbox(holds, Runnable::run);
         List<String> ran = new ArrayList<>();
         mailbox.post(3, 4, () -> ran.add("first"));
         mailbox.post(3, 4, () -> ran.add("second"));
@@ -51,7 +52,7 @@ class ChunkMailboxTest {
 
     @Test
     void aRepostToTheSameChunkWaitsForTheNextPass() {
-        ChunkMailbox mailbox = new ChunkMailbox(new RecordingHolds());
+        ChunkMailbox mailbox = new ChunkMailbox(new RecordingHolds(), Runnable::run);
         List<String> ran = new ArrayList<>();
         mailbox.post(0, 0, () -> {
             ran.add("first");
@@ -67,7 +68,7 @@ class ChunkMailboxTest {
     @Test
     void aThrowingMailLeavesTheRestQueuedWithTheHoldIntact() {
         RecordingHolds holds = new RecordingHolds();
-        ChunkMailbox mailbox = new ChunkMailbox(holds);
+        ChunkMailbox mailbox = new ChunkMailbox(holds, Runnable::run);
         List<String> ran = new ArrayList<>();
         mailbox.post(1, 1, () -> {
             throw new IllegalStateException("region crash");
@@ -86,7 +87,7 @@ class ChunkMailboxTest {
     @Test
     void aTickingPromotionHoldsItsNeighbourhoodAtFullUntilItRan() {
         RecordingHolds holds = new RecordingHolds();
-        ChunkMailbox mailbox = new ChunkMailbox(holds);
+        ChunkMailbox mailbox = new ChunkMailbox(holds, Runnable::run);
         mailbox.post(0, 0, MailHold.FULL_NEIGHBOURHOOD, () -> {
         });
         mailbox.post(1, 0, MailHold.FULL_NEIGHBOURHOOD, () -> {
@@ -97,10 +98,27 @@ class ChunkMailboxTest {
         assertEquals(12, Set.copyOf(added).size());
         assertEquals(List.of("+-1,-1 full", "+-1,0 full", "+-1,1 full"), added.subList(0, 3));
 
-        assertEquals(1, mailbox.drainOrphans(key -> key == ChunkPos.pack(0, 0)));
+        assertEquals(1, mailbox.drain(ChunkPos.pack(0, 0)));
         assertEquals(3, holds.tickets.stream().filter(ticket -> ticket.startsWith("-")).count(), "only the column the second promotion does not share is released");
 
-        assertEquals(1, mailbox.drainOrphans(key -> key == ChunkPos.pack(1, 0)));
+        assertEquals(1, mailbox.drain(ChunkPos.pack(1, 0)));
         assertEquals(12, holds.tickets.stream().filter(ticket -> ticket.startsWith("-")).count());
+    }
+
+    /** 2026-08-30: a chunk no region owns drains on the workers; a claim held elsewhere makes the worker step back, and the release hands the mail over. */
+    @Test
+    void aClaimedChunkWaitsForItsHolderToRelease() {
+        List<String> ran = new ArrayList<>();
+        ChunkMailbox mailbox = new ChunkMailbox(new RecordingHolds(), Runnable::run);
+        long key = ChunkPos.pack(0, 0);
+        assertTrue(mailbox.claim(key));
+        mailbox.post(0, 0, () -> ran.add("held"));
+
+        mailbox.drainOnWorkers(key);
+        assertEquals(List.of(), ran, "the worker steps back while the chunk is claimed");
+
+        mailbox.releaseToWorkers(key);
+        assertEquals(List.of("held"), ran, "the release hands the mail to a worker");
+        assertTrue(mailbox.tryClaim(key), "nothing holds the chunk once the worker is done");
     }
 }

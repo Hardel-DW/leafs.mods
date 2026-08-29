@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoutingNeighborUpdaterTest {
@@ -82,21 +81,31 @@ class RoutingNeighborUpdaterTest {
         router.updateNeighborsAtExceptFromFacing(pos, null, null, null);
     }
 
+    /** 2026-08-29: two chunk workers promoting chunks shared the level's collector and corrupted its stack; an owner without a region collects in its own thread's. */
     @Test
-    void offTickCallsKeepTheLevelCollector() {
-        RecordingUpdater fallback = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback, new FakeTransports());
+    void anOwnerWithoutARegionCollectsInItsOwnThread() throws InterruptedException {
+        List<RecordingUpdater> created = new ArrayList<>();
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> {
+            RecordingUpdater updater = new RecordingUpdater();
+            created.add(updater);
+            return updater;
+        }, new FakeTransports());
 
         callAll(router);
+        Thread other = new Thread(() -> callAll(router));
+        other.start();
+        other.join();
 
-        assertEquals(List.of("shape", "simple", "full", "multi"), fallback.calls);
+        assertEquals(2, created.size(), "one collector per thread");
+        assertEquals(List.of("shape", "simple", "full", "multi"), created.get(0).calls);
+        assertEquals(List.of("shape", "simple", "full", "multi"), created.get(1).calls);
     }
 
     @Test
     void activeContextRoutesEveryEntryPointToItsCollector() {
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback, new FakeTransports());
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, new FakeTransports());
         WorldTickContext.enter(null, null, dataWith(regional));
         try {
             callAll(router);
@@ -114,7 +123,7 @@ class RoutingNeighborUpdaterTest {
         RecordingUpdater fallback = new RecordingUpdater();
         FakeTransports transports = new FakeTransports();
         transports.owner = false;
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, fallback, transports);
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, transports);
 
         callAll(router);
         assertTrue(fallback.calls.isEmpty(), "nothing runs on the thread that does not own the chunk");
@@ -123,13 +132,5 @@ class RoutingNeighborUpdaterTest {
         transports.owner = true;
         transports.mail.forEach(Runnable::run);
         assertEquals(List.of("shape", "simple", "full", "multi"), fallback.calls);
-    }
-
-    @Test
-    void unwrapReturnsTheWrappedCollector() {
-        RecordingUpdater fallback = new RecordingUpdater();
-
-        assertSame(fallback, RoutingNeighborUpdater.unwrap(new RoutingNeighborUpdater(null, fallback, new FakeTransports())));
-        assertSame(fallback, RoutingNeighborUpdater.unwrap(fallback));
     }
 }
