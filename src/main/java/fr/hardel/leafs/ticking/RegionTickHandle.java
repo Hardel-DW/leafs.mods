@@ -62,7 +62,9 @@ public final class RegionTickHandle extends TickHandle {
             WorldTickContext.enter(body.level(), region, worldData);
             try {
                 StageTimings stages = stages();
-                stages.beginTick(System.nanoTime());
+                long startNanos = System.nanoTime();
+                stages.recordLag(startNanos - scheduledStartNanos());
+                stages.beginTick(startNanos);
                 unloadOwnChunks(body.level());
                 stages.mark(TickStages.regionUnloads);
                 body.tick(region, data.clock(), worldData, stages, regions);
