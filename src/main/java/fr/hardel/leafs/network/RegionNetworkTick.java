@@ -5,7 +5,6 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
-import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingBinding;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -55,30 +54,11 @@ public final class RegionNetworkTick {
         }
     }
 
-    /** A region owns the player when one owns his chunk; the global loop keeps its hands off him. */
-    public static boolean ownedByRegion(ServerPlayer player) {
-        if (!(player.level() instanceof ServerLevel level)) {
-            return false;
-        }
-
-        LevelRegions regions = LevelRegions.of(level);
-        ChunkPos chunk = player.chunkPosition();
-        return regions.body() != null && regions.regionizer().regionAt(chunk.x(), chunk.z()) != null;
-    }
-
-    /** {@code Connection.tick}'s listener half: skipped while a region owns the player, otherwise the complete vanilla tick, nobody else touches his chunks. */
+    /** {@code Connection.tick}'s listener half: a game listener ticks on the region owning its player, every other listener here. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
-        if (!(listener instanceof ServerGamePacketListenerImpl game)) {
+        if (!(listener instanceof ServerGamePacketListenerImpl)) {
             original.run();
-            return;
         }
-
-        if (ownedByRegion(game.player)) {
-            return;
-        }
-
-        PacketRouting.queueOf(game).drain();
-        original.run();
     }
 
     /** The respawn runs on the owner of the respawn spot as that listener's packet-handling thread; this drain ends here, the rest of the queue follows the player. */

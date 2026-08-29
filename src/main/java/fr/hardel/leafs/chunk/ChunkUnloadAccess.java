@@ -7,7 +7,7 @@ public interface ChunkUnloadAccess {
 
     ChunkUnloads leafs$unloads();
 
-    OrphanChunks leafs$orphans();
+    WorkerOwnedChunks leafs$workerChunks();
 
     void leafs$scheduleUnload(long pos, ChunkHolder holder);
 }

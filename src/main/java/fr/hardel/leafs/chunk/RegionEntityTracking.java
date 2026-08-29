@@ -18,12 +18,6 @@ public final class RegionEntityTracking {
     private RegionEntityTracking() {
     }
 
-    public static void tickSerial(ChunkMap chunkMap) {
-        for (ServerPlayer player : chunkMap.playerMap.getAllPlayers()) {
-            chunkMap.updateChunkTracking(player);
-        }
-    }
-
     public static void tickRegion(ServerLevel level, RegionEntities entities) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         Int2ObjectMap<ChunkMap.TrackedEntity> entityMap = chunkMap.entityMap;
