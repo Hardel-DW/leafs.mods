@@ -1,30 +1,26 @@
 package fr.hardel.leafs.chunk.core;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSortedSet;
 import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
-import java.util.Comparator;
 import net.minecraft.server.level.ChunkHolder;
 import org.jspecify.annotations.NonNull;
 
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
 /** The one holder table, both vanilla fields point here. The superclass stays empty, so every surface not delegated below throws rather than lie. */
 public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
 
-    private final ConcurrentHashMap<Long, ChunkHolder> holders = new ConcurrentHashMap<>(1024);
+    private final ConcurrentLong2ObjectMap<ChunkHolder> holders = new ConcurrentLong2ObjectMap<>();
     private final AtomicBoolean dirty = new AtomicBoolean();
 
     public ConcurrentChunkTable() {
@@ -43,12 +39,13 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
     @Override
     public ChunkHolder get(Object key) {
-        return key instanceof Long boxed ? holders.get(boxed) : null;
+        return key instanceof Long boxed ? holders.get(boxed.longValue()) : null;
     }
 
     @Override
     public ChunkHolder getOrDefault(long key, ChunkHolder defaultValue) {
-        return holders.getOrDefault(key, defaultValue);
+        ChunkHolder holder = holders.get(key);
+        return holder == null ? defaultValue : holder;
     }
 
     @Override
@@ -103,7 +100,9 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
     @Override
     public void forEach(BiConsumer<? super Long, ? super ChunkHolder> action) {
-        holders.forEach(action);
+        for (Long2ObjectMap.Entry<ChunkHolder> entry : holders.long2ObjectEntrySet()) {
+            action.accept(entry.getLongKey(), entry.getValue());
+        }
     }
 
     /** The double buffer is gone, both vanilla fields must observe the same instance. */
@@ -114,22 +113,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
     @Override
     public @NonNull ObjectCollection<ChunkHolder> values() {
-        return new AbstractObjectCollection<>() {
-            @Override
-            public @NonNull ObjectIterator<ChunkHolder> iterator() {
-                return ObjectIterators.asObjectIterator(holders.values().iterator());
-            }
-
-            @Override
-            public int size() {
-                return holders.size();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-                return value != null && holders.containsValue(value);
-            }
-        };
+        return holders.values();
     }
 
     /** The sorted key view has no meaning over an unordered backing, and nothing in the chunk system asks for it. */
@@ -148,7 +132,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
         @Override
         public @NonNull ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> iterator() {
-            Iterator<Map.Entry<Long, ChunkHolder>> backing = holders.entrySet().iterator();
+            ObjectIterator<Long2ObjectMap.Entry<ChunkHolder>> backing = holders.long2ObjectEntrySet().iterator();
             return new ObjectBidirectionalIterator<>() {
                 @Override
                 public boolean hasNext() {
@@ -157,8 +141,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
                 @Override
                 public Long2ObjectMap.Entry<ChunkHolder> next() {
-                    Map.Entry<Long, ChunkHolder> entry = backing.next();
-                    return new BasicEntry<>(entry.getKey().longValue(), entry.getValue());
+                    return backing.next();
                 }
 
                 @Override
@@ -195,10 +178,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
 
         @Override
         public boolean contains(Object object) {
-            return object instanceof Map.Entry<?, ?> entry
-                && entry.getKey() instanceof Long key
-                && entry.getValue() != null
-                && entry.getValue().equals(holders.get(key));
+            return holders.long2ObjectEntrySet().contains(object);
         }
 
         @Override

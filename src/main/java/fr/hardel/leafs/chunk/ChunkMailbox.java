@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -12,7 +13,6 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.ArrayDeque;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.LockSupport;
 
@@ -24,7 +24,7 @@ public final class ChunkMailbox {
     private final Executor workers;
     private final Long2ObjectOpenHashMap<ArrayDeque<Mail>> mail = new Long2ObjectOpenHashMap<>();
     private final EnumMap<MailHold.Level, Long2IntOpenHashMap> heldChunks = new EnumMap<>(MailHold.Level.class);
-    private final ConcurrentHashMap<Long, Thread> claims = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Thread> claims = new ConcurrentLong2ObjectMap<>();
     private volatile int pending;
 
     private record Mail(int chunkX, int chunkZ, MailHold hold, Runnable task) {}
@@ -221,7 +221,8 @@ public final class ChunkMailbox {
         }
     }
 
-    private synchronized long[] keys() {
+    /** The chunks with mail waiting, for the workers' sweep. */
+    public synchronized long[] keys() {
         return mail.keySet().toLongArray();
     }
 }

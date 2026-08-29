@@ -72,7 +72,7 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionTasks);
         ServerChunkCache chunkSource = level.getChunkSource();
         RegionEntities entities = worldData.entities();
-        entities.refresh(level.entityManager.sectionStorage, chunks.holders());
+        entities.refresh(level, chunks.holders());
         stages.mark(TickStages.regionTickets);
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {

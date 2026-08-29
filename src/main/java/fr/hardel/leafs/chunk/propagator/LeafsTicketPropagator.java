@@ -598,9 +598,9 @@ public abstract class LeafsTicketPropagator {
                     int dz = (direction >>> 2) & 3;
                     int offX = (posX - 1) + dx;
                     int offZ = (posZ - 1) + dz;
-
                     int sectionIndex = (offX >> SECTION_SHIFT) + (offZ >> SECTION_SHIFT) * CACHE_WIDTH + sectionIndexOffset;
                     int localIndex = (offX & (SECTION_SIZE - 1)) | ((offZ & (SECTION_SIZE - 1)) << SECTION_SHIFT);
+                    
                     int start = dx | (dz << 3);
                     long line1 = uncovered & (7L << start);
                     long line2 = uncovered & (7L << (start + 8));
