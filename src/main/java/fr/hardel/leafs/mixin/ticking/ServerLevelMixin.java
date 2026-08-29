@@ -61,6 +61,12 @@ public abstract class ServerLevelMixin implements ServerLevelRegionAccess {
         leafs$markSerial(TickStages.serialDragon);
     }
 
+    @Inject(method = "close", at = @At("TAIL"))
+    private void leafs$forgetOnClose(CallbackInfo callbackInfo) {
+        ServerLevel level = (ServerLevel) (Object) this;
+        TickingManager.of(level.getServer()).forgetLevel(level);
+    }
+
     @Unique
     private void leafs$markSerial(TickStage stage) {
         ServerLevel level = (ServerLevel) (Object) this;

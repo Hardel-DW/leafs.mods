@@ -155,6 +155,16 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         }
     }
 
+    /** Every region handle cancelled: the level is closing, nothing of it ticks again. */
+    public void retire() {
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            RegionTickHandle handle = region.data().handle();
+            if (handle != null) {
+                handle.cancel();
+            }
+        }
+    }
+
     /** An empty tick on every region triggers splits, destroys and reclaims; for the shutdown drain and levels whose pool never bound. */
     public void settle() {
         rethrowFeedFailure();

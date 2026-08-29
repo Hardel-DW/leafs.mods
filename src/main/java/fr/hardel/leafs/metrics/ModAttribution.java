@@ -28,10 +28,14 @@ public final class ModAttribution {
         this.ownerOfClass = ownerOfClass;
     }
 
-    /** Backed by the loader: a class maps to the mod whose origin holds its code source. */
+    /** Backed by the loader: a class maps to the mod whose origin holds its code source. A nested jar has no path of its own, its classes count for the parent. */
     public static ModAttribution fromLoader() {
         Map<Path, ModContainer> byOrigin = new HashMap<>();
         for (ModContainer mod : FabricLoader.getInstance().getAllMods()) {
+            if (mod.getOrigin().getKind() != ModOrigin.Kind.PATH) {
+                continue;
+            }
+
             for (Path path : mod.getOrigin().getPaths()) {
                 byOrigin.put(path.toAbsolutePath().normalize(), mod);
             }
@@ -65,10 +69,6 @@ public final class ModAttribution {
         ModContainer mod = byOrigin.get(source);
         if (mod == null) {
             return Optional.empty();
-        }
-
-        if (mod.getOrigin().getKind() == ModOrigin.Kind.NESTED) {
-            mod = FabricLoader.getInstance().getModContainer(mod.getOrigin().getParentModId()).orElse(mod);
         }
 
         String id = mod.getMetadata().getId();

@@ -1,5 +1,10 @@
 package fr.hardel.leafs.mixin.world;
 
+import fr.hardel.leafs.world.WorldTickContext;
+import java.util.concurrent.ConcurrentHashMap;
+import org.spongepowered.asm.mixin.Mutable;
+import net.minecraft.world.level.ChunkPos;
+import fr.hardel.leafs.chunk.ChangedChunksAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
@@ -27,7 +32,7 @@ import java.util.Set;
 
 /** Per-chunk tick work moved to region bodies; broadcast marks route to the owning unit. */
 @Mixin(ServerChunkCache.class)
-public abstract class ServerChunkCacheMixin {
+public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
 
     @Shadow
     @Final
@@ -36,10 +41,22 @@ public abstract class ServerChunkCacheMixin {
     @Shadow
     private boolean spawnEnemies;
 
+    @Mutable
+    @Shadow
+    @Final
+    private Set<ChunkHolder> chunkHoldersToBroadcast;
+
+    @Override
+    public Set<ChunkHolder> leafs$changedHolders() {
+        return chunkHoldersToBroadcast;
+    }
+
+    /** The set takes writers from every owner; a region skips it for its own chunks, so it holds what the workers' sweep must broadcast. */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$bindPumpLevel(CallbackInfo callbackInfo) {
         ServerChunkCache self = (ServerChunkCache) (Object) this;
         ((ChunkPumpAccess) (Object) self.mainThreadProcessor).leafs$bindLevel(this.level);
+        this.chunkHoldersToBroadcast = ConcurrentHashMap.newKeySet();
     }
 
     /** Once regions tick, each purges its own sections and the workers' sweep the rest; vanilla's purge only survives before activation. */
@@ -73,10 +90,19 @@ public abstract class ServerChunkCacheMixin {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialUnloads);
     }
 
-    /** Every owner walks the broadcast flags of its holders itself, region or workers; the level set stays empty. */
+    /** A region broadcasts its own chunks from their flags; a change anywhere else lands in the set the workers' sweep drains. */
     @WrapOperation(method = {"blockChanged", "onChunkReadyToSend"}, at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))
-    private boolean leafs$broadcastFlagsOnly(Set<ChunkHolder> instance, Object holder, Operation<Boolean> original) {
-        return true;
+    private boolean leafs$changedOutsideTheRegion(Set<ChunkHolder> instance, Object holder, Operation<Boolean> original) {
+        ChunkPos pos = ((ChunkHolder) holder).getPos();
+        return WorldTickContext.ownsChunk(this.level, pos.x(), pos.z()) || original.call(instance, holder);
+    }
+
+    /** The serial broadcast walk only survives before activation; after it the sweep owns the set. */
+    @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;broadcastChangedChunks(Lnet/minecraft/util/profiling/ProfilerFiller;)V"))
+    private void leafs$broadcastAsUniversalOwner(ServerChunkCache instance, ProfilerFiller profiler, Operation<Void> original) {
+        if (LevelRegions.of(this.level).body() == null) {
+            original.call(instance, profiler);
+        }
     }
 
     /** The move runs where it is called; the visibility pass it used to carry runs on every region's tracking tick. */

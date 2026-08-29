@@ -1,19 +1,19 @@
 package fr.hardel.leafs.chunk.propagator;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
 
-/** Replaces vanilla's SimulationChunkTracker: fed by the simulation listener, published as a concurrent map regions read lock-free. 33 means not simulated. A chunk entering or leaving simulation is what shapes the regions. */
+/** Replaces vanilla's SimulationChunkTracker: fed by the simulation listener, published as a concurrent map regions read without boxing. 33 means not simulated. A chunk entering or leaving simulation is what shapes the regions. */
 public final class SimulationLevels extends LeafsTicketPropagator {
 
     public static final int NOT_SIMULATED = 33;
 
     private final AreaLock ticketLock = new AreaLock(SECTION_SHIFT);
-    private final ConcurrentHashMap<Long, Byte> levels = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Byte> levels = new ConcurrentLong2ObjectMap<>();
     private volatile SimulationListener listener;
 
     /** Bound once the level's regions exist; before that nothing simulates. */
@@ -63,7 +63,7 @@ public final class SimulationLevels extends LeafsTicketPropagator {
                 continue;
             }
 
-            if (levels.put(key, (byte) level) == null) {
+            if (levels.put(key, Byte.valueOf((byte) level)) == null) {
                 listener.simulated(ChunkPos.getX(key), ChunkPos.getZ(key));
             }
         }
