@@ -4,7 +4,6 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import fr.hardel.leafs.network.ContainerClickGuard;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
@@ -12,7 +11,6 @@ import fr.hardel.leafs.network.PlayerTeardown;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
-import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -73,10 +71,4 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     private void leafs$disconnectOnTheOwner(DisconnectionDetails details, Operation<Void> original) {
         PlayerTeardown.run(this.player, () -> original.call(details));
     }
-
-    @WrapMethod(method = "handleContainerClick")
-    private void leafs$guardedContainerClick(ServerboundContainerClickPacket packet, Operation<Void> original) {
-        ContainerClickGuard.handleGuarded(this.player, packet, () -> original.call(packet));
-    }
-
 }

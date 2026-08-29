@@ -85,14 +85,10 @@ public final class CommandEngine {
     }
 
     private static <T> T head(Consumer<RegionBorrow> firstContact, Supplier<T> body) {
-        RegionBorrow borrow = RegionBorrow.enter();
-        try {
+        return RegionBorrow.hold(null, borrow -> {
             firstContact.accept(borrow);
             return body.get();
-        } finally {
-            borrow.releaseAll();
-            RegionBorrow.exit();
-        }
+        });
     }
 
     private static void borrowEntity(RegionBorrow borrow, Entity entity) {

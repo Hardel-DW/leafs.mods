@@ -21,15 +21,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Server-scoped orchestrator of the region tick machinery, one per server, reached by {@link #of}. */
 public final class TickingManager {
-    private static final int QUIESCE_DRAIN_FLOOR = 64;
-
     private final MinecraftServer server;
     private final ServerMetrics metrics = new ServerMetrics();
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkWorkers chunkWorkers;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
-    private final SerialWorkBudget serialBudget = new SerialWorkBudget();
     private final int slowTaskWarnMillis;
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
@@ -83,11 +80,7 @@ public final class TickingManager {
         return globalScheduler;
     }
 
-    public SerialWorkBudget serialBudget() {
-        return serialBudget;
-    }
-
-    /** True once {@code stopServer} began: budget deferrals stop, the shutdown drains remaining work in line. */
+    /** True once {@code stopServer} began: the shutdown drains remaining work in line. */
     public boolean halted() {
         return halted;
     }
@@ -131,27 +124,6 @@ public final class TickingManager {
     public void tickPausedNetwork() {
         for (LevelTickUnit unit : levelUnits.values()) {
             unit.tickPausedNetwork();
-        }
-    }
-
-    /** Ticket ops first, then bookkeeping (which runs the distance updates that materialise holders), then offers. */
-    public void quiesce() {
-        for (ServerLevel level : server.getAllLevels()) {
-            LevelRegions regions = LevelRegions.of(level);
-            drainChunkBookkeeping(level);
-            regions.rethrowFeedFailure();
-        }
-    }
-
-    /** Time-boxed on the shared budget above a floor; a synchronous waiter drains the pump itself, so a leftover never blocks. A shutdown drains whole. */
-    private void drainChunkBookkeeping(ServerLevel level) {
-        int drained = 0;
-        boolean hasMore = true;
-        while (hasMore) {
-            hasMore = level.getChunkSource().pollTask();
-            if (hasMore && !halted && ++drained >= QUIESCE_DRAIN_FLOOR && serialBudget.expired(System.nanoTime())) {
-                return;
-            }
         }
     }
 
@@ -222,6 +194,6 @@ public final class TickingManager {
     }
 
     private LevelTickUnit unitFor(ServerLevel level) {
-        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler, serialBudget, slowTaskWarnMillis));
+        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler, slowTaskWarnMillis));
     }
 }
