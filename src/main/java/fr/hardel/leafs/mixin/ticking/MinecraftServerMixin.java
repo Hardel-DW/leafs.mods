@@ -37,9 +37,7 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     /** The global stage sample spans {@code tickServer}; an early pause-branch return still publishes at RETURN. */
     @Inject(method = "tickServer", at = @At("HEAD"))
     private void leafs$beginGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        long now = System.nanoTime();
-        leafs$ticking.metrics().globalStages().beginTick(now);
-        leafs$ticking.serialBudget().beginTick(now);
+        leafs$ticking.metrics().globalStages().beginTick(System.nanoTime());
     }
 
     @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V", shift = At.Shift.AFTER), require = 0)
@@ -65,14 +63,6 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         if (((MinecraftServer) (Object) this).isPaused()) {
             leafs$ticking.tickPausedNetwork();
         }
-    }
-
-    @Inject(method = "tickChildren", at = @At("TAIL"))
-    private void leafs$quiesceLevels(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        StageTimings globalStages = leafs$ticking.metrics().globalStages();
-        globalStages.mark(TickStages.globalSendChunks);
-        leafs$ticking.quiesce();
-        globalStages.mark(TickStages.globalQuiesce);
     }
 
     /** Before the worlds save: the pool stops so saves read settled state, then pending teleports place. */

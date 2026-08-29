@@ -20,7 +20,6 @@ public final class LevelTickUnit extends TickHandle {
     private final ServerLevel level;
     private final LevelRegions regions;
     private final RegionTickScheduler scheduler;
-    private final SerialWorkBudget serialBudget;
     private final int slowTaskWarnMillis;
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
@@ -28,12 +27,11 @@ public final class LevelTickUnit extends TickHandle {
     private volatile int lastChunkCount;
     private volatile int lastViewChunks;
 
-    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, SerialWorkBudget serialBudget, int slowTaskWarnMillis) {
+    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, int slowTaskWarnMillis) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
-        this.serialBudget = serialBudget;
         this.slowTaskWarnMillis = slowTaskWarnMillis;
     }
 
@@ -77,6 +75,7 @@ public final class LevelTickUnit extends TickHandle {
         runQueuedTasks();
         stages.mark(TickStages.serialTasks);
         work.run();
+        regions.rethrowFeedFailure();
 
         if (level.getGameTime() % CENSUS_INTERVAL_TICKS == 0) {
             lastChunkCount = level.getChunkSource().getLoadedChunksCount();
@@ -97,20 +96,15 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** Time-boxed on the budget all dimensions share; at least one task runs, a slow one logs its class. */
+    /** Everything queued runs; a slow one logs its class. */
     private void runQueuedTasks() {
         Runnable task;
         while ((task = tasks.poll()) != null) {
             long start = System.nanoTime();
             task.run();
-            long end = System.nanoTime();
-            long millis = (end - start) / 1_000_000L;
+            long millis = (System.nanoTime() - start) / 1_000_000L;
             if (slowTaskWarnMillis > 0 && millis > slowTaskWarnMillis) {
                 Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
-            }
-
-            if (serialBudget.expired(end)) {
-                break;
             }
         }
     }

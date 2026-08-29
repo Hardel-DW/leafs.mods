@@ -15,10 +15,6 @@ public final class RoutingRandomSource implements RandomSource {
         this.vanilla = vanilla;
     }
 
-    public static RandomSource unwrap(RandomSource random) {
-        return random instanceof RoutingRandomSource routing ? routing.vanilla : random;
-    }
-
     private RandomSource resolve() {
         RegionWorldData data = WorldTickContext.activeFor(level);
         return data == null ? vanilla : data.random();

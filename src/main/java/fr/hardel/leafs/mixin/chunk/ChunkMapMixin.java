@@ -257,7 +257,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return original.call(future, body, leafs$scheduling.tickingPromotionExecutor(pos.x(), pos.z()));
     }
 
-    /** Reached by the promotion body on the owner and by the light-sync continuation on the pump; the latter re-routes. */
+    /** Reached by the promotion body on the owner, or by the light-sync continuation from the pump; the latter hops to the owner. */
     @Inject(method = "onChunkReadyToSend", at = @At("HEAD"), cancellable = true)
     private void leafs$readyToSendOnTheOwner(ChunkHolder chunkHolder, LevelChunk chunk, CallbackInfo callbackInfo) {
         ChunkPos pos = chunk.getPos();
@@ -403,10 +403,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return original.call(future, body, leafs$chunkWorkers());
     }
 
-    /**
-     * The epoch bump replaces the holder walk, each region saves its own chunks. A flush waits for every live region to reach the epoch,
-     * then flushes the storage. An empty server or a stopped pool keeps the vanilla walk, the server thread is then the universal owner.
-     */
+    /** The epoch bump replaces the holder walk, each owner saves its own chunks; a flush waits for every chunk to reach the epoch. The vanilla walk survives for the universal owner. */
     @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
     private void leafs$epochAutosave(boolean flushStorage, CallbackInfo callbackInfo) {
         ChunkMap self = (ChunkMap) (Object) this;

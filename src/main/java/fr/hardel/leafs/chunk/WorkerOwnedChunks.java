@@ -14,10 +14,12 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The loaded chunks no region owns, the view distance beyond every ring: the chunk workers keep their mail, their saves and their unloads. One sweep at a time per level, asked for once per level tick, never run by the server thread. */
+/** The loaded chunks no region owns, the view distance beyond every ring: the chunk workers keep their mail, saves, unloads and broadcasts. One sweep at a time per level, asked for once per level tick, never run by the server thread. */
 public final class WorkerOwnedChunks {
     private final ServerLevel level;
     private final LevelRegions regions;
@@ -60,7 +62,9 @@ public final class WorkerOwnedChunks {
                 ((ServerLevelEntityAccess) level).leafs$entityPersistence().unloadHidden(claimed::contains);
                 unloads.decide(claimed::contains);
                 saves.saveEagerly(claimed::contains);
-                saveBehindEpoch(claimed);
+                List<ChunkHolder> holders = holders(claimed);
+                saveBehindEpoch(holders);
+                ChunkBroadcasts.changed(holders);
             } finally {
                 for (long key : claimed) {
                     mailbox.releaseToWorkers(key);
@@ -69,6 +73,19 @@ public final class WorkerOwnedChunks {
         } finally {
             sweeping.set(false);
         }
+    }
+
+    private List<ChunkHolder> holders(LongOpenHashSet claimed) {
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        List<ChunkHolder> holders = new ArrayList<>(claimed.size());
+        for (long key : claimed) {
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
+            if (holder != null) {
+                holders.add(holder);
+            }
+        }
+
+        return holders;
     }
 
     private LongOpenHashSet claimOwned() {
@@ -83,13 +100,11 @@ public final class WorkerOwnedChunks {
         return claimed;
     }
 
-    private void saveBehindEpoch(LongOpenHashSet claimed) {
+    private void saveBehindEpoch(List<ChunkHolder> holders) {
         long epoch = regions.autosaveEpoch();
         int budget = regions.autosaveForced() ? Integer.MAX_VALUE : ChunkSaves.CHUNKS_PER_TICK;
-        ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        for (long key : claimed) {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
-            if (holder != null && saves.saveBehindEpoch(holder, epoch) && --budget == 0) {
+        for (ChunkHolder holder : holders) {
+            if (saves.saveBehindEpoch(holder, epoch) && --budget == 0) {
                 return;
             }
         }
