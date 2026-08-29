@@ -20,6 +20,11 @@ public final class ChunkUnloads {
         this.unloads = unloads;
     }
 
+    /** What vanilla marked to drop and nobody decided yet. */
+    public LongSet pending() {
+        return toDrop;
+    }
+
     /** The caller's chunks among the ones vanilla marked to drop. */
     public void decide(LongPredicate owned) {
         for (LongIterator iterator = toDrop.iterator(); iterator.hasNext(); ) {

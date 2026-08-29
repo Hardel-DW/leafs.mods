@@ -117,6 +117,16 @@ public final class TickingManager {
         scheduler.runAttached(unit);
     }
 
+    /** A level closing takes its unit and its region handles with it; a mod that unloads a dimension leaves nothing scheduled behind. */
+    public void forgetLevel(ServerLevel level) {
+        LevelTickUnit unit = levelUnits.remove(level);
+        if (unit != null) {
+            unit.cancel();
+        }
+
+        LevelRegions.of(level).retire();
+    }
+
     /** Runs on the owner's next tick, before its level tick. */
     public void submitToLevel(ServerLevel level, Runnable task) {
         unitFor(level).submit(task);

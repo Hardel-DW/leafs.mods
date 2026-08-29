@@ -2,6 +2,7 @@ package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.Visibility;
@@ -27,6 +28,10 @@ public final class RegionEntityPersistence {
     /** A loaded entity chunk lands on its owner; an empty chunk completes on the requesting owner and runs in place. */
     public void deliver(ChunkPos pos, Runnable delivery) {
         ((PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling().runOnOwner(pos.x(), pos.z(), delivery);
+    }
+
+    public LongSet pendingUnloads() {
+        return manager.leafs$chunksToUnload();
     }
 
     /** Vanilla's processUnloads over the chunks the caller owns: a chunk no longer hidden leaves the set, a hidden one unloads. */
