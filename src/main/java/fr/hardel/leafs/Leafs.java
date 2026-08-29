@@ -19,6 +19,6 @@ public final class Leafs implements ModInitializer {
         LeafsCommand.register();
 
         LeafsConfig config = LeafsConfig.get();
-        LOGGER.info("Leafs initialised - {} region workers, {}x{}-chunk sections", config.effectiveThreads(), config.sectionSize(), config.sectionSize());
+        LOGGER.info("Leafs initialised - {} region workers, {} chunk workers, {}x{}-chunk sections", config.effectiveRegionThreads(), config.effectiveChunkThreads(), config.sectionSize(), config.sectionSize());
     }
 }
