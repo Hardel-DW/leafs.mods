@@ -42,7 +42,7 @@ class LevelRegionsTest {
 
     @BeforeEach
     void createRegions() {
-        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, 16, 1, 1, 5, false, LeafsConfig.defaults().debug()));
+        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, 5, false, LeafsConfig.defaults().debug()));
     }
 
     @ParameterizedTest

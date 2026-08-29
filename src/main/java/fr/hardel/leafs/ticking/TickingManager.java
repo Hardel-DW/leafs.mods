@@ -39,12 +39,12 @@ public final class TickingManager {
         this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), CrashTelemetry.fromLoader(config.telemetry()));
-        this.scheduler = new RegionTickScheduler(config.effectiveThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
-        this.chunkWorkers = new ChunkWorkers(config.effectiveThreads());
+        this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
+        this.chunkWorkers = new ChunkWorkers(config.effectiveChunkThreads());
         DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
-        Leafs.LOGGER.info("Leafs ticking live - {} region workers and as many chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveThreads());
+        Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveRegionThreads(), config.effectiveChunkThreads());
     }
 
     /** Vanilla's {@code max-tick-time}, read late: the dedicated settings bind after this manager is built. Only a dedicated server kills, -1 disables. */

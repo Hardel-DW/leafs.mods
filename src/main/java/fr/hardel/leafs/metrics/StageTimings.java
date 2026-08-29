@@ -4,7 +4,7 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 
 import java.util.Arrays;
 
-/** Per-tick ring of one unit, stage durations plus tick length; single writer, torn reads tolerated, skipped passes count for nothing. */
+/** Per-tick ring of one unit, stage durations plus tick length, and lifetime totals a sampler differences; single writer, torn reads tolerated, skipped passes count for nothing. */
 public final class StageTimings {
     public static final int CAPACITY = 240;
     private static final long WINDOW_NANOS = 5_000_000_000L;
@@ -17,6 +17,8 @@ public final class StageTimings {
     private long beginNanos;
     private long lastMarkNanos;
     private volatile int cursor;
+    private volatile long busyNanos;
+    private volatile long lagNanos;
 
     public StageTimings(int stageCount) {
         this.ring = new long[CAPACITY][stageCount];
@@ -45,10 +47,26 @@ public final class StageTimings {
 
     public void endTick(long nowNanos) {
         int index = cursor % CAPACITY;
+        long duration = nowNanos - beginNanos;
         endNanos[index] = nowNanos;
-        durationNanos[index] = nowNanos - beginNanos;
+        durationNanos[index] = duration;
+        busyNanos += duration;
         row = null;
         cursor++;
+    }
+
+    /** How long the unit waited past its due time. Regions only, an attached unit never queues so it stays at zero. */
+    public void recordLag(long nanos) {
+        lagNanos += nanos;
+    }
+
+    /** Total ticking time; a sampler differences two reads to get the work done in between. */
+    public long busyNanos() {
+        return busyNanos;
+    }
+
+    public long lagNanos() {
+        return lagNanos;
     }
 
     public int stageCount() {

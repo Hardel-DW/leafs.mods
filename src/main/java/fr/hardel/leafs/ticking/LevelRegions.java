@@ -45,6 +45,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
 
     /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
     private volatile long created;
+    private volatile long destroyed;
     private volatile long merged;
     private volatile long split;
     private volatile int deferredHandshakes;
@@ -193,6 +194,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         return created;
     }
 
+    public long destroyed() {
+        return destroyed;
+    }
+
     public long merged() {
         return merged;
     }
@@ -289,6 +294,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
 
     @Override
     public void onRegionDestroy(Region<RegionTickData> region) {
+        destroyed++;
     }
 
     @Override

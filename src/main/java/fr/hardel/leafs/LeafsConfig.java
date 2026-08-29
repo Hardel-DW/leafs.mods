@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, boolean telemetry, Debug debug) {
+public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, boolean telemetry, Debug debug) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -32,7 +32,8 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
 
     /** The keys {@code /leafs config} may rewrite; telemetry and the debug group stay a file-only matter. */
     public enum Setting {
-        MAX_THREADS("max_threads", LeafsConfig::maxThreads),
+        REGION_THREADS("region_threads", LeafsConfig::regionThreads),
+        CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
         SECTION_SIZE("section_size", LeafsConfig::sectionSize),
         REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance),
         REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance),
@@ -59,10 +60,13 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
         }
     }
 
-    private static final Codec<Integer> MAX_THREADS = Codec.intRange(ALL_CORES, 1024)
-        .validate(value -> value == 0
-            ? DataResult.error(() -> "max_threads 0 is invalid: -1 uses all cores")
-            : DataResult.success(value));
+    /** Each pool sizes itself, and their sum may exceed the machine: chunk workers run at the lowest priority and give way, so each absorbs the other's slack. */
+    private static Codec<Integer> threads(Setting setting) {
+        return Codec.intRange(ALL_CORES, 1024)
+            .validate(value -> value == 0
+                ? DataResult.error(() -> setting.key() + " 0 is invalid: -1 uses all cores")
+                : DataResult.success(value));
+    }
 
     private static final Codec<Integer> SECTION_SIZE = Codec.intRange(2, 256)
         .validate(value -> Integer.bitCount(value) == 1
@@ -76,7 +80,8 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
     ).apply(builder, Debug::new));
 
     private static final Codec<LeafsConfig> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-        MAX_THREADS.optionalFieldOf(Setting.MAX_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::maxThreads),
+        threads(Setting.REGION_THREADS).optionalFieldOf(Setting.REGION_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::regionThreads),
+        threads(Setting.CHUNK_THREADS).optionalFieldOf(Setting.CHUNK_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::chunkThreads),
         SECTION_SIZE.optionalFieldOf(Setting.SECTION_SIZE.key(), 2).forGetter(LeafsConfig::sectionSize),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
@@ -114,8 +119,16 @@ public record LeafsConfig(int maxThreads, int sectionSize, int regionMergeDistan
         return write(file, parse(file, json));
     }
 
-    public int effectiveThreads() {
-        return maxThreads > 0 ? maxThreads : Runtime.getRuntime().availableProcessors();
+    public int effectiveRegionThreads() {
+        return effective(regionThreads);
+    }
+
+    public int effectiveChunkThreads() {
+        return effective(chunkThreads);
+    }
+
+    private static int effective(int threads) {
+        return threads > 0 ? threads : Runtime.getRuntime().availableProcessors();
     }
 
     public int sectionShift() {

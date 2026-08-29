@@ -30,13 +30,14 @@ class LeafsConfigTest {
     void partialFileOverridesItsKeysAndKeepsTheRest(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");
         Files.writeString(file, """
-            {"max_threads": 8, "section_size": 32, "debug": {"per_region_logs": true}}
+            {"region_threads": 8, "section_size": 32, "debug": {"per_region_logs": true}}
             """);
 
         LeafsConfig config = LeafsConfig.load(file);
         LeafsConfig defaults = LeafsConfig.defaults();
 
-        assertEquals(8, config.effectiveThreads());
+        assertEquals(8, config.effectiveRegionThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors(), config.effectiveChunkThreads());
         assertEquals(32, config.sectionSize());
         assertEquals(5, config.sectionShift());
         assertTrue(config.debug().perRegionLogs());
@@ -46,8 +47,10 @@ class LeafsConfigTest {
 
     @Test
     void absentThreadsResolveToEveryProcessor() {
-        assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().maxThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveThreads());
+        assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().regionThreads());
+        assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().chunkThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveRegionThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveChunkThreads());
     }
 
     @Test
@@ -56,11 +59,12 @@ class LeafsConfigTest {
         }
 
         List<Invalid> cases = List.of(
-            new Invalid("{\"max_threads\": 0}", "max_threads"),
+            new Invalid("{\"region_threads\": 0}", "region_threads"),
+            new Invalid("{\"chunk_threads\": 0}", "chunk_threads"),
             new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 0}}", null),
             new Invalid("{\"section_size\": 20}", "section_size"),
             new Invalid("{\"section_size\": 512}", null),
-            new Invalid("{\"max_threads\": \"lots\"}", null),
+            new Invalid("{\"region_threads\": \"lots\"}", null),
             new Invalid("{oops", null),
             new Invalid("", null)
         );
