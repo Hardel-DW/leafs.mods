@@ -4,6 +4,7 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.chunk.propagator.SimulationListener;
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
@@ -48,6 +49,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
     private volatile long destroyed;
     private volatile long merged;
     private volatile long split;
+
+    /** Totals of the handles that are gone; a sampler adds the live ones to get the level's work, whatever the churn did in between. */
+    private volatile long retiredBusyNanos;
+    private volatile long retiredLagNanos;
+    private volatile long retiredTicks;
     private volatile int deferredHandshakes;
     private volatile Throwable feedFailure;
 
@@ -198,6 +204,18 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         return destroyed;
     }
 
+    public long retiredBusyNanos() {
+        return retiredBusyNanos;
+    }
+
+    public long retiredLagNanos() {
+        return retiredLagNanos;
+    }
+
+    public long retiredTicks() {
+        return retiredTicks;
+    }
+
     public long merged() {
         return merged;
     }
@@ -280,11 +298,20 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         RegionTickHandle previous = region.data().handle();
         if (previous != null) {
             previous.cancel();
+            retire(previous);
         }
 
         RegionTickHandle handle = new RegionTickHandle(region, dimension, this);
         region.data().attachHandle(handle);
         return handle;
+    }
+
+    /** Called wherever a handle stops being used, a crash restart or the region's death, so no work goes missing. */
+    private void retire(RegionTickHandle handle) {
+        StageTimings stages = handle.stages();
+        retiredBusyNanos += stages.busyNanos();
+        retiredLagNanos += stages.lagNanos();
+        retiredTicks += stages.completedTicks();
     }
 
     @Override
@@ -295,6 +322,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
     @Override
     public void onRegionDestroy(Region<RegionTickData> region) {
         destroyed++;
+        RegionTickHandle handle = region.data().handle();
+        if (handle != null) {
+            retire(handle);
+        }
     }
 
     @Override
