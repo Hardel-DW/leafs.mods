@@ -51,7 +51,6 @@ public final class TimingsCommand {
         LevelTickUnit unit = TickingManager.of(source.getServer()).unitOf(level);
         if (unit == null) {
             source.sendFailure(Component.literal("This dimension has not ticked yet"));
-
             return 0;
         }
 
@@ -73,7 +72,6 @@ public final class TimingsCommand {
 
         if (handle == null || handle.isCancelled()) {
             source.sendFailure(Component.literal("No live region #" + regionId + " in this dimension, /leafs regions lists them"));
-
             return 0;
         }
 
@@ -83,7 +81,8 @@ public final class TimingsCommand {
             .append(Component.literal("R#" + region.id() + " " + CommandText.shortDimension(region.dimension())).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(region.stages().sample(System.nanoTime())))
             .append(CommandText.stat("chunks", region.chunkCount()))
-            .append(CommandText.stat("entities", region.entityCount())), false);
+            .append(CommandText.stat("entities", region.entityCount()))
+            .append(CommandText.stat("lag", formatMillis(averageLag(region.stages())))), false);
 
         return sendStages(source, TickFamily.REGION, averages);
     }
@@ -97,6 +96,12 @@ public final class TimingsCommand {
         }
 
         return TickStages.count(family);
+    }
+
+    /** Lag has no ring, so this is the average since the region was born, not over the last five seconds like the stages. */
+    private static long averageLag(StageTimings stages) {
+        int ticks = stages.completedTicks();
+        return ticks == 0 ? 0 : stages.lagNanos() / ticks;
     }
 
     private static long sum(long[] averages) {

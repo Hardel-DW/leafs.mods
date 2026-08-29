@@ -41,7 +41,7 @@ public final class RegionsCommand {
         double serverTps = units.isEmpty() ? 0 : units.getFirst().stages().sample(now).tps();
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("Leafs ").withStyle(ChatFormatting.GREEN))
-            .append(CommandText.gray("%d workers, server thread ".formatted(LeafsConfig.get().effectiveThreads())))
+            .append(CommandText.gray("%d region workers, server thread ".formatted(LeafsConfig.get().effectiveRegionThreads())))
             .append(CommandText.tps(serverTps)), false);
 
         for (LevelTickUnit unit : units) {
@@ -93,6 +93,7 @@ public final class RegionsCommand {
             .append(CommandText.stat("regions", live.size()))
             .append(CommandText.stat("sections", regions.sections())).append(CommandText.gray(" (%d dead)".formatted(regions.deadSections())))
             .append(CommandText.stat("created", regions.created()))
+            .append(CommandText.stat("destroyed", regions.destroyed()))
             .append(CommandText.stat("merged", regions.merged()))
             .append(CommandText.stat("split", regions.split()))
             .append(CommandText.stat("deferred", regions.deferredHandshakes())), false);
