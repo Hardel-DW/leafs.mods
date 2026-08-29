@@ -379,14 +379,15 @@ public final class Regionizer<R> {
             section.setRegion(into);
             into.sectionKeys.add(key);
         }
-        into.deadSectionKeys.addAll(from.deadSectionKeys);
 
+        into.deadSectionKeys.addAll(from.deadSectionKeys);
         for (Region<R> forwardedTarget : from.mergeIntoLater) {
             forwardedTarget.expectingMergeFrom.remove(from);
             if (forwardedTarget != into) {
                 linkDeferredMerge(into, forwardedTarget);
             }
         }
+
         for (Region<R> forwardedSource : from.expectingMergeFrom) {
             forwardedSource.mergeIntoLater.remove(from);
             if (forwardedSource != into) {
@@ -394,6 +395,7 @@ public final class Regionizer<R> {
                 into.expectingMergeFrom.add(forwardedSource);
             }
         }
+
         from.sectionKeys.clear();
         from.deadSectionKeys.clear();
         from.mergeIntoLater.clear();
@@ -424,8 +426,8 @@ public final class Regionizer<R> {
             }
             children.add(child);
         }
-        parent.sectionKeys.clear();
 
+        parent.sectionKeys.clear();
         callbacks.split(parent, sectionToChild, List.copyOf(children));
         regionsById.remove(parent.id());
         callbacks.onRegionDestroy(parent);

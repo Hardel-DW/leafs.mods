@@ -2,12 +2,15 @@ package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
 import fr.hardel.leafs.chunk.propagator.SimulationLevels;
+import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.world.ChunkSaves;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongIterable;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -16,10 +19,11 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The loaded chunks no region owns, the view distance beyond every ring: the chunk workers keep their mail, saves, unloads and broadcasts. One sweep at a time per level, asked for once per level tick, never run by the server thread. */
+/** The loaded chunks no region owns, the view distance beyond every ring: the chunk workers keep their mail, saves, unloads and broadcasts. One sweep at a time per level, asked for once per level tick, never run by the server thread, over the chunks that have work only. */
 public final class WorkerOwnedChunks {
     private final ServerLevel level;
     private final LevelRegions regions;
@@ -28,6 +32,8 @@ public final class WorkerOwnedChunks {
     private final Executor workers;
     private final ChunkSaves saves;
     private final AtomicBoolean sweeping = new AtomicBoolean();
+    private final LongArrayList epochBacklog = new LongArrayList();
+    private long epochSeen;
 
     public WorkerOwnedChunks(ServerLevel level, LevelRegions regions, ChunkMailbox mailbox, ChunkUnloads unloads, Executor workers) {
         this.level = level;
@@ -49,22 +55,22 @@ public final class WorkerOwnedChunks {
         }
     }
 
-    /** The chunks claimed for the whole pass: a region adopting one meanwhile waits at its drain for the release. */
+    /** The chunks with work are claimed for the whole pass: a region adopting one meanwhile waits at its drain for the release. */
     private void sweep() {
         try {
-            LongOpenHashSet claimed = claimOwned();
+            purgeTimedOutTickets();
+            LongOpenHashSet claimed = claimWithWork();
             try {
-                purgeTimedOutTickets();
                 for (long key : claimed) {
                     mailbox.drain(key);
                 }
 
-                ((ServerLevelEntityAccess) level).leafs$entityPersistence().unloadHidden(claimed::contains);
+                persistence().unloadHidden(claimed::contains);
                 unloads.decide(claimed::contains);
                 saves.saveEagerly(claimed::contains);
                 List<ChunkHolder> holders = holders(claimed);
                 saveBehindEpoch(holders);
-                ChunkBroadcasts.changed(holders);
+                broadcast(holders);
             } finally {
                 for (long key : claimed) {
                     mailbox.releaseToWorkers(key);
@@ -73,6 +79,52 @@ public final class WorkerOwnedChunks {
         } finally {
             sweeping.set(false);
         }
+    }
+
+    /** Mail, entity unloads, drops, eager saves, changes to broadcast and the epoch backlog name the chunks; the rest is nobody's work this pass. */
+    private LongOpenHashSet claimWithWork() {
+        LongOpenHashSet claimed = new LongOpenHashSet();
+        claim(claimed, LongArrayList.wrap(mailbox.keys()));
+        claim(claimed, persistence().pendingUnloads());
+        claim(claimed, unloads.pending());
+        claim(claimed, level.getChunkSource().chunkMap.chunksToEagerlySave);
+        for (ChunkHolder holder : changedHolders()) {
+            claim(claimed, holder.getPos().pack());
+        }
+
+        claim(claimed, epochBacklog());
+        return claimed;
+    }
+
+    private void claim(LongOpenHashSet claimed, LongIterable keys) {
+        for (long key : keys) {
+            claim(claimed, key);
+        }
+    }
+
+    private void claim(LongOpenHashSet claimed, long key) {
+        if (!claimed.contains(key) && owns(key) && mailbox.tryClaim(key)) {
+            claimed.add(key);
+        }
+    }
+
+    /** A new epoch lists every owned holder once; each sweep takes its budget off the list. */
+    private LongArrayList epochBacklog() {
+        long epoch = regions.autosaveEpoch();
+        if (epoch != epochSeen) {
+            epochSeen = epoch;
+            epochBacklog.clear();
+            for (ChunkHolder holder : level.getChunkSource().chunkMap.visibleChunkMap.values()) {
+                if (owns(holder.getPos().pack())) {
+                    epochBacklog.add(holder.getPos().pack());
+                }
+            }
+        }
+
+        int budget = regions.autosaveForced() ? epochBacklog.size() : Math.min(ChunkSaves.CHUNKS_PER_TICK, epochBacklog.size());
+        LongArrayList batch = new LongArrayList(epochBacklog.subList(epochBacklog.size() - budget, epochBacklog.size()));
+        epochBacklog.removeElements(epochBacklog.size() - budget, epochBacklog.size());
+        return batch;
     }
 
     private List<ChunkHolder> holders(LongOpenHashSet claimed) {
@@ -88,26 +140,24 @@ public final class WorkerOwnedChunks {
         return holders;
     }
 
-    private LongOpenHashSet claimOwned() {
-        LongOpenHashSet claimed = new LongOpenHashSet();
-        for (ChunkHolder holder : level.getChunkSource().chunkMap.visibleChunkMap.values()) {
-            long key = holder.getPos().pack();
-            if (owns(key) && mailbox.tryClaim(key)) {
-                claimed.add(key);
-            }
-        }
-
-        return claimed;
-    }
-
     private void saveBehindEpoch(List<ChunkHolder> holders) {
         long epoch = regions.autosaveEpoch();
-        int budget = regions.autosaveForced() ? Integer.MAX_VALUE : ChunkSaves.CHUNKS_PER_TICK;
         for (ChunkHolder holder : holders) {
-            if (saves.saveBehindEpoch(holder, epoch) && --budget == 0) {
-                return;
-            }
+            saves.saveBehindEpoch(holder, epoch);
         }
+    }
+
+    private void broadcast(List<ChunkHolder> holders) {
+        ChunkBroadcasts.changed(holders);
+        changedHolders().removeAll(holders);
+    }
+
+    private Set<ChunkHolder> changedHolders() {
+        return ((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders();
+    }
+
+    private RegionEntityPersistence persistence() {
+        return ((ServerLevelEntityAccess) level).leafs$entityPersistence();
     }
 
     /** The timeout tickets of the sections no region owns count down here; an expiry retires a holder level, so both authorities drain right after. */
