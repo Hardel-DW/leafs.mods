@@ -4,7 +4,7 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 
 import java.util.Arrays;
 
-/** Per-tick ring of one unit, stage durations plus tick length, and lifetime totals a sampler differences; single writer, torn reads tolerated, skipped passes count for nothing. */
+/** Per-tick ring of one unit, stage durations plus tick length; single writer, torn reads tolerated, skipped passes count for nothing. */
 public final class StageTimings {
     public static final int CAPACITY = 240;
     private static final long WINDOW_NANOS = 5_000_000_000L;
