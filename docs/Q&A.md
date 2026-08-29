@@ -10,7 +10,7 @@ Le code ne fait rien de spécial pour une entité rapide, et n'en a pas besoin.
 Aucune entité n'est envoyée entre les threads. Une région ne "possède" pas ses entités. Au début de chaque tick elle prend une photo des entités de ses chunks et tick celles-là. Une TNT qui traverse la frontière change simplement de section de chunk, comme en vanilla, et au tick suivant l'autre région la voit dans sa photo. Cent ou mille TNT coûtent la même chose qu'en vanilla.
 
 # Comment sont gérées les entités qui traversent des régions ?
-- Pour les téléportations et portails, ces opérations sont gérées par la région d'origine, et la région d'origine envoie un courrier à la région cible qui la traite.
+- Pour les téléportations et portails, la région d'origine fait le travail, puis envoie un courrier à la région cible qui place l'entité.
 - Pour les entités qui sortent de la région, la réponse est similaire aux canons orbitaux, à chaque début de tick elle prend une photo instantanée de l'état du jeu, si elle devait arriver dans une autre région, celle-ci prendrait à ce moment-là une photo elle aussi sur le tick d'après. Simple.
 - Identiques, ils gèlent en sortant de la zone simulée, comme dans le jeu d'origine. L'ender pearl est une exception du jeu d'origine, elle agrandit la région ou peut en créer une comme un joueur.
 
@@ -21,7 +21,7 @@ Aucune entité n'est envoyée entre les threads. Une région ne "possède" pas s
 
 # Les datapacks/commandes fonctionnent-ils ?
 Toutes les commandes tournent sur le thread serveur, peu importe qui les lance. Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités, la garde jusqu'à la fin de la commande, puis la rend. Une commande coûte exactement son coût vanilla.
-Un datapack lourd utilisant `tick.json` reste sur un seul thread, il ne profite pas du multithreading. Et dégrade les performances globales.
+Un datapack lourd utilisant `tick.json` reste sur un seul thread, il ne profite pas du multithreading. Il ralentit le thread serveur et les régions qu'il emprunte pendant ses commandes, pas les autres.
 
 # Y a-t-il des failles que des tricheurs pourraient exploiter comme détecter la fusion/scission de régions ?
 Par nature oui, si vous changez d'une zone à 20 TPS à une zone à 15 TPS vous n'avez pas besoin de concevoir un mod pour savoir que quelque chose a changé et donc que quelque chose ici est chargé. Un joueur, une `ender pearl`, un `forceload`, un `chunk loader` ou autre.

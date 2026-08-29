@@ -5,6 +5,7 @@ Leafs crée un fichier de configuration au démarrage, `config/leafs.json`.
 - `region_merge_distance` : La distance en sections sous laquelle deux régions voisines fusionnent.
 - `region_buffer_distance` : L'épaisseur en sections de la couronne qu'une région possède.
 - `player_chunk_loads_per_tick` : Chaque joueur peut générer (par défaut `5`) chunks par tick.
+- `telemetry` : `true` par défaut. À chaque crash de région, Leafs écrit une ligne JSON dans le log, `Leafs telemetry`, avec la dimension, la région, l'erreur, le détail vanilla de l'entité ou du block entity, et le mod dont le code est sur la pile. Rien n'est envoyé sur le réseau.
 
 # Debug
 - `debug.watchdog_warn_seconds` : Au-delà de ce délai, un tick bloqué est loggé avec la pile de son thread.
@@ -16,6 +17,6 @@ Leafs crée un fichier de configuration au démarrage, `config/leafs.json`.
 # Commandes
 - `/leafs regions [dimension]` : Affiche les régions par dimension. Avec id, TPS, durée de tick, chunks, entités.
 - `/leafs timings [global ou <dimension>] [id]` : Le coût de chaque étape d'un tick, moyenné sur 5 secondes. Si aucun argument, ça affiche le thread serveur.
-- `/leafs metrics` : Affiche les informations de la dernière minute. Les emprunts pour les évènements Fabric, reports et abandons, refus de chunks...
-- `/leafs config` : permet de définir le fichier de config, nécessite de relancer le serveur pour prendre effet.
+- `/leafs metrics` : Affiche les informations de la dernière minute. Les emprunts pour les évènements Fabric, les travaux passés à une autre région et les abandons, les paquets et les chunks.
+- `/leafs config [clé [valeur]]` : sans argument affiche toutes les clés, avec une clé affiche sa valeur, avec une valeur réécrit le fichier de config, qui prend effet au prochain démarrage.
 - `/leafs crash <dimension> <region>` : permet de faire crasher une région.

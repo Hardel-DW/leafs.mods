@@ -8,14 +8,14 @@ Donc ça veut dire que si vous avez 6 ou 12 ou 50 cœurs le jeu en prend un seul
 ## La solution : Les régions
 Leafs regarde les chunks simulés, ceux autour du joueur définis par la `simulation distance`, le monde est découpé en une grille fixe de 2x2 chunks, et une section devient active quand un de ses chunks est simulé. Les sections actives qui se touchent sont regroupées en une région.
 
-Les régions possèdent une couronne de 1 section autour des sections actives qu'elles ne tickent pas. Et deux couronnes de deux régions différentes ne se touchent jamais. Et il y a toujours au moins une section vide entre deux couronnes.
+Les régions possèdent une couronne de 1 section autour des sections actives, qu'elles ne tickent pas. Deux couronnes de deux régions différentes ne se touchent jamais, il y a toujours au moins une section vide entre elles.
 
 Deux joueurs éloignés sont donc dans une région différente chacun. Les régions bougent avec les joueurs. Deux joueurs qui se rapprochent voient leurs régions fusionner en une seule. Une région qui s'étire jusqu'à se couper en deux morceaux se scinde. Ces opérations se font entre deux ticks, jamais au milieu d'un tick.
 
-Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les paquets réseau de ses joueurs et son propre générateur aléatoire. Pendant son tick, rien d'autre au monde ne touche à son contenu.
+Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les paquets réseau de ses joueurs et son propre générateur aléatoire. Pendant son tick, personne d'autre n'écrit dans son contenu. Lire chez une autre région reste libre pour tout le monde.
 
 # Thread
-**Le thread serveur vanilla existe toujours.** Les régions tickent en même temps que lui. Il fait une fois par tick ce qui est global par nature, l'heure du monde, la météo, la bordure, la liste des joueurs et le déclencheur d'autosave. Il exécute aussi toutes les commandes. Son coût est parfaitement déterministe et minime, sans dépendre du nombre de joueurs, de chunks ou d'entités.
+**Le thread serveur vanilla existe toujours.** Les régions tickent en même temps que lui. Il fait une fois par tick ce qui est global par nature, l'heure du monde, la météo, la bordure, la liste des joueurs et le déclencheur d'autosave. Il exécute aussi toutes les commandes. Son coût est fixe et minime, sans dépendre du nombre de chunks ou d'entités. Seule la liste des joueurs grandit avec eux, et son coût par joueur est infime.
 
 ## Workers de Région
 Une région n'est pas un thread ! Une région est une tâche. Les régions attendent dans une seule liste, triée par le moment du prochain tick. Un worker libre prend la première, la tick. Un worker occupé par une grosse région ne bloque personne, les autres prennent la suite.
@@ -24,7 +24,7 @@ Les TPS en vanilla sont globaux, sur Leafs ils sont par région. Chaque région 
 - L'heure de la journée reste globale. Gérée par le thread global commun. Donc la météo, le soleil se couche à la même vitesse pour tout le monde peu importe vos TPS.
 - Tout ce qui mesure une durée relative, la cuisson d'un four, les entités, la redstone, est géré par l'horloge de la région. Un four ne cuira pas à la même vitesse dans deux régions. Tout dépend du TPS.
 
-Tout ce qui est lié à la téléportation, c'est-à-dire connexion/déconnexion/portail/respawn et autres, est géré avec les régions de départ et d'arrivée, elles communiquent entre elles sans passer par le commun.
+Tout ce qui est lié à la téléportation, c'est-à-dire connexion/déconnexion/portail/respawn et autres, est géré par les régions de départ et d'arrivée, qui communiquent entre elles par leur courrier. Le respawn est le seul à passer d'abord par le thread serveur, parce qu'il est une commande du client.
 
 ## Workers de Chunks
 Les workers de chunks sont parfaitement indépendants des workers de régions. Ils gèrent la lecture des chunks sur le disque, ils génèrent, chargent et déchargent les chunks. Ces workers tournent en priorité système minimale sur le système d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
@@ -39,7 +39,7 @@ Il emprunte une région au moment où la commande touche un de ses chunks ou une
 Ce que la commande touche décide de ce qu'elle emprunte :
 - Un `/say` n'emprunte rien.
 - Un `/give @a` emprunte les régions où il y a des joueurs.
-- Un `/setblock` emprunte la région du chunk visé, et charge le chunk avant si besoin.
+- Un `/setblock` emprunte la région du chunk visé, et charge le chunk avant si besoin. Ce chargement bloque le thread serveur, comme en vanilla.
 - Un `/kill @e` emprunte toutes les régions, parce que c'est ce que la commande veut dire.
 Un datapack coûte donc exactement ce qu'il coûte en vanilla.
 
@@ -66,21 +66,18 @@ La création des metrics, la récupération des valeurs se fait dans Leafs. Il f
 Le serveur fait dans l'ordre :
 1. Lance le `tick.json` pour les commandes.
 2. Puis met à jour l'heure du monde.
-3. Tick chaque dimension.
+3. Tick chaque dimension. La dimension fait l'heure, la météo, la bordure, les raids, puis demande en une ligne aux workers de chunks leur passe sur les chunks sans région.
 4. Tout ce qui est redirigé vers le thread global. Comme les `command blocks`, `respawn`, `commande du chat`.
-5. Les requêtes réseau de chaque connexion de joueur. Quand la région possède le joueur c'est elle qui s'en occupera.
+5. Les requêtes réseau de chaque connexion de joueur. Le transport seulement, le tick du joueur tourne sur sa région.
 6. La liste des joueurs.
-7. Envoi des chunks aux joueurs que personne ne possède.
-8. La quiesce.
-9. L'horloge et le déclenchement de l'autosave, ce sont les régions qui s'occupent ensuite des opérations d'autosave.
-10. Debug, Monitor.
+7. L'horloge et le déclenchement de l'autosave, ce sont les régions et les workers de chunks qui font ensuite les sauvegardes.
+8. Debug, Monitor.
 
 ### Les coûts du thread serveur.
-- Les points `2. Heure du monde, 9. Autosave et 10. Debug` sont des coûts purement fixes, toujours identiques peu importe le serveur et le nombre de joueurs.
-- Les points ` 5. Players Tabs, 6. Réseau de la connexion` sont des coûts qui varient avec le nombre de joueurs, qui sont si infimes que d'un serveur à l'autre le coût est pratiquement identique.
-- Les points `1. Tick.json 4. Command blocks` sont fortement liés aux commandes, donc des coûts évitables/désactivables.
-- Le point `3. Dimensions` a lui une quinzaine d'étapes, une bonne partie à zéro car déplacées sur les régions, ou à des coûts fixes.
-- Les points `7. Envoie des chunk, 8. Quiesce` sont les seul cout qui ne sont pas fixes.
+- Les points `2. Heure du monde, 7. Autosave et 8. Debug` sont des coûts purement fixes, toujours identiques peu importe le serveur et le nombre de joueurs.
+- Les points `5. Réseau de la connexion, 6. Liste des joueurs` sont des coûts qui varient avec le nombre de joueurs, si infimes que d'un serveur à l'autre le coût est pratiquement identique.
+- Les points `1. Tick.json, 4. Command blocks` sont liés aux commandes, donc des coûts évitables.
+- Le point `3. Dimensions` a une quinzaine d'étapes, une bonne partie à zéro car déplacées sur les régions, le reste à coût fixe.
 
 # Philosophie
 Le mod se concentre beaucoup sur les lois d'Amdahl et Gustafson, l'objectif de Leafs est de permettre de scaler linéairement des joueurs selon les threads/RAM disponibles par l'infra. Bien sûr cela nécessite que les joueurs soient éparpillés dans le monde pour profiter des gains. Et c'est aussi recommandé de ne pas utiliser de commandes, même si le support existe et que son coût est le même que vanilla.
