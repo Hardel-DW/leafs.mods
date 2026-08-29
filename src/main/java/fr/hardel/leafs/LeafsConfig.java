@@ -21,7 +21,8 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, boolean telemetry, Debug debug) {
+public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick,
+    boolean telemetry, Debug debug) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -60,7 +61,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         }
     }
 
-    /** Each pool sizes itself, and their sum may exceed the machine: chunk workers run at the lowest priority and give way, so each absorbs the other's slack. */
+    /** Their sum may exceed the machine on purpose: chunk workers hold the lowest priority, so each pool absorbs the other's slack. */
     private static Codec<Integer> threads(Setting setting) {
         return Codec.intRange(ALL_CORES, 1024)
             .validate(value -> value == 0
