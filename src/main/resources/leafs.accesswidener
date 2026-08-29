@@ -19,7 +19,6 @@ accessible method net/minecraft/server/level/ChunkMap getVisibleChunkIfPresent (
 accessible method net/minecraft/server/level/ChunkMap updateChunkTracking (Lnet/minecraft/server/level/ServerPlayer;)V
 accessible method net/minecraft/server/level/ChunkMap anyPlayerCloseEnoughForSpawningInternal (Lnet/minecraft/world/level/ChunkPos;)Z
 accessible field net/minecraft/server/level/ChunkMap entityMap Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;
-accessible field net/minecraft/server/level/ChunkMap playerMap Lnet/minecraft/server/level/PlayerMap;
 accessible class net/minecraft/server/level/ChunkMap$TrackedEntity
 accessible field net/minecraft/server/level/ChunkMap$TrackedEntity serverEntity Lnet/minecraft/server/level/ServerEntity;
 accessible field net/minecraft/server/level/ChunkMap$TrackedEntity entity Lnet/minecraft/world/entity/Entity;
@@ -40,7 +39,6 @@ accessible field net/minecraft/server/level/DistanceManager simulationDistance I
 accessible class net/minecraft/server/level/DistanceManager$PlayerTicketTracker
 accessible method net/minecraft/server/players/PlayerList save (Lnet/minecraft/server/level/ServerPlayer;)V
 accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLoad (J)Ljava/util/Optional;
-accessible field net/minecraft/world/level/chunk/storage/SectionStorage levelHeightAccessor Lnet/minecraft/world/level/LevelHeightAccessor;
 accessible field net/minecraft/world/entity/ai/village/poi/PoiManager loadedChunks Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/world/level/chunk/LevelChunk blockTicks Lnet/minecraft/world/ticks/LevelChunkTicks;

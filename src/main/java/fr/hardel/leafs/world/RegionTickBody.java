@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.ChunkUnloadAccess;
@@ -33,10 +34,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LocalMobCapCalculator;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.NaturalSpawner;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.entity.EntitySectionStorage;
-import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.TickRateManager;
 
 import java.util.ArrayList;
@@ -91,7 +90,7 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionChunkTick);
         }
 
-        broadcastChangedChunks(chunks);
+        ChunkBroadcasts.changed(chunks.holders());
         stages.mark(TickStages.regionBroadcast);
         RegionEntityTracking.tickRegion(level, entities);
         stages.mark(TickStages.regionTracking);
@@ -224,15 +223,6 @@ public final class RegionTickBody {
         }
 
         return entities;
-    }
-
-    private static void broadcastChangedChunks(RegionChunks chunks) {
-        for (ChunkHolder holder : chunks.holders()) {
-            LevelChunk chunk = holder.hasChangesToBroadcast() ? holder.getTickingChunk() : null;
-            if (chunk != null) {
-                holder.broadcastChanges(chunk);
-            }
-        }
     }
 
     private void runBlockEvents(RegionChunks chunks, RegionWorldData worldData) {

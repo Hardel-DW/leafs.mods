@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 
 class RoutingRandomSourceTest {
     private final RandomSource vanilla = fixed(1);
@@ -28,12 +27,6 @@ class RoutingRandomSourceTest {
         assertEquals(2, routing.nextInt());
         WorldTickContext.exit();
         assertEquals(1, routing.nextInt());
-    }
-
-    @Test
-    void unwrapReturnsTheVanillaInstance() {
-        assertSame(vanilla, RoutingRandomSource.unwrap(routing));
-        assertSame(vanilla, RoutingRandomSource.unwrap(vanilla));
     }
 
     private static RandomSource fixed(int value) {

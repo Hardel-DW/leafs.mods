@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
-/** A required chunk that is not there: the ticket goes in, then the thread waits for the delivery the way it may. A region takes the chunk's region first and drains mail meanwhile, the server thread pumps as vanilla, any other thread just waits. A chunk no region owns is delivered by the workers. */
+/** A required chunk that is not there: the ticket goes in, then the thread waits for the delivery the way it may. A region takes the chunk's region and drains mail meanwhile, the server thread pumps as vanilla. */
 public final class ChunkWait {
     private static final long PARK_NANOS = 50_000L;
 
