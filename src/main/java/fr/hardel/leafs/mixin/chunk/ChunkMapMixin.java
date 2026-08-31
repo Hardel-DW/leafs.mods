@@ -178,6 +178,9 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     private ChunkScheduling leafs$scheduling;
 
     @Unique
+    private ParallelChunkTaskDispatcher leafs$worldgen;
+
+    @Unique
     private PlayerChunkLoader leafs$playerLoader;
 
     @Override
@@ -214,7 +217,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         ChunkMap self = (ChunkMap) (Object) this;
         TickingManager ticking = TickingManager.of(self.level.getServer());
         ChunkMailbox mailbox = new ChunkMailbox(new ChunkTicketHolds(self.level), ticking.chunkWorkers());
-        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, this.mainThreadExecutor, mailbox);
+        this.leafs$scheduling = new ChunkScheduling(self, self.getDistanceManager(), leafs$regions(), ticking::halted, this.mainThreadExecutor, leafs$worldgen, mailbox);
         PropagatorAccess authorities = (PropagatorAccess) self.getDistanceManager();
         authorities.leafs$propagator().bindScheduling(leafs$scheduling);
         authorities.leafs$simulation().listen(leafs$regions());
@@ -241,7 +244,8 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     @WrapOperation(method = "<init>", at = @At(value = "NEW", target = "net/minecraft/server/level/ChunkTaskDispatcher", ordinal = 0))
     private ChunkTaskDispatcher leafs$parallelWorldgenDispatcher(TaskScheduler<Runnable> lane, Executor dispatcherExecutor, Operation<ChunkTaskDispatcher> original) {
         ChunkWorkers workers = leafs$chunkWorkers();
-        return new ParallelChunkTaskDispatcher(TaskScheduler.wrapExecutor("leafs-worldgen", workers), dispatcherExecutor, workers.threads() + 2);
+        leafs$worldgen = new ParallelChunkTaskDispatcher(TaskScheduler.wrapExecutor("leafs-worldgen", workers), dispatcherExecutor, workers.threads() + 2);
+        return leafs$worldgen;
     }
 
     /** Steps run in parallel across chunks; the ones that write blocks take the area vanilla declares for them. */

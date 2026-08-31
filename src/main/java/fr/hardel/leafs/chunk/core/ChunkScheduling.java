@@ -34,6 +34,7 @@ public final class ChunkScheduling {
     private final LevelRegions regions;
     private final BooleanSupplier halted;
     private final Executor pump;
+    private final ParallelChunkTaskDispatcher worldgen;
     private final AreaLock schedulingLock = new AreaLock(LeafsTicketPropagator.SECTION_SHIFT);
     private final GenerationExclusion exclusion = new GenerationExclusion();
     private final ThreadLocal<List<DeferredOwnerTask>> deferredOwnerTasks = new ThreadLocal<>();
@@ -41,12 +42,14 @@ public final class ChunkScheduling {
 
     private record DeferredOwnerTask(int chunkX, int chunkZ, MailHold hold, Runnable task) {}
 
-    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, BooleanSupplier halted, Executor pump, ChunkMailbox mailbox) {
+    public ChunkScheduling(ChunkMap chunkMap, DistanceManager distanceManager, LevelRegions regions, BooleanSupplier halted, Executor pump, ParallelChunkTaskDispatcher worldgen,
+        ChunkMailbox mailbox) {
         this.chunkMap = chunkMap;
         this.distanceManager = distanceManager;
         this.regions = regions;
         this.halted = halted;
         this.pump = pump;
+        this.worldgen = worldgen;
         this.mailbox = mailbox;
     }
 
@@ -56,6 +59,10 @@ public final class ChunkScheduling {
 
     public GenerationExclusion exclusion() {
         return exclusion;
+    }
+
+    public ParallelChunkTaskDispatcher worldgen() {
+        return worldgen;
     }
 
     /** The drain reaction, called by the propagator under the drained section's ticket area: level writes first, then the promotions; their side effects stage until the locks release. */

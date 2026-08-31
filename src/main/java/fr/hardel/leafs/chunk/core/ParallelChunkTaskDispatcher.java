@@ -21,6 +21,10 @@ public final class ParallelChunkTaskDispatcher extends ChunkTaskDispatcher {
         this.window = window;
     }
 
+    public int inFlight() {
+        return inFlight.get();
+    }
+
     @Override
     protected ChunkTaskPriorityQueue.TasksForChunk popTasks() {
         return inFlight.get() >= window ? null : super.popTasks();
