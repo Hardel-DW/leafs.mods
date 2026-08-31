@@ -15,9 +15,15 @@ public final class FakeTransports implements DeferredTransports {
     public boolean owner;
 
     @Override
-    public void toOwner(int chunkX, int chunkZ, Runnable task) {
+    public boolean toOwner(int chunkX, int chunkZ, Runnable task) {
+        if (owner) {
+            task.run();
+            return true;
+        }
+
         ownerQueue.add(task);
         ownerChunks.add(new ChunkPos(chunkX, chunkZ));
+        return false;
     }
 
     @Override

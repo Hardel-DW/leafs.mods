@@ -218,32 +218,40 @@ public final class ChunkScheduling {
         return task -> runOnOwner(chunkX, chunkZ, MailHold.FULL_NEIGHBOURHOOD, task);
     }
 
-    public void runOnOwner(int chunkX, int chunkZ, Runnable task) {
-        runOnOwner(chunkX, chunkZ, MailHold.CHUNK, task);
+    public boolean runOnOwner(int chunkX, int chunkZ, Runnable task) {
+        return runOnOwner(chunkX, chunkZ, MailHold.CHUNK, task);
     }
 
-    /** Inline on the owner, mailed to the chunk otherwise; before activation the pump plays vanilla's main thread. */
-    private void runOnOwner(int chunkX, int chunkZ, MailHold hold, Runnable task) {
+    private boolean runOnOwner(int chunkX, int chunkZ, MailHold hold, Runnable task) {
         List<DeferredOwnerTask> deferred = deferredOwnerTasks.get();
         if (deferred != null) {
             deferred.add(new DeferredOwnerTask(chunkX, chunkZ, hold, task));
-            return;
+            return false;
         }
 
         if (isOwner(chunkX, chunkZ)) {
             task.run();
-            return;
+            return true;
         }
 
+        // Before activation the pump plays vanilla's main thread.
         if (regions.body() == null) {
             pump.execute(task);
-            return;
+            return false;
         }
 
         mailbox.post(chunkX, chunkZ, hold, task);
-        if (regions.regionizer().regionAt(chunkX, chunkZ) == null) {
-            mailbox.drainOnWorkers(ChunkPos.pack(chunkX, chunkZ));
+        long key = ChunkPos.pack(chunkX, chunkZ);
+        if (regions.regionizer().regionAt(chunkX, chunkZ) != null) {
+            return false;
         }
+
+        if (mailbox.drainIfFree(key)) {
+            return true;
+        }
+
+        mailbox.drainOnWorkers(key);
+        return false;
     }
 
     /** The owning region on its worker, the thread holding the chunk's claim or borrowing its region, or a universal owner. */
