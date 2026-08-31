@@ -27,6 +27,8 @@ accessible class net/minecraft/server/level/DistanceManager$FixedPlayerDistanceC
 accessible field net/minecraft/world/level/entity/PersistentEntitySectionManager sectionStorage Lnet/minecraft/world/level/entity/EntitySectionStorage;
 accessible class net/minecraft/world/level/entity/PersistentEntitySectionManager$ChunkLoadStatus
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
+accessible method net/minecraft/server/level/ChunkMap onLevelChange (Lnet/minecraft/world/level/ChunkPos;Ljava/util/function/IntSupplier;ILjava/util/function/IntConsumer;)V
+accessible method net/minecraft/server/level/ChunkHolder setQueueLevel (I)V
 accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
