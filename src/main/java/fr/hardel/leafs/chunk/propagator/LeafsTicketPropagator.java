@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.propagator;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.Short2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.Short2ByteMap;
@@ -12,11 +13,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.LockSupport;
 
-/** Ticket level propagation by 64x64 sections. Levels are inverted from vanilla (a source is high, decays to zero). Sources need the ticket cell, drains lock their own 3x3 area. */
+/** Ticket level propagation by 64x64 sections. Levels are inverted from vanilla, a source is high and decays to zero. Sources need the ticket cell, drains lock their 3x3 area. */
 public abstract class LeafsTicketPropagator {
 
     public static final int SECTION_SHIFT = 6;
@@ -27,7 +27,7 @@ public abstract class LeafsTicketPropagator {
     public static final int MAX_SOURCE_LEVEL = SECTION_SIZE - 2;
 
     private final UpdateQueue updateQueue = new UpdateQueue();
-    private final ConcurrentHashMap<Long, Section> sections = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Section> sections = new ConcurrentLong2ObjectMap<>();
 
     /** Vanilla ticket level to inverted propagator level and back, the mapping is its own inverse. */
     public static int convertBetweenTicketLevels(int level) {
@@ -47,7 +47,7 @@ public abstract class LeafsTicketPropagator {
 
         int sectionX = posX >> SECTION_SHIFT;
         int sectionZ = posZ >> SECTION_SHIFT;
-        Section section = sections.computeIfAbsent(positionKey(sectionX, sectionZ), key -> new Section(sectionX, sectionZ));
+        Section section = sections.computeIfAbsent(positionKey(sectionX, sectionZ), (long _) -> new Section(sectionX, sectionZ));
         short localIndex = localIndex(posX, posZ);
         int currentSource = (section.levels[localIndex] >>> 8) & 0xFF;
 
@@ -221,7 +221,7 @@ public abstract class LeafsTicketPropagator {
 
                 int neighbourX = sectionX + dx;
                 int neighbourZ = sectionZ + dz;
-                Section neighbour = sections.computeIfAbsent(positionKey(neighbourX, neighbourZ), key -> new Section(neighbourX, neighbourZ));
+                Section neighbour = sections.computeIfAbsent(positionKey(neighbourX, neighbourZ), (long _) -> new Section(neighbourX, neighbourZ));
                 ++neighbour.neighboursWithSources;
             }
         }

@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The loaded chunks no region owns, the view distance beyond every ring: the chunk workers keep their mail, saves, unloads and broadcasts. One sweep at a time per level, asked for once per level tick, never run by the server thread, over the chunks that have work only. */
+/** The loaded chunks no region owns, the view beyond every ring: the chunk workers keep their mail, saves, unloads and broadcasts. One sweep per level tick, work only. */
 public final class WorkerOwnedChunks {
     private final ServerLevel level;
     private final LevelRegions regions;
@@ -67,8 +67,8 @@ public final class WorkerOwnedChunks {
 
                 persistence().unloadHidden(claimed::contains);
                 unloads.decide(claimed::contains);
-                saves.saveEagerly(claimed::contains);
                 List<ChunkHolder> holders = holders(claimed);
+                saves.saveEagerly(holders);
                 saveBehindEpoch(holders);
                 broadcast(holders);
             } finally {

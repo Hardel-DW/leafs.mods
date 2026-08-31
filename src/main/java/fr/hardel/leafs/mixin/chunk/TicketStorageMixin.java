@@ -67,14 +67,33 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredRemove(long key, Ticket ticket, Operation<Boolean> original) {
         synchronized (this) {
-            return original.call(key, ticket);
+            boolean removed = original.call(key, ticket);
+            if (removed && leafs$timeouts != null) {
+                leafs$timeouts.untrack(key, ticket);
+            }
+
+            return removed;
         }
     }
 
+    /** The predicate decides the removal, so it is where the index learns of it. */
     @WrapMethod(method = "removeTicketIf")
     private void leafs$monitoredRemoveIf(TicketStorage.TicketPredicate predicate, Long2ObjectOpenHashMap<List<Ticket>> removedTickets, Operation<Void> original) {
         synchronized (this) {
-            original.call(predicate, removedTickets);
+            TicketTimeoutIndex timeouts = leafs$timeouts;
+            if (timeouts == null) {
+                original.call(predicate, removedTickets);
+                return;
+            }
+
+            original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
+                boolean removed = predicate.test(ticket, chunkPos);
+                if (removed) {
+                    timeouts.untrack(chunkPos, ticket);
+                }
+
+                return removed;
+            }, removedTickets);
         }
     }
 

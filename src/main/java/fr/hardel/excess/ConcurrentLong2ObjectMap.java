@@ -14,47 +14,48 @@ import org.jspecify.annotations.NonNull;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.LongFunction;
 
-/** ConcurrentHashMap-backed Long2ObjectMap: lock-free reads, atomic point ops, weakly consistent iteration, no nulls. */
+/** ConcurrentHashMap-backed Long2ObjectMap over spread keys: lock-free reads, atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
     private final ConcurrentHashMap<Long, V> map = new ConcurrentHashMap<>();
 
     @Override
     public V get(long key) {
-        V value = map.get(key);
+        V value = map.get(LongSpread.mix(key));
         return value == null ? defaultReturnValue() : value;
     }
 
     @Override
     public V put(long key, V value) {
-        V previous = map.put(key, value);
+        V previous = map.put(LongSpread.mix(key), value);
         return previous == null ? defaultReturnValue() : previous;
     }
 
     /** The value in place, or null when the key was free and the value stored. */
     public V putIfAbsent(long key, V value) {
-        return map.putIfAbsent(key, value);
+        return map.putIfAbsent(LongSpread.mix(key), value);
     }
 
     @Override
     public V remove(long key) {
-        V previous = map.remove(key);
+        V previous = map.remove(LongSpread.mix(key));
         return previous == null ? defaultReturnValue() : previous;
     }
 
     public boolean remove(long key, Object value) {
-        return map.remove(key, value);
+        return map.remove(LongSpread.mix(key), value);
     }
 
     @Override
     public V computeIfAbsent(long key, LongFunction<? extends V> mappingFunction) {
-        return map.computeIfAbsent(key, mappingFunction::apply);
+        return map.computeIfAbsent(LongSpread.mix(key), _ -> mappingFunction.apply(key));
     }
 
     @Override
     public V computeIfAbsent(long key, Long2ObjectFunction<? extends V> mappingFunction) {
-        V existing = map.get(key);
+        V existing = get(key);
         if (existing != null) {
             return existing;
         }
@@ -63,12 +64,18 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
             return defaultReturnValue();
         }
 
-        return map.computeIfAbsent(key, boxed -> mappingFunction.get(boxed.longValue()));
+        return map.computeIfAbsent(LongSpread.mix(key), _ -> mappingFunction.get(key));
+    }
+
+    /** Atomic read-modify-write of one key; a null result removes it. */
+    @Override
+    public V compute(long key, BiFunction<? super Long, ? super V, ? extends V> remappingFunction) {
+        return map.compute(LongSpread.mix(key), (_, value) -> remappingFunction.apply(key, value));
     }
 
     @Override
     public boolean containsKey(long key) {
-        return map.containsKey(key);
+        return map.containsKey(LongSpread.mix(key));
     }
 
     @Override
@@ -131,7 +138,7 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
                     @Override
                     public Long2ObjectMap.Entry<V> next() {
                         Map.Entry<Long, V> entry = backing.next();
-                        return new BasicEntry<>(entry.getKey(), entry.getValue());
+                        return new BasicEntry<>(LongSpread.unmix(entry.getKey()), entry.getValue());
                     }
                 };
             }
@@ -143,7 +150,7 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
 
             @Override
             public boolean contains(Object object) {
-                return object instanceof Map.Entry<?, ?> entry && entry.getKey() instanceof Long key && entry.getValue() != null && entry.getValue().equals(map.get(key));
+                return object instanceof Map.Entry<?, ?> entry && entry.getKey() instanceof Long key && entry.getValue() != null && entry.getValue().equals(get(key.longValue()));
             }
         };
     }

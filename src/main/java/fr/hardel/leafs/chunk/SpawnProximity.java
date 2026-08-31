@@ -1,12 +1,11 @@
 package fr.hardel.leafs.chunk;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongIterators;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
 
-import java.util.concurrent.ConcurrentHashMap;
 
 /** Replaces vanilla's naturalSpawnChunkCounter: a player marks the disk of radius 8 on enter, unmarks on leave. One int per chunk, two refcounts (within 5 high, within 8 low). */
 public final class SpawnProximity {
@@ -15,7 +14,7 @@ public final class SpawnProximity {
     private static final int COVERED_MASK = 0xFFFF;
     private static final int CLOSE_UNIT = 1 << 16;
 
-    private final ConcurrentHashMap<Long, Integer> counts = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Integer> counts = new ConcurrentLong2ObjectMap<>();
 
     public void add(int chunkX, int chunkZ) {
         mark(chunkX, chunkZ, 1);
@@ -47,7 +46,7 @@ public final class SpawnProximity {
 
     /** A weakly consistent iteration of the covered chunks, vanilla's spawn candidate list. */
     public LongIterator coveredChunks() {
-        return LongIterators.asLongIterator(counts.keySet().iterator());
+        return counts.keySet().iterator();
     }
 
     private void mark(int chunkX, int chunkZ, int direction) {
@@ -55,7 +54,7 @@ public final class SpawnProximity {
             for (int dx = -SPAWN_RADIUS; dx <= SPAWN_RADIUS; dx++) {
                 int close = Math.max(Math.abs(dx), Math.abs(dz)) <= NaturalSpawner.INSCRIBED_SQUARE_SPAWN_DISTANCE_CHUNK ? CLOSE_UNIT : 0;
                 int delta = direction * (close + 1);
-                counts.compute(ChunkPos.pack(chunkX + dx, chunkZ + dz), (key, packed) -> {
+                counts.compute(ChunkPos.pack(chunkX + dx, chunkZ + dz), (_, packed) -> {
                     int updated = (packed == null ? 0 : packed) + delta;
                     return (updated & COVERED_MASK) == 0 ? null : updated;
                 });
