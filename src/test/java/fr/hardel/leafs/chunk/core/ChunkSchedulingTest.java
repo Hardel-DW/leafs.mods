@@ -39,7 +39,7 @@ class ChunkSchedulingTest {
 
     private static ChunkScheduling ownedScheduling() {
         LevelRegions regions = new LevelRegions(LeafsConfig.defaults());
-        ChunkScheduling scheduling = new ChunkScheduling(null, null, regions, () -> false, null, new ChunkMailbox(new ChunkHoldController() {
+        ChunkScheduling scheduling = new ChunkScheduling(null, null, regions, () -> false, null, null, new ChunkMailbox(new ChunkHoldController() {
             @Override
             public void addHold(int chunkX, int chunkZ, MailHold.Level level) {
             }

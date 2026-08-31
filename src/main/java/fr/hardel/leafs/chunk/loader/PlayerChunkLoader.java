@@ -65,7 +65,7 @@ public final class PlayerChunkLoader {
         }
     }
 
-    /** The chunk under the player takes its ticking ticket now, on the thread that moved him, so his region exists before anyone asks who owns him. Cheap once the chunk is at the ticking stage. */
+    /** The chunk under the player is ticketed now, by the thread that moved him, so his region exists before anyone asks who owns him. The view pipeline keeps its own ticket. */
     public void follow(ServerPlayer player) {
         if (skip(player)) {
             return;
@@ -73,20 +73,13 @@ public final class PlayerChunkLoader {
 
         PlayerViewState state = states.computeIfAbsent(player, ignored -> new PlayerViewState());
         long chunk = player.chunkPosition().pack();
-        byte stage = state.stages.get(chunk);
-        if (stage == PlayerViewState.STAGE_TICK) {
+        long previous = state.standing.getAndSet(chunk);
+        if (previous == chunk) {
             return;
         }
 
-        if (stage == 0) {
-            tickets.acquire(chunk, StageTickets.TICK);
-        } else {
-            tickets.swap(chunk, PlayerViewState.heldTicketStage(stage), StageTickets.TICK);
-            state.loading.remove(chunk);
-            state.generating.remove(chunk);
-        }
-
-        state.stages.put(chunk, PlayerViewState.STAGE_TICK);
+        tickets.acquire(chunk, StageTickets.TICK);
+        releaseStanding(previous);
         simulation.drain();
         propagator.drain();
     }
@@ -100,6 +93,14 @@ public final class PlayerChunkLoader {
         for (ObjectIterator<Long2ByteMap.Entry> iterator = state.stages.long2ByteEntrySet().fastIterator(); iterator.hasNext(); ) {
             Long2ByteMap.Entry entry = iterator.next();
             tickets.release(entry.getLongKey(), PlayerViewState.heldTicketStage(entry.getByteValue()));
+        }
+
+        releaseStanding(state.standing.getAndSet(ChunkPos.INVALID_CHUNK_POS));
+    }
+
+    private void releaseStanding(long chunk) {
+        if (chunk != ChunkPos.INVALID_CHUNK_POS) {
+            tickets.release(chunk, StageTickets.TICK);
         }
     }
 
