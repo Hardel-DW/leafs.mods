@@ -1,16 +1,17 @@
 package fr.hardel.leafs.chunk.propagator;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
 
 /** Lock over rectangular cell areas, owned by the node it hands out, so any thread may release it. A conflict rolls back fully before parking, so two areas never deadlock. */
 public final class AreaLock {
 
     private final int shift;
-    private final ConcurrentHashMap<Long, Node> cells = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Node> cells = new ConcurrentLong2ObjectMap<>();
 
     public AreaLock(int shift) {
         this.shift = shift;
@@ -54,7 +55,7 @@ public final class AreaLock {
     }
 
     private void removeCells(Node node) {
-        for (Long key : node.acquired) {
+        for (long key : node.acquired) {
             if (cells.remove(key) != node) {
                 throw new IllegalStateException("Cell " + key + " was not owned by the unlocking node");
             }
@@ -63,13 +64,13 @@ public final class AreaLock {
         node.acquired.clear();
     }
 
-    private static Long cellKey(int cellX, int cellZ) {
+    private static long cellKey(int cellX, int cellZ) {
         return (cellX & 0xFFFFFFFFL) | ((cellZ & 0xFFFFFFFFL) << 32);
     }
 
     public static final class Node {
         private final AreaLock lock;
-        private final List<Long> acquired = new ArrayList<>();
+        private final LongArrayList acquired = new LongArrayList();
         private final ArrayDeque<Thread> waiters = new ArrayDeque<>();
         private boolean closed;
 
@@ -78,10 +79,10 @@ public final class AreaLock {
         }
 
         /** Takes every free cell of the area; the first cell held by another node stops the scan and is returned. */
-        private Node claim(ConcurrentHashMap<Long, Node> cells, int fromCellX, int fromCellZ, int toCellX, int toCellZ) {
+        private Node claim(ConcurrentLong2ObjectMap<Node> cells, int fromCellX, int fromCellZ, int toCellX, int toCellZ) {
             for (int cellZ = fromCellZ; cellZ <= toCellZ; ++cellZ) {
                 for (int cellX = fromCellX; cellX <= toCellX; ++cellX) {
-                    Long key = cellKey(cellX, cellZ);
+                    long key = cellKey(cellX, cellZ);
                     Node previous = cells.putIfAbsent(key, this);
                     if (previous != null) {
                         return previous;

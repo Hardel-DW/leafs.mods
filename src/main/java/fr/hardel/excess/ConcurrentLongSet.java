@@ -8,23 +8,23 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** LongSet over a ConcurrentHashMap key set: atomic membership, weakly consistent iteration, boxing accepted. */
+/** LongSet over a ConcurrentHashMap key set of spread keys: atomic membership, weakly consistent iteration, boxing accepted. */
 public final class ConcurrentLongSet extends AbstractLongSet {
     private final Set<Long> set = ConcurrentHashMap.newKeySet();
 
     @Override
     public boolean add(long value) {
-        return set.add(value);
+        return set.add(LongSpread.mix(value));
     }
 
     @Override
     public boolean remove(long value) {
-        return set.remove(value);
+        return set.remove(LongSpread.mix(value));
     }
 
     @Override
     public boolean contains(long value) {
-        return set.contains(value);
+        return set.contains(LongSpread.mix(value));
     }
 
     @Override
@@ -53,7 +53,7 @@ public final class ConcurrentLongSet extends AbstractLongSet {
 
             @Override
             public long nextLong() {
-                return backing.next();
+                return LongSpread.unmix(backing.next());
             }
 
             @Override
