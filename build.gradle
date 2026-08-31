@@ -30,7 +30,7 @@ loom {
 		}
 
 		client {
-			vmArg "-Xmx4G"
+			vmArg "-Xmx2G"
 		}
 
 		server {
