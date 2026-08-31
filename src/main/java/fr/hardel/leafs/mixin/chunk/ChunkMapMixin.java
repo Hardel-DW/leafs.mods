@@ -244,10 +244,10 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         return new ParallelChunkTaskDispatcher(TaskScheduler.wrapExecutor("leafs-worldgen", workers), dispatcherExecutor, workers.threads() + 2);
     }
 
-    /** FEATURES and the light steps cross chunk boundaries; their exclusion covers the work, the free statuses pass through. */
+    /** Steps run in parallel across chunks; the ones that write blocks take the area vanilla declares for them. */
     @WrapOperation(method = "applyStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/status/ChunkStep;apply(Lnet/minecraft/world/level/chunk/status/WorldGenContext;Lnet/minecraft/util/StaticCache2D;Lnet/minecraft/world/level/chunk/ChunkAccess;)Ljava/util/concurrent/CompletableFuture;"))
-    private CompletableFuture<ChunkAccess> leafs$excludeCrossChunkSteps(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Operation<CompletableFuture<ChunkAccess>> original) {
-        return leafs$scheduling.exclusion().runStep(step.targetStatus(), chunk.getPos(), () -> original.call(step, context, cache, chunk));
+    private CompletableFuture<ChunkAccess> leafs$excludeWritingSteps(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Operation<CompletableFuture<ChunkAccess>> original) {
+        return leafs$scheduling.exclusion().runStep(step, chunk.getPos(), () -> original.call(step, context, cache, chunk));
     }
 
     /** The ticking promotion body (postProcessGeneration, startTickingChunk) runs on the position's owner, not the pump, with its 3x3 held at FULL meanwhile. */
