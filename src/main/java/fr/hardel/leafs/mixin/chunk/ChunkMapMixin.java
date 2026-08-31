@@ -312,7 +312,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     /** Regions and the workers decide their own unloads; vanilla's drop loop sees nothing, the server thread decides for everyone only before activation and once the pool stopped. */
     @Inject(method = "processUnloads", at = @At("HEAD"))
     private void leafs$decideUnloadsAsUniversalOwner(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
-        if (leafs$ticking().halted() || leafs$regions().body() == null) {
+        if (leafs$scheduling.isUniversalOwner()) {
             leafs$unloads.decide(_ -> true);
         }
     }
@@ -325,7 +325,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     /** Each region saves its own eager chunks and the workers save theirs; vanilla's pass only survives before activation and once the pool stopped. */
     @WrapOperation(method = "processUnloads", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;saveChunksEagerly(Ljava/util/function/BooleanSupplier;)V"))
     private void leafs$eagerSavesOnTheRegions(ChunkMap instance, BooleanSupplier haveTime, Operation<Void> original) {
-        if (leafs$regions().body() == null || leafs$ticking().halted()) {
+        if (leafs$scheduling.isUniversalOwner()) {
             original.call(instance, haveTime);
         }
     }
@@ -389,7 +389,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
     /** The tracking pass moved to the region bodies, every player is owned; the serial call has nothing left. */
     @Inject(method = "tick()V", at = @At("HEAD"), cancellable = true)
     private void leafs$noSerialTracking(CallbackInfo callbackInfo) {
-        if (leafs$regions().body() == null) {
+        if (leafs$scheduling.isUniversalOwner()) {
             return;
         }
 
