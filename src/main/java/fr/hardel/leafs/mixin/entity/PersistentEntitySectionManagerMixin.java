@@ -159,11 +159,6 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     }
 
     @Override
-    public void leafs$requeueUnload(long chunkKey) {
-        chunksToUnload.add(chunkKey);
-    }
-
-    @Override
     public LongSet leafs$chunksToUnload() {
         return chunksToUnload;
     }
