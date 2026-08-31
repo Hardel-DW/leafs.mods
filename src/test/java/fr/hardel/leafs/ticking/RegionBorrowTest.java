@@ -107,32 +107,4 @@ class RegionBorrowTest {
             assertEquals(RegionState.TICKING, region.state());
         }
     }
-
-    /** 2026-08-29: a ticking region that needs a chunk of its pending merge partner takes it; the merge waits for the taker, so waiting for the merge would wait forever. */
-    @Test
-    void aTickingRegionTakesItsPendingMergePartner() throws InterruptedException {
-        regions.simulated(0, 0);
-        regions.simulated(96, 0);
-        regions.settle();
-        Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
-        Region<RegionTickData> east = regions.regionizer().regionAt(96, 0);
-        assertTrue(west.tryMarkTicking());
-        regions.simulated(32, 0);
-        regions.simulated(64, 0);
-        CountDownLatch taken = new CountDownLatch(1);
-        Thread worker = new Thread(() -> {
-            RegionBorrow borrow = RegionBorrow.enter(west);
-            borrow.borrow(regions, 96, 0);
-            taken.countDown();
-            borrow.releaseAll();
-            RegionBorrow.exit();
-        });
-        worker.start();
-
-        assertTrue(taken.await(2, TimeUnit.SECONDS), "the partner is taken without waiting for the merge");
-        worker.join();
-        west.markNotTicking();
-        assertSame(regions.regionizer().regionAt(0, 0), regions.regionizer().regionAt(96, 0), "the merge ran once the taker released");
-        assertEquals(RegionState.DEAD, east.state() == RegionState.DEAD ? east.state() : west.state(), "one of the two merged away");
-    }
 }

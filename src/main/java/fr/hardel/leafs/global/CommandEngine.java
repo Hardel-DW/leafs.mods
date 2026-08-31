@@ -85,7 +85,7 @@ public final class CommandEngine {
     }
 
     private static <T> T head(Consumer<RegionBorrow> firstContact, Supplier<T> body) {
-        return RegionBorrow.hold(null, borrow -> {
+        return RegionBorrow.hold(borrow -> {
             firstContact.accept(borrow);
             return body.get();
         });
