@@ -15,7 +15,6 @@
 		"chunk.ServerChunkCacheMixin",
 		"chunk.ServerLevelMixin",
 		"chunk.StructureTemplatePaletteMixin",
-		"chunk.ThreadedLevelLightEngineMixin",
 		"chunk.TicketStorageMixin",
 		"compat.ArrayBackedEventShim",
 		"compat.FabricApiLookupCacheShim",
