@@ -1,5 +1,6 @@
 package fr.hardel.leafs.region;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
@@ -15,7 +16,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.IntSupplier;
@@ -33,8 +33,8 @@ public final class Regionizer<R> {
     private final RegionCallbacks<R> callbacks;
 
     private final StampedLock lock = new StampedLock();
-    private final ConcurrentHashMap<Long, RegionSection<R>> sections = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, Region<R>> regionsById = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<RegionSection<R>> sections = new ConcurrentLong2ObjectMap<>();
+    private final ConcurrentLong2ObjectMap<Region<R>> regionsById = new ConcurrentLong2ObjectMap<>();
     private final Collection<Region<R>> regionsView = Collections.unmodifiableCollection(regionsById.values());
     private final AtomicLong nextRegionId = new AtomicLong(1);
     private volatile Thread writeLockOwner;

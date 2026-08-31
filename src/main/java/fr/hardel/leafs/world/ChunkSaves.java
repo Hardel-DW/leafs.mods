@@ -3,7 +3,6 @@ package fr.hardel.leafs.world;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -11,7 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-import java.util.function.LongPredicate;
+import java.util.List;
 
 /** The save primitives an owner applies to its own chunks and players: vanilla's eager saves, and the epoch walk that visits everything once per autosave. */
 public final class ChunkSaves {
@@ -23,24 +22,22 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    /** Vanilla's saveChunksEagerly over the caller's chunks: the dirty ones whose save cadence elapsed, twenty per tick. */
-    public void saveEagerly(LongPredicate owned) {
+    /** Vanilla's saveChunksEagerly over the caller's holders: the dirty ones whose save cadence elapsed, twenty per tick. */
+    public void saveEagerly(List<ChunkHolder> holders) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         long now = Util.getMillis();
         int saved = 0;
-        for (LongIterator iterator = chunkMap.chunksToEagerlySave.iterator(); saved < CHUNKS_PER_TICK && iterator.hasNext(); ) {
-            long chunkKey = iterator.nextLong();
-            if (!owned.test(chunkKey)) {
-                continue;
+        for (ChunkHolder holder : holders) {
+            if (saved == CHUNKS_PER_TICK) {
+                return;
             }
 
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
-            ChunkAccess chunk = holder == null ? null : holder.getLatestChunk();
+            ChunkAccess chunk = holder.getLatestChunk();
             if (chunk == null || !chunk.isUnsaved()) {
-                iterator.remove();
+                chunkMap.chunksToEagerlySave.remove(holder.getPos().pack());
             } else if (chunkMap.saveChunkIfNeeded(holder, now)) {
+                chunkMap.chunksToEagerlySave.remove(holder.getPos().pack());
                 saved++;
-                iterator.remove();
             }
         }
     }
