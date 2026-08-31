@@ -1,5 +1,8 @@
 package fr.hardel.leafs.mixin.world;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.BlockWriteReroute;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingBinding;
@@ -13,6 +16,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
 import org.spongepowered.asm.mixin.Final;
@@ -44,6 +48,16 @@ public abstract class LevelMixin {
             this.random = new RoutingRandomSource(level, this.random);
             this.neighborUpdater = new RoutingNeighborUpdater(level, () -> new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), TickingBinding.of(level));
         }
+    }
+
+    /** A block write is the owner's, its side effects with it: a foreign thread mails it and answers like a write that happened. */
+    @WrapMethod(method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z")
+    private boolean leafs$writeOnTheOwner(BlockPos pos, BlockState state, int flags, int updateLimit, Operation<Boolean> original) {
+        if (!((Object) this instanceof ServerLevel level)) {
+            return original.call(pos, state, flags, updateLimit);
+        }
+
+        return BlockWriteReroute.write(pos, TickingBinding.of(level), target -> original.call(target, state, flags, updateLimit));
     }
 
     /** The chunk contract decides what any thread may read; only the chunk's owner creates a block entity, another thread reads what exists. */
