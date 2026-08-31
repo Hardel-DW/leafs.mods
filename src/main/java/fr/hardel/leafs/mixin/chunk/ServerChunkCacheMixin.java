@@ -6,7 +6,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
@@ -106,6 +105,6 @@ public abstract class ServerChunkCacheMixin {
 
     @Unique
     private ChunkScheduling leafs$scheduling() {
-        return ((PropagatorAccess) ((ServerChunkCache) (Object) this).chunkMap.getDistanceManager()).leafs$propagator().scheduling();
+        return RegionChunkAccess.scheduling(((ServerChunkCache) (Object) this).chunkMap);
     }
 }
