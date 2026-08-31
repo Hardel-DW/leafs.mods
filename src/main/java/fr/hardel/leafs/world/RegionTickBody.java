@@ -35,7 +35,6 @@ import net.minecraft.world.level.LocalMobCapCalculator;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.entity.EntitySectionStorage;
 import net.minecraft.world.TickRateManager;
 
 import java.util.ArrayList;
@@ -92,7 +91,7 @@ public final class RegionTickBody {
 
         ChunkBroadcasts.changed(chunks.holders());
         stages.mark(TickStages.regionBroadcast);
-        RegionEntityTracking.tickRegion(level, entities);
+        RegionEntityTracking.tickRegion(level, chunks, entities);
         stages.mark(TickStages.regionTracking);
         if (runs) {
             runBlockEvents(chunks, worldData);
@@ -160,7 +159,7 @@ public final class RegionTickBody {
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(chunks, chunkMap, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, collectAccessibleEntities(chunks), (chunkKey, output) -> {
+        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, worldData.entities().accessible(), (chunkKey, output) -> {
             ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
             if (holder != null) {
                 holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
@@ -208,21 +207,6 @@ public final class RegionTickBody {
         }
 
         return spawnable;
-    }
-
-    /** The census matches vanilla's {@code getAllEntities()} (accessible entities), restricted to owned chunks. */
-    private List<Entity> collectAccessibleEntities(RegionChunks chunks) {
-        EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
-        List<Entity> entities = new ArrayList<>();
-        for (ChunkHolder holder : chunks.holders()) {
-            storage.getExistingSectionsInChunk(holder.getPos().pack()).forEach(section -> {
-                if (section.getStatus().isAccessible()) {
-                    section.getEntities().forEach(entities::add);
-                }
-            });
-        }
-
-        return entities;
     }
 
     private void runBlockEvents(RegionChunks chunks, RegionWorldData worldData) {
