@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -7,21 +8,22 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.LongPredicate;
 
-/** Only the tickets that can expire, sharded by region section. Each region purges its sections, the server thread the sections no region owns. */
+/** Only the tickets that can expire, sharded by region section: each region counts down its own, the workers' sweep the rest. The storage says when a ticket leaves. */
 public final class TicketTimeoutIndex {
 
     private record TrackedTicket(long chunkPos, Ticket ticket) {
+        boolean matches(long chunkPos, Ticket ticket) {
+            return this.chunkPos == chunkPos && this.ticket.getType() == ticket.getType() && this.ticket.getTicketLevel() == ticket.getTicketLevel();
+        }
     }
 
     private final TicketStorage storage;
     private final ChunkMap chunkMap;
     private final int sectionShift;
-    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<TrackedTicket>> sections = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<ConcurrentLinkedQueue<TrackedTicket>> sections = new ConcurrentLong2ObjectMap<>();
 
     public TicketTimeoutIndex(TicketStorage storage, ChunkMap chunkMap, int sectionShift) {
         this.storage = storage;
@@ -33,71 +35,86 @@ public final class TicketTimeoutIndex {
         return sections.isEmpty();
     }
 
-    /** Called under the storage monitor, for every timeout ticket the table actually stored. */
+    /** Under the storage monitor, for every timeout ticket the table actually stored. */
     public void track(long chunkPos, Ticket ticket) {
-        long section = CoordinateKey.pack(ChunkPos.getX(chunkPos) >> sectionShift, ChunkPos.getZ(chunkPos) >> sectionShift);
-        sections.compute(section, (key, queue) -> {
+        sections.compute(sectionOf(chunkPos), (_, queue) -> {
             ConcurrentLinkedQueue<TrackedTicket> target = queue == null ? new ConcurrentLinkedQueue<>() : queue;
             target.add(new TrackedTicket(chunkPos, ticket));
             return target;
         });
     }
 
-    /** The owner's per-tick purge over its own sections; returns how many tickets expired. */
-    public int purgeSections(long[] sectionKeys) {
-        int expired = 0;
-        for (long key : sectionKeys)
-            expired += purgeSection(key);
+    /** Under the storage monitor, for every ticket the table removed; vanilla matches removals by type and level, so does this. */
+    public void untrack(long chunkPos, Ticket ticket) {
+        if (!ticket.getType().hasTimeout()) {
+            return;
+        }
 
-        return expired;
-    }
-
-    /** The serial fallback for the sections no region owns. */
-    public int purgeUnowned(LongPredicate sectionOwned) {
-        int expired = 0;
-        for (long key : sections.keySet())
-            if (!sectionOwned.test(key))
-                expired += purgeSection(key);
-
-        return expired;
-    }
-
-    /** A ticket the table no longer holds leaves lazily; Ticket has no equals, so contains is an identity test. */
-    private int purgeSection(long sectionKey) {
-        ConcurrentLinkedQueue<TrackedTicket> queue = sections.get(sectionKey);
-        if (queue == null)
-            return 0;
-
-        int expired = 0;
-        for (Iterator<TrackedTicket> iterator = queue.iterator(); iterator.hasNext(); ) {
-            TrackedTicket tracked = iterator.next();
-            if (!storage.getTickets(tracked.chunkPos()).contains(tracked.ticket())) {
-                iterator.remove();
-                continue;
+        sections.compute(sectionOf(chunkPos), (_, queue) -> {
+            if (queue == null) {
+                return null;
             }
 
+            queue.removeIf(tracked -> tracked.matches(chunkPos, ticket));
+            return queue.isEmpty() ? null : queue;
+        });
+    }
+
+    /** The owner's per-tick countdown over its own sections; returns how many tickets expired. */
+    public int purgeSections(long[] sectionKeys) {
+        int expired = 0;
+        for (long key : sectionKeys) {
+            expired += purgeSection(key);
+        }
+
+        return expired;
+    }
+
+    /** The workers' countdown over the sections no region owns. */
+    public int purgeUnowned(LongPredicate sectionOwned) {
+        int expired = 0;
+        for (long key : sections.keySet()) {
+            if (!sectionOwned.test(key)) {
+                expired += purgeSection(key);
+            }
+        }
+
+        return expired;
+    }
+
+    /** An expired ticket leaves through the storage, whose removal untracks it here. */
+    private int purgeSection(long sectionKey) {
+        ConcurrentLinkedQueue<TrackedTicket> queue = sections.get(sectionKey);
+        if (queue == null) {
+            return 0;
+        }
+
+        int expired = 0;
+        for (TrackedTicket tracked : queue) {
             if (!canExpire(tracked.ticket(), tracked.chunkPos())) {
                 continue;
             }
 
             tracked.ticket().decreaseTicksLeft();
-            if (tracked.ticket().isTimedOut()) {
-                storage.removeTicket(tracked.chunkPos(), tracked.ticket());
-                iterator.remove();
+            if (tracked.ticket().isTimedOut() && storage.removeTicket(tracked.chunkPos(), tracked.ticket())) {
                 expired++;
             }
         }
 
-        sections.compute(sectionKey, (key, remaining) -> remaining == null || remaining.isEmpty() ? null : remaining);
         return expired;
     }
 
     /** Vanilla {@code TicketStorage.canTicketExpire}: a busy chunk pauses the countdown of the types that must survive its save. */
     private boolean canExpire(Ticket ticket, long chunkPos) {
-        if (ticket.getType().canExpireIfUnloaded())
+        if (ticket.getType().canExpireIfUnloaded()) {
             return true;
+        }
 
         ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(chunkPos);
         return holder == null || holder.isReadyForSaving();
+    }
+
+    private long sectionOf(long chunkPos) {
+        return CoordinateKey.pack(ChunkPos.getX(chunkPos) >> sectionShift, ChunkPos.getZ(chunkPos) >> sectionShift);
     }
 }

@@ -116,7 +116,7 @@ public final class RegionTickBody {
             }
         });
         stages.mark(TickStages.regionPlayers);
-        autosave.tick(region, chunks, entities, regions.autosaveEpoch(), regions.autosaveForced());
+        autosave.tick(chunks, entities, regions.autosaveEpoch(), regions.autosaveForced());
         stages.mark(TickStages.regionAutosave);
     }
 
@@ -232,7 +232,8 @@ public final class RegionTickBody {
 
     private void runBlockEvent(BlockEventData event) {
         if (level.doBlockEvent(event)) {
-            level.getServer().getPlayerList().broadcast(null, event.pos().getX(), event.pos().getY(), event.pos().getZ(), 64.0, level.dimension(), new ClientboundBlockEventPacket(event.pos(), event.block(), event.paramA(), event.paramB()));
+            ClientboundBlockEventPacket packet = new ClientboundBlockEventPacket(event.pos(), event.block(), event.paramA(), event.paramB());
+            level.getServer().getPlayerList().broadcast(null, event.pos().getX(), event.pos().getY(), event.pos().getZ(), 64.0, level.dimension(), packet);
         }
     }
 
@@ -245,7 +246,8 @@ public final class RegionTickBody {
             }
 
             entity.checkDespawn();
-            if (entity instanceof ServerPlayer ? chunkSource.isPositionTicking(entity.chunkPosition().pack()) : distanceManager.inEntityTickingRange(entity.chunkPosition().pack())) {
+            long chunk = entity.chunkPosition().pack();
+            if (entity instanceof ServerPlayer ? chunkSource.isPositionTicking(chunk) : distanceManager.inEntityTickingRange(chunk)) {
                 Entity vehicle = entity.getVehicle();
                 if (vehicle != null) {
                     if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {

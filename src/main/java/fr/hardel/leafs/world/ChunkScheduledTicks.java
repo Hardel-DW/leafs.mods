@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.Vec3i;
@@ -14,14 +15,13 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 /** The level's tick field: a concurrent map of the chunk containers, nothing else. The drain belongs to the owning region, see {@link ScheduledTickDrain}. */
 public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
-    private final ConcurrentHashMap<Long, LevelChunkTicks<T>> containers = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<LevelChunkTicks<T>> containers = new ConcurrentLong2ObjectMap<>();
     private final ServerLevel level;
     private final Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf;
 
