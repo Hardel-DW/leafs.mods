@@ -177,6 +177,44 @@ class PlayerPacketQueueTest {
         assertTrue(drainedSecond.get());
     }
 
+    /** 2026-08-31: the player's own pass ran outside this exclusion, so the new owner's drain wrote his movement list while the old owner read it. */
+    @Test
+    void aPlayerPassKeepsDrainersOutWhileItRuns() throws InterruptedException {
+        FakeListener listener = new FakeListener(true);
+        AtomicBoolean insidePass = new AtomicBoolean();
+        AtomicBoolean overlapped = new AtomicBoolean();
+        CountDownLatch passStarted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        queue.add(listener, new FakePacket("move_player", _ -> overlapped.compareAndSet(false, insidePass.get())));
+
+        Thread previousOwner = new Thread(() -> queue.handleAs(() -> {
+            insidePass.set(true);
+            passStarted.countDown();
+            awaitQuietly(release);
+            insidePass.set(false);
+        }));
+        previousOwner.start();
+        assertTrue(passStarted.await(5, TimeUnit.SECONDS));
+
+        Thread newOwner = new Thread(queue::drain);
+        newOwner.start();
+        newOwner.join(200);
+        assertTrue(newOwner.isAlive(), "the new owner waits for the pass instead of handling packets under it");
+
+        release.countDown();
+        previousOwner.join();
+        newOwner.join();
+        assertFalse(overlapped.get(), "no packet may be handled while the player's pass runs");
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Test
     void concurrentSubmissionsKeepPerThreadOrder() throws InterruptedException {
         FakeListener listener = new FakeListener(true);
