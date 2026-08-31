@@ -1,6 +1,7 @@
 # Config
 Leafs crée un fichier de configuration au démarrage, `config/leafs.json`.
-- `max_threads` : Le nombre de workers de régions et de chunks. Les deux auront le même nombre. Avec `-1` cela prend tous les cœurs.
+- `region_threads` : Le nombre de workers de régions. Avec `-1` cela prend tous les cœurs.
+- `chunk_threads` : Le nombre de workers de chunk. Avec `-1` cela prend tous les cœurs.
 - `section_size` : Nombre de chunks qui forment une section. Les sections proches forment une région. Une puissance de deux, `2` par défaut. Plus la section est grande plus la région est grande.
 - `region_merge_distance` : La distance en sections sous laquelle deux régions voisines fusionnent.
 - `region_buffer_distance` : L'épaisseur en sections de la couronne qu'une région possède.

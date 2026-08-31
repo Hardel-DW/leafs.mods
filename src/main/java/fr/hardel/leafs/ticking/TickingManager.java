@@ -44,7 +44,8 @@ public final class TickingManager {
         DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
-        Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread", config.effectiveRegionThreads(), config.effectiveChunkThreads());
+        Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",
+            config.effectiveRegionThreads(), config.effectiveChunkThreads());
     }
 
     /** Vanilla's {@code max-tick-time}, read late: the dedicated settings bind after this manager is built. Only a dedicated server kills, -1 disables. */
@@ -90,14 +91,14 @@ public final class TickingManager {
         return chunkWorkers;
     }
 
-    /** Once regions may be live, an off-thread {@code MinecraftServer.execute} lands in the global phase. Hot path, logs nothing. */
     /** The server thread pumping while it waits (managedBlock) also runs the diverted tasks, or a wait on one of them never ends. */
     public boolean pumpDiverted() {
         return globalTicking && server.isSameThread() && globalScheduler.drain();
     }
 
+    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. */
     public boolean divertExecute(Runnable task) {
-        if (!globalTicking || server.isSameThread() || server.isStopped()) {
+        if (!globalTicking || server.isSameThread()) {
             return false;
         }
 
@@ -162,9 +163,11 @@ public final class TickingManager {
         globalScheduler.drain();
     }
 
-    /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. */
+    /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. The pools are gone, so diversion ends here. */
     public void shutdown() {
         chunkWorkers.shutdown();
+        globalTicking = false;
+        globalScheduler.drain();
         watchdog.stop();
         DeferredFileWrites.stopAndFlush();
         drainRegions();

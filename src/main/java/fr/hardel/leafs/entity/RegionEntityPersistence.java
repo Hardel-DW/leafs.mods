@@ -1,7 +1,6 @@
 package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.chunk.PropagatorAccess;
-import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -34,15 +33,9 @@ public final class RegionEntityPersistence {
         return manager.leafs$chunksToUnload();
     }
 
-    /** Vanilla's processUnloads over the chunks the caller owns: a chunk no longer hidden leaves the set, a hidden one unloads. */
+    /** Vanilla's processUnloads over the chunks the caller owns: a settled chunk leaves the set, a failed unload stays there for a later pass. */
     public void unloadHidden(LongPredicate owned) {
-        for (LongIterator iterator = manager.leafs$chunksToUnload().iterator(); iterator.hasNext(); ) {
-            long chunkKey = iterator.nextLong();
-            if (owned.test(chunkKey)) {
-                iterator.remove();
-                unload(chunkKey);
-            }
-        }
+        manager.leafs$chunksToUnload().removeIf((long chunkKey) -> owned.test(chunkKey) && unload(chunkKey));
     }
 
     /** The owning region's autosave walk: stores the entity chunk like vanilla's entity autosave, a HIDDEN one unloads instead. */
@@ -64,14 +57,8 @@ public final class RegionEntityPersistence {
         regionTaskDrain.run();
     }
 
-    /** A chunk revived between dispatch and execution stays; the next HIDDEN transition re-queues it. */
-    private void unload(long chunkKey) {
-        if (manager.leafs$visibility(chunkKey) != Visibility.HIDDEN) {
-            return;
-        }
-
-        if (!manager.leafs$unloadChunk(chunkKey)) {
-            manager.leafs$requeueUnload(chunkKey);
-        }
+    /** Settled means nothing more to do here: a chunk revived since its queueing, or one whose entities are gone. Entities still loading are not, the next pass retries. */
+    private boolean unload(long chunkKey) {
+        return manager.leafs$visibility(chunkKey) != Visibility.HIDDEN || manager.leafs$unloadChunk(chunkKey);
     }
 }
