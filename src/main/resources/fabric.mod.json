@@ -34,8 +34,11 @@
 		"lithium:options": {
 			"mixin.ai.poi": false,
 			"mixin.alloc.chunk_random": false,
+			"mixin.alloc.nbt": false,
 			"mixin.chunk.no_locking": false,
+			"mixin.chunk.palette": false,
 			"mixin.util.chunk_status_tracking": false,
+			"mixin.util.section_data_storage": false,
 			"mixin.util.data_storage": false,
 			"mixin.world.chunk_ticking.random_block_ticking": false
 		}
