@@ -2,10 +2,12 @@ package fr.hardel.leafs.network;
 
 import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.TickingBinding;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
 import net.minecraft.network.Connection;
@@ -21,7 +23,7 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.storage.LevelData;
 
 
-/** Player network split: owning region drains packets and runs the listener tick; global loop keeps transport. */
+/** Player network split: the owning region drains his packets and runs his pass, both as his packet-handling thread; the global loop keeps transport. */
 public final class RegionNetworkTick {
     private RegionNetworkTick() {
     }
@@ -29,17 +31,34 @@ public final class RegionNetworkTick {
     /** Region tick start: the owned player's packets, stopped if a handler moves the player off-level. */
     public static void drainOnRegion(ServerPlayer player, ServerLevel level) {
         ServerGamePacketListenerImpl listener = player.connection;
-        PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
+        countIfShared(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
     }
 
-    /** Region tick end: the full vanilla listener tick, with vanilla's kick-instead-of-crash catch. */
-    public static void tickListenerOnRegion(ServerPlayer player, MinecraftServer server) {
+    /** Region tick end: the player's whole pass, as his packet-handling thread, so no other thread touches him while it runs. */
+    public static void tickPlayerOnRegion(ServerPlayer player, PlayerChunkLoader loader, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
         if (connection.isConnecting() || !connection.isConnected()) {
             return;
         }
 
+        countIfShared(server, PacketRouting.queueOf(listener).handleAs(() -> {
+            loader.tick(player);
+            tickListener(listener, connection, server);
+            listener.chunkSender.sendNextChunks(player);
+            connection.flushChannel();
+        }));
+    }
+
+    /** A wait is a collision that the exclusion just prevented, so the counter says how often two threads wanted the same player. */
+    private static void countIfShared(MinecraftServer server, boolean waited) {
+        if (waited) {
+            TickingManager.of(server).metrics().sharedPlayers().increment();
+        }
+    }
+
+    /** The full vanilla listener tick, with vanilla's kick-instead-of-crash catch. */
+    private static void tickListener(ServerGamePacketListenerImpl listener, Connection connection, MinecraftServer server) {
         try {
             listener.tick();
         } catch (Exception exception) {
