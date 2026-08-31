@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
 import it.unimi.dsi.fastutil.longs.LongList;
+import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.Ticket;
@@ -13,8 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/** The request behind a chunk wait: file the tickets, drain the propagator once so the holders exist, request the status so the pool delivers. The future completes at delivery. */
+/** The request behind a chunk wait: tickets, one drain so the holders exist, head of the generation queue, status request. The future completes at delivery. */
 public final class ChunkDemands {
+    private static final int HEAD_OF_QUEUE = 0;
 
     private ChunkDemands() {
     }
@@ -32,6 +34,12 @@ public final class ChunkDemands {
         List<CompletableFuture<?>> deliveries = new ArrayList<>(positions.size());
         for (int index = 0; index < positions.size(); index++) {
             long position = positions.getLong(index);
+            ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(position);
+            if (holder == null) {
+                continue;
+            }
+
+            prioritise(chunkMap, holder);
             CompletableFuture<?> delivery = propagator.scheduling().requestStatus(ChunkPos.getX(position), ChunkPos.getZ(position), status);
             if (delivery != null) {
                 deliveries.add(delivery);
@@ -43,5 +51,10 @@ public final class ChunkDemands {
         }
 
         return CompletableFuture.allOf(deliveries.toArray(CompletableFuture[]::new));
+    }
+
+    /** Someone waits for this chunk: its tasks move to the head of both dispatchers. The queue level is separate from the ticket level, nothing changes about loading. */
+    private static void prioritise(ChunkMap chunkMap, ChunkHolder holder) {
+        chunkMap.onLevelChange(holder.getPos(), holder::getQueueLevel, HEAD_OF_QUEUE, holder::setQueueLevel);
     }
 }

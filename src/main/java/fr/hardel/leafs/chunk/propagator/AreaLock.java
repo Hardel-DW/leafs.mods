@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
 
-/** Reentrant lock over rectangular cell areas. A conflict rolls back fully before parking, so two areas never deadlock. No partial overlap with cells already owned. */
+/** Lock over rectangular cell areas, owned by the node it hands out, so any thread may release it. A conflict rolls back fully before parking, so two areas never deadlock. */
 public final class AreaLock {
 
     private final int shift;
@@ -21,61 +21,26 @@ public final class AreaLock {
     }
 
     public Node lock(int fromX, int fromZ, int toX, int toZ) {
-        Thread thread = Thread.currentThread();
         int fromCellX = fromX >> shift;
         int fromCellZ = fromZ >> shift;
         int toCellX = toX >> shift;
         int toCellZ = toZ >> shift;
-
-        List<Long> acquired = new ArrayList<>();
-        Node node = new Node(this, acquired, thread);
+        Node node = new Node(this);
 
         for (;;) {
-            Node conflict = null;
-            boolean ownedSome = false;
-
-            scan:
-            for (int cellZ = fromCellZ; cellZ <= toCellZ; ++cellZ) {
-                for (int cellX = fromCellX; cellX <= toCellX; ++cellX) {
-                    Long key = cellKey(cellX, cellZ);
-                    Node previous = cells.putIfAbsent(key, node);
-                    if (previous == null) {
-                        acquired.add(key);
-                        continue;
-                    }
-                    if (previous.thread != thread) {
-                        conflict = previous;
-                        break scan;
-                    }
-                    ownedSome = true;
-                }
-            }
-
+            Node conflict = node.claim(cells, fromCellX, fromCellZ, toCellX, toCellZ);
             if (conflict == null) {
-                if (ownedSome && !acquired.isEmpty()) {
-                    throw new IllegalStateException("Area partially overlaps cells already owned by " + thread);
-                }
                 return node;
             }
 
-            boolean inserted = !acquired.isEmpty();
-            if (inserted) {
-                removeCells(node);
-                acquired.clear();
-                // threads that parked on us while we briefly held cells must retry now
-                node.closeAndWake();
-            }
-
-            // a false add means the conflicting node was released in between, just retry
-            if (conflict.addWaiter(thread)) {
+            // threads that parked on us while we briefly held cells must retry now
+            removeCells(node);
+            node.closeAndWake();
+            if (conflict.addWaiter(Thread.currentThread())) {
                 LockSupport.park();
             }
 
-            if (inserted) {
-                synchronized (node) {
-                    node.closed = false;
-                }
-            }
+            node.reopen();
         }
     }
 
@@ -94,6 +59,8 @@ public final class AreaLock {
                 throw new IllegalStateException("Cell " + key + " was not owned by the unlocking node");
             }
         }
+
+        node.acquired.clear();
     }
 
     private static Long cellKey(int cellX, int cellZ) {
@@ -102,15 +69,29 @@ public final class AreaLock {
 
     public static final class Node {
         private final AreaLock lock;
-        private final List<Long> acquired;
-        private final Thread thread;
+        private final List<Long> acquired = new ArrayList<>();
         private final ArrayDeque<Thread> waiters = new ArrayDeque<>();
         private boolean closed;
 
-        private Node(AreaLock lock, List<Long> acquired, Thread thread) {
+        private Node(AreaLock lock) {
             this.lock = lock;
-            this.acquired = acquired;
-            this.thread = thread;
+        }
+
+        /** Takes every free cell of the area; the first cell held by another node stops the scan and is returned. */
+        private Node claim(ConcurrentHashMap<Long, Node> cells, int fromCellX, int fromCellZ, int toCellX, int toCellZ) {
+            for (int cellZ = fromCellZ; cellZ <= toCellZ; ++cellZ) {
+                for (int cellX = fromCellX; cellX <= toCellX; ++cellX) {
+                    Long key = cellKey(cellX, cellZ);
+                    Node previous = cells.putIfAbsent(key, this);
+                    if (previous != null) {
+                        return previous;
+                    }
+
+                    acquired.add(key);
+                }
+            }
+
+            return null;
         }
 
         private synchronized boolean addWaiter(Thread waiter) {
@@ -120,6 +101,10 @@ public final class AreaLock {
 
             waiters.add(waiter);
             return true;
+        }
+
+        private synchronized void reopen() {
+            closed = false;
         }
 
         /** Closing before unparking guarantees late waiters observe the release and retry instead of parking. */
