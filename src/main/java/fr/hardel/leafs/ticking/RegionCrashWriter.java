@@ -1,7 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.metrics.CrashTelemetry;
+import fr.hardel.leafs.metrics.ModAttribution;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,17 +14,16 @@ public final class RegionCrashWriter {
     private static final DateTimeFormatter FILE_STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss");
 
     private final Path directory;
-    private final CrashTelemetry telemetry;
+    private final ModAttribution attribution;
 
-    public RegionCrashWriter(Path directory, CrashTelemetry telemetry) {
+    public RegionCrashWriter(Path directory, ModAttribution attribution) {
         this.directory = directory;
-        this.telemetry = telemetry;
+        this.attribution = attribution;
     }
 
     public void write(RegionCrashReport report, Throwable cause) {
-        String content = report.format(cause);
+        String content = report.format(attribution, cause);
         Leafs.LOGGER.error("Region crash:\n{}", content);
-        telemetry.record(report, cause);
         try {
             Files.createDirectories(directory);
             Files.writeString(uniqueFile(), content);

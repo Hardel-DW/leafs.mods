@@ -21,8 +21,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick,
-    boolean telemetry, Debug debug) {
+public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, Debug debug) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -31,7 +30,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
     }
 
-    /** The keys {@code /leafs config} may rewrite; telemetry and the debug group stay a file-only matter. */
+    /** The keys {@code /leafs config} may rewrite; the debug group stays a file-only matter. */
     public enum Setting {
         REGION_THREADS("region_threads", LeafsConfig::regionThreads),
         CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
@@ -87,7 +86,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
         Codec.intRange(1, 1000).optionalFieldOf(Setting.PLAYER_CHUNK_LOADS_PER_TICK.key(), 5).forGetter(LeafsConfig::playerChunkLoadsPerTick),
-        Codec.BOOL.optionalFieldOf("telemetry", true).forGetter(LeafsConfig::telemetry),
         DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug)
     ).apply(builder, LeafsConfig::new));
 
