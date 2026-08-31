@@ -95,19 +95,24 @@ public final class ChunkMailbox {
         return ran;
     }
 
-    /** A chunk no region owns: a worker drains it when free, and comes back for what arrived meanwhile; a claim held elsewhere hands it over at release. */
-    public void drainOnWorkers(long key) {
-        workers.execute(() -> {
-            if (!tryClaim(key)) {
-                return;
-            }
+    /** A chunk no region owns, drained here and now: the caller reads back what it wrote. Never waits for the claim, two threads crossing chunks would hold each other forever. */
+    public boolean drainIfFree(long key) {
+        if (!tryClaim(key)) {
+            return false;
+        }
 
-            try {
-                drainChunk(key);
-            } finally {
-                releaseToWorkers(key);
-            }
-        });
+        try {
+            drainChunk(key);
+        } finally {
+            releaseToWorkers(key);
+        }
+
+        return true;
+    }
+
+    /** The same pass on a worker, for a caller that could not take the chunk. */
+    public void drainOnWorkers(long key) {
+        workers.execute(() -> drainIfFree(key));
     }
 
     /** The release of a chunk no region owns: the mail that arrived under the claim goes to a worker. */

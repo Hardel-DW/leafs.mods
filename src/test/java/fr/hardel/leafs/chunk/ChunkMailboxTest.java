@@ -4,10 +4,16 @@ import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -120,5 +126,46 @@ class ChunkMailboxTest {
         mailbox.releaseToWorkers(key);
         assertEquals(List.of("held"), ran, "the release hands the mail to a worker");
         assertTrue(mailbox.tryClaim(key), "nothing holds the chunk once the worker is done");
+    }
+
+    /** Two writers crossing on two chunks would hold each other forever if taking a chunk could wait. */
+    @Test
+    void takingAChunkNeverWaitsForItsHolder() throws InterruptedException {
+        ChunkMailbox mailbox = new ChunkMailbox(new RecordingHolds(), _ -> {
+        });
+        long first = ChunkPos.pack(0, 0);
+        long second = ChunkPos.pack(1, 0);
+        CountDownLatch bothHold = new CountDownLatch(2);
+        List<Boolean> took = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger seat = new AtomicInteger();
+
+        Runnable crossing = () -> {
+            boolean firstSeat = seat.getAndIncrement() == 0;
+            long mine = firstSeat ? first : second;
+            mailbox.tryClaim(mine);
+            bothHold.countDown();
+            await(bothHold);
+            took.add(mailbox.drainIfFree(firstSeat ? second : first));
+            mailbox.release(mine);
+        };
+
+        Thread one = new Thread(crossing);
+        Thread two = new Thread(crossing);
+        one.start();
+        two.start();
+        one.join(SECONDS.toMillis(5));
+        two.join(SECONDS.toMillis(5));
+
+        assertFalse(one.isAlive(), "a writer that cannot take a chunk hands it to a worker instead of waiting");
+        assertFalse(two.isAlive());
+        assertEquals(List.of(false, false), took, "neither writer took the chunk the other held");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

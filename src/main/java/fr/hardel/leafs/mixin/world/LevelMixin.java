@@ -2,8 +2,10 @@ package fr.hardel.leafs.mixin.world;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.chunk.BlockWriteReroute;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.scheduler.DeferredTransports;
+import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.ticking.TickingBinding;
 import fr.hardel.leafs.world.ChunkTickAccess;
@@ -50,14 +52,23 @@ public abstract class LevelMixin {
         }
     }
 
-    /** A block write is the owner's, its side effects with it: a foreign thread mails it and answers like a write that happened. */
+    /** A block write is the owner's, its side effects with it; only a region that ticks the chunk turns it into mail, and then it answers like a write that happened. */
     @WrapMethod(method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z")
     private boolean leafs$writeOnTheOwner(BlockPos pos, BlockState state, int flags, int updateLimit, Operation<Boolean> original) {
         if (!((Object) this instanceof ServerLevel level)) {
             return original.call(pos, state, flags, updateLimit);
         }
 
-        return BlockWriteReroute.write(pos, TickingBinding.of(level), target -> original.call(target, state, flags, updateLimit));
+        DeferredTransports transports = TickingBinding.of(level);
+        int chunkX = SectionPos.blockToSectionCoord(pos.getX());
+        int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
+        if (transports.owns(chunkX, chunkZ)) {
+            return original.call(pos, state, flags, updateLimit);
+        }
+
+        BlockPos target = pos.immutable();
+        DeferredWork.owner(DeferReason.BLOCK_WRITE, transports.stats(), chunkX, chunkZ, () -> original.call(target, state, flags, updateLimit)).submit(transports);
+        return true;
     }
 
     /** The chunk contract decides what any thread may read; only the chunk's owner creates a block entity, another thread reads what exists. */
