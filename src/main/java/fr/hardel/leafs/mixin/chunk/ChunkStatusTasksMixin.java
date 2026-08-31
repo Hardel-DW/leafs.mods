@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.PropagatorAccess;
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.chunk.core.GenerationExclusion;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatusTasks;
@@ -25,7 +26,11 @@ public abstract class ChunkStatusTasksMixin {
     private static CompletableFuture<Object> leafs$fullOnTheOwner(Supplier<Object> body, Executor pump, Operation<CompletableFuture<Object>> original, @Local(argsOnly = true) WorldGenContext context, @Local(argsOnly = true) ChunkAccess chunk) {
         ChunkPos pos = chunk.getPos();
         ChunkScheduling scheduling = ((PropagatorAccess) context.level().getChunkSource().chunkMap.getDistanceManager()).leafs$propagator().scheduling();
-        Supplier<Object> excluded = () -> scheduling.exclusion().supplyExcluded(pos, GenerationExclusion.FULL_STEP_RADIUS, body);
+        Supplier<Object> excluded = () -> {
+            Object full = scheduling.exclusion().supplyExcluded(pos, GenerationExclusion.FULL_STEP_RADIUS, body);
+            TickingManager.of(context.level().getServer()).metrics().chunksFull().increment();
+            return full;
+        };
         return original.call(excluded, scheduling.ownerExecutor(pos.x(), pos.z()));
     }
 }

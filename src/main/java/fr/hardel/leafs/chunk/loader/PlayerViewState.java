@@ -3,8 +3,11 @@ package fr.hardel.leafs.chunk.loader;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.world.level.ChunkPos;
 
-/** One player's view, touched only by the thread that ticks him. The in-flight sets are what the polls walk, not the whole stage map. */
+import java.util.concurrent.atomic.AtomicLong;
+
+/** One player's view, touched only by the thread that ticks him, except the chunk he stands on, which whoever moves him tickets. The in-flight sets are what the polls walk. */
 final class PlayerViewState {
 
     static final byte STAGE_LOADING = 1;
@@ -17,6 +20,7 @@ final class PlayerViewState {
     final LongArrayFIFOQueue pending = new LongArrayFIFOQueue();
     final LongOpenHashSet loading = new LongOpenHashSet();
     final LongOpenHashSet generating = new LongOpenHashSet();
+    final AtomicLong standing = new AtomicLong(ChunkPos.INVALID_CHUNK_POS);
 
     int centerX;
     int centerZ;
