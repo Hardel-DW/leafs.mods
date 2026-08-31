@@ -14,8 +14,8 @@ public record TickingBinding(ServerLevel level) implements DeferredTransports {
     }
 
     @Override
-    public void toOwner(int chunkX, int chunkZ, Runnable task) {
-        scheduling().runOnOwner(chunkX, chunkZ, task);
+    public boolean toOwner(int chunkX, int chunkZ, Runnable task) {
+        return scheduling().runOnOwner(chunkX, chunkZ, task);
     }
 
     @Override
