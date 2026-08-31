@@ -5,7 +5,7 @@ import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
 import fr.hardel.leafs.global.DeferredFileWrites;
-import fr.hardel.leafs.metrics.CrashTelemetry;
+import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
@@ -38,7 +38,7 @@ public final class TickingManager {
         this.server = server;
         this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
-        RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), CrashTelemetry.fromLoader(config.telemetry()));
+        RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), ModAttribution.fromLoader());
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.chunkWorkers = new ChunkWorkers(config.effectiveChunkThreads());
         DeferredFileWrites.start();
