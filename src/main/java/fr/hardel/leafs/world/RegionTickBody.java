@@ -108,10 +108,7 @@ public final class RegionTickBody {
         PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkSource.chunkMap).leafs$playerLoader();
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
-                loader.tick(player);
-                RegionNetworkTick.tickListenerOnRegion(player, level.getServer());
-                player.connection.chunkSender.sendNextChunks(player);
-                player.connection.connection.flushChannel();
+                RegionNetworkTick.tickPlayerOnRegion(player, loader, level.getServer());
             }
         });
         stages.mark(TickStages.regionPlayers);

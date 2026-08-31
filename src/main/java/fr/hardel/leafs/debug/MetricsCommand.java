@@ -54,6 +54,10 @@ public final class MetricsCommand {
             .append(CommandText.stat("chunk loads", perMinute(metrics.chunkLoads().perMinute())))
             .append(CommandText.stat("unloads", perMinute(metrics.chunkUnloads().perMinute()))), false);
 
+        source.sendSuccess(() -> Component.empty()
+            .append(Component.literal("players").withStyle(ChatFormatting.AQUA))
+            .append(CommandText.stat("two threads on one player", perMinute(metrics.sharedPlayers().perMinute()))), false);
+
         return 1;
     }
 

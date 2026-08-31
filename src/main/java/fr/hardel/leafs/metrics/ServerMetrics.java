@@ -12,6 +12,7 @@ public final class ServerMetrics {
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
     private final MinuteCounter chunksFull = new MinuteCounter();
+    private final MinuteCounter sharedPlayers = new MinuteCounter();
 
     /** Server tick events emitted with a subscriber, each one a borrow scope on the server thread. */
     public MinuteCounter fabricEventBorrows() {
@@ -49,5 +50,10 @@ public final class ServerMetrics {
     /** Chunks that ran their FULL step, the generation pipeline's output. */
     public MinuteCounter chunksFull() {
         return chunksFull;
+    }
+
+    /** Times a thread waited for a player another thread held: before his tick joined that exclusion, the two ran on him together. */
+    public MinuteCounter sharedPlayers() {
+        return sharedPlayers;
     }
 }
