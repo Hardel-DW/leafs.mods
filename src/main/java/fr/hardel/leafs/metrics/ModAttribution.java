@@ -28,6 +28,10 @@ public final class ModAttribution {
         this.ownerOfClass = ownerOfClass;
     }
 
+    public static ModAttribution none() {
+        return new ModAttribution(_ -> Optional.empty());
+    }
+
     /** Backed by the loader: a class maps to the mod whose origin holds its code source. A nested jar has no path of its own, its classes count for the parent. */
     public static ModAttribution fromLoader() {
         Map<Path, ModContainer> byOrigin = new HashMap<>();

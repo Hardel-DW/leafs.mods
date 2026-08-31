@@ -6,7 +6,6 @@ Leafs crée un fichier de configuration au démarrage, `config/leafs.json`.
 - `region_merge_distance` : La distance en sections sous laquelle deux régions voisines fusionnent.
 - `region_buffer_distance` : L'épaisseur en sections de la couronne qu'une région possède.
 - `player_chunk_loads_per_tick` : Chaque joueur peut générer (par défaut `5`) chunks par tick.
-- `telemetry` : `true` par défaut. À chaque crash de région, Leafs écrit une ligne JSON dans le log, `Leafs telemetry`, avec la dimension, la région, l'erreur, le détail vanilla de l'entité ou du block entity, et le mod dont le code est sur la pile. Rien n'est envoyé sur le réseau.
 
 # Debug
 - `debug.watchdog_warn_seconds` : Au-delà de ce délai, un tick bloqué est loggé avec la pile de son thread.
