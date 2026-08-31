@@ -39,7 +39,7 @@ public abstract class ServerLevelMixin {
     /** A custom spawner probes terrain near a random player and spawns there: the server thread takes the regions it touches, like a command. */
     @WrapOperation(method = "tickCustomSpawners", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/CustomSpawner;tick(Lnet/minecraft/server/level/ServerLevel;Z)V"))
     private void leafs$borrowingSpawner(CustomSpawner spawner, ServerLevel level, boolean spawnEnemies, Operation<Void> original) {
-        RegionBorrow.hold(null, _ -> {
+        RegionBorrow.hold(_ -> {
             original.call(spawner, level, spawnEnemies);
             return null;
         });

@@ -16,27 +16,19 @@ import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
-/** What a thread holds for one piece of work, taken at first contact and kept until released: regions, and the chunks no region owns. The server thread borrows for a command, a ticking region for a chunk it waits on. */
+/** What the server thread holds for one piece of head work, taken at first contact and kept until released: regions, and the chunks no region owns. A region never borrows, it waits for nobody's tick. */
 public final class RegionBorrow {
     private static final ThreadLocal<RegionBorrow> CURRENT = new ThreadLocal<>();
     private static final long WAIT_NANOS = 50_000L;
 
-    private final Region<RegionTickData> by;
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
     private final Map<LevelRegions, LongOpenHashSet> heldChunks = new LinkedHashMap<>();
 
-    private RegionBorrow(Region<RegionTickData> by) {
-        this.by = by;
+    private RegionBorrow() {
     }
 
-    /** The server thread borrows in its own name. */
     public static RegionBorrow enter() {
-        return enter(null);
-    }
-
-    /** A ticking region borrows in its name: a partner owed to it by a pending merge is taken instead of waited for. */
-    public static RegionBorrow enter(Region<RegionTickData> by) {
-        RegionBorrow borrow = new RegionBorrow(by);
+        RegionBorrow borrow = new RegionBorrow();
         CURRENT.set(borrow);
         return borrow;
     }
@@ -45,14 +37,14 @@ public final class RegionBorrow {
         CURRENT.remove();
     }
 
-    /** Reuses the borrow open on this thread, or opens one in {@code by}'s name and returns everything at the end. */
-    public static <T> T hold(Region<RegionTickData> by, Function<RegionBorrow, T> body) {
+    /** Reuses the borrow open on this thread, or opens one and returns everything at the end. */
+    public static <T> T hold(Function<RegionBorrow, T> body) {
         RegionBorrow current = CURRENT.get();
         if (current != null) {
             return body.apply(current);
         }
 
-        RegionBorrow borrow = enter(by);
+        RegionBorrow borrow = enter();
         try {
             return body.apply(borrow);
         } finally {
@@ -75,7 +67,7 @@ public final class RegionBorrow {
         }
 
         while (region != null && !held.contains(region)) {
-            if (region.tryMarkTicking(by)) {
+            if (region.tryMarkTicking()) {
                 held.add(region);
                 return;
             }
@@ -127,7 +119,7 @@ public final class RegionBorrow {
 
     private void borrowRegion(Region<RegionTickData> region) {
         while (!held.contains(region) && region.state() != RegionState.DEAD) {
-            if (region.tryMarkTicking(by)) {
+            if (region.tryMarkTicking()) {
                 held.add(region);
                 return;
             }
