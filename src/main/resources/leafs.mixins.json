@@ -10,7 +10,6 @@
 		"chunk.HashMapPaletteMixin",
 		"chunk.PalettedContainerMixin",
 		"chunk.PoiManagerMixin",
-		"chunk.PortalForcerMixin",
 		"chunk.SectionStorageMixin",
 		"chunk.ServerChunkCacheMixin",
 		"chunk.ServerLevelMixin",

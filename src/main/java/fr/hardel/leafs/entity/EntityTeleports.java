@@ -38,7 +38,7 @@ public final class EntityTeleports {
         return true;
     }
 
-    /** Vanilla's handlePortal tail on the origin's owner: the search waits for its chunks, the frame write takes their regions. */
+    /** Vanilla's handlePortal tail on the origin's owner: the search waits for its chunks, the exit frame it writes travels to the exit's owner like any block. */
     public void deferPortal(Entity entity, PortalProcessor process) {
         DeferredTransports transports = transportsOf.apply(level);
         ChunkPos chunk = entity.chunkPosition();

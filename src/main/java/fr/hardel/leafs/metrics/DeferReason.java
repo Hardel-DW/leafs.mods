@@ -7,5 +7,6 @@ public enum DeferReason {
     TELEPORT,
     PLAYER_TELEPORT,
     PLAYER_PLACEMENT,
-    PLAYER_TEARDOWN
+    PLAYER_TEARDOWN,
+    BLOCK_WRITE
 }
