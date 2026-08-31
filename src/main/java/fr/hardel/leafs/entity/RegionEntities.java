@@ -5,34 +5,50 @@ import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.EntitySection;
 import net.minecraft.world.level.entity.EntitySectionStorage;
+import net.minecraft.world.level.entity.Visibility;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** The region's ticking entities this tick, read from the sections of its chunks at tick start. A chunk crossing mid-pass ticks once, in the pass that saw it; a level crossing hands the entity to the other level's region at once. */
+/** The region's entities this tick, from the sections of its chunks: the ticking ones, and every accessible one for the spawn census. */
 public final class RegionEntities {
     private final List<Entity> entities = new ArrayList<>();
+    private final List<Entity> accessible = new ArrayList<>();
     private final IntOpenHashSet ids = new IntOpenHashSet();
     private ServerLevel level;
     private long lastTrackingNanos;
 
-    /** Vanilla's tick list membership: a ticking section, or an entity that always ticks such as a player. */
+    /** One walk of the sections: vanilla's tick list membership is a ticking section or an entity that always ticks, vanilla's census is every accessible section. */
     public void refresh(ServerLevel level, List<ChunkHolder> holders) {
         this.level = level;
         entities.clear();
+        accessible.clear();
         ids.clear();
         EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
         for (ChunkHolder holder : holders) {
-            storage.getExistingSectionsInChunk(holder.getPos().pack()).forEach(this::collect);
+            ChunkPos pos = holder.getPos();
+            for (long key : storage.getChunkSections(pos.x(), pos.z())) {
+                EntitySection<Entity> section = storage.sections.get(key);
+                if (section != null) {
+                    collect(section);
+                }
+            }
         }
     }
 
     private void collect(EntitySection<Entity> section) {
-        boolean ticking = section.getStatus().isTicking();
+        Visibility status = section.getStatus();
+        boolean ticking = status.isTicking();
+        boolean visible = status.isAccessible();
         section.getEntities().forEach(entity -> {
+            if (visible) {
+                accessible.add(entity);
+            }
+
             if (!entity.isRemoved() && (ticking || entity.isAlwaysTicking())) {
                 entities.add(entity);
                 ids.add(entity.getId());
@@ -57,6 +73,11 @@ public final class RegionEntities {
         });
     }
 
+    /** Vanilla's {@code getAllEntities()} restricted to the region: the spawn census. */
+    public List<Entity> accessible() {
+        return accessible;
+    }
+
     public boolean contains(Entity entity) {
         return ids.contains(entity.getId());
     }
@@ -65,7 +86,7 @@ public final class RegionEntities {
         return entities.size();
     }
 
-    /** Start of the last tracking pass; a player who moved since is re-checked against every entity. */
+    /** Start of the last tracking pass; a player who moved since is re-checked against the entities he may see. */
     public long lastTrackingNanos() {
         return lastTrackingNanos;
     }
