@@ -49,33 +49,36 @@ public final class PlayerPacketQueue {
         handedOver = true;
     }
 
-    /** Runs one handler as this listener's packet-handling thread, once the drain in flight, if any, let go. */
-    public void handleAs(Runnable handler) {
+    /** Runs one handler as this listener's packet-handling thread, once the drain in flight, if any, let go. True when it had to wait for another thread. */
+    public boolean handleAs(Runnable handler) {
         if (handledByCurrentThread()) {
             handler.run();
-            return;
+            return false;
         }
 
-        asDrainer(handler);
+        return asDrainer(handler);
     }
 
     /** Vanilla {@code processQueuedPackets} semantics: everything queued, including what handlers queue back. */
-    public void drain() {
-        drain(() -> true);
+    public boolean drain() {
+        return drain(() -> true);
     }
 
     /** Stops when the caller loses the player mid-drain, the rest waits for the new owner. */
-    public void drain(BooleanSupplier ownerHolds) {
+    public boolean drain(BooleanSupplier ownerHolds) {
         if (handledByCurrentThread()) {
             drainLoop(ownerHolds);
-            return;
+            return false;
         }
 
-        asDrainer(() -> drainLoop(ownerHolds));
+        return asDrainer(() -> drainLoop(ownerHolds));
     }
 
-    private void asDrainer(Runnable body) {
+    /** Waiting here means another thread held the player, the two would have run on him together before this exclusion covered his tick. */
+    private boolean asDrainer(Runnable body) {
+        boolean waited = false;
         while (!claimed.compareAndSet(false, true)) {
+            waited = true;
             LockSupport.parkNanos(CLAIM_WAIT_NANOS);
         }
 
@@ -92,6 +95,8 @@ public final class PlayerPacketQueue {
 
             claimed.set(false);
         }
+
+        return waited;
     }
 
     private void drainLoop(BooleanSupplier ownerHolds) {
