@@ -1,20 +1,23 @@
 package fr.hardel.leafs.scheduler;
 
 import fr.hardel.leafs.metrics.DeferStats;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /** Recording transports: queued tasks pile up and run only when the test drains them. */
-final class FakeTransports implements DeferredTransports {
+public final class FakeTransports implements DeferredTransports {
 
-    final List<Runnable> ownerQueue = new ArrayList<>();
-    final DeferStats stats = new DeferStats();
-    boolean owner;
+    public final List<Runnable> ownerQueue = new ArrayList<>();
+    public final List<ChunkPos> ownerChunks = new ArrayList<>();
+    public final DeferStats stats = new DeferStats();
+    public boolean owner;
 
     @Override
     public void toOwner(int chunkX, int chunkZ, Runnable task) {
         ownerQueue.add(task);
+        ownerChunks.add(new ChunkPos(chunkX, chunkZ));
     }
 
     @Override
@@ -28,7 +31,7 @@ final class FakeTransports implements DeferredTransports {
     }
 
     /** Drains like the owner's pass: only what was queued before the drain started runs. */
-    void drainOwner() {
+    public void drainOwner() {
         List<Runnable> batch = List.copyOf(ownerQueue);
         ownerQueue.clear();
         batch.forEach(Runnable::run);
