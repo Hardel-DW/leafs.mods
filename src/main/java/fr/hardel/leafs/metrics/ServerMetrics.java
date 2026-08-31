@@ -11,6 +11,7 @@ public final class ServerMetrics {
     private final MinuteCounter packetsOut = new MinuteCounter();
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
+    private final MinuteCounter chunksFull = new MinuteCounter();
 
     /** Server tick events emitted with a subscriber, each one a borrow scope on the server thread. */
     public MinuteCounter fabricEventBorrows() {
@@ -43,5 +44,10 @@ public final class ServerMetrics {
     /** Unload decisions taken; the drop-side half of the churn. */
     public MinuteCounter chunkUnloads() {
         return chunkUnloads;
+    }
+
+    /** Chunks that ran their FULL step, the generation pipeline's output. */
+    public MinuteCounter chunksFull() {
+        return chunksFull;
     }
 }
