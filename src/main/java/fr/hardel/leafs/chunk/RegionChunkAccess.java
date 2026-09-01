@@ -2,6 +2,8 @@ package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
 import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
+import fr.hardel.leafs.ticking.RegionContext;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
@@ -55,6 +57,15 @@ public final class RegionChunkAccess {
     /** The one holder table, read by section: the regions take their photo from it. */
     public static ConcurrentChunkTable holders(ChunkMap chunkMap) {
         return (ConcurrentChunkTable) chunkMap.updatingChunkMap;
+    }
+
+    /** A region serializes its own chunks and the chunks no region owns; another region's chunk stays pending in the sender until ownership converges. */
+    public static boolean sendable(ChunkMap chunkMap, long key) {
+        if (!(RegionContext.current() instanceof RegionContext.Region)) {
+            return true;
+        }
+
+        return WorldTickContext.ownsChunk(chunkMap.level, ChunkPos.getX(key), ChunkPos.getZ(key)) || ((ChunkUnloadAccess) chunkMap).leafs$workerChunks().owns(key);
     }
 
     public static ChunkScheduling scheduling(ChunkMap chunkMap) {
