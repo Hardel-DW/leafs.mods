@@ -59,7 +59,13 @@ public final class RegionChunkAccess {
         return (ConcurrentChunkTable) chunkMap.updatingChunkMap;
     }
 
-    /** A region serializes its own chunks and the chunks no region owns; another region's chunk stays pending in the sender until ownership converges. */
+    /** Vanilla's readiness of a chunk for the client, whoever owns it: what decides that a chunk entering a view joins the send queue. */
+    public static LevelChunk readyToSend(ChunkMap chunkMap, long key) {
+        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
+        return holder == null ? null : holder.getChunkToSend();
+    }
+
+    /** A region serializes its own chunks and the chunks no region owns; another region's chunk stays in the send queue until ownership converges. */
     public static boolean sendable(ChunkMap chunkMap, long key) {
         if (!(RegionContext.current() instanceof RegionContext.Region)) {
             return true;
