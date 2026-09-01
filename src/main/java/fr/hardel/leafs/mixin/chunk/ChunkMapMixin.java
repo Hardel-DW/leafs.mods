@@ -23,7 +23,6 @@ import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.chunk.loader.StageTickets;
 import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.metrics.TickStages;
-import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
@@ -445,19 +444,6 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         if (WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunk.x(), chunk.z())) {
             original.call(player);
         }
-    }
-
-    /** A region serializes the chunks it owns and the chunks no region owns; another region's chunk stays pending and converges with ownership. */
-    @WrapMethod(method = "getChunkToSend")
-    private LevelChunk leafs$sendOwnedOrWorkerChunks(long pos, Operation<LevelChunk> original) {
-        LevelChunk chunk = original.call(pos);
-        if (chunk == null || !(RegionContext.current() instanceof RegionContext.Region)) {
-            return chunk;
-        }
-
-        int chunkX = ChunkPos.getX(pos);
-        int chunkZ = ChunkPos.getZ(pos);
-        return WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunkX, chunkZ) || leafs$workerChunks.owns(pos) ? chunk : null;
     }
 
     @Unique
