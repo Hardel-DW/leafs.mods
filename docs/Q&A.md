@@ -27,3 +27,6 @@ Un datapack lourd utilisant `tick.json` reste sur un seul thread, il ne profite 
 Par nature oui, si vous changez d'une zone à 20 TPS à une zone à 15 TPS vous n'avez pas besoin de concevoir un mod pour savoir que quelque chose a changé et donc que quelque chose ici est chargé. Un joueur, une `ender pearl`, un `forceload`, un `chunk loader` ou autre.
 Le mob cap est par région, par exemple deux usines dans deux régions proches tournent avec un mob cap complet, en cas de fusion des deux zones l'usine peut être affectée et donc son rendement divisé par deux.
 Cependant certaines techniques obscures basées sur l'analyse de l'aléatoire deviennent plus complexes à utiliser comme chaque région a sa propre graine d'aléatoire.
+
+# Des recommendations pour un gros serveur ?
+- La `locator bar` sur beaucoup de joueurs devient illisible, il est préférable de la désactiver. `/gamerule locator_bar false`. De plus leafs a une optimisations qui désactives tout les calcules proprement de la `locator bar` quand elle est désactiver.
