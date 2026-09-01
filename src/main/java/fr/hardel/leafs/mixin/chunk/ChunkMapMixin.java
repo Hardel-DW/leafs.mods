@@ -209,7 +209,7 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         this.chunksToEagerlySave = new ConcurrentLongSet();
         this.pendingUnloads = new PendingUnloadClaims();
         this.nextChunkSaveTime = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
-        ConcurrentChunkTable table = new ConcurrentChunkTable();
+        ConcurrentChunkTable table = new ConcurrentChunkTable(LeafsConfig.get().sectionShift());
         this.updatingChunkMap = table;
         this.visibleChunkMap = table;
         this.toDrop = new ConcurrentLongSet();
