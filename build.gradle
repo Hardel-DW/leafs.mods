@@ -30,12 +30,12 @@ loom {
 		}
 
 		client {
-			vmArg "-Xmx2G"
+			vmArg "-Xmx4G"
 		}
 
 		server {
-			vmArg "-Xms16G"
-			vmArg "-Xmx16G"
+			vmArg "-Xms12G"
+			vmArg "-Xmx12G"
 			vmArg "-XX:+AlwaysPreTouch"
 		}
 	}
