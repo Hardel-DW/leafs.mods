@@ -4,15 +4,12 @@ import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayDeque;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.LockSupport;
 
@@ -53,31 +50,15 @@ public final class ChunkMailbox {
         pending++;
     }
 
-    /** The owner's pass over its photo. Mail is popped one by one: a throw leaves the ones behind it queued, holds intact. */
-    public int drain(List<ChunkHolder> holders) {
-        if (pending == 0) {
-            return 0;
-        }
-
-        int ran = 0;
-        for (ChunkHolder holder : holders) {
-            ran += drain(holder.getPos().pack());
-        }
-
-        return ran;
-    }
-
-    /** A borrowed region's chunks, for the thread that holds it. */
+    /** The mail of a region's loaded chunks, for the thread that ticks or holds it: only the chunks with mail are visited, a chunk without holder waits for its holder. */
     public int drain(Region<?> region, ChunkMap chunkMap) {
         if (pending == 0) {
             return 0;
         }
 
-        LongList keys = new LongArrayList();
-        region.forEachChunk((chunkX, chunkZ) -> keys.add(ChunkPos.pack(chunkX, chunkZ)));
         int ran = 0;
-        for (long key : keys) {
-            if (chunkMap.getVisibleChunkIfPresent(key) != null) {
+        for (long key : keys()) {
+            if (region.owns(ChunkPos.getX(key), ChunkPos.getZ(key)) && chunkMap.getVisibleChunkIfPresent(key) != null) {
                 ran += drain(key);
             }
         }

@@ -119,8 +119,9 @@ public final class RegionTickBody {
     /** The photo of the region's chunks, then the mail of every chunk in it; the entity photo comes after, so an arrival ticks this pass. */
     public RegionChunks drainMail(Region<?> region, RegionWorldData worldData) {
         RegionChunks chunks = worldData.chunks();
-        chunks.refresh(region, level.getChunkSource().chunkMap);
-        mailbox.drain(chunks.holders());
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        chunks.refresh(region, chunkMap);
+        mailbox.drain(region, chunkMap);
         return chunks;
     }
 

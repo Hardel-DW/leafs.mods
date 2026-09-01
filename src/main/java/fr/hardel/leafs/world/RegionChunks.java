@@ -1,7 +1,10 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
 import fr.hardel.leafs.region.Region;
 import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -9,7 +12,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The region's chunks this tick, taken at tick start: every visible holder, the ticking chunks among them, and the box they span. Every phase walks these two lists. */
+/** The region's chunks this tick, taken at tick start from the section index: every holder, the ticking chunks among them, and the box they span. Every phase walks these two lists. */
 public final class RegionChunks {
     private final List<ChunkHolder> holders = new ArrayList<>();
     private final List<LevelChunk> ticking = new ArrayList<>();
@@ -25,22 +28,28 @@ public final class RegionChunks {
         minZ = Integer.MAX_VALUE;
         maxX = Integer.MIN_VALUE;
         maxZ = Integer.MIN_VALUE;
-        region.forEachChunk((chunkX, chunkZ) -> {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
-            if (holder == null) {
-                return;
-            }
+        ConcurrentChunkTable table = RegionChunkAccess.holders(chunkMap);
+        for (long section : region.sectionKeySnapshot()) {
+            table.forEachHolderIn(section, this::collect);
+        }
+    }
 
-            holders.add(holder);
-            minX = Math.min(minX, chunkX);
-            minZ = Math.min(minZ, chunkZ);
-            maxX = Math.max(maxX, chunkX);
-            maxZ = Math.max(maxZ, chunkZ);
-            LevelChunk chunk = holder.getTickingChunk();
-            if (chunk != null) {
-                ticking.add(chunk);
-            }
-        });
+    /** The ticket level says whether the ticking future can hold a chunk, so most holders never touch it. */
+    private void collect(ChunkHolder holder) {
+        holders.add(holder);
+        ChunkPos pos = holder.getPos();
+        minX = Math.min(minX, pos.x());
+        minZ = Math.min(minZ, pos.z());
+        maxX = Math.max(maxX, pos.x());
+        maxZ = Math.max(maxZ, pos.z());
+        if (!ChunkLevel.isBlockTicking(holder.getTicketLevel())) {
+            return;
+        }
+
+        LevelChunk chunk = holder.getTickingChunk();
+        if (chunk != null) {
+            ticking.add(chunk);
+        }
     }
 
     public List<ChunkHolder> holders() {

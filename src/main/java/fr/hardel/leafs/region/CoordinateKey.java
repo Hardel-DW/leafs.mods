@@ -18,6 +18,12 @@ public final class CoordinateKey {
         return (int) (key >>> 32);
     }
 
+    /** Slot of a chunk inside its section, row by row: what a section-local array is indexed with. */
+    public static int index(int chunkX, int chunkZ, int sectionShift) {
+        int mask = (1 << sectionShift) - 1;
+        return ((chunkZ & mask) << sectionShift) | (chunkX & mask);
+    }
+
     public static String describe(long key) {
         return "[" + x(key) + ", " + z(key) + "]";
     }

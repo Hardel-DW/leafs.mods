@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.core.ChunkScheduling;
+import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
@@ -49,6 +50,11 @@ public final class RegionChunkAccess {
         }
 
         return ChunkWait.chunk(chunkMap, chunkX, chunkZ, status);
+    }
+
+    /** The one holder table, read by section: the regions take their photo from it. */
+    public static ConcurrentChunkTable holders(ChunkMap chunkMap) {
+        return (ConcurrentChunkTable) chunkMap.updatingChunkMap;
     }
 
     public static ChunkScheduling scheduling(ChunkMap chunkMap) {

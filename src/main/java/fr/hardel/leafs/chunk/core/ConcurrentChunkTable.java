@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.core;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import fr.hardel.leafs.region.CoordinateKey;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
@@ -11,20 +12,41 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
 import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
-/** The one holder table, both vanilla fields point here. The superclass stays empty, so every surface not delegated below throws rather than lie. */
+/** The one holder table, both vanilla fields point here, plus the same holders grouped by region section, kept at every birth and death. The superclass stays empty, so every surface not delegated below throws rather than lie. */
 public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
 
     private final ConcurrentLong2ObjectMap<ChunkHolder> holders = new ConcurrentLong2ObjectMap<>();
+    private final ConcurrentLong2ObjectMap<AtomicReferenceArray<ChunkHolder>> sections = new ConcurrentLong2ObjectMap<>();
     private final AtomicBoolean dirty = new AtomicBoolean();
+    private final int sectionShift;
 
-    public ConcurrentChunkTable() {
+    public ConcurrentChunkTable(int sectionShift) {
         super(0);
+        this.sectionShift = sectionShift;
+    }
+
+    /** The holders of one section, lock-free: a region photographs its chunks section by section instead of asking every position. */
+    public void forEachHolderIn(long sectionKey, Consumer<ChunkHolder> action) {
+        AtomicReferenceArray<ChunkHolder> slots = sections.get(sectionKey);
+        if (slots == null) {
+            return;
+        }
+
+        for (int slot = 0; slot < slots.length(); slot++) {
+            ChunkHolder holder = slots.get(slot);
+            if (holder != null) {
+                action.accept(holder);
+            }
+        }
     }
 
     /** What promoteChunkMap becomes: true when holders appeared or vanished since the last call. */
@@ -51,25 +73,41 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
     @Override
     public ChunkHolder put(long key, ChunkHolder value) {
         dirty.set(true);
+        index(key, value);
         return holders.put(key, value);
     }
 
     @Override
     public ChunkHolder putIfAbsent(long key, ChunkHolder value) {
         dirty.set(true);
-        return holders.putIfAbsent(key, value);
+        ChunkHolder present = holders.putIfAbsent(key, value);
+        if (present == null) {
+            index(key, value);
+        }
+
+        return present;
     }
 
     @Override
     public ChunkHolder remove(long key) {
         dirty.set(true);
-        return holders.remove(key);
+        ChunkHolder removed = holders.remove(key);
+        if (removed != null) {
+            unindex(key);
+        }
+
+        return removed;
     }
 
     @Override
     public boolean remove(long key, Object value) {
         dirty.set(true);
-        return holders.remove(key, value);
+        boolean removed = holders.remove(key, value);
+        if (removed) {
+            unindex(key);
+        }
+
+        return removed;
     }
 
     @Override
@@ -96,6 +134,7 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
     public void clear() {
         dirty.set(true);
         holders.clear();
+        sections.clear();
     }
 
     @Override
@@ -103,6 +142,40 @@ public final class ConcurrentChunkTable extends Long2ObjectLinkedOpenHashMap<Chu
         for (Long2ObjectMap.Entry<ChunkHolder> entry : holders.long2ObjectEntrySet()) {
             action.accept(entry.getLongKey(), entry.getValue());
         }
+    }
+
+    /** Both sides of a section's life go through one atomic compute per key, so a birth and a death on the same section never lose each other. */
+    private void index(long key, ChunkHolder holder) {
+        sections.compute(sectionOf(key), (_, slots) -> {
+            AtomicReferenceArray<ChunkHolder> target = slots == null ? new AtomicReferenceArray<>(1 << (2 * sectionShift)) : slots;
+            target.set(slotOf(key), holder);
+            return target;
+        });
+    }
+
+    private void unindex(long key) {
+        sections.compute(sectionOf(key), (_, slots) -> {
+            slots.set(slotOf(key), null);
+            return holdsAny(slots) ? slots : null;
+        });
+    }
+
+    private static boolean holdsAny(AtomicReferenceArray<ChunkHolder> slots) {
+        for (int slot = 0; slot < slots.length(); slot++) {
+            if (slots.get(slot) != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private long sectionOf(long key) {
+        return CoordinateKey.pack(ChunkPos.getX(key) >> sectionShift, ChunkPos.getZ(key) >> sectionShift);
+    }
+
+    private int slotOf(long key) {
+        return CoordinateKey.index(ChunkPos.getX(key), ChunkPos.getZ(key), sectionShift);
     }
 
     /** The double buffer is gone, both vanilla fields must observe the same instance. */
