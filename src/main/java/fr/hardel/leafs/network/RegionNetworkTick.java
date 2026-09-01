@@ -34,17 +34,16 @@ public final class RegionNetworkTick {
         countIfShared(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
     }
 
-    /** Region tick end: the player's whole pass, as his packet-handling thread, so no other thread touches him while it runs. */
+    /** Region tick end: the player's whole pass, as his packet-handling thread, so no other thread touches him while it runs. The view and the chunk sends run for every player, as vanilla's; the listener ticks only behind a channel, as vanilla's connection list. */
     public static void tickPlayerOnRegion(ServerPlayer player, PlayerChunkLoader loader, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
-        if (connection.isConnecting() || !connection.isConnected()) {
-            return;
-        }
-
         countIfShared(server, PacketRouting.queueOf(listener).handleAs(() -> {
             loader.tick(player);
-            tickListener(listener, connection, server);
+            if (!connection.isConnecting()) {
+                tickListener(listener, connection, server);
+            }
+
             listener.chunkSender.sendNextChunks(player);
             connection.flushChannel();
         }));
