@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.core;
 
+import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.server.level.ChunkHolder;
@@ -10,6 +11,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,7 +48,7 @@ class ConcurrentChunkTableTest {
 
     @Test
     void pointOperationsAndViewsReadTheSameBacking() {
-        ConcurrentChunkTable table = new ConcurrentChunkTable();
+        ConcurrentChunkTable table = new ConcurrentChunkTable(1);
         ChunkHolder holder = holder(3, 4);
         long key = ChunkPos.pack(3, 4);
 
@@ -61,10 +63,39 @@ class ConcurrentChunkTableTest {
         assertTrue(table.isEmpty());
     }
 
+    /** The section index follows the table: a birth adds the holder to its section, a death removes it, a revival puts it back. */
+    @Test
+    void sectionIndexFollowsBirthsAndDeaths() {
+        ConcurrentChunkTable table = new ConcurrentChunkTable(1);
+        long section = CoordinateKey.pack(1, 2);
+        ChunkHolder first = holder(3, 4);
+        ChunkHolder second = holder(2, 5);
+        table.put(ChunkPos.pack(3, 4), first);
+        assertNull(table.putIfAbsent(ChunkPos.pack(2, 5), second));
+        table.put(ChunkPos.pack(4, 4), holder(4, 4));
+
+        assertEquals(List.of(first, second), holdersIn(table, section));
+        assertEquals(1, holdersIn(table, CoordinateKey.pack(2, 2)).size());
+
+        table.remove(ChunkPos.pack(3, 4));
+        assertEquals(List.of(second), holdersIn(table, section));
+        assertTrue(table.remove(ChunkPos.pack(2, 5), second));
+        assertTrue(holdersIn(table, section).isEmpty());
+
+        table.put(ChunkPos.pack(3, 4), first);
+        assertEquals(List.of(first), holdersIn(table, section));
+    }
+
+    private static List<ChunkHolder> holdersIn(ConcurrentChunkTable table, long section) {
+        List<ChunkHolder> found = new ArrayList<>();
+        table.forEachHolderIn(section, found::add);
+        return found;
+    }
+
     /** The superclass storage is empty, so an undelegated surface must fail instead of answering from it. */
     @Test
     void unsupportedSurfacesThrowInsteadOfAnsweringEmpty() {
-        ConcurrentChunkTable table = new ConcurrentChunkTable();
+        ConcurrentChunkTable table = new ConcurrentChunkTable(1);
         table.put(ChunkPos.pack(1, 1), holder(1, 1));
 
         assertThrows(UnsupportedOperationException.class, table::keySet);
@@ -74,7 +105,7 @@ class ConcurrentChunkTableTest {
     /** The promotion step became this flag: it must report each holder churn exactly once. */
     @Test
     void dirtyFlagConsumesOncePerChurn() {
-        ConcurrentChunkTable table = new ConcurrentChunkTable();
+        ConcurrentChunkTable table = new ConcurrentChunkTable(1);
         assertFalse(table.consumeDirty());
         table.put(ChunkPos.pack(0, 0), holder(0, 0));
         assertTrue(table.consumeDirty());
@@ -87,7 +118,7 @@ class ConcurrentChunkTableTest {
     /** Both vanilla fields point at the same instance; clone must not fork the table. */
     @Test
     void cloneReturnsTheSameInstance() {
-        ConcurrentChunkTable table = new ConcurrentChunkTable();
+        ConcurrentChunkTable table = new ConcurrentChunkTable(1);
         assertSame(table, table.clone());
     }
 }

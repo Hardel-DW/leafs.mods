@@ -107,6 +107,6 @@ final class RegionSection<R> {
     }
 
     private int bitIndex(int chunkX, int chunkZ) {
-        return ((chunkZ & coordinateMask) << indexShift) | (chunkX & coordinateMask);
+        return CoordinateKey.index(chunkX, chunkZ, indexShift);
     }
 }
