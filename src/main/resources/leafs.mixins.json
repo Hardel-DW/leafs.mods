@@ -45,7 +45,6 @@
 		"global.ServerBossEventMixin",
 		"global.ServerScoreboardMixin",
 		"global.ServerStatsCounterMixin",
-		"global.ServerWaypointManagerMixin",
 		"network.ConnectionMixin",
 		"network.MinecraftServerMixin",
 		"network.PacketProcessorMixin",
