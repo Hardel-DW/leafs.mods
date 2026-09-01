@@ -12,11 +12,13 @@ import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import fr.hardel.leafs.ticking.RegionContext;
+import fr.hardel.leafs.global.ConcurrentWaypointManager;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.TickingBinding;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.waypoints.ServerWaypointManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
 import net.minecraft.world.level.entity.EntityTickList;
@@ -32,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Facade swap (dragonParts, players COW), teleport routing, passenger membership from the region photo. */
+/** Facade swap (dragonParts, players COW, waypoints), teleport routing, passenger membership from the region photo. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
@@ -45,6 +47,11 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
     @Shadow
     @Final
     private List<ServerPlayer> players;
+
+    @Mutable
+    @Shadow
+    @Final
+    private ServerWaypointManager waypointManager;
 
     @Unique
     private EntityTeleports leafs$entityTeleports;
@@ -67,6 +74,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.dragonParts = new ConcurrentInt2ObjectMap<>();
         this.players = new CopyOnWriteArrayList<>();
         ServerLevel self = (ServerLevel) (Object) this;
+        this.waypointManager = new ConcurrentWaypointManager(self);
         this.leafs$entityTeleports = new EntityTeleports(self, TickingBinding::of);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
         this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> RegionChunkAccess.scheduling(self.getChunkSource().chunkMap).mailbox().drainAll());
