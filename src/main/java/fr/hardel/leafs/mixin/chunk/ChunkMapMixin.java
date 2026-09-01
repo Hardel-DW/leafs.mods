@@ -9,6 +9,7 @@ import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.PendingUnloadClaims;
 import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.chunk.PropagatorAccess;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.StalledShutdown;
 import fr.hardel.leafs.chunk.ChunkMailbox;
 import fr.hardel.leafs.chunk.ChunkTicketHolds;
@@ -444,6 +445,18 @@ public abstract class ChunkMapMixin implements PlayerLoaderAccess, ChunkUnloadAc
         if (WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunk.x(), chunk.z())) {
             original.call(player);
         }
+    }
+
+    /** The chunks a batch may serialize: this region's own and the workers'; the rest waits in the queue. */
+    @WrapMethod(method = "getChunkToSend")
+    private LevelChunk leafs$sendOwnedOrWorkerChunks(long pos, Operation<LevelChunk> original) {
+        return RegionChunkAccess.sendable((ChunkMap) (Object) this, pos) ? original.call(pos) : null;
+    }
+
+    /** A chunk entering a view joins the queue on vanilla's readiness, whoever owns it; the send above decides when it leaves. */
+    @WrapOperation(method = "markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkToSend(J)Lnet/minecraft/world/level/chunk/LevelChunk;"))
+    private LevelChunk leafs$queueOnVanillaReadiness(ChunkMap chunkMap, long pos, Operation<LevelChunk> original) {
+        return RegionChunkAccess.readyToSend(chunkMap, pos);
     }
 
     @Unique
