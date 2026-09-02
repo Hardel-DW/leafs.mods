@@ -7,6 +7,10 @@ Leafs crée un fichier de configuration au démarrage, `config/leafs.json`.
 - `region_buffer_distance` : L'épaisseur en sections de la couronne qu'une région possède.
 - `player_chunk_loads_per_tick` : Chaque joueur peut générer (par défaut `5`) chunks par tick.
 
+# Gameplay
+- `gameplay.mob_cap_scope` : Si les entités sont calculer pour chaque régions `region` ou pour la dimension `level`.
+- `gameplay.mob_cap` : Valeurs vanilla par défaut, le nombre d'entités qui peuvent apparaitre.
+
 # Debug
 - `debug.watchdog_warn_seconds` : Au-delà de ce délai, un tick bloqué est loggé avec la pile de son thread.
 - `debug.slow_task_warn_millis` : Par défaut 50, une tâche sérielle > 50ms est loggée avec sa classe.

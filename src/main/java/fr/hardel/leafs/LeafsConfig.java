@@ -12,16 +12,20 @@ import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.MobCategory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, Debug debug) {
+public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, Debug debug, Gameplay gameplay) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -30,7 +34,29 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
     }
 
-    /** The keys {@code /leafs config} may rewrite; the debug group stays a file-only matter. */
+    public record Gameplay(MobCapScope mobCapScope, Map<MobCategory, Integer> mobCap) {
+        public int mobCap(MobCategory category) {
+            return mobCap.getOrDefault(category, category.getMaxInstancesPerChunk());
+        }
+    }
+
+    public enum MobCapScope implements StringRepresentable {
+        LEVEL("level"),
+        REGION("region");
+
+        private final String name;
+
+        MobCapScope(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return name;
+        }
+    }
+
+    /** The keys {@code /leafs config} may rewrite; the debug and gameplay groups stay a file-only matter. */
     public enum Setting {
         REGION_THREADS("region_threads", LeafsConfig::regionThreads),
         CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
@@ -79,6 +105,11 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         Codec.intRange(0, 60_000).optionalFieldOf("slow_task_warn_millis", 50).forGetter(Debug::slowTaskWarnMillis)
     ).apply(builder, Debug::new));
 
+    private static final MapCodec<Gameplay> GAMEPLAY = RecordCodecBuilder.mapCodec(builder -> builder.group(
+        StringRepresentable.fromEnum(MobCapScope::values).optionalFieldOf("mob_cap_scope", MobCapScope.LEVEL).forGetter(Gameplay::mobCapScope),
+        Codec.unboundedMap(MobCategory.CODEC, Codec.intRange(0, 100_000)).optionalFieldOf("mob_cap", vanillaMobCaps()).forGetter(Gameplay::mobCap)
+    ).apply(builder, Gameplay::new));
+
     private static final Codec<LeafsConfig> CODEC = RecordCodecBuilder.create(builder -> builder.group(
         threads(Setting.REGION_THREADS).optionalFieldOf(Setting.REGION_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::regionThreads),
         threads(Setting.CHUNK_THREADS).optionalFieldOf(Setting.CHUNK_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::chunkThreads),
@@ -86,8 +117,20 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
         Codec.intRange(1, 1000).optionalFieldOf(Setting.PLAYER_CHUNK_LOADS_PER_TICK.key(), 5).forGetter(LeafsConfig::playerChunkLoadsPerTick),
-        DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug)
+        DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug),
+        GAMEPLAY.codec().optionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
     ).apply(builder, LeafsConfig::new));
+
+    private static Map<MobCategory, Integer> vanillaMobCaps() {
+        Map<MobCategory, Integer> caps = new EnumMap<>(MobCategory.class);
+        for (MobCategory category : MobCategory.values()) {
+            if (category != MobCategory.MISC) {
+                caps.put(category, category.getMaxInstancesPerChunk());
+            }
+        }
+
+        return caps;
+    }
 
     public static void register() {
         file = FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json");
