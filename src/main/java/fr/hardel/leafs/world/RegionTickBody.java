@@ -48,11 +48,13 @@ public final class RegionTickBody {
     private final ServerLevel level;
     private final ChunkMailbox mailbox;
     private final RegionAutosave autosave;
+    private final MobCaps mobCaps;
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
         this.mailbox = RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox();
         this.autosave = new RegionAutosave(level);
+        this.mobCaps = new MobCaps(level);
     }
 
     public ServerLevel level() {
@@ -165,7 +167,7 @@ public final class RegionTickBody {
         }, new LocalMobCapCalculator(chunkMap));
         List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
             ? List.of()
-            : NaturalSpawner.getFilteredSpawningCategories(state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
+            : mobCaps.spawnable(worldData, state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
         stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {

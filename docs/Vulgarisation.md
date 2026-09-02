@@ -52,9 +52,7 @@ Ce que la commande touche décide de ce qu'elle emprunte :
 Un datapack coûte donc exactement ce qu'il coûte en vanilla.
 
 # Connexion et déconnexion
-La connexion et la déconnexion sont partiellement modifiées, elles sont asynchrones de manière à ce que ces deux tâches n'aient aucun impact de lag sur le serveur. L'objectif est qu'aucun joueur ne ressente le moindre tick de différence dans son expérience.
-- Quand un joueur se connecte, ses fichiers sont lus pendant l'écran de connexion, le placement du joueur tourne sur la région de son point d'apparition.
-- Quand un joueur se déconnecte, même une vague de 100 joueurs, cela n'affecte pas les autres joueurs.
+Le thread serveur gère l'arrivée et le départ d'un joueur. il emprunte la région du joueur le temps de l'opération, c'est moins d'une milliseconde. Les autres régions ne voient rien, aucun joueur ne ressent de différence, même sur une vague de 100 connexions.
 
 # Compatibilité des mods.
 Les primitives sont les méthodes dans le code de Minecraft qui sont les plus basses et les plus utilisées, où le plus de trafic passe par elles.
