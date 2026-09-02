@@ -3,19 +3,19 @@ package fr.hardel.leafs.global;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/** Every command runs on the server thread, which borrows a region the moment it touches one of its chunks or entities and returns them all when the head execution ends. */
+/** A head execution on the server thread, a command, a join or a leave, borrows a region the moment it touches one of its chunks or entities and returns them all at the end. */
 public final class CommandEngine {
 
     private CommandEngine() {
@@ -36,9 +36,17 @@ public final class CommandEngine {
         return RegionBorrow.current() != null;
     }
 
-    /** The head of a command: the source entity is taken first, the rest at contact. */
-    public static void runHead(CommandSourceStack source, Runnable execution) {
-        head(borrow -> borrowEntity(borrow, source.getEntity()), () -> {
+    /** The head: the entity it starts from is taken first, the rest at contact. Any other thread already runs under its own ownership rules. */
+    public static <T> T runHead(MinecraftServer server, @Nullable Entity first, Supplier<T> execution) {
+        if (!server.isSameThread()) {
+            return execution.get();
+        }
+
+        return head(borrow -> borrowEntity(borrow, first), execution);
+    }
+
+    public static void runHead(MinecraftServer server, @Nullable Entity first, Runnable execution) {
+        runHead(server, first, () -> {
             execution.run();
             return null;
         });

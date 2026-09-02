@@ -4,6 +4,7 @@ Le serveur fait des boucles de 50ms, 20 fois par seconde. Le fameux 20 TPS. Quan
 
 ## Problèmes
 Donc ça veut dire que si vous avez 6 ou 12 ou 50 cœurs le jeu en prend un seul pour tout gérer. Donc si vous achetez du matériel plus cher, vous n'y gagnez rien. Minecraft a été développé il y a 15 ans et à l'époque il n'était pas courant d'avoir plusieurs cœurs, le jeu a donc été conçu pour son temps.
+Leafs, imposes une régles simple, en étudiant les loi Ahmdal et Gustafon, le mods doit garantir de scales le nombre de joueurs/régions en fonction de la ram/thread disponible. Si ont veut plus de joueurs ont achéte plus de ram ou un meilleurs cpu de maniére linéare.
 
 ## La solution : Les régions
 Leafs regarde les chunks simulés, ceux autour du joueur définis par la `simulation distance`, le monde est découpé en une grille fixe de 2x2 chunks, et une section devient active quand un de ses chunks est simulé. Les sections actives qui se touchent sont regroupées en une région.
@@ -32,6 +33,13 @@ Les workers de chunks sont parfaitement indépendants des workers de régions. I
 - Une zone très dense, avec un TPS bas, n'affecte pas la vitesse de génération du monde donc il peut continuer à se déplacer fluidement.
 - Chaque joueur est plafonné à 5 chunks par tick. (Configurable par `player_chunk_loads_per_tick`)
 
+# Emprunts et Courrier
+Deux concepts de Multithread de Leafs simples.
+**Courrier**: Quand une régions veut effectuer une tache sur une autre régions, il envoie un courrier, au début de sont tick elle lira tout les courrier dans l'ordre.
+**L'emprunt**: Ils est utile notament aux `commandes`. Le thread serveur peut créer un emprunt en visant une entités/chunks cela emprunte leurs régions. Le thread serveur fait alors le travail lui-même, dans le même ordre que vanilla, et rend tout à la fin.
+
+Une seule règle du projet: **le thread serveur ne touche jamais une région sans l'emprunter**, `Commandes`, `event Fabric`, `arrivée`, `départ`. 
+
 # Les commandes
 Toutes les commandes tournent sur le thread serveur, peu importe qui les lance.
 Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités, la garde jusqu'à la fin de la commande, puis la rend.
@@ -53,6 +61,8 @@ Les primitives sont les méthodes dans le code de Minecraft qui sont les plus ba
 Leafs explore une voie assez simple, modifier toutes les primitives les plus basses de Minecraft, les fonctions de téléportation, de réseau, de lecture/écriture des chunks. Des portails, structures, entités...
 Les mods utilisent ces fonctions sans le savoir et sont donc automatiquement compatibles.
 Lithium/Ferrite/Mapple sont compatibles. C2ME, VMP, Moonrise sont incompatibles.
+
+Lors du dév de Leafs, toutes a était penser pour que la moindre changement d'une fonction internes de mojang qui est utiliser par les moddeurs comme lire/écrire des chunks, blocs, ou de la teleportion. Soit parfaitement identiques en pratiques. Pour que les moddeurs n'est pas de mauvaises surprises. Les mods ne s'adpate pas a Leafs. C'est Leafs qui s'adaptes au mods. Leafs ne doit en aucuns cas créer de bugs, problémes. Sinon faites un ticket.
 
 # Mapple
 Leafs ne rajoute aucune optimisation, que ce soit `CPU`, `RAM`, `Garbage Collector` ou `load-time allocations`. N'importe quelle forme d'optimisation sera faite dans un mod indépendant nommé Mapple. Ce mod fonctionne avec ou sans Leafs comme un mod sans config/compromis, du pur gain. Mais pensé pour le meilleur gain possible pour le multithreading Leafs.

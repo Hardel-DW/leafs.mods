@@ -49,3 +49,5 @@ accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/uni
 accessible field net/minecraft/world/level/chunk/LevelChunk blockTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
 accessible field net/minecraft/world/level/chunk/LevelChunk fluidTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
 accessible class net/minecraft/server/MinecraftServer$ReloadableResources
+accessible field net/minecraft/server/level/ChunkMap activeChunkWrites Ljava/util/concurrent/atomic/AtomicInteger;
+accessible field net/minecraft/server/level/ChunkMap MAX_ACTIVE_CHUNK_WRITES I

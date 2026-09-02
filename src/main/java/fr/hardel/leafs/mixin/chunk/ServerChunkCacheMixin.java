@@ -74,10 +74,10 @@ public abstract class ServerChunkCacheMixin {
         return chunk;
     }
 
-    /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree or a correct hasChunk-then-read sequence crashes. */
+    /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree on every thread, or a correct hasChunk-then-read sequence waits for a chunk it was told is there. */
     @Inject(method = "hasChunk(II)Z", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
-        if (Thread.currentThread() != this.mainThread) {
+        if (!leafs$scheduling().isUniversalOwner()) {
             ServerChunkCache self = (ServerChunkCache) (Object) this;
             callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
         }

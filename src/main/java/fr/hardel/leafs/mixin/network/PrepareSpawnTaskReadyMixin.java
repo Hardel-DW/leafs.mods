@@ -1,23 +1,26 @@
 package fr.hardel.leafs.mixin.network;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.leafs.network.JoinPreload;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.players.NameAndId;
-import net.minecraft.server.players.PlayerList;
+import fr.hardel.leafs.global.CommandEngine;
+import net.minecraft.network.Connection;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.Shadow;
 
-import java.util.Optional;
-
-/** The flip into the game reuses what the waiting room prepared: no second disk read. */
+/** Hook only: the whole vanilla spawn, placement, pearls and vehicle in order, as one head execution of the server thread. */
 @Mixin(targets = "net.minecraft.server.network.config.PrepareSpawnTask$Ready")
 public abstract class PrepareSpawnTaskReadyMixin {
 
-    /** The second read of the playerdata is served from the tag {@code start} kept. */
-    @WrapOperation(method = "spawn", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;loadPlayerData(Lnet/minecraft/server/players/NameAndId;)Ljava/util/Optional;"))
-    private Optional<CompoundTag> leafs$serveKeptPlayerData(PlayerList playerList, NameAndId nameAndId, Operation<Optional<CompoundTag>> original) {
-        return JoinPreload.servePlayerData(nameAndId, () -> original.call(playerList, nameAndId));
+    @Shadow
+    @Final
+    private ServerLevel spawnLevel;
+
+    @WrapMethod(method = "spawn")
+    private ServerPlayer leafs$spawnAsHead(Connection connection, CommonListenerCookie cookie, Operation<ServerPlayer> original) {
+        return CommandEngine.runHead(spawnLevel.getServer(), null, () -> original.call(connection, cookie));
     }
 }

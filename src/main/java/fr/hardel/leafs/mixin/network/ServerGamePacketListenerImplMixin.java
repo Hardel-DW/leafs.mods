@@ -4,10 +4,10 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.global.CommandEngine;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
-import fr.hardel.leafs.network.PlayerTeardown;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
@@ -66,9 +66,9 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
     }
 
-    /** Leave message, bed release and removal run as one block on the player's owner. */
+    /** Leave message, bed release and removal, one head execution of the server thread. */
     @WrapMethod(method = "onDisconnect")
-    private void leafs$disconnectOnTheOwner(DisconnectionDetails details, Operation<Void> original) {
-        PlayerTeardown.run(this.player, () -> original.call(details));
+    private void leafs$disconnectAsHead(DisconnectionDetails details, Operation<Void> original) {
+        CommandEngine.runHead(player.level().getServer(), player, () -> original.call(details));
     }
 }

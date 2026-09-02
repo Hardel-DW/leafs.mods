@@ -4,7 +4,6 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.core.ChunkWorkers;
-import fr.hardel.leafs.global.DeferredFileWrites;
 import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
@@ -41,7 +40,6 @@ public final class TickingManager {
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), ModAttribution.fromLoader());
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.chunkWorkers = new ChunkWorkers(config.effectiveChunkThreads());
-        DeferredFileWrites.start();
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",
@@ -169,7 +167,6 @@ public final class TickingManager {
         globalTicking = false;
         globalScheduler.drain();
         watchdog.stop();
-        DeferredFileWrites.stopAndFlush();
         drainRegions();
         // A dedicated JVM must now die, so the deadline stays armed until the process exits; in solo the JVM lives on.
         if (!server.isDedicatedServer()) {
