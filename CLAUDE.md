@@ -41,6 +41,10 @@ We do it really clean, for the long term. Good code quality without hacks. Split
 Try to write readable code, well split up, with generic methods/class that each have a clear responsibility. Type things properly, no "Object" or equivalent. Avoid too much nesting of if/else/switch/for/try. Think about early returns, or splitting the codebase up well to keep it readable.
 Avoid implementing too many safety nets. Code/Architecture and logic that is well built by nature will never have problems. These nets can degrade maintainability, potential bugs and future optimization, and they can also be a sign of a poor quality codebase.
 
+# No Protection
+When you're developing, you don't think in terms of adding safeguards, barriers, protections, safety nets... You think through all the rules end to end, at the right level, and you really have to take the time to figure out where each thing belongs. You just define together all the end to end rules, universal, simple and generic. And all those imperative rules, properly thought through, mean the system doesn't need a safety net, doesn't need to handle edge cases one by one, doesn't need try/if statements everywhere. You end up with minimal code, very clean, very tidy, that works perfectly because you thought it through perfectly
+You never start a refactor without having perfectly defined all the design rules. You also have to fully take in the project's existing rules, either to follow them and avoid creating new ones, or to build a continuity with them. You think it through together and lay it all out cleanly
+
 # Reponse
 Try to vulgarize, explain things in the simplest terms possible, I don't have every part of this codebase or repositories or patterns and mathematical concepts in my mind.
 Summarize, be simple, direct, concise, but complete. Try not to leave out any context, or any information that's useful for understanding. But be as concise as you can.

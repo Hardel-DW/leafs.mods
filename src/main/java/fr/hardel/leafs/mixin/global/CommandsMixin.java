@@ -23,7 +23,7 @@ public abstract class CommandsMixin {
 
         Runnable execution = () -> Commands.executeCommandInContext(context, config);
         if (!CommandEngine.divert(context.getServer(), execution)) {
-            CommandEngine.runHead(context, execution);
+            CommandEngine.runHead(context.getServer(), context.getEntity(), execution);
         }
 
         callbackInfo.cancel();

@@ -17,3 +17,8 @@ On pense long terme : pas de fix rapide qui devient une dette, pas de cas par ca
 ## Tester
 - Les tests unitaires, `gradlew test`, tournent avec le vrai Minecraft bootstrappé quand il le faut.
 - La validation en jeu suit : connexion, déconnexion, casser et poser, coffres, four, chat, commande, mort et respawn, portail aller retour. La charge se teste avec les bots overstress en montée progressive, et spark en `--thread *` sans quoi on ne voit que le thread serveur.
+
+# Compatibilité des mods.
+Si, lorsqu'on modifie des concepts du jeu comme des fonctions primitives (lire/écrire des blocs, des chunks, les mécanismes de téléportation ou autres), un mod qui les utilise doit fonctionner de manière parfaitement identique à avant.
+Si on a connaissance d'un décalage, ou d'un écart/bug qui pourrait survenir, on doit juste changer l'archi, les règles, et repenser Leafs. Les mods/moddeurs ne doivent avoir aucune différence dans leur expérience de développement. C'est le point le plus important et il passe avant tout le reste. La compatibilité des mods est prioritaire sur tout.
+Je préfère sacrifier une optimisation mais permettre que les mods marchent parfaitement. Leur dire que ce qu'ils font fonctionnera, mais différemment, n'est pas non plus une option
