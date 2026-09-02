@@ -20,14 +20,12 @@ public final class ChunkUnloads {
         this.unloads = unloads;
     }
 
-    /** What vanilla marked to drop and nobody decided yet. */
     public LongSet pending() {
         return toDrop;
     }
 
-    /** The caller's chunks among the ones vanilla marked to drop. */
     public void decide(LongPredicate owned) {
-        for (LongIterator iterator = toDrop.iterator(); iterator.hasNext(); ) {
+        for (LongIterator iterator = toDrop.iterator(); chunkMap.activeChunkWrites.get() < ChunkMap.MAX_ACTIVE_CHUNK_WRITES && iterator.hasNext(); ) {
             long pos = iterator.nextLong();
             if (owned.test(pos)) {
                 iterator.remove();
@@ -36,7 +34,6 @@ public final class ChunkUnloads {
         }
     }
 
-    /** A chunk that unloads stopped simulating long before, so it left every region on its own. */
     private void claim(long pos) {
         ChunkHolder holder = RegionChunkAccess.scheduling(chunkMap).claimUnload(pos);
         if (holder == null) {

@@ -19,12 +19,12 @@ class DeferredWorkTest {
     void aThreadAlreadyHoldingTheDestinationRunsInline() {
         transports.owner = true;
 
-        boolean deferred = DeferredWork.owner(DeferReason.PLAYER_PLACEMENT, transports.stats, 0, 0, () -> ran.add("inline")).submit(transports);
+        boolean deferred = DeferredWork.owner(DeferReason.PLAYER_TELEPORT, transports.stats, 0, 0, () -> ran.add("inline")).submit(transports);
 
         assertFalse(deferred, "nothing was deferred, the caller must not cancel vanilla");
         assertEquals(List.of("inline"), ran);
         assertTrue(transports.ownerQueue.isEmpty());
-        assertEquals(0, transports.stats.deferrals(DeferReason.PLAYER_PLACEMENT).perMinute(), "an inline run is not a deferral");
+        assertEquals(0, transports.stats.deferrals(DeferReason.PLAYER_TELEPORT).perMinute(), "an inline run is not a deferral");
     }
 
     @Test
