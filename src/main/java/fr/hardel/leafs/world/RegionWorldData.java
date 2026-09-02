@@ -25,6 +25,7 @@ public final class RegionWorldData {
     private final BlockEventBatch<LevelChunk> blockEvents = new BlockEventBatch<>(chunk -> ((ChunkTickAccess) chunk).leafs$blockEvents());
     private final RegionChunks chunks = new RegionChunks();
     private final RegionEntities entities = new RegionEntities();
+    private volatile MobCensus census = MobCensus.EMPTY;
     private long subTick;
     private long lastInhabitedUpdate;
 
@@ -74,6 +75,14 @@ public final class RegionWorldData {
 
     public RegionEntities entities() {
         return entities;
+    }
+
+    public MobCensus census() {
+        return census;
+    }
+
+    public void publishCensus(MobCensus census) {
+        this.census = census;
     }
 
     /** Vanilla's shape on the region clock; the sub-tick counter keeps the drain order deterministic within a tick. */

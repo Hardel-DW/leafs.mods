@@ -1,5 +1,6 @@
 package fr.hardel.leafs;
 
+import net.minecraft.world.entity.MobCategory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,6 +25,23 @@ class LeafsConfigTest {
         assertEquals(written, LeafsConfig.load(file));
         assertEquals(LeafsConfig.defaults(), written);
         assertEquals(15, written.debug().watchdogWarnSeconds());
+        assertEquals(LeafsConfig.MobCapScope.LEVEL, written.gameplay().mobCapScope());
+        assertEquals(7, written.gameplay().mobCap().size());
+        assertEquals(70, written.gameplay().mobCap(MobCategory.MONSTER));
+    }
+
+    @Test
+    void gameplayOverridesOneCapAndKeepsVanillaForTheRest(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        Files.writeString(file, """
+            {"gameplay": {"mob_cap_scope": "region", "mob_cap": {"monster": 35}}}
+            """);
+
+        LeafsConfig.Gameplay gameplay = LeafsConfig.load(file).gameplay();
+
+        assertEquals(LeafsConfig.MobCapScope.REGION, gameplay.mobCapScope());
+        assertEquals(35, gameplay.mobCap(MobCategory.MONSTER));
+        assertEquals(10, gameplay.mobCap(MobCategory.CREATURE));
     }
 
     @Test
