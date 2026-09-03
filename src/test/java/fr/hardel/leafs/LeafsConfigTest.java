@@ -55,7 +55,7 @@ class LeafsConfigTest {
         LeafsConfig defaults = LeafsConfig.defaults();
 
         assertEquals(8, config.effectiveRegionThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors(), config.effectiveChunkThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors() / 2, config.effectiveChunkThreads());
         assertEquals(32, config.sectionSize());
         assertEquals(5, config.sectionShift());
         assertTrue(config.debug().perRegionLogs());
@@ -68,7 +68,7 @@ class LeafsConfigTest {
         assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().regionThreads());
         assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().chunkThreads());
         assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveRegionThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveChunkThreads());
+        assertEquals(Runtime.getRuntime().availableProcessors() / 2, LeafsConfig.defaults().effectiveChunkThreads());
     }
 
     @Test

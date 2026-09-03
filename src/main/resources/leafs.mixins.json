@@ -3,6 +3,7 @@
 	"package": "fr.hardel.leafs.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"chunk.BackgroundWorkerMixin",
 		"chunk.ChunkHolderMixin",
 		"chunk.ChunkMapMixin",
 		"chunk.ChunkStatusTasksMixin",
