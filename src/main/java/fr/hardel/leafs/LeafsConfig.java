@@ -56,7 +56,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         }
     }
 
-    /** The keys {@code /leafs config} may rewrite; the debug and gameplay groups stay a file-only matter. */
     public enum Setting {
         REGION_THREADS("region_threads", LeafsConfig::regionThreads),
         CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
@@ -86,7 +85,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         }
     }
 
-    /** Their sum may exceed the machine on purpose: chunk workers hold the lowest priority, so each pool absorbs the other's slack. */
     private static Codec<Integer> threads(Setting setting) {
         return Codec.intRange(ALL_CORES, 1024)
             .validate(value -> value == 0
@@ -149,12 +147,10 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         return defaultsOf(CODEC);
     }
 
-    /** A missing file is written with the defaults; unknown keys are ignored, an invalid value stops the boot naming the file. */
     static LeafsConfig load(Path file) {
         return Files.notExists(file) ? write(file, defaults()) : parse(file, read(file));
     }
 
-    /** One key rewritten through the same codec as the load, so the same ranges apply; live at the next start. */
     public static LeafsConfig rewrite(Setting setting, int value) {
         JsonObject json = encode(get());
         json.addProperty(setting.key(), value);
@@ -162,15 +158,15 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     public int effectiveRegionThreads() {
-        return effective(regionThreads);
+        return effective(regionThreads, Runtime.getRuntime().availableProcessors());
     }
 
     public int effectiveChunkThreads() {
-        return effective(chunkThreads);
+        return effective(chunkThreads, Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
     }
 
-    private static int effective(int threads) {
-        return threads > 0 ? threads : Runtime.getRuntime().availableProcessors();
+    private static int effective(int threads, int allCores) {
+        return threads > 0 ? threads : allCores;
     }
 
     public int sectionShift() {

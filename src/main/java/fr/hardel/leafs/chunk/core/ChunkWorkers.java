@@ -24,15 +24,20 @@ public final class ChunkWorkers implements Executor {
         AtomicInteger ids = new AtomicInteger(1);
         this.pool = new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
             Thread thread = new Thread(() -> {
-                NativeThreadPriority.lowerCurrentThread();
+                yieldToRegions();
                 runnable.run();
             }, "Leafs Chunk Worker #" + ids.getAndIncrement());
             thread.setDaemon(true);
-            thread.setPriority(Thread.MIN_PRIORITY);
             thread.setUncaughtExceptionHandler((t, throwable) -> Leafs.LOGGER.error("Uncaught exception on {}", t.getName(), throwable));
             workerThreads.add(thread);
             return thread;
         });
+    }
+
+    /** The lowest priority, Java's everywhere and the OS nice on Linux, for any thread that generates or saves chunks. */
+    public static void yieldToRegions() {
+        Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
+        NativeThreadPriority.lowerCurrentThread();
     }
 
     public int threads() {
