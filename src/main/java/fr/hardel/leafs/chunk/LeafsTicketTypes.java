@@ -8,12 +8,9 @@ import net.minecraft.server.level.TicketType;
 
 public final class LeafsTicketTypes {
     private static final long DEMAND_TIMEOUT_TICKS = 300;
-
-    /** A thread waiting for a chunk it requires. */
     public static TicketType demand;
 
-    private LeafsTicketTypes() {
-    }
+    private LeafsTicketTypes() {}
 
     public static void register() {
         demand = Registry.register(BuiltInRegistries.TICKET_TYPE, Identifier.fromNamespaceAndPath(Leafs.MOD_ID, "demand"), new TicketType(DEMAND_TIMEOUT_TICKS, TicketType.FLAG_LOADING));
