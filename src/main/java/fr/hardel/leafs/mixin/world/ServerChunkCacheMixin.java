@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.spongepowered.asm.mixin.Mutable;
 import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.chunk.ChangedChunksAccess;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
@@ -63,7 +62,7 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
     /** Once regions tick, each purges its own sections and the workers' sweep the rest; the halted case matters, vanilla keeps purging during its stop loop. */
     @WrapOperation(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/TicketStorage;purgeStaleTickets(Lnet/minecraft/server/level/ChunkMap;)V"))
     private void leafs$purgeAsUniversalOwner(TicketStorage storage, ChunkMap chunkMap, Operation<Void> original) {
-        if (RegionChunkAccess.scheduling(chunkMap).isUniversalOwner()) {
+        if (!LevelRegions.of(this.level).live()) {
             original.call(storage, chunkMap);
         }
     }
@@ -101,7 +100,7 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
     /** The serial broadcast walk only survives for the universal owner; after activation the sweep owns the set. */
     @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;broadcastChangedChunks(Lnet/minecraft/util/profiling/ProfilerFiller;)V"))
     private void leafs$broadcastAsUniversalOwner(ServerChunkCache instance, ProfilerFiller profiler, Operation<Void> original) {
-        if (RegionChunkAccess.scheduling(instance.chunkMap).isUniversalOwner()) {
+        if (!LevelRegions.of(this.level).live()) {
             original.call(instance, profiler);
         }
     }

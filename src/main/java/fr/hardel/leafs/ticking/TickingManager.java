@@ -2,14 +2,14 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
-import fr.hardel.leafs.chunk.core.ChunkWorkers;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import net.minecraft.server.level.ServerLevel;
 
 import java.nio.file.Path;
@@ -25,7 +25,7 @@ public final class TickingManager {
     private final ServerMetrics metrics = new ServerMetrics();
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
-    private final ChunkWorkers chunkWorkers;
+    private final ChunkPool chunkPool;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
     private final int slowTaskWarnMillis;
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
@@ -39,7 +39,7 @@ public final class TickingManager {
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), ModAttribution.fromLoader());
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
-        this.chunkWorkers = new ChunkWorkers(config.effectiveChunkThreads());
+        this.chunkPool = new ChunkPool(config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",
@@ -85,8 +85,8 @@ public final class TickingManager {
         return halted;
     }
 
-    public ChunkWorkers chunkWorkers() {
-        return chunkWorkers;
+    public ChunkPool chunkPool() {
+        return chunkPool;
     }
 
     /** The server thread pumping while it waits (managedBlock) also runs the diverted tasks, or a wait on one of them never ends. */
@@ -141,13 +141,13 @@ public final class TickingManager {
         scheduler.setPeriodNanos(periodNanos);
     }
 
-    /** Every chunk's mail runs inline, looped because a mail can post a follow-up on another level (cross-dimension teleport). */
+    /** Every region's inbox runs inline, looped because a task can post a follow-up on another level (cross-dimension teleport). */
     private void drainRegionTasks() {
         int drained;
         do {
             drained = 0;
             for (ServerLevel level : server.getAllLevels()) {
-                drained += RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox().drainAll();
+                drained += LevelRegions.of(level).drainInboxes();
             }
         } while (drained > 0);
     }
@@ -163,7 +163,7 @@ public final class TickingManager {
 
     /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. The pools are gone, so diversion ends here. */
     public void shutdown() {
-        chunkWorkers.shutdown();
+        chunkPool.shutdown();
         globalTicking = false;
         globalScheduler.drain();
         watchdog.stop();

@@ -1,12 +1,12 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.chunk.ChunkMailbox;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
-import fr.hardel.leafs.world.RegionTickBody;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.server.level.ChunkMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.LinkedHashMap;
@@ -16,13 +16,13 @@ import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
-/** What the server thread holds for one piece of head work, taken at first contact and kept until released: regions, and the chunks no region owns. A region never borrows, it waits for nobody's tick. */
+/** What the server thread holds for one piece of head work, taken at first contact and kept until released: regions, and the chunks no region covers. A region never borrows. */
 public final class RegionBorrow {
     private static final ThreadLocal<RegionBorrow> CURRENT = new ThreadLocal<>();
     private static final long WAIT_NANOS = 50_000L;
 
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
-    private final Map<LevelRegions, LongOpenHashSet> heldChunks = new LinkedHashMap<>();
+    private final Map<LevelRegions, Long2ObjectOpenHashMap<RegionInbox>> heldChunks = new LinkedHashMap<>();
 
     private RegionBorrow() {
     }
@@ -58,7 +58,7 @@ public final class RegionBorrow {
         return CURRENT.get();
     }
 
-    /** The region of the position, waiting for its tick in flight, or the chunk itself when no region owns it. A merge pending with a region this thread holds waits for that one: everything is returned, the regionizer folds, the survivor is taken again. */
+    /** The region of the position, waiting for its tick in flight, or the chunk itself when no region covers it. A merge pending with a region this thread holds waits for that one: everything is returned, the regionizer folds, the survivor is taken again. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
         Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
         if (region == null) {
@@ -95,26 +95,28 @@ public final class RegionBorrow {
         } while (held.size() != before);
     }
 
-    /** Whether this thread holds the region of the position; a chunk no region owns is held by its claim in the mailbox. */
+    /** Whether this thread holds the region of the position, or the chunk itself when no region covers it. */
     public boolean holds(LevelRegions regions, int chunkX, int chunkZ) {
         Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
-        return region != null && held.contains(region);
+        if (region != null) {
+            return held.contains(region);
+        }
+
+        Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.get(regions);
+        return chunks != null && chunks.containsKey(ChunkPos.pack(chunkX, chunkZ));
     }
 
+    /** What lands on a borrowed chunk waits in its inbox for the borrower; the pool owns the chunk again at the release. */
     private void borrowChunk(LevelRegions regions, int chunkX, int chunkZ) {
-        RegionTickBody body = regions.body();
-        if (body == null) {
+        if (!regions.live()) {
             return;
         }
 
         long key = ChunkPos.pack(chunkX, chunkZ);
-        LongOpenHashSet chunks = heldChunks.computeIfAbsent(regions, _ -> new LongOpenHashSet());
-        if (chunks.contains(key)) {
-            return;
+        Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.computeIfAbsent(regions, _ -> new Long2ObjectOpenHashMap<>());
+        if (!chunks.containsKey(key)) {
+            chunks.put(key, LevelChunks.of(regions.level()).owners().borrow(chunkX, chunkZ));
         }
-
-        mailboxOf(body.level().getChunkSource().chunkMap).claim(key);
-        chunks.add(key);
     }
 
     private void borrowRegion(Region<RegionTickData> region) {
@@ -135,25 +137,24 @@ public final class RegionBorrow {
 
         held.clear();
         heldChunks.forEach((regions, chunks) -> {
-            ChunkMailbox mailbox = mailboxOf(regions.body().level().getChunkSource().chunkMap);
-            for (long key : chunks) {
-                mailbox.releaseToWorkers(key);
+            ChunkOwners owners = LevelChunks.of(regions.level()).owners();
+            for (Long2ObjectMap.Entry<RegionInbox> entry : chunks.long2ObjectEntrySet()) {
+                owners.release(ChunkPos.getX(entry.getLongKey()), ChunkPos.getZ(entry.getLongKey()), entry.getValue());
             }
         });
         heldChunks.clear();
     }
 
-    /** The mail of what this thread holds on that level: a chunk it waits for is delivered there, and nobody else drains what is held. */
-    public int drainMail(ChunkMailbox mailbox, ChunkMap chunkMap) {
+    /** What this thread holds runs here while it waits: the inboxes of its regions and of its chunks. */
+    public int drainInboxes() {
         int drained = 0;
         for (Region<RegionTickData> region : held) {
-            drained += mailbox.drain(region, chunkMap);
+            drained += region.data().inbox().drain();
         }
 
-        LongOpenHashSet chunks = heldChunks.get(LevelRegions.of(chunkMap.level));
-        if (chunks != null) {
-            for (long key : chunks) {
-                drained += mailbox.drain(key);
+        for (Long2ObjectOpenHashMap<RegionInbox> chunks : heldChunks.values()) {
+            for (RegionInbox inbox : chunks.values()) {
+                drained += inbox.drain();
             }
         }
 
@@ -162,9 +163,5 @@ public final class RegionBorrow {
 
     public int size() {
         return held.size();
-    }
-
-    private static ChunkMailbox mailboxOf(ChunkMap chunkMap) {
-        return RegionChunkAccess.scheduling(chunkMap).mailbox();
     }
 }

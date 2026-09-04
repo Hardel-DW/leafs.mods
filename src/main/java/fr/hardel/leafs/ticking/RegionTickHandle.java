@@ -1,10 +1,9 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.chunk.ChunkUnloadAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
+import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
 import fr.hardel.leafs.metrics.TickStages;
-import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -53,21 +52,21 @@ public final class RegionTickHandle extends TickHandle {
                 return;
             }
 
-            // Paused solo: the mail still drains, like vanilla's main-thread queue.
-            if (body.level().getServer().isPaused()) {
-                body.drainMail(region, worldData);
-                return;
-            }
-
             WorldTickContext.enter(body.level(), region, worldData);
             try {
+                // Paused solo: the inbox still drains, like the main-thread queue of vanilla.
+                if (body.level().getServer().isPaused()) {
+                    data.inbox().drain();
+                    return;
+                }
+
                 StageTimings stages = stages();
                 long startNanos = System.nanoTime();
                 stages.recordLag(startNanos - scheduledStartNanos());
                 stages.beginTick(startNanos);
-                unloadOwnChunks(body.level());
+                unloadHiddenEntities(body.level());
                 stages.mark(TickStages.regionUnloads);
-                body.tick(region, data.clock(), worldData, stages, regions);
+                body.tick(region, data.clock(), worldData, stages, regions, startNanos + regions.tickPeriodNanos());
                 chunkCensus = region.chunkCount();
                 entityCensus = worldData.entities().size();
                 stages.endTick(System.nanoTime());
@@ -94,10 +93,9 @@ public final class RegionTickHandle extends TickHandle {
         }
     }
 
-    /** The region lets its own chunks go: hidden entity chunks first, then the chunk decisions; the teardowns run on the chunk workers after the save. */
-    private void unloadOwnChunks(ServerLevel level) {
+    /** The entity sections the region's chunks left behind; the chunks themselves leave through the loading graph. */
+    private void unloadHiddenEntities(ServerLevel level) {
         ((ServerLevelEntityAccess) level).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
-        ((ChunkUnloadAccess) level.getChunkSource().chunkMap).leafs$unloads().decide(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
     }
 
     @Override
