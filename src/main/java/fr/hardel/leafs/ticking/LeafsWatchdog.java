@@ -1,5 +1,7 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.chunk.holder.ChunkWait;
+
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -116,6 +118,11 @@ public final class LeafsWatchdog {
 
     private String describeStall(TickHandle handle, RunningTick tick, long now) {
         StringBuilder message = new StringBuilder(headerLine(handle, tick, now));
+        String waiting = ChunkWait.describe(tick.thread);
+        if (waiting != null) {
+            message.append(System.lineSeparator()).append('	').append(waiting);
+        }
+
         for (StackTraceElement element : tick.thread.getStackTrace()) {
             message.append(System.lineSeparator()).append("\tat ").append(element);
         }

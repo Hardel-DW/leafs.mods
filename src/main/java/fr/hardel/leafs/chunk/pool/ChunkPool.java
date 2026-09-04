@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Every piece of chunk work runs here, most urgent first, under its reservation. Lowest OS priority so region ticks win the cores. */
 public final class ChunkPool implements Executor {
+    public static final int FIRST = 0;
     private static final long[] NO_RESERVATION = {};
 
     private final PriorityBuckets buckets;
@@ -28,7 +29,7 @@ public final class ChunkPool implements Executor {
         this.buckets = new PriorityBuckets(priorities);
         List<Thread> started = new ArrayList<>(threads);
         for (int index = 1; index <= threads; index++) {
-            Thread worker = new Thread(this::work, "Leafs Chunk Worker #" + index);
+            Thread worker = new Worker(this::work, index);
             worker.setDaemon(true);
             started.add(worker);
             worker.start();
@@ -41,6 +42,10 @@ public final class ChunkPool implements Executor {
     public static void yieldToRegions() {
         Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
         NativeThreadPriority.lowerCurrentThread();
+    }
+
+    public static boolean isWorker() {
+        return Thread.currentThread() instanceof Worker;
     }
 
     public int threads() {
@@ -73,10 +78,9 @@ public final class ChunkPool implements Executor {
         }
     }
 
-    /** Plain work, no reservation, the least urgent. */
     @Override
     public void execute(@NonNull Runnable task) {
-        submit(ChunkTask.of(buckets.count() - 1, NO_RESERVATION, task));
+        submit(ChunkTask.of(FIRST, NO_RESERVATION, task));
     }
 
     /** Queued work still runs, within ten seconds. */
@@ -149,5 +153,11 @@ public final class ChunkPool implements Executor {
     private void finish(ChunkTask task) {
         active.decrementAndGet();
         reservations.release(task);
+    }
+
+    private static final class Worker extends Thread {
+        private Worker(Runnable work, int index) {
+            super(work, "Leafs Chunk Worker #" + index);
+        }
     }
 }

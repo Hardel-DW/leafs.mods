@@ -76,6 +76,6 @@ public final class PlayerView {
     }
 
     private void drain() {
-        graphs.batch(() -> players.drain(tickets));
+        graphs.onPool(() -> players.drain(tickets));
     }
 }

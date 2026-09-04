@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk;
 
+import fr.hardel.leafs.chunk.disk.ChunkWrites;
 import fr.hardel.leafs.chunk.holder.ChunkHolders;
 import fr.hardel.leafs.chunk.holder.GenerationSteps;
 import fr.hardel.leafs.chunk.holder.HolderTable;
@@ -21,10 +22,9 @@ import net.minecraft.world.level.TicketStorage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** The chunk system of one level, built with its ChunkMap. */
 public final class LevelChunks {
     private static final AtomicInteger IDS = new AtomicInteger();
-
+    private final ChunkPool pool;
     private final TicketGraphs graphs;
     private final TicketTimeoutIndex timeouts;
     private final PlayerView view;
@@ -32,22 +32,25 @@ public final class LevelChunks {
     private final ChunkHolders holders;
     private final GenerationSteps steps;
     private final UnownedSweep sweep;
+    private final ChunkWrites writes;
 
     public LevelChunks(ChunkMap chunkMap, TicketStorage tickets, HolderTable table, PendingUnloads unloading, Executor serial) {
         ServerLevel level = chunkMap.level;
         LevelRegions regions = LevelRegions.of(level);
         TickingManager ticking = TickingManager.of(level.getServer());
-        ChunkPool pool = ticking.chunkPool();
+        this.pool = ticking.chunkPool();
         TicketStorageAccess storage = (TicketStorageAccess) tickets;
         this.graphs = storage.leafs$graphs();
         this.timeouts = new TicketTimeoutIndex(tickets, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
         this.view = new PlayerView(tickets, graphs);
-        this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), view::level, regions::live, serial);
-        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, ticking.metrics());
+        this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial);
         this.steps = new GenerationSteps(pool, owners);
+        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, steps, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
-        graphs.listen(holders, regions);
+        this.writes = new ChunkWrites(pool, chunkMap.worker);
+        ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
+        graphs.listen(holders, regions, pool);
         timeouts.pauseWhile(holders::busy);
     }
 
@@ -55,7 +58,6 @@ public final class LevelChunks {
         return ((LevelChunksAccess) level.getChunkSource().chunkMap).leafs$chunks();
     }
 
-    /** The current thread's right to write at a chunk: its region ticking, a borrow holding it, or the server thread while the regions are not running. */
     private static boolean holds(ServerLevel level, LevelRegions regions, int chunkX, int chunkZ) {
         if (WorldTickContext.ownsChunk(level, chunkX, chunkZ)) {
             return true;
@@ -67,6 +69,15 @@ public final class LevelChunks {
         }
 
         return !regions.live() && level.getServer().isSameThread();
+    }
+
+    /** The head of the pool while a thread waits for it, the distance to the nearest player otherwise. */
+    private int urgency(int chunkX, int chunkZ) {
+        return holders.demanded(chunkX, chunkZ) ? ChunkPool.FIRST : view.level(chunkX, chunkZ);
+    }
+
+    public ChunkPool pool() {
+        return pool;
     }
 
     public TicketGraphs graphs() {
@@ -95,5 +106,9 @@ public final class LevelChunks {
 
     public UnownedSweep sweep() {
         return sweep;
+    }
+
+    public ChunkWrites writes() {
+        return writes;
     }
 }

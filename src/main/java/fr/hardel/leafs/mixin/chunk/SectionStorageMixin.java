@@ -74,6 +74,7 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
         leafs$villageLock.runLocked(original::call);
     }
 
+    /** A chunk save touches what the POI writes touch: same lock. */
     @WrapMethod(method = "flush")
     private void leafs$chunkFlushUnderVillageLock(ChunkPos chunkPos, Operation<Void> original) {
         leafs$villageLock.runLocked(() -> original.call(chunkPos));

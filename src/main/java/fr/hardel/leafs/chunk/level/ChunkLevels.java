@@ -213,7 +213,7 @@ public final class ChunkLevels {
 
         /** Seeds push outward, strongest first, until nothing improves. */
         private void raise() {
-            for (int level = 0; level < none - 1; level++) {
+            for (int level = 0; level < none; level++) {
                 LongArrayList atLevel = seeds[level];
                 if (atLevel == null) {
                     continue;
