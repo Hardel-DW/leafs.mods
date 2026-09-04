@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 2026-09-04: a region paid 30 ms of level bookkeeping at every chunk its player crossed; the pool drains, the region only posts. */
+/** 2026-09-04: a region paid 30 ms of level bookkeeping at every chunk its player crossed. */
 class TicketGraphsTest {
     private final ChunkPool pool = new ChunkPool(1, 46);
     private final TicketGraphs graphs = new TicketGraphs();
@@ -63,7 +63,7 @@ class TicketGraphsTest {
         assertTrue(threads.getFirst().startsWith("Leafs Chunk Worker"));
     }
 
-    /** 2026-09-04: a worker draining after its own light ticket applied a region's move half way, the removal without the addition, and the region was destroyed and reborn. */
+    /** 2026-09-04: a worker applied a region's move half way, the removal without the addition, and the region died and was reborn. */
     @Test
     void aBystanderLeavesTheSimulationMoveToItsWriter() throws InterruptedException {
         List<String> simulation = new CopyOnWriteArrayList<>();

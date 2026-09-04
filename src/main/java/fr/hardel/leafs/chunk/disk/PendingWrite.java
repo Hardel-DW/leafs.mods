@@ -17,7 +17,6 @@ public final class PendingWrite extends CompletableFuture<CompoundTag> {
         this.photo = photo;
     }
 
-    /** Done once the bytes are in the file. */
     public CompletableFuture<Void> written() {
         return written;
     }
@@ -32,7 +31,6 @@ public final class PendingWrite extends CompletableFuture<CompoundTag> {
         photo = null;
     }
 
-    /** A fresh tag, like vanilla's copy of its pending tree. */
     public CompoundTag read() throws IOException {
         Supplier<CompoundTag> taken = photo;
         CompressedChunk ready = bytes;

@@ -42,13 +42,11 @@ public abstract class IOWorkerMixin implements ChunkWritesAccess {
         });
     }
 
-    /** A flush waits for the writes still on the pool to reach the file, then vanilla's own. */
     @WrapMethod(method = "synchronize")
     private CompletableFuture<Void> leafs$flushWhatIsOnItsWay(boolean flush, Operation<CompletableFuture<Void>> original) {
         return leafs$writes == null ? original.call(flush) : leafs$writes.settled().thenCompose(_ -> original.call(flush));
     }
 
-    /** POI and entity storages keep vanilla's path. */
     @Unique
     private @Nullable PendingWrite leafs$pending(ChunkPos pos) {
         return leafs$writes == null ? null : leafs$writes.pending(pos);

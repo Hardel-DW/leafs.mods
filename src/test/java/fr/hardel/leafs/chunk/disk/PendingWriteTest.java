@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
-/** A reader of a chunk on its way to the disk never waits: the photo answers until the bytes exist, the bytes answer after. */
 class PendingWriteTest {
     private final AtomicInteger photos = new AtomicInteger();
     private final PendingWrite write = new PendingWrite(this::photo);

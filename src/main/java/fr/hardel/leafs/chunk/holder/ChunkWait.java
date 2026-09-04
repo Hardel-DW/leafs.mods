@@ -52,7 +52,6 @@ public final class ChunkWait {
         }
     }
 
-    /** For a stall report: what the thread waits for, null when it waits for nothing. */
     public static @Nullable String describe(Thread thread) {
         WaitReport report = WAITING.get(thread);
         return report == null ? null : report.toString();

@@ -18,7 +18,6 @@ import java.nio.ByteBuffer;
 public record CompressedChunk(byte[] bytes) {
     private static final int HEADER = 5;
 
-    /** Vanilla's ChunkBuffer, on the calling thread. */
     public static CompressedChunk of(CompoundTag tag) {
         RegionFileVersion version = RegionFileVersion.getSelected();
         ByteArrayOutputStream buffer = new ByteArrayOutputStream(8096);

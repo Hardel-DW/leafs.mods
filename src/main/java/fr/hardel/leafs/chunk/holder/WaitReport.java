@@ -15,7 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/** What a thread waits for, read at the moment a stall report asks. */
+/** What a thread waits for, for a stall report. */
 record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, CompletableFuture<?> delivery) {
     @Override
     public String toString() {

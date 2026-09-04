@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-/** POI writes mark a chunk dirty on the block's owner while chunk saves flush it from any thread; the dirty set must survive both. */
 class PoiDirtySetConcurrencyTest {
     private static final int CHUNKS = 64;
     private static final int PASSES = 400;
@@ -39,7 +38,7 @@ class PoiDirtySetConcurrencyTest {
         poiTypes.freeze();
     }
 
-    /** 2026-09-04: eight regions restarted on Index -1 in the dirty set's rehash, a save flushing while a block change marked. */
+    /** 2026-09-04: eight regions restarted on Index -1 in the dirty set, a save flushing while a POI write marked. */
     @Test
     void markingAndFlushingFromTwoThreadsKeepsTheDirtySetSound() throws IOException, InterruptedException {
         PoiManager poiManager = new PoiManager(
