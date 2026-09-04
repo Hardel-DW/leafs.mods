@@ -41,3 +41,6 @@ replay_*.log
 logs/
 roadmap
 libs/
+.fabric/
+.mixin.out/
+config/
