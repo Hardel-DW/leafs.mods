@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, Debug debug, Gameplay gameplay) {
+public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug, Gameplay gameplay) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -61,8 +61,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
         SECTION_SIZE("section_size", LeafsConfig::sectionSize),
         REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance),
-        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance),
-        PLAYER_CHUNK_LOADS_PER_TICK("player_chunk_loads_per_tick", LeafsConfig::playerChunkLoadsPerTick);
+        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance);
 
         private final String key;
         private final ToIntFunction<LeafsConfig> getter;
@@ -114,7 +113,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         SECTION_SIZE.optionalFieldOf(Setting.SECTION_SIZE.key(), 2).forGetter(LeafsConfig::sectionSize),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
-        Codec.intRange(1, 1000).optionalFieldOf(Setting.PLAYER_CHUNK_LOADS_PER_TICK.key(), 5).forGetter(LeafsConfig::playerChunkLoadsPerTick),
         DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug),
         GAMEPLAY.codec().optionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
     ).apply(builder, LeafsConfig::new));

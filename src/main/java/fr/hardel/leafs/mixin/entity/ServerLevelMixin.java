@@ -5,7 +5,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import fr.hardel.leafs.entity.EntityManagerAccess;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
@@ -14,6 +13,7 @@ import fr.hardel.leafs.world.WorldTickContext;
 import fr.hardel.leafs.ticking.RegionContext;
 import fr.hardel.leafs.global.ConcurrentWaypointManager;
 import fr.hardel.leafs.global.SharedStateMonitor;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingBinding;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
@@ -77,7 +77,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.waypointManager = new ConcurrentWaypointManager(self);
         this.leafs$entityTeleports = new EntityTeleports(self, TickingBinding::of);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
-        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> RegionChunkAccess.scheduling(self.getChunkSource().chunkMap).mailbox().drainAll());
+        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainInboxes());
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 

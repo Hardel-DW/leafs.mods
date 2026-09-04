@@ -29,7 +29,6 @@ Decompiled and reference sources are in the "repository" folder outside the work
 - Prioritize the OOP approach. Don't make everything in a static class. Use a correct Pattern. (Static is good but not for everything)
 - Avoid unchecked, UNCHECKED_CAST find good architectural solutions that avoid them as much as possible.
 - Avoid Inline Import.
-- If you have huge rename/move refactor, I can use Intelij, it does instantly.
 - sub-agent is not permitted to create a sub-agent
 - Line Width 180 characters
 

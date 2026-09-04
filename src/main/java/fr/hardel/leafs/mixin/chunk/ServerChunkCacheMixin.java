@@ -1,20 +1,19 @@
 package fr.hardel.leafs.mixin.chunk;
 
-import fr.hardel.leafs.ticking.RegionBorrow;
-import fr.hardel.leafs.ticking.LevelRegions;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
-import fr.hardel.leafs.chunk.TicketStorageAccess;
-import fr.hardel.leafs.chunk.core.ChunkScheduling;
+import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -25,17 +24,15 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
 
-/** Region workers answer thread-identity checks through ownership. */
+/** The read contract: every thread reads what is published, a required absent chunk is waited for, a borrower takes the chunk's region. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin {
-
     @Shadow
     @Final
     private ServerLevel level;
@@ -44,67 +41,56 @@ public abstract class ServerChunkCacheMixin {
     @Final
     private Thread mainThread;
 
-    /** The storage is constructed level-blind as saved data; the routing shim needs its level. */
-    @Inject(method = "<init>", at = @At("TAIL"))
-    private void leafs$bindTicketStorage(CallbackInfo callbackInfo) {
-        ((TicketStorageAccess) ((ServerChunkCache) (Object) this).ticketStorage).leafs$bindLevel(this.level);
-    }
-
-    /** Off the main thread the concurrent table answers, with the contract's peek rule: presence serves every thread. */
+    /** Off the main thread the table answers, with the contract's peek rule: presence serves every thread. */
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
         if (Thread.currentThread() != this.mainThread) {
-            ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z));
+            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z));
         }
     }
 
-    /** The contract for every thread once regions run, vanilla for the universal owner; a borrower takes the chunk's region before reading it. */
+    /** The contract for every thread once regions run, vanilla for the universal owner. */
     @WrapMethod(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;")
     private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
-        ServerChunkCache self = (ServerChunkCache) (Object) this;
-        ChunkAccess chunk = leafs$scheduling().isUniversalOwner()
-            ? original.call(x, z, targetStatus, loadOrGenerate)
-            : RegionChunkAccess.contractedChunk(self.chunkMap, x, z, targetStatus, loadOrGenerate);
+        LevelRegions regions = LevelRegions.of(this.level);
+        ChunkAccess chunk = regions.live() ? RegionChunkAccess.contractedChunk(leafs$chunkMap(), x, z, targetStatus, loadOrGenerate) : original.call(x, z, targetStatus, loadOrGenerate);
         RegionBorrow borrow = RegionBorrow.current();
         if (chunk != null && borrow != null) {
-            borrow.borrow(LevelRegions.of(this.level), x, z);
+            borrow.borrow(regions, x, z);
         }
 
         return chunk;
     }
 
-    /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree on every thread, or a correct hasChunk-then-read sequence waits for a chunk it was told is there. */
+    /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree on every thread. */
     @Inject(method = "hasChunk(II)Z", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
-        if (!leafs$scheduling().isUniversalOwner()) {
-            ServerChunkCache self = (ServerChunkCache) (Object) this;
-            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(self.chunkMap, x, z) != null);
+        if (LevelRegions.of(this.level).live()) {
+            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z) != null);
         }
     }
 
     /** A light change marks its section on the chunk's owner, like a block change; the owner broadcasts at its next pass. */
     @WrapOperation(method = "onLightUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache$MainThreadExecutor;execute(Ljava/lang/Runnable;)V"))
     private void leafs$lightChangeOnTheOwner(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original, @Local(argsOnly = true) SectionPos pos) {
-        leafs$scheduling().runOnOwner(pos.x(), pos.z(), mark);
+        LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), mark);
     }
 
-    /** The request takes the scheduling area around the position, and the tasks it builds start after the release. */
+    /** A request writes holder state, so it runs under the locks a drain around the chunk takes. */
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
-    private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderSchedulingLock(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
+    private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         ChunkPos pos = holder.getPos();
-        return leafs$scheduling().requestArea(pos.x(), pos.z(), 0, () -> original.call(holder, status, chunkMap));
+        return LevelChunks.of(this.level).graphs().loading().locked(pos.x(), pos.z(), () -> original.call(holder, status, chunkMap));
     }
 
-    /** Same discipline for the radius form, which schedules a whole area of neighbours at once. */
     @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkRangeFuture(Lnet/minecraft/server/level/ChunkHolder;ILjava/util/function/IntFunction;)Ljava/util/concurrent/CompletableFuture;"))
-    private CompletableFuture<ChunkResult<List<ChunkAccess>>> leafs$radiusRequestUnderSchedulingLock(ChunkMap chunkMap, ChunkHolder holder, int radius, IntFunction<ChunkStatus> distanceToStatus, Operation<CompletableFuture<ChunkResult<List<ChunkAccess>>>> original) {
+    private CompletableFuture<ChunkResult<List<ChunkAccess>>> leafs$radiusRequestUnderTheGraphLocks(ChunkMap chunkMap, ChunkHolder holder, int radius, IntFunction<ChunkStatus> distanceToStatus, Operation<CompletableFuture<ChunkResult<List<ChunkAccess>>>> original) {
         ChunkPos pos = holder.getPos();
-        return leafs$scheduling().requestArea(pos.x(), pos.z(), radius, () -> original.call(chunkMap, holder, radius, distanceToStatus));
+        return LevelChunks.of(this.level).graphs().loading().locked(pos.x(), pos.z(), () -> original.call(chunkMap, holder, radius, distanceToStatus));
     }
 
     @Unique
-    private ChunkScheduling leafs$scheduling() {
-        return RegionChunkAccess.scheduling(((ServerChunkCache) (Object) this).chunkMap);
+    private ChunkMap leafs$chunkMap() {
+        return ((ServerChunkCache) (Object) this).chunkMap;
     }
 }

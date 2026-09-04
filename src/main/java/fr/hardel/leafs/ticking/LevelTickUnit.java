@@ -1,7 +1,6 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
@@ -25,7 +24,6 @@ public final class LevelTickUnit extends TickHandle {
     private Runnable pendingWork;
     private boolean activated;
     private volatile int lastChunkCount;
-    private volatile int lastViewChunks;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, int slowTaskWarnMillis) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
@@ -79,7 +77,6 @@ public final class LevelTickUnit extends TickHandle {
 
         if (level.getGameTime() % CENSUS_INTERVAL_TICKS == 0) {
             lastChunkCount = level.getChunkSource().getLoadedChunksCount();
-            lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
         }
 
         stages.mark(TickStages.serialManagement);
@@ -112,11 +109,6 @@ public final class LevelTickUnit extends TickHandle {
     /** Last on-owner census; readable from any thread, at most {@value #CENSUS_INTERVAL_TICKS} ticks old. */
     public int chunkCount() {
         return lastChunkCount;
-    }
-
-    /** Chunks the player view pipelines retain a ticket on; a count that never falls back after a wave names a leak. */
-    public int viewChunks() {
-        return lastViewChunks;
     }
 
     /** Sum of the region censuses, O(regions), any thread. */

@@ -66,6 +66,10 @@ public final class RegionTickScheduler {
         this.periodNanos = Math.max(1, periodNanos);
     }
 
+    public long periodNanos() {
+        return periodNanos;
+    }
+
     public void runAttached(TickHandle handle) {
         executeTick(handle);
     }

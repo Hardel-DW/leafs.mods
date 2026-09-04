@@ -51,3 +51,10 @@ accessible field net/minecraft/world/level/chunk/LevelChunk fluidTicks Lnet/mine
 accessible class net/minecraft/server/MinecraftServer$ReloadableResources
 accessible field net/minecraft/server/level/ChunkMap activeChunkWrites Ljava/util/concurrent/atomic/AtomicInteger;
 accessible field net/minecraft/server/level/ChunkMap MAX_ACTIVE_CHUNK_WRITES I
+accessible method net/minecraft/server/level/ChunkMap scheduleUnload (JLnet/minecraft/server/level/ChunkHolder;)V
+accessible field net/minecraft/server/level/ChunkMap lightEngine Lnet/minecraft/server/level/ThreadedLevelLightEngine;
+accessible field net/minecraft/server/level/ChunkMap mainThreadExecutor Lnet/minecraft/util/thread/BlockableEventLoop;
+accessible field net/minecraft/util/StaticCache2D minX I
+accessible field net/minecraft/util/StaticCache2D minZ I
+accessible field net/minecraft/util/StaticCache2D sizeX I
+accessible field net/minecraft/util/StaticCache2D sizeZ I
