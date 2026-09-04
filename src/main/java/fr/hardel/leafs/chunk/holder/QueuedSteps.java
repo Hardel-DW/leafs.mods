@@ -28,7 +28,6 @@ final class QueuedSteps {
         drivers.remove(centerKey);
     }
 
-    /** For a stall report. */
     String describeAround(int chunkX, int chunkZ) {
         int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
         int queuedSteps = 0;
@@ -44,7 +43,7 @@ final class QueuedSteps {
         return queuedSteps + " steps and " + queuedDrivers + " drivers queued within " + radius + ", own step " + steps.containsKey(ChunkPos.pack(chunkX, chunkZ)) + ", own driver " + drivers.containsKey(ChunkPos.pack(chunkX, chunkZ));
     }
 
-    /** A thread waits for this chunk: everything queued within vanilla's radius moves to the head of the pool. */
+    /** Everything queued within vanilla's radius of a required chunk moves to the head of the pool. */
     void expedite(ChunkPool pool, int chunkX, int chunkZ) {
         int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
         for (int dz = -radius; dz <= radius; dz++) {

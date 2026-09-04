@@ -26,7 +26,7 @@ public final class ChunkWrites {
         this.files = disk.storage;
     }
 
-    /** One pool task, photo then compression, then the file write on the disk thread. The write is vanilla's photo future. */
+    /** The write is vanilla's photo future: the disk thread never joins it. */
     public PendingWrite photograph(ChunkPos pos, Supplier<CompoundTag> photo) {
         PendingWrite write = new PendingWrite(photo);
         pending.put(pos.pack(), write);
@@ -52,17 +52,14 @@ public final class ChunkWrites {
         return write;
     }
 
-    /** Null once the bytes are in the file. */
     public @Nullable PendingWrite pending(ChunkPos pos) {
         return pending.get(pos.pack());
     }
 
-    /** For a flush of the storage. */
     public CompletableFuture<Void> settled() {
         return CompletableFuture.allOf(pending.values().stream().map(PendingWrite::written).toArray(CompletableFuture[]::new));
     }
 
-    /** Vanilla's ChunkBuffer close, on the disk thread. */
     private CompletableFuture<Void> store(ChunkPos pos, CompressedChunk bytes) {
         return disk.submitThrowingTask(() -> {
             RegionFile file = files.getRegionFile(pos);
