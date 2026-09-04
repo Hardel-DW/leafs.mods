@@ -9,6 +9,7 @@ import fr.hardel.leafs.chunk.DistanceManagerAccess;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.LevelChunksAccess;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.disk.PendingWrite;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
@@ -26,6 +27,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkHolder;
@@ -57,6 +59,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /** Leafs owns the holder bookkeeping: the table, the generation on the pool, the publication on the owner, the unload. Vanilla's serial passes are cut. */
@@ -181,6 +184,18 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @WrapOperation(method = "scheduleChunkLoad", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;exceptionallyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<?> leafs$loadFailureOnThePool(CompletableFuture<?> future, Function<Throwable, ?> body, Executor executor, Operation<CompletableFuture<?>> original, @Local(argsOnly = true) ChunkPos pos) {
         return original.call(future, body, leafs$chunks.steps().loading(pos));
+    }
+
+    /** The photo is a pool task, compressed there, handed to the disk thread as bytes. */
+    @WrapOperation(method = "save", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
+    private CompletableFuture<CompoundTag> leafs$photographOnThePool(Supplier<CompoundTag> photo, Executor workerMain, Operation<CompletableFuture<CompoundTag>> original, @Local(argsOnly = true) ChunkAccess chunk) {
+        return leafs$chunks.writes().photograph(chunk.getPos(), photo);
+    }
+
+    /** The photo future is the write; the disk thread never joins it. */
+    @WrapOperation(method = "save", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;write(Lnet/minecraft/world/level/ChunkPos;Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;"))
+    private CompletableFuture<Void> leafs$bytesToTheDisk(ChunkMap self, ChunkPos pos, Supplier<CompoundTag> join, Operation<CompletableFuture<Void>> original, @Local CompletableFuture<CompoundTag> photographed) {
+        return ((PendingWrite) photographed).written();
     }
 
     /** The ticking promotion body, postProcessGeneration and startTickingChunk, runs on the position's owner. */
