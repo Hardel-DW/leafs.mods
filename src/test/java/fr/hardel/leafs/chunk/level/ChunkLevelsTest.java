@@ -164,4 +164,15 @@ class ChunkLevelsTest {
             }
         }
     }
+
+    /** 2026-09-04: a thread read the holder without the source it had just posted, its drain having found the queue empty behind another thread's poll. */
+    @Test
+    void holderWorkUnderTheLocksSeesTheSourcePostedBeforeIt() {
+        graph.setSource(10, 10, 31);
+        int seen = graph.settled(10, 10, this::record, () -> level(10, 10));
+        assertEquals(31, seen);
+        assertEquals(32, level(11, 10));
+        assertEquals(31, reported.get(ChunkPos.pack(10, 10)));
+        assertFalse(graph.drain(this::record));
+    }
 }

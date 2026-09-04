@@ -8,6 +8,7 @@ import fr.hardel.leafs.chunk.SectionStorageAccess;
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.SectionStorage;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -71,5 +72,10 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
     @WrapMethod(method = "flushAll")
     private void leafs$flushUnderVillageLock(Operation<Void> original) {
         leafs$villageLock.runLocked(original::call);
+    }
+
+    @WrapMethod(method = "flush")
+    private void leafs$chunkFlushUnderVillageLock(ChunkPos chunkPos, Operation<Void> original) {
+        leafs$villageLock.runLocked(() -> original.call(chunkPos));
     }
 }

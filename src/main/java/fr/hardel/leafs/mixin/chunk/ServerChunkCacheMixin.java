@@ -76,17 +76,17 @@ public abstract class ServerChunkCacheMixin {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), mark);
     }
 
-    /** A request writes holder state, so it runs under the locks a drain around the chunk takes. */
+    /** A request writes holder state: the tickets around the chunk settle first, then it runs under the graph's locks. */
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         ChunkPos pos = holder.getPos();
-        return LevelChunks.of(this.level).graphs().loading().locked(pos.x(), pos.z(), () -> original.call(holder, status, chunkMap));
+        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(holder, status, chunkMap));
     }
 
     @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkRangeFuture(Lnet/minecraft/server/level/ChunkHolder;ILjava/util/function/IntFunction;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<List<ChunkAccess>>> leafs$radiusRequestUnderTheGraphLocks(ChunkMap chunkMap, ChunkHolder holder, int radius, IntFunction<ChunkStatus> distanceToStatus, Operation<CompletableFuture<ChunkResult<List<ChunkAccess>>>> original) {
         ChunkPos pos = holder.getPos();
-        return LevelChunks.of(this.level).graphs().loading().locked(pos.x(), pos.z(), () -> original.call(chunkMap, holder, radius, distanceToStatus));
+        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(chunkMap, holder, radius, distanceToStatus));
     }
 
     @Unique
