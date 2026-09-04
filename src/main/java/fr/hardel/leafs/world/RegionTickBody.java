@@ -1,23 +1,17 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.ChunkBroadcasts;
-import fr.hardel.leafs.chunk.ChunkMailbox;
-import fr.hardel.leafs.chunk.PlayerLoaderAccess;
-import fr.hardel.leafs.chunk.ChunkUnloadAccess;
-import fr.hardel.leafs.chunk.PropagatorAccess;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
-import fr.hardel.leafs.chunk.SpawnProximity;
-import fr.hardel.leafs.chunk.TicketStorageAccess;
-import fr.hardel.leafs.chunk.TicketTimeoutIndex;
-import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
+import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
-import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.region.Region;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionClock;
+import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
 import net.minecraft.server.level.ChunkHolder;
@@ -27,15 +21,15 @@ import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Util;
+import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LocalMobCapCalculator;
 import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.LocalMobCapCalculator;
 import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.TickRateManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,13 +40,11 @@ public final class RegionTickBody {
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
 
     private final ServerLevel level;
-    private final ChunkMailbox mailbox;
     private final RegionAutosave autosave;
     private final MobCaps mobCaps;
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
-        this.mailbox = RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox();
         this.autosave = new RegionAutosave(level);
         this.mobCaps = new MobCaps(level);
     }
@@ -61,20 +53,20 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<?> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions) {
+    public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long deadlineNanos) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         if (runs) {
             clock.advance();
         }
 
-        purgeTimedOutTickets(region);
-        RegionChunks chunks = drainMail(region, worldData);
-        stages.mark(TickStages.regionTasks);
-        ServerChunkCache chunkSource = level.getChunkSource();
-        RegionEntities entities = worldData.entities();
-        entities.refresh(level, chunks.holders());
+        LevelChunks chunks = LevelChunks.of(level);
+        chunks.timeouts().purgeSections(region.sectionKeySnapshot());
+        RegionChunks owned = worldData.chunks();
+        owned.refresh(region, level.getChunkSource().chunkMap);
         stages.mark(TickStages.regionTickets);
+        RegionEntities entities = worldData.entities();
+        entities.refresh(level, owned.holders());
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 RegionNetworkTick.drainOnRegion(player, level);
@@ -83,73 +75,51 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionPackets);
         if (runs && !level.isDebug()) {
             long currentTick = clock.currentTick();
-            worldData.blockTicks().drain(chunks.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickBlock);
+            worldData.blockTicks().drain(owned.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickBlock);
             stages.mark(TickStages.regionBlockTicks);
-            worldData.fluidTicks().drain(chunks.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickFluid);
+            worldData.fluidTicks().drain(owned.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickFluid);
             stages.mark(TickStages.regionFluidTicks);
-            tickChunks(chunks, worldData, stages);
+            tickChunks(owned, worldData, chunks.view(), stages);
             stages.mark(TickStages.regionChunkTick);
         }
 
-        ChunkBroadcasts.changed(chunks.holders());
+        ChunkBroadcasts.changed(owned.holders());
         stages.mark(TickStages.regionBroadcast);
-        RegionEntityTracking.tickRegion(level, chunks, entities);
+        RegionEntityTracking.tickRegion(level, owned, entities);
         stages.mark(TickStages.regionTracking);
         if (runs) {
-            runBlockEvents(chunks, worldData);
+            runBlockEvents(owned, worldData);
         }
 
         stages.mark(TickStages.regionBlockEvents);
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
             tickEntities(tickRateManager, entities);
             stages.mark(TickStages.regionEntities);
-            tickBlockEntities(region, runs, chunks);
+            tickBlockEntities(region, runs, owned);
             stages.mark(TickStages.regionBlockEntities);
         }
 
-        PlayerChunkLoader loader = ((PlayerLoaderAccess) chunkSource.chunkMap).leafs$playerLoader();
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
-                RegionNetworkTick.tickPlayerOnRegion(player, loader, level.getServer());
+                RegionNetworkTick.tickPlayerOnRegion(player, level.getServer());
             }
         });
         stages.mark(TickStages.regionPlayers);
-        autosave.tick(chunks, entities, regions.autosaveEpoch(), regions.autosaveForced());
+        autosave.tick(owned, entities, regions.autosaveEpoch(), regions.autosaveForced());
         stages.mark(TickStages.regionAutosave);
+        region.data().inbox().drain(deadlineNanos);
+        stages.mark(TickStages.regionTasks);
     }
 
-    /** The photo of the region's chunks, then the mail of every chunk in it; the entity photo comes after, so an arrival ticks this pass. */
-    public RegionChunks drainMail(Region<?> region, RegionWorldData worldData) {
-        RegionChunks chunks = worldData.chunks();
-        ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        chunks.refresh(region, chunkMap);
-        mailbox.drain(region, chunkMap);
-        return chunks;
-    }
-
-    /** The region's own timeout tickets count down here; an expiry retires its holder level, so the propagator drains right after. */
-    private void purgeTimedOutTickets(Region<?> region) {
-        TicketTimeoutIndex timeouts = ((TicketStorageAccess) level.getChunkSource().ticketStorage).leafs$timeouts();
-        if (timeouts == null || timeouts.isEmpty()) {
-            return;
-        }
-
-        if (timeouts.purgeSections(region.sectionKeySnapshot()) > 0) {
-            PropagatorAccess access = (PropagatorAccess) level.getChunkSource().chunkMap.getDistanceManager();
-            access.leafs$simulation().drain();
-            access.leafs$propagator().drain();
-        }
-    }
-
-    /** What is left of the serial {@code tickChunks} pass: the ask for the workers' sweep, then the custom spawners. */
+    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, then the custom spawners. */
     public void tickSerial(boolean spawnEnemies) {
-        ((ChunkUnloadAccess) level.getChunkSource().chunkMap).leafs$workerChunks().sweepSoon();
+        LevelChunks.of(level).sweep().soon();
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
         }
     }
 
-    private void tickChunks(RegionChunks chunks, RegionWorldData worldData, StageTimings stages) {
+    private void tickChunks(RegionChunks chunks, RegionWorldData worldData, PlayerView view, StageTimings stages) {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
         DistanceManager distanceManager = chunkMap.getDistanceManager();
@@ -158,7 +128,7 @@ public final class RegionTickBody {
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
-        int spawnableChunks = countAndCollect(chunks, chunkMap, spawningChunks, randomTickingChunks);
+        int spawnableChunks = countAndCollect(chunks, chunkMap, view, spawningChunks, randomTickingChunks);
         NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, worldData.entities().accessible(), (chunkKey, output) -> {
             ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
             if (holder != null) {
@@ -188,13 +158,12 @@ public final class RegionTickBody {
     }
 
     /** One pass over the ticking chunks: the spawnable census, the spawning list and the random-tick list. */
-    private int countAndCollect(RegionChunks chunks, ChunkMap chunkMap, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
+    private int countAndCollect(RegionChunks chunks, ChunkMap chunkMap, PlayerView view, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
         DistanceManager distanceManager = chunkMap.getDistanceManager();
-        SpawnProximity proximity = ((PropagatorAccess) distanceManager).leafs$spawnProximity();
         int spawnable = 0;
         for (LevelChunk chunk : chunks.ticking()) {
             long chunkKey = chunk.getPos().pack();
-            if (proximity.covered(chunkKey)) {
+            if (view.covered(chunkKey)) {
                 spawnable++;
                 if (chunkMap.anyPlayerCloseEnoughForSpawningInternal(chunk.getPos())) {
                     spawningChunks.add(chunk);

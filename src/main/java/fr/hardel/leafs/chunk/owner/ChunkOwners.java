@@ -1,0 +1,141 @@
+package fr.hardel.leafs.chunk.owner;
+
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import fr.hardel.leafs.chunk.level.ChunkLevels;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.chunk.pool.ChunkTask;
+import net.minecraft.world.level.ChunkPos;
+import org.jspecify.annotations.Nullable;
+
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
+
+/** Who writes into the live world at a position: the thread that already owns it, the region covering it at its next tick, or the pool right now. */
+public final class ChunkOwners {
+    private static final long[] NO_RESERVATION = {};
+
+    /** The region's inbox at a chunk, null where no region covers it. */
+    @FunctionalInterface
+    public interface Inboxes {
+        @Nullable RegionInbox at(int chunkX, int chunkZ);
+    }
+
+    /** Whether the current thread may write at a chunk now: its region ticking, a borrow holding it, or a universal owner. */
+    @FunctionalInterface
+    public interface Ownership {
+        boolean holds(int chunkX, int chunkZ);
+    }
+
+    /** The urgency of a chunk, its distance to the nearest player. */
+    @FunctionalInterface
+    public interface Urgency {
+        int of(int chunkX, int chunkZ);
+    }
+
+    private final ChunkPool pool;
+    private final int level;
+    private final Inboxes inboxes;
+    private final Ownership ownership;
+    private final Urgency urgency;
+    private final BooleanSupplier live;
+    private final Executor serial;
+    private final ConcurrentLong2ObjectMap<RegionInbox> borrowed = new ConcurrentLong2ObjectMap<>();
+
+    /** Before the regions run and once they stopped, the server thread owns everything and its pump runs what other threads post. */
+    public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial) {
+        this.pool = pool;
+        this.level = level;
+        this.inboxes = inboxes;
+        this.ownership = ownership;
+        this.urgency = urgency;
+        this.live = live;
+        this.serial = serial;
+    }
+
+    /** True when the task ran in line, which is what lets a caller read back what it wrote. Under a drain the owner posts to itself instead. */
+    public boolean submit(int chunkX, int chunkZ, Runnable task) {
+        if (ownership.holds(chunkX, chunkZ) && !ChunkLevels.draining()) {
+            task.run();
+            return true;
+        }
+
+        if (!live.getAsBoolean()) {
+            serial.execute(task);
+            return false;
+        }
+
+        while (true) {
+            RegionInbox inbox = inboxAt(chunkX, chunkZ);
+            if (inbox == null) {
+                onPool(chunkX, chunkZ, 0, task);
+                return false;
+            }
+
+            if (inbox.post(chunkX, chunkZ, task)) {
+                return false;
+            }
+        }
+    }
+
+    /** Pool work under the reservation of the area around a chunk, at the chunk's urgency. */
+    public void onPool(int chunkX, int chunkZ, int radius, Runnable task) {
+        pool.submit(ChunkTask.of(urgency.of(chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
+    }
+
+    public boolean holds(int chunkX, int chunkZ) {
+        return ownership.holds(chunkX, chunkZ);
+    }
+
+    public Executor executor(int chunkX, int chunkZ) {
+        return task -> submit(chunkX, chunkZ, task);
+    }
+
+    public int urgency(int chunkX, int chunkZ) {
+        return urgency.of(chunkX, chunkZ);
+    }
+
+    /** The keys of the square around a chunk; a negative radius reserves nothing. */
+    public long[] area(int chunkX, int chunkZ, int radius) {
+        if (radius < 0) {
+            return NO_RESERVATION;
+        }
+
+        int side = 2 * radius + 1;
+        long[] keys = new long[side * side];
+        int count = 0;
+        for (int dz = -radius; dz <= radius; dz++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                keys[count++] = ChunkTask.key(level, chunkX + dx, chunkZ + dz);
+            }
+        }
+
+        return keys;
+    }
+
+    /** A head execution on the server thread takes a chunk no region covers: what lands there runs on the borrower until it releases. */
+    public RegionInbox borrow(int chunkX, int chunkZ) {
+        RegionInbox inbox = new RegionInbox();
+        borrowed.put(ChunkPos.pack(chunkX, chunkZ), inbox);
+        return inbox;
+    }
+
+    public void release(int chunkX, int chunkZ, RegionInbox inbox) {
+        borrowed.remove(ChunkPos.pack(chunkX, chunkZ), inbox);
+        resubmit(inbox);
+    }
+
+    /** A dead region's inbox, handed back off the regionizer's lock. */
+    public void abandon(RegionInbox inbox) {
+        pool.execute(() -> resubmit(inbox));
+    }
+
+    /** A borrow that ended hands its inbox back: each task finds its owner again. */
+    public void resubmit(RegionInbox inbox) {
+        inbox.close(posted -> submit(posted.chunkX(), posted.chunkZ(), posted.task()));
+    }
+
+    private @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
+        RegionInbox region = inboxes.at(chunkX, chunkZ);
+        return region != null ? region : borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+    }
+}

@@ -6,7 +6,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.chunk.ChunkWait;
+import fr.hardel.leafs.chunk.holder.ChunkWait;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;

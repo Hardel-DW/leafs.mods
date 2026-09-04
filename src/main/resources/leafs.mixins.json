@@ -4,11 +4,14 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"chunk.BackgroundWorkerMixin",
+		"chunk.ChunkGeneratorMixin",
 		"chunk.ChunkHolderMixin",
 		"chunk.ChunkMapMixin",
 		"chunk.ChunkStatusTasksMixin",
 		"chunk.DistanceManagerMixin",
+		"chunk.GenerationChunkHolderMixin",
 		"chunk.HashMapPaletteMixin",
+		"chunk.NoiseBasedChunkGeneratorMixin",
 		"chunk.PalettedContainerMixin",
 		"chunk.PoiManagerMixin",
 		"chunk.SectionStorageMixin",
@@ -43,6 +46,9 @@
 		"global.ScoreboardMixin",
 		"global.ServerBossEventMixin",
 		"global.ServerScoreboardMixin",
+		"light.ChunkSystemHooksMixin",
+		"light.SchedulingUtilMixin",
+		"light.StarLightInterfaceMixin",
 		"network.ConnectionMixin",
 		"network.MinecraftServerMixin",
 		"network.PacketProcessorMixin",
@@ -77,4 +83,3 @@
 		"requireAnnotations": true
 	}
 }
-

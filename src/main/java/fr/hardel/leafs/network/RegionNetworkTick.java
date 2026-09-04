@@ -2,7 +2,6 @@ package fr.hardel.leafs.network;
 
 import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
@@ -35,11 +34,10 @@ public final class RegionNetworkTick {
     }
 
     /** Region tick end: the player's whole pass, as his packet-handling thread, so no other thread touches him while it runs. The view and the chunk sends run for every player, as vanilla's; the listener ticks only behind a channel, as vanilla's connection list. */
-    public static void tickPlayerOnRegion(ServerPlayer player, PlayerChunkLoader loader, MinecraftServer server) {
+    public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
         countIfShared(server, PacketRouting.queueOf(listener).handleAs(() -> {
-            loader.tick(player);
             if (!connection.isConnecting()) {
                 tickListener(listener, connection, server);
             }

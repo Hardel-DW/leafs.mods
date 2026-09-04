@@ -1,14 +1,21 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.world.RegionWorldData;
 
-/** The per-region composite: a clock and a tick payload that a crash renews, a handle once the level activated. */
+/** The per-region composite: its inbox, a clock and a tick payload that a crash renews, a handle once the level activated. */
 public final class RegionTickData {
     private static final long DEATH_WINDOW_NANOS = 60_000_000_000L;
+
+    private final RegionInbox inbox = new RegionInbox();
     private volatile RegionTickHandle handle;
     private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
     private long lastDeathNanos;
+
+    public RegionInbox inbox() {
+        return inbox;
+    }
 
     public RegionTickHandle handle() {
         return handle;

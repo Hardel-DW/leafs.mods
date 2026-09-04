@@ -2,7 +2,6 @@ package fr.hardel.leafs.debug;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
@@ -35,7 +34,7 @@ public final class CrashCommand {
                     chunk[0] = chunkX;
                     chunk[1] = chunkZ;
                 });
-                RegionChunkAccess.scheduling(level.getChunkSource().chunkMap).mailbox().post(chunk[0], chunk[1], () -> {
+                region.data().inbox().post(chunk[0], chunk[1], () -> {
                     throw new IllegalStateException("Crash requested by /leafs crash on region #" + regionId);
                 });
                 source.sendSuccess(() -> Component.literal("Region #" + regionId + " will throw on its next tick").withStyle(ChatFormatting.RED), true);

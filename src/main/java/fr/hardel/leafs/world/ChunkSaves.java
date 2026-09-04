@@ -22,24 +22,36 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    /** Vanilla's saveChunksEagerly over the caller's holders: the dirty ones whose save cadence elapsed, twenty per tick. */
+    /** Vanilla's saveChunksEagerly over the caller's holders, twenty per tick. */
     public void saveEagerly(List<ChunkHolder> holders) {
-        ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        long now = Util.getMillis();
         int saved = 0;
         for (ChunkHolder holder : holders) {
             if (saved == CHUNKS_PER_TICK) {
                 return;
             }
 
-            ChunkAccess chunk = holder.getLatestChunk();
-            if (chunk == null || !chunk.isUnsaved()) {
-                chunkMap.chunksToEagerlySave.remove(holder.getPos().pack());
-            } else if (chunkMap.saveChunkIfNeeded(holder, now)) {
-                chunkMap.chunksToEagerlySave.remove(holder.getPos().pack());
+            if (saveEagerly(holder)) {
                 saved++;
             }
         }
+    }
+
+    /** One dirty chunk whose save cadence elapsed; a clean one leaves the eager set. */
+    public boolean saveEagerly(ChunkHolder holder) {
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        long key = holder.getPos().pack();
+        ChunkAccess chunk = holder.getLatestChunk();
+        if (chunk == null || !chunk.isUnsaved()) {
+            chunkMap.chunksToEagerlySave.remove(key);
+            return false;
+        }
+
+        if (!chunkMap.saveChunkIfNeeded(holder, Util.getMillis())) {
+            return false;
+        }
+
+        chunkMap.chunksToEagerlySave.remove(key);
+        return true;
     }
 
     /** False when the holder already saved this epoch; true after its chunk and entity chunk went out, vanilla's autosave for one chunk. */

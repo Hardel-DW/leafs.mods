@@ -2,8 +2,10 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
-import fr.hardel.leafs.chunk.propagator.SimulationListener;
+import fr.hardel.leafs.chunk.level.LevelListener;
+import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
@@ -17,39 +19,37 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
-/** One per level, owns the regionizer and the handle lifecycle. Callbacks run under the regionizer's write lock: no tickets, no re-entry. */
-public final class LevelRegions implements RegionCallbacks<RegionTickData>, SimulationListener {
-    /** Mutated only by the simulation feed; every other method just reads it. */
+/** One per level, owns the regionizer and the handle lifecycle. Callbacks run under the regionizer's write lock: no tickets, no lookup, no re-entry. */
+public final class LevelRegions implements RegionCallbacks<RegionTickData>, LevelListener {
+    /** Mutated only by the simulation graph; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
-
     private volatile String dimension;
     private volatile LongSupplier gameTime;
     private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
-
     /** Bumped by the global autosave trigger only; each chunk and player compares it against the epoch that last saved it. A forced epoch saves everything in one pass. */
     private volatile long autosaveEpoch;
     private volatile boolean autosaveForced;
-
     /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
     private volatile long created;
     private volatile long destroyed;
     private volatile long merged;
     private volatile long split;
-
     /** Totals of the handles that are gone; a sampler adds the live ones to get the level's work, whatever the churn did in between. */
     private volatile long retiredBusyNanos;
     private volatile long retiredLagNanos;
@@ -76,14 +76,14 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
 
     /** Once, on the server thread, before the level's first tick. Regions equip, then the handles schedule. */
     public void activate(String dimension, RegionTickScheduler scheduler, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
-        if (this.scheduler != null)
+        if (this.scheduler != null) {
             return;
+        }
 
         this.dimension = dimension;
         this.gameTime = gameTime;
         this.worldDataFactory = worldDataFactory;
         this.body = body;
-
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.data().worldData() == null) {
                 equipWorld(region.data());
@@ -100,6 +100,42 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
 
     public RegionTickBody body() {
         return body;
+    }
+
+    /** The budget of one region tick, from the tick rate in force. */
+    public long tickPeriodNanos() {
+        return scheduler.periodNanos();
+    }
+
+    /** Regions tick between activation and the halt; outside that window the server thread owns every chunk. */
+    public boolean live() {
+        RegionTickBody body = this.body;
+        return body != null && !TickingManager.of(body.level().getServer()).halted();
+    }
+
+    /** The level, once activated. */
+    public ServerLevel level() {
+        return body.level();
+    }
+
+    /** The inbox of the region covering a chunk, null without one or while the regions do not run. */
+    public @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
+        if (!live()) {
+            return null;
+        }
+
+        Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
+        return region == null ? null : region.data().inbox();
+    }
+
+    /** Every region's inbox, for the thread that owns them all. */
+    public int drainInboxes() {
+        int drained = 0;
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            drained += region.data().inbox().drain();
+        }
+
+        return drained;
     }
 
     /** The owning region's payload, null for a chunk without a region or before activation. */
@@ -127,7 +163,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         return autosaveForced;
     }
 
-    /** Whether every loaded chunk and every player saved the epoch: each belongs to a region or to the workers, so each gets there. */
+    /** Whether every loaded chunk and every player saved the epoch: each belongs to a region or to the pool, so each gets there. */
     public boolean autosaveReached(long epoch, Iterable<ChunkHolder> holders, List<ServerPlayer> players) {
         for (ChunkHolder holder : holders) {
             if (((SavedEpochAccess) holder).leafs$savedEpoch() < epoch) {
@@ -144,21 +180,24 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         return true;
     }
 
+    /** The simulation graph: a chunk entering or leaving block ticking is what shapes the regions. */
     @Override
-    public void simulated(int chunkX, int chunkZ) {
-        try {
-            regionizer.addChunk(chunkX, chunkZ);
-        } catch (RuntimeException exception) {
-            throw recordFeedFailure("simulate", chunkX, chunkZ, exception);
+    public void changed(long chunkKey, int oldLevel, int newLevel) {
+        boolean simulates = ChunkLevel.isBlockTicking(newLevel);
+        if (simulates == ChunkLevel.isBlockTicking(oldLevel)) {
+            return;
         }
-    }
 
-    @Override
-    public void unsimulated(int chunkX, int chunkZ) {
+        int chunkX = ChunkPos.getX(chunkKey);
+        int chunkZ = ChunkPos.getZ(chunkKey);
         try {
-            regionizer.removeChunk(chunkX, chunkZ);
+            if (simulates) {
+                regionizer.addChunk(chunkX, chunkZ);
+            } else {
+                regionizer.removeChunk(chunkX, chunkZ);
+            }
         } catch (RuntimeException exception) {
-            throw recordFeedFailure("unsimulate", chunkX, chunkZ, exception);
+            throw recordFeedFailure(simulates ? "simulate" : "unsimulate", chunkX, chunkZ, exception);
         }
     }
 
@@ -175,7 +214,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
     /** An empty tick on every region triggers splits, destroys and reclaims; for the shutdown drain and levels whose pool never bound. */
     public void settle() {
         rethrowFeedFailure();
-
         int deferred = 0;
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.tryMarkTicking()) {
@@ -319,12 +357,17 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         created++;
     }
 
+    /** A dead region's inbox goes back through the owners, off this lock. */
     @Override
     public void onRegionDestroy(Region<RegionTickData> region) {
         destroyed++;
         RegionTickHandle handle = region.data().handle();
         if (handle != null) {
             retire(handle);
+        }
+
+        if (body != null) {
+            LevelChunks.of(body.level()).owners().abandon(region.data().inbox());
         }
     }
 
@@ -344,7 +387,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         }
     }
 
-    /** The moved chunks carry their scheduled ticks onto the survivor's clock; their mail stays on them. */
+    /** The moved chunks carry their scheduled ticks onto the survivor's clock, and the dead region's inbox pours into the survivor's. */
     @Override
     public void merge(Region<RegionTickData> from, Region<RegionTickData> into, LongList movedChunks) {
         RegionTickBody body = this.body;
@@ -352,6 +395,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
             rebaseTicks(body.level(), movedChunks, into.data().clock().currentTick() - from.data().clock().currentTick());
         }
 
+        RegionInbox survivor = into.data().inbox();
+        from.data().inbox().close(posted -> survivor.post(posted.chunkX(), posted.chunkZ(), posted.task()));
         merged++;
     }
 
@@ -369,7 +414,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
         }
     }
 
-    /** Children start on the parent's clock once regions are equipped; everything positional already sits in the chunks. */
+    /** Children start on the parent's clock once regions are equipped; each posted task follows its section to its child. */
     @Override
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
         if (worldDataFactory != null) {
@@ -378,6 +423,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Simu
             }
         }
 
+        int shift = regionizer.sectionShift();
+        parent.data().inbox().close(posted -> {
+            Region<RegionTickData> child = sectionToChild.get(CoordinateKey.pack(posted.chunkX() >> shift, posted.chunkZ() >> shift));
+            child.data().inbox().post(posted.chunkX(), posted.chunkZ(), posted.task());
+        });
         split++;
     }
 

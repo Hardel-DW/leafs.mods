@@ -12,6 +12,9 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import org.junit.jupiter.api.BeforeEach;
+import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.server.level.FullChunkStatus;
+import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -42,7 +45,7 @@ class LevelRegionsTest {
 
     @BeforeEach
     void createRegions() {
-        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, 5, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
+        regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
     }
 
     @ParameterizedTest
@@ -84,16 +87,16 @@ class LevelRegionsTest {
 
     @Test
     void aBridgeOnlySplitsOnSettleAndMergesBackOnRefill() {
-        regions.simulated(0, 0);
-        regions.simulated(32, 0);
-        regions.simulated(64, 0);
-        regions.simulated(96, 0);
+        simulated(regions, 0, 0);
+        simulated(regions, 32, 0);
+        simulated(regions, 64, 0);
+        simulated(regions, 96, 0);
         regions.settle();
         assertEquals(1, regionCount());
         assertEquals(1, regions.created());
 
-        regions.unsimulated(32, 0);
-        regions.unsimulated(64, 0);
+        unsimulated(regions, 32, 0);
+        unsimulated(regions, 64, 0);
 
         assertEquals(1, regionCount(), "splitting is what settle() exists for - the feed alone never splits");
         assertEquals(0, regions.split());
@@ -108,8 +111,8 @@ class LevelRegionsTest {
         }
         assertNotSame(regions.regionizer().regionAt(0, 0), regions.regionizer().regionAt(96, 0));
 
-        regions.simulated(32, 0);
-        regions.simulated(64, 0);
+        simulated(regions, 32, 0);
+        simulated(regions, 64, 0);
         regions.settle();
 
         assertEquals(1, regionCount());
@@ -120,16 +123,16 @@ class LevelRegionsTest {
 
     @Test
     void drainingEveryChunkReclaimsSectionsAndRegions() {
-        regions.simulated(0, 0);
-        regions.simulated(1, 0);
-        regions.simulated(200, 200);
+        simulated(regions, 0, 0);
+        simulated(regions, 1, 0);
+        simulated(regions, 200, 200);
         regions.settle();
         assertEquals(2, regionCount());
         assertTrue(regions.sections() > 0);
 
-        regions.unsimulated(0, 0);
-        regions.unsimulated(1, 0);
-        regions.unsimulated(200, 200);
+        unsimulated(regions, 0, 0);
+        unsimulated(regions, 1, 0);
+        unsimulated(regions, 200, 200);
         regions.settle();
 
         assertEquals(0, regionCount());
@@ -140,9 +143,9 @@ class LevelRegionsTest {
 
     @Test
     void aFeedFailureIsRethrownOnceByTheNextSettle() {
-        regions.simulated(0, 0);
+        simulated(regions, 0, 0);
 
-        assertThrows(IllegalStateException.class, () -> regions.unsimulated(500, 500));
+        assertThrows(IllegalStateException.class, () -> unsimulated(regions, 500, 500));
         assertThrows(IllegalStateException.class, regions::settle, "the recorded failure must reach the game thread");
 
         regions.settle();
@@ -151,8 +154,8 @@ class LevelRegionsTest {
 
     @Test
     void activationBindsHandlesAndRegionDeathCancelsThem() {
-        regions.simulated(0, 0);
-        regions.simulated(200, 200);
+        simulated(regions, 0, 0);
+        simulated(regions, 200, 200);
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             assertNull(region.data().handle(), "no handle may exist before the pool binds");
         }
@@ -164,7 +167,7 @@ class LevelRegionsTest {
         }
 
         RegionTickHandle doomed = regions.regionizer().regionAt(200, 200).data().handle();
-        regions.unsimulated(200, 200);
+        unsimulated(regions, 200, 200);
         regions.settle();
         assertTrue(doomed.isCancelled());
         assertEquals(1, regionCount());
@@ -173,14 +176,14 @@ class LevelRegionsTest {
     @Test
     void aHandleTickSplitsAndItsChildrenCarryFreshHandles() {
         activateRegions();
-        regions.simulated(0, 0);
-        regions.simulated(32, 0);
-        regions.simulated(64, 0);
-        regions.simulated(96, 0);
+        simulated(regions, 0, 0);
+        simulated(regions, 32, 0);
+        simulated(regions, 64, 0);
+        simulated(regions, 96, 0);
         RegionTickHandle parentHandle = regions.regionizer().regionAt(0, 0).data().handle();
 
-        regions.unsimulated(32, 0);
-        regions.unsimulated(64, 0);
+        unsimulated(regions, 32, 0);
+        unsimulated(regions, 64, 0);
 
         parentHandle.tick();
         assertEquals(2, regionCount(), "the handle's own release is what splits");
@@ -196,8 +199,8 @@ class LevelRegionsTest {
     @Test
     void mergeKeepsTheSurvivorClockAndSplitChildrenStartOnTheParentClock() {
         activateRegions();
-        regions.simulated(0, 0);
-        regions.simulated(96, 0);
+        simulated(regions, 0, 0);
+        simulated(regions, 96, 0);
         regions.settle();
         assertEquals(2, regionCount());
         RegionClock west = regions.regionizer().regionAt(0, 0).data().clock();
@@ -206,16 +209,16 @@ class LevelRegionsTest {
         west.advance();
         east.advance();
 
-        regions.simulated(32, 0);
-        regions.simulated(64, 0);
+        simulated(regions, 32, 0);
+        simulated(regions, 64, 0);
         regions.settle();
         assertEquals(1, regionCount());
         RegionClock survivor = regions.regionizer().regionAt(0, 0).data().clock();
         assertTrue(survivor == west || survivor == east, "the survivor keeps one of the two clocks untouched");
 
         survivor.advance();
-        regions.unsimulated(32, 0);
-        regions.unsimulated(64, 0);
+        unsimulated(regions, 32, 0);
+        unsimulated(regions, 64, 0);
         regions.settle();
         assertEquals(2, regionCount());
         assertEquals(survivor.currentTick(), regions.regionizer().regionAt(0, 0).data().clock().currentTick());
@@ -242,7 +245,7 @@ class LevelRegionsTest {
         } while (!present.add(key));
 
         presentList.add(key);
-        regions.simulated(CoordinateKey.x(key), CoordinateKey.z(key));
+        simulated(regions, CoordinateKey.x(key), CoordinateKey.z(key));
     }
 
     private void feedDestroy(Random random, LongOpenHashSet present, LongArrayList presentList) {
@@ -251,10 +254,18 @@ class LevelRegionsTest {
         presentList.set(index, presentList.getLong(presentList.size() - 1));
         presentList.removeLong(presentList.size() - 1);
         present.remove(key);
-        regions.unsimulated(CoordinateKey.x(key), CoordinateKey.z(key));
+        unsimulated(regions, CoordinateKey.x(key), CoordinateKey.z(key));
     }
 
     private static int randomCoordinate(Random random) {
         return (random.nextInt(POSITIONS_PER_AXIS) - POSITIONS_PER_AXIS / 2) * POSITION_STRIDE;
+    }
+
+    private static void simulated(LevelRegions regions, int chunkX, int chunkZ) {
+        regions.changed(ChunkPos.pack(chunkX, chunkZ), ChunkLevel.MAX_LEVEL + 1, ChunkLevel.byStatus(FullChunkStatus.BLOCK_TICKING));
+    }
+
+    private static void unsimulated(LevelRegions regions, int chunkX, int chunkZ) {
+        regions.changed(ChunkPos.pack(chunkX, chunkZ), ChunkLevel.byStatus(FullChunkStatus.BLOCK_TICKING), ChunkLevel.MAX_LEVEL + 1);
     }
 }

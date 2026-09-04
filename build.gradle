@@ -15,7 +15,10 @@ dependencies {
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 	localRuntime "fr.hardel:mapple:${project.mapple_version}"
+	compileOnly files("libs/ScalableLux-fabric-0.3.0-alpha.0.3-all.jar")
+	localRuntime files("libs/ScalableLux-fabric-0.3.0-alpha.0.3-all.jar", "libs/zfastnoise-1.0.40+26.2.jar")
 	testRuntimeOnly "fr.hardel:mapple:${project.mapple_version}"
+	testRuntimeOnly files("libs/ScalableLux-fabric-0.3.0-alpha.0.3-all.jar", "libs/zfastnoise-1.0.40+26.2.jar")
 
 	testImplementation platform("org.junit:junit-bom:5.12.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"
