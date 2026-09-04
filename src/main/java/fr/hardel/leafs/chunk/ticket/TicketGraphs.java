@@ -73,7 +73,7 @@ public final class TicketGraphs {
         return result;
     }
 
-    /** True when a level changed on this thread. Off the pool, one loading pass is handed over at a time. */
+    /** Off the pool, one loading pass is handed over at a time. */
     public boolean drain() {
         if (loadingListener == null || batching.get()) {
             return false;
@@ -94,7 +94,6 @@ public final class TicketGraphs {
         return changed;
     }
 
-    /** Ticket-writing work on the pool, drained once done. */
     public void onPool(Runnable work) {
         if (ChunkPool.isWorker()) {
             batch(work);

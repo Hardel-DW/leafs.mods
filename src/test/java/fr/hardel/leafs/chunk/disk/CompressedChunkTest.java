@@ -17,7 +17,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** The bytes the pool produces are what vanilla's ChunkBuffer would have produced: the region file takes them and vanilla reads them back. */
 class CompressedChunkTest {
     private static CompoundTag chunkTag() {
         CompoundTag tag = new CompoundTag();

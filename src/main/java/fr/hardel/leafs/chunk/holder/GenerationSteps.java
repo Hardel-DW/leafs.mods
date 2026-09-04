@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-/** Vanilla's generation on the pool: the task advances layer by layer, each step reserves the radius it writes, everything at the chunk's urgency. */
+/** Vanilla's generation on the pool: each step reserves the radius it writes, at the chunk's urgency. */
 public final class GenerationSteps {
     private static final long[] NO_RESERVATION = {};
 
@@ -29,7 +29,6 @@ public final class GenerationSteps {
         this.owners = owners;
     }
 
-    /** The task schedules a layer, waits for it off any thread, and comes back here. */
     public void run(ChunkGenerationTask task) {
         ChunkPos pos = task.getCenter().getPos();
         long center = pos.pack();
@@ -44,7 +43,6 @@ public final class GenerationSteps {
         pool.submit(driver);
     }
 
-    /** One step of one chunk, as urgent as the chunk that asked for it, its future completing when the step's own future does. */
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk) {
         ChunkPos pos = chunk.getPos();
         long key = pos.pack();
@@ -91,7 +89,6 @@ public final class GenerationSteps {
         return queued.describeAround(chunkX, chunkZ);
     }
 
-    /** The read of a chunk file, once the disk thread hands it over. */
     public Executor loading(ChunkPos pos) {
         return task -> owners.onPool(pos.x(), pos.z(), 0, task);
     }

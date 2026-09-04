@@ -114,7 +114,6 @@ public final class ChunkHolders implements LevelListener {
         return delivery;
     }
 
-    /** Within vanilla's radius of a chunk a thread waits for. */
     public boolean demanded(int chunkX, int chunkZ) {
         for (LongIterator demand = demands.iterator(); demand.hasNext(); ) {
             long key = demand.nextLong();
@@ -127,12 +126,10 @@ public final class ChunkHolders implements LevelListener {
         return false;
     }
 
-    /** What vanilla expects of runAllUpdates before it reads the holder. */
     public void settle(int chunkX, int chunkZ) {
         loading.settled(chunkX, chunkZ, this, () -> null);
     }
 
-    /** Holder work outside a drain, under the graph's locks, once the chunk's own sources landed. */
     public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
         return loading.settled(chunkX, chunkZ, this, body);
     }
