@@ -21,8 +21,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
-/** Leafs' bookkeeping of vanilla's holders, fed by the loading graph: birth on a loaded level, level changes, unload on the owner. */
 public final class ChunkHolders implements LevelListener {
     private final ChunkMap chunkMap;
     private final ChunkLevels loading;
@@ -49,7 +49,6 @@ public final class ChunkHolders implements LevelListener {
         return table;
     }
 
-    /** Vanilla's updateChunkScheduling: a loaded level revives the holder waiting for its teardown or makes a new one, an unloaded level sends it to the teardown. */
     @Override
     public void changed(long chunkKey, int oldLevel, int newLevel) {
         ChunkHolder holder = table.get(chunkKey);
@@ -76,7 +75,6 @@ public final class ChunkHolders implements LevelListener {
         batch.get().add(holder);
     }
 
-    /** Vanilla's two passes over the changed holders, then the unloads leave for their owner. */
     @Override
     public void published() {
         List<ChunkHolder> changed = batch.get();
@@ -97,14 +95,16 @@ public final class ChunkHolders implements LevelListener {
         changed.clear();
     }
 
-    /** A status required by a waiting thread: the ticket makes the holder, the request follows under the drain's locks. */
     public CompletableFuture<ChunkResult<ChunkAccess>> require(int chunkX, int chunkZ, ChunkStatus status) {
         long key = ChunkPos.pack(chunkX, chunkZ);
         tickets.addTicket(key, new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status)));
-        return loading.locked(chunkX, chunkZ, () -> table.get(key).scheduleChunkGenerationTask(status, chunkMap));
+        return settled(chunkX, chunkZ, () -> table.get(key).scheduleChunkGenerationTask(status, chunkMap));
     }
 
-    /** Generation or a promotion in flight: vanilla's ticket countdown pauses on it. */
+    public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
+        return loading.settled(chunkX, chunkZ, this, body);
+    }
+
     public boolean busy(long chunkKey) {
         ChunkHolder holder = table.get(chunkKey);
         return holder != null && !holder.isReadyForSaving();

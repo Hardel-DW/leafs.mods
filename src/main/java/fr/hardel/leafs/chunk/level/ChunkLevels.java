@@ -33,7 +33,6 @@ public final class ChunkLevels {
         return none;
     }
 
-    /** Posting none removes the source. Visible after a drain. */
     public void setSource(int chunkX, int chunkZ, int level) {
         Section section = sections.computeIfAbsent(Section.keyOf(chunkX, chunkZ), key -> new Section(key, none));
         section.post(Section.index(chunkX, chunkZ), level);
@@ -49,19 +48,16 @@ public final class ChunkLevels {
         return section == null ? none : section.level(Section.index(chunkX, chunkZ));
     }
 
-    /** Every chunk at or under a level, weakly consistent, for a rule that moves with the level like the view distance. */
     public void forEachAtMost(int level, LongConsumer consumer) {
         for (Section section : sections.values()) {
             section.forEachAtMost(level, consumer);
         }
     }
 
-    /** Whether this thread is inside a drain of any graph: what it owns then waits for the drain to end, nothing heavy runs under the section locks. */
     public static boolean draining() {
         return DRAINING.get() != null;
     }
 
-    /** Every section with posted sources, one after the other; true when any level changed. Asked from inside a listener, it is the outer drain's next section. */
     public boolean drain(LevelListener listener) {
         if (DRAINING.get() != null) {
             return false;
@@ -82,14 +78,23 @@ public final class ChunkLevels {
         }
     }
 
-    /** Holder work outside a drain, under the locks a drain around this chunk would take. */
-    public <T> T locked(int chunkX, int chunkZ, Supplier<T> body) {
-        Section[] area = area(sections.computeIfAbsent(Section.keyOf(chunkX, chunkZ), key -> new Section(key, none)));
+    public <T> T settled(int chunkX, int chunkZ, LevelListener listener, Supplier<T> body) {
+        Section center = sections.computeIfAbsent(Section.keyOf(chunkX, chunkZ), key -> new Section(key, none));
+        Section[] area = area(center);
         for (Section section : area) {
             section.lock.lock();
         }
 
         try {
+            if (DRAINING.get() == null) {
+                DRAINING.set(this);
+                try {
+                    propagate(center, listener);
+                } finally {
+                    DRAINING.remove();
+                }
+            }
+
             return body.get();
         } finally {
             for (int index = area.length - 1; index >= 0; index--) {
@@ -105,13 +110,17 @@ public final class ChunkLevels {
         }
 
         try {
-            Short2ByteMap batch = center.takePending();
-            return !batch.isEmpty() && new Propagation(center, batch).run(listener);
+            return propagate(center, listener);
         } finally {
             for (int index = area.length - 1; index >= 0; index--) {
                 area[index].lock.unlock();
             }
         }
+    }
+
+    private boolean propagate(Section center, LevelListener listener) {
+        Short2ByteMap batch = center.takePending();
+        return !batch.isEmpty() && new Propagation(center, batch).run(listener);
     }
 
     /** The 3 by 3 around a section, created on demand, locked in one global order so two drains never wait on each other crosswise. */
