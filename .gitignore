@@ -43,3 +43,6 @@ logs/
 roadmap
 docs/ia/
 libs/
+.fabric/
+.mixin.out/
+config/
