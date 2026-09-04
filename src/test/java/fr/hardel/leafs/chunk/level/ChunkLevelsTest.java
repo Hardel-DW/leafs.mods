@@ -165,6 +165,17 @@ class ChunkLevelsTest {
         }
     }
 
+    /** 2026-09-04: a source at the last real level, a ticket at EMPTY, was never raised: the raise stopped one level short. */
+    @Test
+    void aSourceAtTheLastLevelIsPublished() {
+        graph.setSource(5, 5, NONE - 1);
+
+        assertTrue(graph.drain(this::record));
+
+        assertEquals(NONE - 1, level(5, 5));
+        assertEquals(NONE, level(6, 5));
+    }
+
     /** 2026-09-04: a thread read the holder without the source it had just posted, its drain having found the queue empty behind another thread's poll. */
     @Test
     void holderWorkUnderTheLocksSeesTheSourcePostedBeforeIt() {

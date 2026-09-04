@@ -76,7 +76,22 @@ public abstract class ServerChunkCacheMixin {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), mark);
     }
 
-    /** A request writes holder state: the tickets around the chunk settle first, then it runs under the graph's locks. */
+    /** Vanilla reads the holder right after runAllUpdates: the chunk's own section settles on this thread. */
+    @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
+    private boolean leafs$settleTheRequestedChunk(ServerChunkCache self, Operation<Boolean> original, @Local(argsOnly = true, ordinal = 0) int x, @Local(argsOnly = true, ordinal = 1) int z) {
+        boolean changed = original.call(self);
+        LevelChunks.of(this.level).holders().settle(x, z);
+        return changed;
+    }
+
+    @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
+    private boolean leafs$settleTheRadiusCentre(ServerChunkCache self, Operation<Boolean> original, @Local(argsOnly = true) ChunkPos pos) {
+        boolean changed = original.call(self);
+        LevelChunks.of(this.level).holders().settle(pos.x(), pos.z());
+        return changed;
+    }
+
+    /** A request writes holder state: under the graph's locks, once the chunk's tickets settled. */
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         ChunkPos pos = holder.getPos();

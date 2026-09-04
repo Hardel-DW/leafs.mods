@@ -43,7 +43,6 @@ public abstract class DistanceManagerMixin implements DistanceManagerAccess {
         callbackInfo.cancel();
     }
 
-    /** The server thread's drain; everything else drained already. */
     @Inject(method = "runAllUpdates", at = @At("HEAD"), cancellable = true)
     private void leafs$drainTheGraphs(ChunkMap scheduler, CallbackInfoReturnable<Boolean> callbackInfo) {
         callbackInfo.setReturnValue(leafs$chunks.graphs().drain());

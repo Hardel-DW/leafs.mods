@@ -59,6 +59,25 @@ class ChunkOwnersTest {
         assertEquals(0, inbox.size());
     }
 
+    /** 2026-09-04: a status change on an uncovered chunk re-submitted itself to the pool forever, the worker not counting as its owner. */
+    @Test
+    void thePoolWorkerHoldsTheChunkOfTheTaskItRuns() throws InterruptedException {
+        covered = false;
+        ChunkOwners owners = owners();
+        CountDownLatch done = new CountDownLatch(1);
+        boolean[] inLine = new boolean[1];
+
+        owners.submit(1, 1, () -> {
+            inLine[0] = owners.holds(1, 1) && owners.submit(1, 1, () -> ran.add("nested"));
+            done.countDown();
+        });
+
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        assertTrue(inLine[0]);
+        assertEquals(List.of("nested"), ran);
+        assertFalse(owners.holds(1, 1));
+    }
+
     @Test
     void aDrainRunsWhatWasPostedBeforeIt() {
         ChunkOwners owners = owners();

@@ -40,6 +40,7 @@ public final class ChunkOwners {
     private final BooleanSupplier live;
     private final Executor serial;
     private final ConcurrentLong2ObjectMap<RegionInbox> borrowed = new ConcurrentLong2ObjectMap<>();
+    private final ThreadLocal<Long> poolOwned = new ThreadLocal<>();
 
     /** Before the regions run and once they stopped, the server thread owns everything and its pump runs what other threads post. */
     public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial) {
@@ -54,7 +55,7 @@ public final class ChunkOwners {
 
     /** True when the task ran in line, which is what lets a caller read back what it wrote. Under a drain the owner posts to itself instead. */
     public boolean submit(int chunkX, int chunkZ, Runnable task) {
-        if (ownership.holds(chunkX, chunkZ) && !ChunkLevels.draining()) {
+        if (holds(chunkX, chunkZ) && !ChunkLevels.draining()) {
             task.run();
             return true;
         }
@@ -67,7 +68,7 @@ public final class ChunkOwners {
         while (true) {
             RegionInbox inbox = inboxAt(chunkX, chunkZ);
             if (inbox == null) {
-                onPool(chunkX, chunkZ, 0, task);
+                pool.submit(ChunkTask.of(ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> owning(chunkX, chunkZ, task)));
                 return false;
             }
 
@@ -82,8 +83,10 @@ public final class ChunkOwners {
         pool.submit(ChunkTask.of(urgency.of(chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
     }
 
+    /** A worker holds the chunk of the owner task it runs. */
     public boolean holds(int chunkX, int chunkZ) {
-        return ownership.holds(chunkX, chunkZ);
+        Long owned = poolOwned.get();
+        return owned != null && owned == ChunkPos.pack(chunkX, chunkZ) || ownership.holds(chunkX, chunkZ);
     }
 
     public Executor executor(int chunkX, int chunkZ) {
@@ -132,6 +135,16 @@ public final class ChunkOwners {
     /** A borrow that ended hands its inbox back: each task finds its owner again. */
     public void resubmit(RegionInbox inbox) {
         inbox.close(posted -> submit(posted.chunkX(), posted.chunkZ(), posted.task()));
+    }
+
+    private void owning(int chunkX, int chunkZ, Runnable task) {
+        Long previous = poolOwned.get();
+        poolOwned.set(ChunkPos.pack(chunkX, chunkZ));
+        try {
+            task.run();
+        } finally {
+            poolOwned.set(previous);
+        }
     }
 
     private @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {

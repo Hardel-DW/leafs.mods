@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.holder;
 
+import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
@@ -17,8 +18,11 @@ import java.util.concurrent.Executor;
 
 /** Vanilla's generation on the pool: the task advances layer by layer, each step reserves the radius it writes, everything at the chunk's urgency. */
 public final class GenerationSteps {
+    private static final long[] NO_RESERVATION = {};
+
     private final ChunkPool pool;
     private final ChunkOwners owners;
+    private final QueuedSteps queued = new QueuedSteps();
 
     public GenerationSteps(ChunkPool pool, ChunkOwners owners) {
         this.pool = pool;
@@ -28,27 +32,33 @@ public final class GenerationSteps {
     /** The task schedules a layer, waits for it off any thread, and comes back here. */
     public void run(ChunkGenerationTask task) {
         ChunkPos pos = task.getCenter().getPos();
-        owners.onPool(pos.x(), pos.z(), -1, () -> {
+        long center = pos.pack();
+        ChunkTask driver = ChunkTask.of(owners.urgency(pos.x(), pos.z()), NO_RESERVATION, () -> {
+            queued.driverStarted(center);
             CompletableFuture<?> waiting = task.runUntilWait();
             if (waiting != null) {
                 waiting.thenRun(() -> run(task));
             }
         });
+        queued.driverQueued(center, driver);
+        pool.submit(driver);
     }
 
     /** One step of one chunk, as urgent as the chunk that asked for it, its future completing when the step's own future does. */
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk) {
         ChunkPos pos = chunk.getPos();
+        long key = pos.pack();
         int urgency = Math.min(owners.urgency(pos.x(), pos.z()), owners.urgency(cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2));
         CompletableFuture<ChunkAccess> result = new CompletableFuture<>();
-        pool.submit(new ChunkTask(urgency, owners.area(pos.x(), pos.z(), step.blockStateWriteRadius())) {
+        ChunkTask task = new ChunkTask(urgency, owners.area(pos.x(), pos.z(), step.blockStateWriteRadius())) {
             @Override
             protected @Nullable CompletableFuture<?> run() {
+                queued.stepStarted(key);
                 CompletableFuture<ChunkAccess> applied;
                 try {
                     applied = step.apply(context, cache, chunk);
                 } catch (Throwable failure) {
-                    result.completeExceptionally(failure);
+                    fail(failure);
                     return null;
                 }
 
@@ -56,13 +66,29 @@ public final class GenerationSteps {
                     if (failure == null) {
                         result.complete(generated);
                     } else {
-                        result.completeExceptionally(failure);
+                        fail(failure);
                     }
                 });
                 return applied;
             }
-        });
+
+            /** Vanilla keeps a failed step for the server thread's next loop, which may be the one waiting: logged here. */
+            private void fail(Throwable failure) {
+                Leafs.LOGGER.error("Step {} of chunk {} failed", step.targetStatus(), pos, failure);
+                result.completeExceptionally(failure);
+            }
+        };
+        queued.stepQueued(key, task);
+        pool.submit(task);
         return result;
+    }
+
+    public void expedite(int chunkX, int chunkZ) {
+        queued.expedite(pool, chunkX, chunkZ);
+    }
+
+    public String describeQueued(int chunkX, int chunkZ) {
+        return queued.describeAround(chunkX, chunkZ);
     }
 
     /** The read of a chunk file, once the disk thread hands it over. */

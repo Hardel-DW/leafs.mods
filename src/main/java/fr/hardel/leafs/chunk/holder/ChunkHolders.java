@@ -1,11 +1,13 @@
 package fr.hardel.leafs.chunk.holder;
 
+import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.metrics.ServerMetrics;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
@@ -23,6 +25,7 @@ import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
+/** Leafs' bookkeeping of vanilla's holders, fed by the loading graph: birth on a loaded level, level changes, unload on the owner. */
 public final class ChunkHolders implements LevelListener {
     private final ChunkMap chunkMap;
     private final ChunkLevels loading;
@@ -30,17 +33,20 @@ public final class ChunkHolders implements LevelListener {
     private final PendingUnloads unloading;
     private final ChunkOwners owners;
     private final TicketStorage tickets;
+    private final GenerationSteps steps;
+    private final ConcurrentLongSet demands = new ConcurrentLongSet();
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
     private final ThreadLocal<List<ChunkHolder>> batch = ThreadLocal.withInitial(ArrayList::new);
 
-    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, ServerMetrics metrics) {
+    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
         this.chunkMap = chunkMap;
         this.loading = loading;
         this.table = table;
         this.unloading = unloading;
         this.owners = owners;
         this.tickets = tickets;
+        this.steps = steps;
         this.loads = metrics.chunkLoads();
         this.unloads = metrics.chunkUnloads();
     }
@@ -50,6 +56,7 @@ public final class ChunkHolders implements LevelListener {
     }
 
     @Override
+    /** Vanilla's updateChunkScheduling: a loaded level revives the holder waiting for its teardown or makes a new one, an unloaded level sends it to the teardown. */
     public void changed(long chunkKey, int oldLevel, int newLevel) {
         ChunkHolder holder = table.get(chunkKey);
         if (holder == null) {
@@ -76,6 +83,7 @@ public final class ChunkHolders implements LevelListener {
     }
 
     @Override
+    /** Vanilla's two passes over the changed holders, then the unloads leave for their owner. */
     public void published() {
         List<ChunkHolder> changed = batch.get();
         for (ChunkHolder holder : changed) {
@@ -95,16 +103,41 @@ public final class ChunkHolders implements LevelListener {
         changed.clear();
     }
 
+    /** The chunk heads the pool until it lands; the request follows once its own ticket has settled. */
     public CompletableFuture<ChunkResult<ChunkAccess>> require(int chunkX, int chunkZ, ChunkStatus status) {
         long key = ChunkPos.pack(chunkX, chunkZ);
+        demands.add(key);
         tickets.addTicket(key, new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status)));
-        return settled(chunkX, chunkZ, () -> table.get(key).scheduleChunkGenerationTask(status, chunkMap));
+        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> table.get(key).scheduleChunkGenerationTask(status, chunkMap));
+        steps.expedite(chunkX, chunkZ);
+        delivery.whenComplete((_, _) -> demands.remove(key));
+        return delivery;
     }
 
+    /** Within vanilla's radius of a chunk a thread waits for. */
+    public boolean demanded(int chunkX, int chunkZ) {
+        for (LongIterator demand = demands.iterator(); demand.hasNext(); ) {
+            long key = demand.nextLong();
+            int distance = Math.max(Math.abs(ChunkPos.getX(key) - chunkX), Math.abs(ChunkPos.getZ(key) - chunkZ));
+            if (distance <= ChunkLevel.RADIUS_AROUND_FULL_CHUNK) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** What vanilla expects of runAllUpdates before it reads the holder. */
+    public void settle(int chunkX, int chunkZ) {
+        loading.settled(chunkX, chunkZ, this, () -> null);
+    }
+
+    /** Holder work outside a drain, under the graph's locks, once the chunk's own sources landed. */
     public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
         return loading.settled(chunkX, chunkZ, this, body);
     }
 
+    /** Generation or a promotion in flight: vanilla's ticket countdown pauses on it. */
     public boolean busy(long chunkKey) {
         ChunkHolder holder = table.get(chunkKey);
         return holder != null && !holder.isReadyForSaving();

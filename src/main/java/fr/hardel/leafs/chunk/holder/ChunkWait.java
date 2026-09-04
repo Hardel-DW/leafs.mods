@@ -9,14 +9,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
 /** A required chunk that is not there: the thread asks for it and runs what it owns until it lands. The server thread borrows first. */
 public final class ChunkWait {
     private static final long PARK_NANOS = 50_000L;
+    private static final ConcurrentHashMap<Thread, WaitReport> WAITING = new ConcurrentHashMap<>();
 
     private ChunkWait() {
     }
@@ -49,11 +52,23 @@ public final class ChunkWait {
         }
     }
 
+    /** For a stall report: what the thread waits for, null when it waits for nothing. */
+    public static @Nullable String describe(Thread thread) {
+        WaitReport report = WAITING.get(thread);
+        return report == null ? null : report.toString();
+    }
+
     private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
-        until(level, delivery::isDone);
+        WAITING.put(Thread.currentThread(), new WaitReport(level, chunkX, chunkZ, status, delivery));
+        try {
+            until(level, delivery::isDone);
+        } finally {
+            WAITING.remove(Thread.currentThread());
+        }
+
         ChunkResult<ChunkAccess> result = delivery.join();
-        return result.orElseThrow(() -> new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] was not delivered at " + status + ": " + result.getError()
-            + ", tickets " + level.getChunkSource().ticketStorage.getTicketDebugString(ChunkPos.pack(chunkX, chunkZ), false)));
+        return result.orElseThrow(() -> new IllegalStateException("Chunk [%d, %d] was not delivered at %s: %s, tickets %s".formatted(
+            chunkX, chunkZ, status, result.getError(), level.getChunkSource().ticketStorage.getTicketDebugString(ChunkPos.pack(chunkX, chunkZ), false))));
     }
 }
