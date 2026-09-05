@@ -3,6 +3,8 @@ package fr.hardel.leafs.chunk.holder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import net.minecraft.server.level.ChunkHolder;
 
+import java.util.List;
+
 /** Vanilla's pendingUnloads: the holders between their last level and their teardown, claimed under one monitor from any thread. */
 public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
     @Override
@@ -44,5 +46,9 @@ public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHold
     @Override
     public synchronized int size() {
         return super.size();
+    }
+
+    public synchronized List<ChunkHolder> snapshot() {
+        return List.copyOf(values());
     }
 }

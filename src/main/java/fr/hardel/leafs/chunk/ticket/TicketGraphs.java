@@ -4,24 +4,27 @@ import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/** The two graphs the tickets feed. Only the writer of a simulation ticket drains the simulation graph, in its own tick; the pool drains the loading graph. */
+/** The three graphs. The writer drains the players graph, whose tickets feed the two others, and its own simulation writes; the pool drains the loading graph. */
 public final class TicketGraphs {
     private static final int LEVELS = ChunkLevel.MAX_LEVEL + 2;
 
     private final ChunkLevels loading = new ChunkLevels(LEVELS);
     private final ChunkLevels simulation = new ChunkLevels(LEVELS);
+    private final ChunkLevels players = new ChunkLevels(ChunkMap.MAX_VIEW_DISTANCE + 2);
     private final ThreadLocal<Boolean> batching = ThreadLocal.withInitial(() -> false);
     private final ThreadLocal<Boolean> wroteSimulation = ThreadLocal.withInitial(() -> false);
     private final AtomicBoolean handed = new AtomicBoolean();
     private volatile ChunkPool pool;
     private volatile LevelListener loadingListener;
     private volatile LevelListener simulationListener;
+    private volatile LevelListener playersListener;
 
     public ChunkLevels loading() {
         return loading;
@@ -31,9 +34,15 @@ public final class TicketGraphs {
         return simulation;
     }
 
-    public void listen(LevelListener loading, LevelListener simulation, ChunkPool pool) {
+    /** Where the players stand, one level per chunk of distance to the nearest. */
+    public ChunkLevels players() {
+        return players;
+    }
+
+    public void listen(LevelListener loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
         this.loadingListener = loading;
         this.simulationListener = simulation;
+        this.playersListener = players;
         this.pool = pool;
     }
 
@@ -48,7 +57,7 @@ public final class TicketGraphs {
         };
     }
 
-    /** Several ticket writes, one drain at the end, once every monitor is released. */
+    /** Several writes, one drain at the end, once every monitor is released. */
     public void batch(Runnable writes) {
         batch(() -> {
             writes.run();
@@ -73,10 +82,17 @@ public final class TicketGraphs {
         return result;
     }
 
-    /** Off the pool, one loading pass is handed over at a time. */
+    /** The players drain writes tickets, so it runs as one more batch; off the pool, one loading pass is handed over at a time. */
     public boolean drain() {
         if (loadingListener == null || batching.get()) {
             return false;
+        }
+
+        batching.set(true);
+        try {
+            players.drain(playersListener);
+        } finally {
+            batching.set(false);
         }
 
         boolean changed = drainOwnSimulation();
@@ -92,15 +108,6 @@ public final class TicketGraphs {
         }
 
         return changed;
-    }
-
-    public void onPool(Runnable work) {
-        if (ChunkPool.isWorker()) {
-            batch(work);
-            return;
-        }
-
-        pool.execute(() -> batch(work));
     }
 
     /** A bystander leaves a region's pending move alone. */

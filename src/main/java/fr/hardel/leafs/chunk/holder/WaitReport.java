@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -33,12 +34,30 @@ record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status,
             "tickets " + level.getChunkSource().ticketStorage.getTicketDebugString(key, false));
     }
 
-    private static String holder(ChunkHolder holder) {
+    static String holder(ChunkHolder holder) {
         ChunkGenerationTask task = holder.task.get();
         return String.join(", ",
-            "holder level %d, latest %s, started %s".formatted(holder.getTicketLevel(), holder.getLatestStatus(), holder.startedWork.get()),
+            "holder %s level %d, latest %s, started %s, generation refs %d".formatted(holder.getPos(), holder.getTicketLevel(), holder.getLatestStatus(), holder.startedWork.get(), holder.generationRefCount.get()),
             "pending " + pending(holder),
-            task == null ? "no task" : "task to %s at %s, cancelled %b".formatted(task.targetStatus, task.scheduledStatus, task.markedForCancellation));
+            task == null ? "no task" : task(task));
+    }
+
+    /** A task, its layer, and the first holder of that layer whose future still holds it up. */
+    static String task(ChunkGenerationTask task) {
+        String head = "task to %s at %s, cancelled %b".formatted(task.targetStatus, task.scheduledStatus, task.markedForCancellation);
+        ChunkStatus layer = task.scheduledStatus;
+        if (layer == null) {
+            return head;
+        }
+
+        List<String> stuck = new ArrayList<>();
+        task.cache.forEach(member -> {
+            CompletableFuture<?> future = member.futures.get(layer.getIndex());
+            if (future != null && !future.isDone()) {
+                stuck.add(member.getPos() + " latest " + member.getLatestStatus() + " started " + member.startedWork.get());
+            }
+        });
+        return head + ", layer pending on " + stuck.size() + (stuck.isEmpty() ? "" : ", first " + stuck.getFirst());
     }
 
     private static String pending(ChunkHolder holder) {

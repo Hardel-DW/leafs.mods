@@ -28,14 +28,18 @@ public final class GenerationSteps {
         this.owners = owners;
     }
 
+    /** A new task starts at the urgency of its centre. */
     public void run(ChunkGenerationTask task) {
         ChunkPos pos = task.getCenter().getPos();
-        pool.submit(ChunkTask.of(owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> {
-            CompletableFuture<?> waiting = task.runUntilWait();
-            if (waiting != null) {
-                waiting.thenRun(() -> run(task));
-            }
-        }));
+        pool.submit(ChunkTask.of(owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> drive(task)));
+    }
+
+    /** A layer done, the task schedules the next one or releases its claims on 289 holders: a continuation, so it heads the pool like every continuation. */
+    private void drive(ChunkGenerationTask task) {
+        CompletableFuture<?> waiting = task.runUntilWait();
+        if (waiting != null) {
+            waiting.thenRun(() -> pool.execute(() -> drive(task)));
+        }
     }
 
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk) {

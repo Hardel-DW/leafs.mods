@@ -121,10 +121,6 @@ public final class ChunkOwners {
         return task -> submit(chunkX, chunkZ, task);
     }
 
-    public int urgency(int chunkX, int chunkZ) {
-        return urgency.of(chunkX, chunkZ);
-    }
-
     /** The keys of the square around a chunk; a negative radius reserves nothing. */
     public long[] area(int chunkX, int chunkZ, int radius) {
         if (radius < 0) {

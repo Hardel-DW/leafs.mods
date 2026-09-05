@@ -48,12 +48,12 @@ public final class LevelChunks {
         this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial);
         this.steps = new GenerationSteps(pool, owners);
         this.full = new FullStep(owners, ticking.metrics().chunksFull());
-        this.view = new PlayerView(tickets, graphs, owners.follow());
+        this.view = new PlayerView(tickets, graphs);
         this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
-        graphs.listen(holders, regions, pool);
+        graphs.listen(holders, regions, view.tickets().and(owners.follow()), pool);
         timeouts.pauseWhile(holders::busy);
     }
 
