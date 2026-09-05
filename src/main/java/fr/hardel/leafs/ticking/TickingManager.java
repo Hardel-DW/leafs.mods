@@ -31,7 +31,7 @@ public final class TickingManager {
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
-    private final int chunkWaitWarnMillis;
+    private final int slowTaskWarnMillis;
     private volatile boolean halted;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
@@ -39,7 +39,7 @@ public final class TickingManager {
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), ModAttribution.fromLoader());
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
-        this.chunkWaitWarnMillis = config.debug().chunkWaitWarnMillis();
+        this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
         this.chunkPool = new ChunkPool(config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
         watchdog.start();
         scheduler.start();
@@ -81,9 +81,9 @@ public final class TickingManager {
         return globalScheduler;
     }
 
-    /** Above this, a thread that waited for a chunk is logged with what asked for it. */
-    public int chunkWaitWarnMillis() {
-        return chunkWaitWarnMillis;
+    /** Above this, a chunk wait or an inbox task is logged with what it was. */
+    public int slowTaskWarnMillis() {
+        return slowTaskWarnMillis;
     }
 
     /** True once {@code stopServer} began: the shutdown drains remaining work in line. */

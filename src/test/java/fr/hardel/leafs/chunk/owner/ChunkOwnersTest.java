@@ -15,13 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChunkOwnersTest {
     private final ChunkPool pool = new ChunkPool(1, 4);
-    private final RegionInbox inbox = new RegionInbox();
+    private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final List<String> ran = new CopyOnWriteArrayList<>();
     private boolean holding;
     private boolean covered = true;
 
     private ChunkOwners owners() {
-        return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run);
+        return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, Long.MAX_VALUE);
     }
 
     @AfterEach

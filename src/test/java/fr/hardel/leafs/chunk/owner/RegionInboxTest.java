@@ -8,7 +8,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RegionInboxTest {
-    private final RegionInbox inbox = new RegionInbox();
+    private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final List<String> ran = new ArrayList<>();
 
     @Test
