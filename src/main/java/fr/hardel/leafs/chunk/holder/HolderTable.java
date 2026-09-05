@@ -6,16 +6,11 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSortedSet;
-import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.NonNull;
 
-import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -156,100 +151,23 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
         return holders.values();
     }
 
+    /** The ordered views are snapshots: vanilla only walks them, from its debug dump. */
     @Override
     public @NonNull LongSortedSet keySet() {
-        throw new UnsupportedOperationException("The holder table has no key order; iterate long2ObjectEntrySet or values instead");
+        return snapshot().keySet();
     }
 
     @Override
     public Long2ObjectSortedMap.FastSortedEntrySet<ChunkHolder> long2ObjectEntrySet() {
-        return new EntrySetView();
+        return snapshot().long2ObjectEntrySet();
     }
 
-    private final class EntrySetView extends AbstractObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> implements Long2ObjectSortedMap.FastSortedEntrySet<ChunkHolder> {
-        @Override
-        public @NonNull ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> iterator() {
-            ObjectIterator<Long2ObjectMap.Entry<ChunkHolder>> backing = holders.long2ObjectEntrySet().iterator();
-            return new ObjectBidirectionalIterator<>() {
-                @Override
-                public boolean hasNext() {
-                    return backing.hasNext();
-                }
-
-                @Override
-                public Long2ObjectMap.Entry<ChunkHolder> next() {
-                    return backing.next();
-                }
-
-                @Override
-                public boolean hasPrevious() {
-                    return false;
-                }
-
-                @Override
-                public Long2ObjectMap.Entry<ChunkHolder> previous() {
-                    throw new UnsupportedOperationException("The holder table iterates forward only");
-                }
-            };
+    private Long2ObjectLinkedOpenHashMap<ChunkHolder> snapshot() {
+        Long2ObjectLinkedOpenHashMap<ChunkHolder> copy = new Long2ObjectLinkedOpenHashMap<>(holders.size());
+        for (Long2ObjectMap.Entry<ChunkHolder> entry : holders.long2ObjectEntrySet()) {
+            copy.put(entry.getLongKey(), entry.getValue());
         }
 
-        @Override
-        public ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> fastIterator() {
-            return iterator();
-        }
-
-        @Override
-        public ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> fastIterator(Long2ObjectMap.Entry<ChunkHolder> from) {
-            throw unordered();
-        }
-
-        @Override
-        public ObjectBidirectionalIterator<Long2ObjectMap.Entry<ChunkHolder>> iterator(Long2ObjectMap.Entry<ChunkHolder> fromElement) {
-            throw unordered();
-        }
-
-        @Override
-        public int size() {
-            return holders.size();
-        }
-
-        @Override
-        public boolean contains(Object object) {
-            return holders.long2ObjectEntrySet().contains(object);
-        }
-
-        @Override
-        public Comparator<? super Long2ObjectMap.Entry<ChunkHolder>> comparator() {
-            return null;
-        }
-
-        @Override
-        public @NonNull ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> subSet(Long2ObjectMap.Entry<ChunkHolder> fromElement, Long2ObjectMap.Entry<ChunkHolder> toElement) {
-            throw unordered();
-        }
-
-        @Override
-        public @NonNull ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> headSet(Long2ObjectMap.Entry<ChunkHolder> toElement) {
-            throw unordered();
-        }
-
-        @Override
-        public @NonNull ObjectSortedSet<Long2ObjectMap.Entry<ChunkHolder>> tailSet(Long2ObjectMap.Entry<ChunkHolder> fromElement) {
-            throw unordered();
-        }
-
-        @Override
-        public Long2ObjectMap.Entry<ChunkHolder> first() {
-            throw unordered();
-        }
-
-        @Override
-        public Long2ObjectMap.Entry<ChunkHolder> last() {
-            throw unordered();
-        }
-
-        private static UnsupportedOperationException unordered() {
-            return new UnsupportedOperationException("The holder table has no entry order");
-        }
+        return copy;
     }
 }

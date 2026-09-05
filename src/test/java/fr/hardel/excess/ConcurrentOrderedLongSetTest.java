@@ -1,6 +1,5 @@
-package fr.hardel.leafs.entity;
+package fr.hardel.excess;
 
-import fr.hardel.excess.ConcurrentOrderedLongSet;
 import it.unimi.dsi.fastutil.longs.LongBidirectionalIterator;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;

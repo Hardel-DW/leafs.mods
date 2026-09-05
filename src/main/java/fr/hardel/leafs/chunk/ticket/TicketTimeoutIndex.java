@@ -33,10 +33,6 @@ public final class TicketTimeoutIndex {
         this.busy = busy;
     }
 
-    public boolean isEmpty() {
-        return sections.isEmpty();
-    }
-
     /** Under the storage monitor, for every timeout ticket the table actually stored. */
     public void track(long chunkPos, Ticket ticket) {
         sections.compute(sectionOf(chunkPos), (_, queue) -> {

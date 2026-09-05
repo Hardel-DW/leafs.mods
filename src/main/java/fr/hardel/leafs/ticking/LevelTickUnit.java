@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
@@ -10,8 +9,6 @@ import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 /** The server-thread remainder of the level tick. Activation schedules the regions before any of them ticks. */
 public final class LevelTickUnit extends TickHandle {
     private static final int CENSUS_INTERVAL_TICKS = 100;
@@ -19,18 +16,15 @@ public final class LevelTickUnit extends TickHandle {
     private final ServerLevel level;
     private final LevelRegions regions;
     private final RegionTickScheduler scheduler;
-    private final int slowTaskWarnMillis;
-    private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
     private boolean activated;
     private volatile int lastChunkCount;
 
-    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, int slowTaskWarnMillis) {
+    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
-        this.slowTaskWarnMillis = slowTaskWarnMillis;
     }
 
     public LevelRegions regions() {
@@ -51,10 +45,6 @@ public final class LevelTickUnit extends TickHandle {
         pendingWork = work;
     }
 
-    void submit(Runnable task) {
-        tasks.add(task);
-    }
-
     @Override
     public long currentTick() {
         return level.getGameTime();
@@ -70,8 +60,6 @@ public final class LevelTickUnit extends TickHandle {
         pendingWork = null;
         StageTimings stages = stages();
         stages.beginTick(System.nanoTime());
-        runQueuedTasks();
-        stages.mark(TickStages.serialTasks);
         work.run();
         regions.rethrowFeedFailure();
 
@@ -90,19 +78,6 @@ public final class LevelTickUnit extends TickHandle {
             RegionNetworkTick.drainPaused(level);
         } finally {
             RegionContext.exit();
-        }
-    }
-
-    /** Everything queued runs; a slow one logs its class. */
-    private void runQueuedTasks() {
-        Runnable task;
-        while ((task = tasks.poll()) != null) {
-            long start = System.nanoTime();
-            task.run();
-            long millis = (System.nanoTime() - start) / 1_000_000L;
-            if (slowTaskWarnMillis > 0 && millis > slowTaskWarnMillis) {
-                Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
-            }
         }
     }
 
