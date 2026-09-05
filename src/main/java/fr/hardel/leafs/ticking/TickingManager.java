@@ -28,18 +28,18 @@ public final class TickingManager {
     private final RegionTickScheduler scheduler;
     private final ChunkPool chunkPool;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
-    private final int slowTaskWarnMillis;
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
+    private final int chunkWaitWarnMillis;
     private volatile boolean halted;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
-        this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
         this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), ModAttribution.fromLoader());
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
+        this.chunkWaitWarnMillis = config.debug().chunkWaitWarnMillis();
         this.chunkPool = new ChunkPool(config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
         watchdog.start();
         scheduler.start();
@@ -81,9 +81,9 @@ public final class TickingManager {
         return globalScheduler;
     }
 
-    /** Above this, a serial task or a chunk wait is logged with what it did. */
-    public int slowTaskWarnMillis() {
-        return slowTaskWarnMillis;
+    /** Above this, a thread that waited for a chunk is logged with what asked for it. */
+    public int chunkWaitWarnMillis() {
+        return chunkWaitWarnMillis;
     }
 
     /** True once {@code stopServer} began: the shutdown drains remaining work in line. */
@@ -130,11 +130,6 @@ public final class TickingManager {
         }
 
         LevelRegions.of(level).retire();
-    }
-
-    /** Runs on the owner's next tick, before its level tick. */
-    public void submitToLevel(ServerLevel level, Runnable task) {
-        unitFor(level).submit(task);
     }
 
     public void tickPausedNetwork() {
@@ -215,6 +210,6 @@ public final class TickingManager {
     }
 
     private LevelTickUnit unitFor(ServerLevel level) {
-        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler, slowTaskWarnMillis));
+        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler));
     }
 }

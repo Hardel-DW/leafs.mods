@@ -21,6 +21,7 @@ import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.TriState;
 import net.minecraft.util.Util;
 import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
@@ -167,7 +168,7 @@ public final class RegionTickBody {
         int spawnable = 0;
         for (LevelChunk chunk : chunks.ticking()) {
             long chunkKey = chunk.getPos().pack();
-            if (view.covered(chunkKey)) {
+            if (view.nearby(chunkKey) != TriState.FALSE) {
                 spawnable++;
                 if (chunkMap.anyPlayerCloseEnoughForSpawningInternal(chunk.getPos())) {
                     spawningChunks.add(chunk);

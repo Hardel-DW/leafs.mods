@@ -29,10 +29,7 @@ accessible field net/minecraft/world/level/entity/EntitySectionStorage sections 
 accessible method net/minecraft/world/level/entity/EntitySectionStorage getChunkSections (II)Lit/unimi/dsi/fastutil/longs/LongSortedSet;
 accessible class net/minecraft/world/level/entity/PersistentEntitySectionManager$ChunkLoadStatus
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
-accessible method net/minecraft/server/level/ChunkHolder setQueueLevel (I)V
 accessible method net/minecraft/world/level/chunk/status/ChunkStatusTasks postLoadProtoChunk (Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/storage/ValueInput$ValueInputList;)V
-accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
-accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
 accessible method net/minecraft/server/level/GenerationChunkHolder isStatusDisallowed (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
 accessible method net/minecraft/server/level/GenerationChunkHolder acquireStatusBump (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
@@ -45,7 +42,6 @@ accessible field net/minecraft/server/level/ChunkMap pendingUnloads Lit/unimi/ds
 accessible field net/minecraft/server/level/ChunkMap serverViewDistance I
 accessible field net/minecraft/server/level/DistanceManager simulationDistance I
 accessible method net/minecraft/server/players/PlayerList save (Lnet/minecraft/server/level/ServerPlayer;)V
-accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLoad (J)Ljava/util/Optional;
 accessible field net/minecraft/world/entity/ai/village/poi/PoiManager loadedChunks Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/world/level/chunk/LevelChunk blockTicks Lnet/minecraft/world/ticks/LevelChunkTicks;

@@ -85,7 +85,7 @@ public final class ChunkWait {
             long waited = System.nanoTime() - started;
             TickingManager ticking = TickingManager.of(level.getServer());
             ticking.metrics().chunkWaited(waited);
-            if (waited >= ticking.slowTaskWarnMillis() * 1_000_000L) {
+            if (waited >= ticking.chunkWaitWarnMillis() * 1_000_000L) {
                 Leafs.LOGGER.warn("Waited {} ms for a chunk, asked by {}, found {}", waited / 1_000_000L, asker(), found);
             }
 

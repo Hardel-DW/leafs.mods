@@ -53,11 +53,6 @@ public final class PlayerView {
         return Math.min(players.level(ChunkPos.pack(chunkX, chunkZ)), tickets.viewDistance());
     }
 
-    /** Within 8 chunks of a player, the census condition of the spawn pass. */
-    public boolean covered(long chunkKey) {
-        return players.level(chunkKey) <= SPAWN_RADIUS;
-    }
-
     /** Vanilla's TriState: TRUE inside the inscribed square, FALSE past 8, DEFAULT asks the exact euclidean test. */
     public TriState nearby(long chunkKey) {
         int distance = players.level(chunkKey);

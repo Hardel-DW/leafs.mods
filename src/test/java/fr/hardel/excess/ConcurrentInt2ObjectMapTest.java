@@ -1,6 +1,5 @@
-package fr.hardel.leafs.entity;
+package fr.hardel.excess;
 
-import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

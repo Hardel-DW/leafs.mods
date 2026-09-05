@@ -29,14 +29,12 @@ public final class TickStages {
     public static final TickStage globalPlayers = create(TickFamily.GLOBAL, "players");
     public static final TickStage globalAutosave = create(TickFamily.GLOBAL, "autosave");
 
-    public static final TickStage serialTasks = create(TickFamily.SERIAL, "tasks");
     public static final TickStage serialBorder = create(TickFamily.SERIAL, "border");
     public static final TickStage serialWeather = create(TickFamily.SERIAL, "weather");
     public static final TickStage serialTime = create(TickFamily.SERIAL, "time");
     public static final TickStage serialRaids = create(TickFamily.SERIAL, "raids");
     public static final TickStage serialPurge = create(TickFamily.SERIAL, "purge");
     public static final TickStage serialView = create(TickFamily.SERIAL, "view");
-    public static final TickStage serialTracking = create(TickFamily.SERIAL, "tracking");
     public static final TickStage serialUnloads = create(TickFamily.SERIAL, "unloads");
     public static final TickStage serialDragon = create(TickFamily.SERIAL, "dragon");
     public static final TickStage serialManagement = create(TickFamily.SERIAL, "management");
