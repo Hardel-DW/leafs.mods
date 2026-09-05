@@ -81,6 +81,11 @@ public final class TickingManager {
         return globalScheduler;
     }
 
+    /** Above this, a serial task or a chunk wait is logged with what it did. */
+    public int slowTaskWarnMillis() {
+        return slowTaskWarnMillis;
+    }
+
     /** True once {@code stopServer} began: the shutdown drains remaining work in line. */
     public boolean halted() {
         return halted;
