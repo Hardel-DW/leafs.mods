@@ -58,18 +58,38 @@ public final class RegionBorrow {
         return CURRENT.get();
     }
 
-    /** The region of the position, waiting for its tick in flight, or the chunk itself when no region covers it. A merge pending with a region this thread holds waits for that one: everything is returned, the regionizer folds, the survivor is taken again. */
+    /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
-        Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
-        if (region == null) {
-            borrowChunk(regions, chunkX, chunkZ);
-            return;
-        }
-
-        while (region != null && !held.contains(region)) {
-            if (region.tryMarkTicking()) {
-                held.add(region);
+        while (true) {
+            Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
+            if (region == null) {
+                borrowChunk(regions, chunkX, chunkZ);
                 return;
+            }
+
+            if (take(region)) {
+                return;
+            }
+        }
+    }
+
+    /** Every region of the level, looping until a full pass adds nothing: the feed may create one while the pass runs, a fold may replace some. */
+    public void borrowAll(LevelRegions regions) {
+        int before;
+        do {
+            before = held.size();
+            for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+                take(region);
+            }
+        } while (held.size() != before);
+    }
+
+    /** Waits for a tick in flight. A region idle yet untakeable is owed a merge with one this thread holds: everything is returned so the regionizer folds, and the survivor is taken again. False once the region is dead. */
+    private boolean take(Region<RegionTickData> region) {
+        while (region.state() != RegionState.DEAD) {
+            if (held.contains(region) || region.tryMarkTicking()) {
+                held.add(region);
+                return true;
             }
 
             if (region.state() != RegionState.TICKING && !held.isEmpty()) {
@@ -77,22 +97,9 @@ public final class RegionBorrow {
             } else {
                 LockSupport.parkNanos(WAIT_NANOS);
             }
-
-            region = regions.regionizer().regionAt(chunkX, chunkZ);
         }
-    }
 
-    /** Every region of the level, looping until a full pass adds nothing: the feed may create one while the pass runs. */
-    public void borrowAll(LevelRegions regions) {
-        int before;
-        do {
-            before = held.size();
-            for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-                if (region.state() != RegionState.DEAD) {
-                    borrowRegion(region);
-                }
-            }
-        } while (held.size() != before);
+        return false;
     }
 
     /** Whether this thread holds the region of the position, or the chunk itself when no region covers it. */
@@ -116,17 +123,6 @@ public final class RegionBorrow {
         Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.computeIfAbsent(regions, _ -> new Long2ObjectOpenHashMap<>());
         if (!chunks.containsKey(key)) {
             chunks.put(key, LevelChunks.of(regions.level()).owners().borrow(chunkX, chunkZ));
-        }
-    }
-
-    private void borrowRegion(Region<RegionTickData> region) {
-        while (!held.contains(region) && region.state() != RegionState.DEAD) {
-            if (region.tryMarkTicking()) {
-                held.add(region);
-                return;
-            }
-
-            LockSupport.parkNanos(WAIT_NANOS);
         }
     }
 

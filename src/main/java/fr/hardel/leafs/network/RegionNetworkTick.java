@@ -1,11 +1,9 @@
 package fr.hardel.leafs.network;
 
-import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
-import fr.hardel.leafs.ticking.TickingBinding;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -19,8 +17,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelData;
-
 
 /** Player network split: the owning region drains his packets and runs his pass, both as his packet-handling thread; the global loop keeps transport. */
 public final class RegionNetworkTick {
@@ -90,16 +88,15 @@ public final class RegionNetworkTick {
         ServerLevel level = server.getLevel(spot.dimension());
         ServerLevel target = level == null ? server.overworld() : level;
         ChunkPos chunk = ChunkPos.containing(spot.pos());
-        DeferredTransports transports = TickingBinding.of(target);
-        if (transports.owns(chunk.x(), chunk.z()) && PacketRouting.queueOf(listener).handledByCurrentThread()) {
+        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
+        if (LevelChunks.of(target).owners().holds(chunk.x(), chunk.z()) && queue.handledByCurrentThread()) {
             return false;
         }
 
-        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
         queue.handOver();
-        DeferredWork.owner(DeferReason.RESPAWN, transports.stats(), chunk.x(), chunk.z(), () -> queue.handleAs(() -> listener.handleClientCommand(packet)))
+        DeferredWork.owner(target, DeferReason.RESPAWN, chunk.x(), chunk.z(), () -> queue.handleAs(() -> listener.handleClientCommand(packet)))
             .validIf(listener.connection::isConnected)
-            .submit(transports);
+            .submit();
 
         return true;
     }

@@ -1,6 +1,8 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.scheduler.FakeTransports;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.RegionInbox;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -9,6 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
 import net.minecraft.world.level.redstone.Orientation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -18,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoutingNeighborUpdaterTest {
+    private final ChunkPool pool = new ChunkPool(1, 4);
+    private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
+    private boolean holding;
 
     private static final class RecordingUpdater extends CollectingNeighborUpdater {
         final List<String> calls = new ArrayList<>();
@@ -47,11 +53,14 @@ class RoutingNeighborUpdaterTest {
         }
     }
 
-    /** Owns everything, so an update runs where it is asked. */
-    private static FakeTransports owning() {
-        FakeTransports transports = new FakeTransports();
-        transports.owner = true;
-        return transports;
+    @AfterEach
+    void stop() {
+        pool.shutdown();
+    }
+
+    /** Every chunk is covered by one region; the test says whether the calling thread holds it. */
+    private ChunkOwners owners() {
+        return new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, Long.MAX_VALUE);
     }
 
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
@@ -69,12 +78,13 @@ class RoutingNeighborUpdaterTest {
     /** 2026-08-29: two chunk workers promoting chunks shared the level's collector and corrupted its stack; an owner without a region collects in its own thread's. */
     @Test
     void anOwnerWithoutARegionCollectsInItsOwnThread() throws InterruptedException {
+        holding = true;
         List<RecordingUpdater> created = new ArrayList<>();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> {
             RecordingUpdater updater = new RecordingUpdater();
             created.add(updater);
             return updater;
-        }, owning());
+        }, this::owners);
 
         callAll(router);
         Thread other = new Thread(() -> callAll(router));
@@ -88,9 +98,10 @@ class RoutingNeighborUpdaterTest {
 
     @Test
     void activeContextRoutesEveryEntryPointToItsCollector() {
+        holding = true;
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, owning());
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, this::owners);
         WorldTickContext.enter(null, null, dataWith(regional));
         try {
             callAll(router);
@@ -106,15 +117,14 @@ class RoutingNeighborUpdaterTest {
     @Test
     void aForeignChunkUpdateIsMailedToItsOwner() {
         RecordingUpdater fallback = new RecordingUpdater();
-        FakeTransports transports = new FakeTransports();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, transports);
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, this::owners);
 
         callAll(router);
         assertTrue(fallback.calls.isEmpty(), "nothing runs on the thread that does not own the chunk");
-        assertEquals(4, transports.ownerQueue.size());
+        assertEquals(4, inbox.size());
 
-        transports.owner = true;
-        transports.drainOwner();
+        holding = true;
+        assertEquals(4, inbox.drain());
         assertEquals(List.of("shape", "simple", "full", "multi"), fallback.calls);
     }
 }
