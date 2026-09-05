@@ -59,11 +59,15 @@ public final class ChunkWait {
 
     private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
-        WAITING.put(Thread.currentThread(), new WaitReport(level, chunkX, chunkZ, status, delivery));
+        WaitReport outer = WAITING.put(Thread.currentThread(), new WaitReport(level, chunkX, chunkZ, status, delivery));
         try {
             until(level, delivery::isDone);
         } finally {
-            WAITING.remove(Thread.currentThread());
+            if (outer == null) {
+                WAITING.remove(Thread.currentThread());
+            } else {
+                WAITING.put(Thread.currentThread(), outer);
+            }
         }
 
         ChunkResult<ChunkAccess> result = delivery.join();

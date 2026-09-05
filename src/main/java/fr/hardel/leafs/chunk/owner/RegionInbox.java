@@ -21,19 +21,29 @@ public final class RegionInbox {
         return true;
     }
 
-    /** Everything posted before the call, so a task that re-posts to its own region waits for the next pass. */
+    /** As many tasks as were posted before the call, taken one at a time: a task that waits for a chunk drains the rest itself, and a re-post waits for the next pass. */
     public int drain() {
-        Posted[] batch;
+        int planned;
         synchronized (this) {
-            batch = tasks.toArray(Posted[]::new);
-            tasks.clear();
+            planned = tasks.size();
         }
 
-        for (Posted posted : batch) {
-            posted.task().run();
+        int ran = 0;
+        while (ran < planned) {
+            Posted next;
+            synchronized (this) {
+                next = tasks.pollFirst();
+            }
+
+            if (next == null) {
+                break;
+            }
+
+            next.task().run();
+            ran++;
         }
 
-        return batch.length;
+        return ran;
     }
 
     /** The end of the region: every posted task leaves through the consumer, nothing lands here again. */
