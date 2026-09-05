@@ -3,8 +3,8 @@ package fr.hardel.leafs.mixin.chunk;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.chunk.PoiLockAccess;
-import fr.hardel.leafs.chunk.PoiVillageLock;
+import fr.hardel.leafs.chunk.SectionStorageAccess;
+import fr.hardel.leafs.chunk.SectionStorageLock;
 import fr.hardel.excess.ConcurrentLongSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.SectionPos;
@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-// Concurrent loadedChunks facade plus village lock: the distance tracker graph cannot be made concurrent by facades.
+/** Concurrent loadedChunks facade; the village distance graph and the section consistency pass take the storage's lock, no facade can carry a graph. */
 @Mixin(PoiManager.class)
 public abstract class PoiManagerMixin {
 
@@ -35,33 +35,33 @@ public abstract class PoiManagerMixin {
     }
 
     @WrapMethod(method = "tick")
-    private void leafs$tickUnderVillageLock(BooleanSupplier haveTime, Operation<Void> original) {
+    private void leafs$tickUnderTheLock(BooleanSupplier haveTime, Operation<Void> original) {
         leafs$lock().runLocked(() -> original.call(haveTime));
     }
 
     @WrapMethod(method = "setDirty")
-    private void leafs$dirtyUnderVillageLock(long sectionPos, Operation<Void> original) {
+    private void leafs$dirtyUnderTheLock(long sectionPos, Operation<Void> original) {
         leafs$lock().runLocked(() -> original.call(sectionPos));
     }
 
     @WrapMethod(method = "onSectionLoad")
-    private void leafs$sectionLoadUnderVillageLock(long sectionPos, Operation<Void> original) {
+    private void leafs$sectionLoadUnderTheLock(long sectionPos, Operation<Void> original) {
         leafs$lock().runLocked(() -> original.call(sectionPos));
     }
 
     /** Chunk deserialization runs on the chunk workers and rewrites a section's records, so it takes the same lock as the save that packs them. */
     @WrapMethod(method = "checkConsistencyWithBlocks")
-    private void leafs$consistencyUnderVillageLock(SectionPos sectionPos, LevelChunkSection blockSection, Operation<Void> original) {
+    private void leafs$consistencyUnderTheLock(SectionPos sectionPos, LevelChunkSection blockSection, Operation<Void> original) {
         leafs$lock().runLocked(() -> original.call(sectionPos, blockSection));
     }
 
     @WrapMethod(method = "sectionsToVillage")
-    private int leafs$villageQueryUnderLock(SectionPos sectionPos, Operation<Integer> original) {
+    private int leafs$villageQueryUnderTheLock(SectionPos sectionPos, Operation<Integer> original) {
         return leafs$lock().callLocked(() -> original.call(sectionPos));
     }
 
     @Unique
-    private PoiVillageLock leafs$lock() {
-        return ((PoiLockAccess) this).leafs$villageLock();
+    private SectionStorageLock leafs$lock() {
+        return ((SectionStorageAccess) this).leafs$lock();
     }
 }

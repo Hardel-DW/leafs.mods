@@ -2,9 +2,8 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.chunk.PoiLockAccess;
-import fr.hardel.leafs.chunk.PoiVillageLock;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
+import fr.hardel.leafs.chunk.SectionStorageLock;
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
@@ -22,9 +21,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Optional;
 
-/** Concurrent storage facade. Carries the village lock shared with the POI subclass; held over the dirty-set save. */
+/** Concurrent storage facade, and the storage's lock: its writes, its saves and the graphs of its subclass take it. */
 @Mixin(SectionStorage.class)
-public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, SectionStorageAccess {
+public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess {
 
     @Mutable
     @Shadow
@@ -32,14 +31,14 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
     private Long2ObjectMap<Optional<R>> storage;
 
     @Unique
-    private final PoiVillageLock leafs$villageLock = new PoiVillageLock();
+    private final SectionStorageLock leafs$lock = new SectionStorageLock();
 
     @Unique
     private ServerLevel leafs$level;
 
     @Override
-    public PoiVillageLock leafs$villageLock() {
-        return leafs$villageLock;
+    public SectionStorageLock leafs$lock() {
+        return leafs$lock;
     }
 
     @Override
@@ -70,13 +69,13 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
     }
 
     @WrapMethod(method = "flushAll")
-    private void leafs$flushUnderVillageLock(Operation<Void> original) {
-        leafs$villageLock.runLocked(original::call);
+    private void leafs$flushUnderTheLock(Operation<Void> original) {
+        leafs$lock.runLocked(original::call);
     }
 
-    /** A chunk save touches what the POI writes touch: same lock. */
+    /** A chunk save packs the sections the writes touch: same lock. */
     @WrapMethod(method = "flush")
-    private void leafs$chunkFlushUnderVillageLock(ChunkPos chunkPos, Operation<Void> original) {
-        leafs$villageLock.runLocked(() -> original.call(chunkPos));
+    private void leafs$chunkFlushUnderTheLock(ChunkPos chunkPos, Operation<Void> original) {
+        leafs$lock.runLocked(() -> original.call(chunkPos));
     }
 }

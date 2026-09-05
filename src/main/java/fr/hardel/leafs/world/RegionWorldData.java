@@ -28,6 +28,7 @@ public final class RegionWorldData {
     private volatile MobCensus census = MobCensus.EMPTY;
     private long subTick;
     private long lastInhabitedUpdate;
+    private long savedEpoch;
 
     public RegionWorldData(LongSupplier time, RandomSource random, CollectingNeighborUpdater neighborUpdater, PathTypeCache pathTypeCache, long inhabitedFrom) {
         this.time = time;
@@ -92,6 +93,20 @@ public final class RegionWorldData {
 
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay) {
         return new ScheduledTick<>(type, pos, currentTick() + delay, subTick++);
+    }
+
+    /** The autosave epoch every chunk of the region has reached; the walk that found them all done set it. */
+    public long savedEpoch() {
+        return savedEpoch;
+    }
+
+    public void markEpochSaved(long epoch) {
+        savedEpoch = epoch;
+    }
+
+    /** Chunks joined the region: the next pass walks them. */
+    public void forgetEpoch() {
+        savedEpoch = Long.MIN_VALUE;
     }
 
     public long advanceInhabitedTime(long gameTime) {

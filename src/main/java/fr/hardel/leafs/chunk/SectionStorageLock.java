@@ -2,8 +2,8 @@ package fr.hardel.leafs.chunk;
 
 import java.util.function.IntSupplier;
 
-/** One monitor per POI storage for the village distance graph, the dirty set and the save walk, which no concurrent facade can carry. */
-public final class PoiVillageLock {
+/** One monitor per section storage for what no concurrent facade can carry: its dirty set, its save walk, and the graphs a subclass keeps over its sections. */
+public final class SectionStorageLock {
 
     public synchronized void runLocked(Runnable action) {
         action.run();
