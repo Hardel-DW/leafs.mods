@@ -31,6 +31,7 @@ public abstract class ChunkTask {
     private final @Nullable Place place;
     private volatile int priority;
     private volatile int bucket = UNQUEUED;
+    private volatile boolean withdrawn;
 
     /** Housekeeping with a fixed priority, invisible to the re-prioritisation. */
     protected ChunkTask(int priority, long... reserved) {
@@ -92,6 +93,15 @@ public abstract class ChunkTask {
 
     /** Null when the work is done on return. */
     protected abstract @Nullable CompletableFuture<?> run();
+
+    /** Left the queue before running: the pool drops it when it reaches it. */
+    protected final void withdraw() {
+        withdrawn = true;
+    }
+
+    final boolean withdrawn() {
+        return withdrawn;
+    }
 
     final void wants(int priority) {
         this.priority = priority;

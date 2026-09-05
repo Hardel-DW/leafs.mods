@@ -42,7 +42,6 @@ public final class TickStages {
     public static final TickStage serialManagement = create(TickFamily.SERIAL, "management");
 
     public static final TickStage regionUnloads = create(TickFamily.REGION, "unloads");
-    public static final TickStage regionTasks = create(TickFamily.REGION, "tasks");
     public static final TickStage regionTickets = create(TickFamily.REGION, "tickets");
     public static final TickStage regionPackets = create(TickFamily.REGION, "packets");
     public static final TickStage regionBlockTicks = create(TickFamily.REGION, "block_ticks");
@@ -56,6 +55,7 @@ public final class TickStages {
     public static final TickStage regionBlockEntities = create(TickFamily.REGION, "block_entities");
     public static final TickStage regionPlayers = create(TickFamily.REGION, "players");
     public static final TickStage regionAutosave = create(TickFamily.REGION, "autosave");
+    public static final TickStage regionTasks = create(TickFamily.REGION, "tasks");
 
     static {
         byFamily.replaceAll((_, stages) -> List.copyOf(stages));

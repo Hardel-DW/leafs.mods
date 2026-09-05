@@ -54,16 +54,14 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions) {
+    /** The save takes a tenth of the period at most, the inbox what is left of it and a tenth at least: a heavy tick still publishes, a light one publishes everything. */
+    public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tickDeadlineNanos) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         if (runs) {
             clock.advance();
         }
 
-        RegionInbox inbox = region.data().inbox();
-        inbox.drain();
-        stages.mark(TickStages.regionTasks);
         LevelChunks chunks = LevelChunks.of(level);
         chunks.timeouts().purgeSections(region.sectionKeySnapshot());
         RegionChunks owned = worldData.chunks();
@@ -109,9 +107,11 @@ public final class RegionTickBody {
             }
         });
         stages.mark(TickStages.regionPlayers);
-        autosave.tick(owned, entities, regions.autosaveEpoch(), regions.autosaveForced());
+        long slice = regions.tickPeriodNanos() / 10;
+        autosave.tick(owned, entities, regions.autosaveEpoch(), regions.autosaveForced(), System.nanoTime() + slice);
         stages.mark(TickStages.regionAutosave);
-        inbox.drain();
+        RegionInbox inbox = region.data().inbox();
+        inbox.drain(Math.max(tickDeadlineNanos, System.nanoTime() + slice));
         stages.mark(TickStages.regionTasks);
     }
 

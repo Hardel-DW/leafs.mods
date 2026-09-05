@@ -138,6 +138,12 @@ public final class ChunkPool implements Executor {
                 return;
             }
 
+            if (task.withdrawn()) {
+                placed.remove(task);
+                queued.decrementAndGet();
+                continue;
+            }
+
             if (!reservations.acquire(task)) {
                 continue;
             }

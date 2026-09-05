@@ -102,6 +102,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return body;
     }
 
+    /** The budget of one region tick, from the tick rate in force. */
+    public long tickPeriodNanos() {
+        return scheduler.periodNanos();
+    }
+
     /** Regions tick between activation and the halt; outside that window the server thread owns every chunk. */
     public boolean live() {
         RegionTickBody body = this.body;

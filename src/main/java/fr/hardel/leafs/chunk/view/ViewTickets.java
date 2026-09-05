@@ -22,6 +22,10 @@ public final class ViewTickets implements LevelListener {
         this.viewDistance = viewDistance;
     }
 
+    public int viewDistance() {
+        return viewDistance;
+    }
+
     /** Every chunk that crosses the new limit gains or loses its ticket. */
     public void viewDistance(int distance) {
         int previous = viewDistance;
