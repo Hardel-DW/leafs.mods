@@ -6,4 +6,22 @@ public interface LevelListener {
 
     default void published() {
     }
+
+    /** Both hear every change, this one first. */
+    default LevelListener and(LevelListener other) {
+        LevelListener first = this;
+        return new LevelListener() {
+            @Override
+            public void changed(long chunkKey, int oldLevel, int newLevel) {
+                first.changed(chunkKey, oldLevel, newLevel);
+                other.changed(chunkKey, oldLevel, newLevel);
+            }
+
+            @Override
+            public void published() {
+                first.published();
+                other.published();
+            }
+        };
+    }
 }

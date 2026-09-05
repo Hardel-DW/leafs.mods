@@ -3,6 +3,7 @@ package fr.hardel.leafs.world;
 import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
+import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.metrics.StageTimings;
@@ -53,13 +54,16 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long deadlineNanos) {
+    public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
         if (runs) {
             clock.advance();
         }
 
+        RegionInbox inbox = region.data().inbox();
+        inbox.drain();
+        stages.mark(TickStages.regionTasks);
         LevelChunks chunks = LevelChunks.of(level);
         chunks.timeouts().purgeSections(region.sectionKeySnapshot());
         RegionChunks owned = worldData.chunks();
@@ -107,7 +111,7 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionPlayers);
         autosave.tick(owned, entities, regions.autosaveEpoch(), regions.autosaveForced());
         stages.mark(TickStages.regionAutosave);
-        region.data().inbox().drain(deadlineNanos);
+        inbox.drain();
         stages.mark(TickStages.regionTasks);
     }
 
@@ -200,7 +204,7 @@ public final class RegionTickBody {
 
             entity.checkDespawn();
             long chunk = entity.chunkPosition().pack();
-            if (entity instanceof ServerPlayer ? chunkSource.isPositionTicking(chunk) : distanceManager.inEntityTickingRange(chunk)) {
+            if (entity instanceof ServerPlayer || distanceManager.inEntityTickingRange(chunk)) {
                 Entity vehicle = entity.getVehicle();
                 if (vehicle != null) {
                     if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {

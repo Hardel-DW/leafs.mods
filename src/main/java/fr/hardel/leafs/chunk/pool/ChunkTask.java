@@ -19,12 +19,29 @@ public abstract class ChunkTask {
         }
     }
 
+    /** Where a task works, in reservation keys: the chunk it writes and the centre it serves. The more urgent of the two is its priority, so a dependency inherits the urgency of its user. */
+    public record Place(long chunkKey, long centerKey, Urgency urgency) {
+        public int priority() {
+            int chunk = urgency.of(chunkX(chunkKey), chunkZ(chunkKey));
+            return chunkKey == centerKey ? chunk : Math.min(chunk, urgency.of(chunkX(centerKey), chunkZ(centerKey)));
+        }
+    }
+
     private final long[] reserved;
+    private final @Nullable Place place;
     private volatile int priority;
     private volatile int bucket = UNQUEUED;
 
+    /** Housekeeping with a fixed priority, invisible to the re-prioritisation. */
     protected ChunkTask(int priority, long... reserved) {
+        this.place = null;
         this.priority = priority;
+        this.reserved = reserved;
+    }
+
+    protected ChunkTask(Place place, long... reserved) {
+        this.place = place;
+        this.priority = place.priority();
         this.reserved = reserved;
     }
 
@@ -38,13 +55,35 @@ public abstract class ChunkTask {
         };
     }
 
+    public static ChunkTask of(Place place, long[] reserved, Runnable body) {
+        return new ChunkTask(place, reserved) {
+            @Override
+            protected @Nullable CompletableFuture<?> run() {
+                body.run();
+                return null;
+            }
+        };
+    }
+
     /** Chunk coordinates fit in 22 bits each, the owner in the 20 above, so two levels never share a key. */
     public static long key(int owner, int chunkX, int chunkZ) {
         return ((long) owner << 44) | ((chunkX & 0x3FFFFFL) << 22) | (chunkZ & 0x3FFFFFL);
     }
 
+    public static int chunkX(long key) {
+        return (int) (key << 20 >> 42);
+    }
+
+    public static int chunkZ(long key) {
+        return (int) (key << 42 >> 42);
+    }
+
     public final long[] reserved() {
         return reserved;
+    }
+
+    public final @Nullable Place place() {
+        return place;
     }
 
     public final int priority() {

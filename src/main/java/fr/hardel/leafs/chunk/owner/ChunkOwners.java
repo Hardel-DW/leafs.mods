@@ -2,8 +2,11 @@ package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
+import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
+import fr.hardel.leafs.chunk.pool.Urgency;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;
 
@@ -24,12 +27,6 @@ public final class ChunkOwners {
     @FunctionalInterface
     public interface Ownership {
         boolean holds(int chunkX, int chunkZ);
-    }
-
-    /** The urgency of a chunk, its distance to the nearest player. */
-    @FunctionalInterface
-    public interface Urgency {
-        int of(int chunkX, int chunkZ);
     }
 
     private final ChunkPool pool;
@@ -78,9 +75,40 @@ public final class ChunkOwners {
         }
     }
 
-    /** Pool work under the reservation of the area around a chunk, at the chunk's urgency. */
+    /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
     public void onPool(int chunkX, int chunkZ, int radius, Runnable task) {
-        pool.submit(ChunkTask.of(urgency.of(chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
+        pool.submit(ChunkTask.of(place(chunkX, chunkZ, chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
+    }
+
+    public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ) {
+        return new ChunkTask.Place(ChunkTask.key(level, chunkX, chunkZ), ChunkTask.key(level, centerX, centerZ), urgency);
+    }
+
+    /** Fed by the players graph: a chunk whose distance to the players changed re-prioritises what the pool queued on it. */
+    public LevelListener follow() {
+        return (chunkKey, _, _) -> pool.changed(ChunkTask.key(level, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
+    }
+
+    /** Everything queued within vanilla's radius of a required chunk heads the pool, disk reads and light included. */
+    public void expedite(int chunkX, int chunkZ) {
+        int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
+        for (int dz = -radius; dz <= radius; dz++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                pool.expedite(ChunkTask.key(level, chunkX + dx, chunkZ + dz));
+            }
+        }
+    }
+
+    public String describeQueued(int chunkX, int chunkZ) {
+        int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
+        int around = 0;
+        for (int dz = -radius; dz <= radius; dz++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                around += pool.queuedAt(ChunkTask.key(level, chunkX + dx, chunkZ + dz));
+            }
+        }
+
+        return around + " tasks queued within " + radius + ", " + pool.queuedAt(ChunkTask.key(level, chunkX, chunkZ)) + " on the chunk itself";
     }
 
     /** A worker holds the chunk of the owner task it runs. */
