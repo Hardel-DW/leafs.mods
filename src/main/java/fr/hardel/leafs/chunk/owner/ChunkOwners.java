@@ -157,7 +157,7 @@ public final class ChunkOwners {
     }
 
     /** A borrow that ended hands its inbox back: each task finds its owner again. */
-    public void resubmit(RegionInbox inbox) {
+    void resubmit(RegionInbox inbox) {
         inbox.close(posted -> submit(posted.chunkX(), posted.chunkZ(), posted.task()));
     }
 

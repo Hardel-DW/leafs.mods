@@ -69,11 +69,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return regionizer;
     }
 
-    /** Null until the level activates; region contexts only exist after activation. */
-    public String dimensionName() {
-        return dimension;
-    }
-
     /** Once, on the server thread, before the level's first tick. Regions equip, then the handles schedule. */
     public void activate(String dimension, RegionTickScheduler scheduler, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
         if (this.scheduler != null) {
