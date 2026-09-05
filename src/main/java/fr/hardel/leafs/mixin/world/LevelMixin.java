@@ -2,12 +2,11 @@ package fr.hardel.leafs.mixin.world;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
-import fr.hardel.leafs.ticking.TickingBinding;
 import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
@@ -48,7 +47,7 @@ public abstract class LevelMixin {
     private void leafs$routeUnitState(CallbackInfo callbackInfo) {
         if ((Object) this instanceof ServerLevel level) {
             this.random = new RoutingRandomSource(level, this.random);
-            this.neighborUpdater = new RoutingNeighborUpdater(level, () -> new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), TickingBinding.of(level));
+            this.neighborUpdater = new RoutingNeighborUpdater(level, () -> new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), () -> LevelChunks.of(level).owners());
         }
     }
 
@@ -59,15 +58,14 @@ public abstract class LevelMixin {
             return original.call(pos, state, flags, updateLimit);
         }
 
-        DeferredTransports transports = TickingBinding.of(level);
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        if (transports.owns(chunkX, chunkZ)) {
+        if (LevelChunks.of(level).owners().holds(chunkX, chunkZ)) {
             return original.call(pos, state, flags, updateLimit);
         }
 
         BlockPos target = pos.immutable();
-        DeferredWork.owner(DeferReason.BLOCK_WRITE, transports.stats(), chunkX, chunkZ, () -> original.call(target, state, flags, updateLimit)).submit(transports);
+        DeferredWork.owner(level, DeferReason.BLOCK_WRITE, chunkX, chunkZ, () -> original.call(target, state, flags, updateLimit)).submit();
         return true;
     }
 
@@ -79,7 +77,7 @@ public abstract class LevelMixin {
         }
 
         LevelChunk chunk = level.getChunkAt(pos);
-        boolean owner = TickingBinding.of(level).owns(chunk.getPos().x(), chunk.getPos().z());
+        boolean owner = LevelChunks.of(level).owners().holds(chunk.getPos().x(), chunk.getPos().z());
         callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : ((ChunkTickAccess) chunk).leafs$existingBlockEntity(pos));
     }
 

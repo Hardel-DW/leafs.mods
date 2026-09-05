@@ -1,6 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.metrics.ModAttribution;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,7 +12,7 @@ class RegionCrashReportTest {
     void reportIsScopedToTheRegion() {
         RegionCrashReport report = new RegionCrashReport(42, "minecraft:the_end", 12345, 96, 210);
 
-        String text = report.format(ModAttribution.none(), new IllegalStateException("boom"));
+        String text = report.format(new ModAttribution(_ -> Optional.empty()), new IllegalStateException("boom"));
 
         assertTrue(text.contains("Region: #42"));
         assertTrue(text.contains("Dimension: minecraft:the_end"));

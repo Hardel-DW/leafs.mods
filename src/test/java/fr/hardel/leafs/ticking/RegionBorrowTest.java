@@ -3,10 +3,13 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
-import org.junit.jupiter.api.AfterEach;
+import net.minecraft.SharedConstants;
+import net.minecraft.server.Bootstrap;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.level.ChunkPos;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
@@ -21,6 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionBorrowTest {
     private final LevelRegions regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
+
+    @BeforeAll
+    static void bootstrap() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+    }
 
     @AfterEach
     void exitBorrow() {
@@ -94,6 +103,30 @@ class RegionBorrowTest {
         assertEquals(1, borrow.size());
         borrow.releaseAll();
         assertEquals(RegionState.READY, survivor.state());
+    }
+
+    /** The same fold for the whole level: a region owed to one this thread holds cannot be taken until the held one is returned. */
+    @Test
+    void borrowAllFoldsAPendingMergeWithAHeldRegion() throws InterruptedException {
+        simulated(regions, 0, 0);
+        simulated(regions, 96, 0);
+        regions.settle();
+        CountDownLatch done = new CountDownLatch(1);
+        Thread borrower = new Thread(() -> {
+            RegionBorrow borrow = RegionBorrow.enter();
+            borrow.borrow(regions, 0, 0);
+            simulated(regions, 32, 0);
+            simulated(regions, 64, 0);
+            borrow.borrowAll(regions);
+            done.countDown();
+        });
+        borrower.start();
+
+        assertTrue(done.await(2, TimeUnit.SECONDS), "borrowAll must return everything, let the merge run and take the survivor");
+        Region<RegionTickData> survivor = regions.regionizer().regionAt(96, 0);
+        assertSame(survivor, regions.regionizer().regionAt(0, 0), "the merge ran");
+        assertEquals(RegionState.TICKING, survivor.state());
+        borrower.join();
     }
 
     @Test
