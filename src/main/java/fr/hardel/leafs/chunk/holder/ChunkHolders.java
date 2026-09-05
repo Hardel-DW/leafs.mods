@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.holder;
 
 import fr.hardel.excess.ConcurrentLongSet;
+import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /** Leafs' bookkeeping of vanilla's holders, fed by the loading graph: birth on a loaded level, level changes, unload on the owner. */
 public final class ChunkHolders implements LevelListener {
@@ -134,6 +136,26 @@ public final class ChunkHolders implements LevelListener {
 
     public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
         return loading.settled(chunkX, chunkZ, this, body);
+    }
+
+    /** Once the pool is done: the holders that left the table and never reached their teardown, by the status they stopped at, and the tasks still alive that hold them. */
+    public void logWaitingTeardowns(String dimension) {
+        List<ChunkHolder> waiting = unloading.snapshot();
+        if (waiting.isEmpty()) {
+            return;
+        }
+
+        List<ChunkHolder> tasked = new ArrayList<>();
+        table.forEach((_, holder) -> {
+            if (holder.task.get() != null) {
+                tasked.add(holder);
+            }
+        });
+        String byStatus = waiting.stream().collect(Collectors.groupingBy(holder -> String.valueOf(holder.getLatestStatus()), Collectors.counting())).toString();
+        String samples = waiting.stream().limit(3).map(WaitReport::holder).collect(Collectors.joining("; "));
+        String tasks = tasked.stream().limit(5).map(WaitReport::holder).collect(Collectors.joining("; "));
+        Leafs.LOGGER.warn("{} holders of {} still wait for their teardown, by latest status {}: {}", waiting.size(), dimension, byStatus, samples);
+        Leafs.LOGGER.warn("{} holders of {} still carry a generation task: {}", tasked.size(), dimension, tasks);
     }
 
     /** Generation or a promotion in flight: vanilla's ticket countdown pauses on it. */

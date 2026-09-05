@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
@@ -164,6 +165,10 @@ public final class TickingManager {
     /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. The pools are gone, so diversion ends here. */
     public void shutdown() {
         chunkPool.shutdown();
+        for (ServerLevel level : server.getAllLevels()) {
+            LevelChunks.of(level).holders().logWaitingTeardowns(level.dimension().identifier().toString());
+        }
+
         globalTicking = false;
         globalScheduler.drain();
         watchdog.stop();

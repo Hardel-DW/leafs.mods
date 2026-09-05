@@ -141,6 +141,12 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         ((DistanceManagerAccess) self.getDistanceManager()).leafs$bind(leafs$chunks);
     }
 
+    /** A move is one ticket change: the old and the new position land together, so no graph ever sees a player-less instant. */
+    @WrapMethod(method = "move")
+    private void leafs$moveAsOneChange(ServerPlayer player, Operation<Void> original) {
+        leafs$chunks.graphs().batch(() -> original.call(player));
+    }
+
     /** The visibility pass of a move runs on the regions, against every player that moved; the rest of the move stays. */
     @WrapOperation(method = "move", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;values()Lit/unimi/dsi/fastutil/objects/ObjectCollection;"))
     private ObjectCollection<ChunkMap.TrackedEntity> leafs$noLevelWidePassOnMove(Int2ObjectMap<ChunkMap.TrackedEntity> instance, Operation<ObjectCollection<ChunkMap.TrackedEntity>> original) {
