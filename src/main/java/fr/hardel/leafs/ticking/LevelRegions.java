@@ -56,9 +56,16 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     private volatile long retiredTicks;
     private volatile int deferredHandshakes;
     private volatile Throwable feedFailure;
+    private final long slowTaskNanos;
 
     public LevelRegions(LeafsConfig config) {
         this.regionizer = new Regionizer<>(config.sectionShift(), config.regionMergeDistance(), config.regionBufferDistance(), this);
+        this.slowTaskNanos = config.debug().slowTaskWarnMillis() * 1_000_000L;
+    }
+
+    /** Above this, an inbox task is logged with its class and chunk. */
+    public long slowTaskNanos() {
+        return slowTaskNanos;
     }
 
     public static LevelRegions of(ServerLevel level) {
@@ -264,7 +271,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     @Override
     public RegionTickData createData(Region<RegionTickData> region) {
-        RegionTickData data = new RegionTickData();
+        RegionTickData data = new RegionTickData(slowTaskNanos);
         if (worldDataFactory != null) {
             equipWorld(data);
         }
