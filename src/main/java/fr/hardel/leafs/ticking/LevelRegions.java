@@ -395,6 +395,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         RegionTickBody body = this.body;
         if (body != null) {
             rebaseTicks(body.level(), movedChunks, into.data().clock().currentTick() - from.data().clock().currentTick());
+            into.data().worldData().forgetEpoch();
         }
 
         RegionInbox survivor = into.data().inbox();
