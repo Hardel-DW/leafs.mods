@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.view;
 
 import fr.hardel.leafs.chunk.level.ChunkLevels;
+import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
@@ -18,11 +19,14 @@ public final class PlayerView {
     private final TicketGraphs graphs;
     private final PlayerSources sources;
     private final ViewTickets tickets;
+    private final LevelListener followers;
 
-    public PlayerView(TicketStorage storage, TicketGraphs graphs) {
+    /** The priorities of the pool follow the same drain as the view tickets. */
+    public PlayerView(TicketStorage storage, TicketGraphs graphs, LevelListener priorities) {
         this.graphs = graphs;
         this.sources = new PlayerSources(storage, players, DEFAULT_SIMULATION_DISTANCE);
         this.tickets = new ViewTickets(storage, players, 0);
+        this.followers = tickets.and(priorities);
     }
 
     public void enter(long chunkKey) {
@@ -76,6 +80,6 @@ public final class PlayerView {
     }
 
     private void drain() {
-        graphs.onPool(() -> players.drain(tickets));
+        graphs.onPool(() -> players.drain(followers));
     }
 }

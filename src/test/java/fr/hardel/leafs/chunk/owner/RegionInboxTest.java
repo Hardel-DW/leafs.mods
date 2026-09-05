@@ -12,29 +12,27 @@ class RegionInboxTest {
     private final List<String> ran = new ArrayList<>();
 
     @Test
-    void aPassedDeadlineStillRunsOneTaskAndKeepsTheOrder() {
+    void everythingPostedBeforeThePassRunsInOrder() {
         inbox.post(0, 0, () -> ran.add("first"));
         inbox.post(0, 0, () -> ran.add("second"));
         inbox.post(0, 0, () -> ran.add("third"));
 
-        assertEquals(1, inbox.drain(System.nanoTime() - 1));
-        assertEquals(List.of("first"), ran);
-        assertEquals(2, inbox.size());
-
-        assertEquals(2, inbox.drain());
+        assertEquals(3, inbox.drain());
         assertEquals(List.of("first", "second", "third"), ran);
+        assertEquals(0, inbox.size());
     }
 
     @Test
-    void aTaskPostedDuringTheDrainWaitsBehindWhatWasKept() {
+    void aTaskPostedDuringThePassWaitsForTheNextOne() {
         inbox.post(0, 0, () -> {
             ran.add("first");
             inbox.post(0, 0, () -> ran.add("late"));
         });
         inbox.post(0, 0, () -> ran.add("second"));
 
-        assertEquals(1, inbox.drain(System.nanoTime() - 1));
         assertEquals(2, inbox.drain());
+        assertEquals(List.of("first", "second"), ran);
+        assertEquals(1, inbox.drain());
         assertEquals(List.of("first", "second", "late"), ran);
     }
 }

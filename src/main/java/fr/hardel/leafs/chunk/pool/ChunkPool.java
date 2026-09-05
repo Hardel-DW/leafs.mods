@@ -18,6 +18,7 @@ public final class ChunkPool implements Executor {
     private static final long[] NO_RESERVATION = {};
 
     private final PriorityBuckets buckets;
+    private final PlacedTasks placed = new PlacedTasks();
     private final Reservations reservations = new Reservations(this::enqueue);
     private final Semaphore permits = new Semaphore(0);
     private final List<Thread> workers;
@@ -67,11 +68,26 @@ public final class ChunkPool implements Executor {
 
     public void submit(ChunkTask task) {
         queued.incrementAndGet();
+        placed.add(task);
         enqueue(task);
     }
 
-    /** A running task is unaffected. */
-    public void reprioritise(ChunkTask task, int priority) {
+    /** A chunk whose distance to the players changed: what waits on it takes its new priority. */
+    public void changed(long key) {
+        placed.forEachAt(key, task -> reprioritise(task, task.place().priority()));
+    }
+
+    /** What a thread waits for heads the pool. */
+    public void expedite(long key) {
+        placed.forEachAt(key, task -> reprioritise(task, FIRST));
+    }
+
+    public int queuedAt(long key) {
+        return placed.countAt(key);
+    }
+
+    /** A running task is unaffected; a task parked behind a reservation takes the priority when it is requeued. */
+    private void reprioritise(ChunkTask task, int priority) {
         task.wants(priority);
         if (buckets.move(task, priority)) {
             permits.release();
@@ -126,6 +142,7 @@ public final class ChunkPool implements Executor {
                 continue;
             }
 
+            placed.remove(task);
             queued.decrementAndGet();
             active.incrementAndGet();
             runReserved(task);

@@ -1,36 +1,24 @@
 package fr.hardel.leafs.mixin.chunk;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.metrics.MinuteCounter;
-import fr.hardel.leafs.ticking.TickingManager;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.server.level.GenerationChunkHolder;
+import net.minecraft.util.StaticCache2D;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatusTasks;
+import net.minecraft.world.level.chunk.status.ChunkStep;
 import net.minecraft.world.level.chunk.status.WorldGenContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.Supplier;
 
-/** The FULL step publishes the chunk into the live world, so it runs on the position's owner. */
+/** The FULL step publishes into the live world: the pool builds the chunk and only the publication reaches the owner. */
 @Mixin(ChunkStatusTasks.class)
 public abstract class ChunkStatusTasksMixin {
-    @WrapOperation(method = "full", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
-    private static CompletableFuture<Object> leafs$fullOnTheOwner(Supplier<Object> body, Executor pump, Operation<CompletableFuture<Object>> original, @Local(argsOnly = true) WorldGenContext context, @Local(argsOnly = true) ChunkAccess chunk) {
-        ServerLevel level = context.level();
-        ChunkPos pos = chunk.getPos();
-        MinuteCounter completed = TickingManager.of(level.getServer()).metrics().chunksFull();
-        Supplier<Object> counted = () -> {
-            Object full = body.get();
-            completed.increment();
-            return full;
-        };
-        return original.call(counted, LevelChunks.of(level).owners().executor(pos.x(), pos.z()));
+    @Inject(method = "full", at = @At("HEAD"), cancellable = true)
+    private static void leafs$buildOnThePoolPublishOnTheOwner(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk, CallbackInfoReturnable<CompletableFuture<ChunkAccess>> callbackInfo) {
+        callbackInfo.setReturnValue(LevelChunks.of(context.level()).full().apply(context, chunks, chunk));
     }
 }

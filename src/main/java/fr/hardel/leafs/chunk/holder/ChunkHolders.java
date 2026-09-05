@@ -33,20 +33,18 @@ public final class ChunkHolders implements LevelListener {
     private final PendingUnloads unloading;
     private final ChunkOwners owners;
     private final TicketStorage tickets;
-    private final GenerationSteps steps;
     private final ConcurrentLongSet demands = new ConcurrentLongSet();
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
     private final ThreadLocal<List<ChunkHolder>> batch = ThreadLocal.withInitial(ArrayList::new);
 
-    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
+    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, ServerMetrics metrics) {
         this.chunkMap = chunkMap;
         this.loading = loading;
         this.table = table;
         this.unloading = unloading;
         this.owners = owners;
         this.tickets = tickets;
-        this.steps = steps;
         this.loads = metrics.chunkLoads();
         this.unloads = metrics.chunkUnloads();
     }
@@ -103,14 +101,18 @@ public final class ChunkHolders implements LevelListener {
         changed.clear();
     }
 
-    /** The chunk heads the pool until it lands; the request follows once its own ticket has settled. */
+    /** The chunk heads the pool until it lands; the request follows once its own ticket has settled, and its ticket leaves with the delivery. */
     public CompletableFuture<ChunkResult<ChunkAccess>> require(int chunkX, int chunkZ, ChunkStatus status) {
         long key = ChunkPos.pack(chunkX, chunkZ);
+        Ticket demand = new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status));
         demands.add(key);
-        tickets.addTicket(key, new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status)));
+        tickets.addTicket(key, demand);
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> table.get(key).scheduleChunkGenerationTask(status, chunkMap));
-        steps.expedite(chunkX, chunkZ);
-        delivery.whenComplete((_, _) -> demands.remove(key));
+        owners.expedite(chunkX, chunkZ);
+        delivery.whenComplete((_, _) -> {
+            demands.remove(key);
+            tickets.removeTicket(key, demand);
+        });
         return delivery;
     }
 

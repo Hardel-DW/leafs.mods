@@ -27,7 +27,7 @@ record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status,
             "waiting for chunk [%d, %d] at %s, delivered %b".formatted(chunkX, chunkZ, status, delivery.isDone()),
             "loading level " + chunks.graphs().loading().level(key),
             holder == null ? "no holder" : holder(holder),
-            chunks.steps().describeQueued(chunkX, chunkZ),
+            chunks.owners().describeQueued(chunkX, chunkZ),
             owner(regions),
             "pool queued %d active %d".formatted(chunks.pool().queued(), chunks.pool().active()),
             "tickets " + level.getChunkSource().ticketStorage.getTicketDebugString(key, false));

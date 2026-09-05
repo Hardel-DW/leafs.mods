@@ -7,12 +7,12 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.TicketType;
 
 public final class LeafsTicketTypes {
-    private static final long DEMAND_TIMEOUT_TICKS = 300;
+    /** Lives exactly as long as the wait that posted it, so no timeout. */
     public static TicketType demand;
 
     private LeafsTicketTypes() {}
 
     public static void register() {
-        demand = Registry.register(BuiltInRegistries.TICKET_TYPE, Identifier.fromNamespaceAndPath(Leafs.MOD_ID, "demand"), new TicketType(DEMAND_TIMEOUT_TICKS, TicketType.FLAG_LOADING));
+        demand = Registry.register(BuiltInRegistries.TICKET_TYPE, Identifier.fromNamespaceAndPath(Leafs.MOD_ID, "demand"), new TicketType(0, TicketType.FLAG_LOADING));
     }
 }
