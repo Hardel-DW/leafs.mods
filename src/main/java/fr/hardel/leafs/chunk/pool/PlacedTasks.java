@@ -1,12 +1,14 @@
 package fr.hardel.leafs.chunk.pool;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
+
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /** The placed tasks still waiting in the pool, under the chunk they write and the centre they serve. */
 final class PlacedTasks {
-    private final ConcurrentHashMap<Long, Set<ChunkTask>> byChunk = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Set<ChunkTask>> byChunk = new ConcurrentLong2ObjectMap<>();
 
     void add(ChunkTask task) {
         ChunkTask.Place place = task.place();
@@ -53,7 +55,11 @@ final class PlacedTasks {
     }
 
     private void unindex(long key, ChunkTask task) {
-        byChunk.computeIfPresent(key, (_, at) -> {
+        byChunk.compute(key, (_, at) -> {
+            if (at == null) {
+                return null;
+            }
+
             at.remove(task);
             return at.isEmpty() ? null : at;
         });

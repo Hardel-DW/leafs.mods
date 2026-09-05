@@ -35,6 +35,34 @@ class ChunkPoolTest {
         assertTrue(done.await(5, TimeUnit.SECONDS));
     }
 
+    /** 2026-09-05: the steps of chunks the players had left kept running, a quarter of the pool for nothing. */
+    @Test
+    void aWithdrawnQueuedTaskIsDroppedWhenReached() throws InterruptedException {
+        pool = new ChunkPool(1, 8);
+        CountDownLatch gate = occupyTheWorker();
+        List<String> ran = new CopyOnWriteArrayList<>();
+        CountDownLatch done = new CountDownLatch(1);
+        ChunkTask stale = new ChunkTask(1, NONE) {
+            @Override
+            protected CompletableFuture<?> run() {
+                ran.add("stale");
+                return null;
+            }
+        };
+        pool.submit(stale);
+        pool.submit(ChunkTask.of(2, NONE, () -> {
+            ran.add("live");
+            done.countDown();
+        }));
+
+        stale.withdraw();
+        gate.countDown();
+
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of("live"), ran);
+        assertEquals(0, pool.queued());
+    }
+
     @Test
     void theMostUrgentQueuedTaskRunsFirst() throws InterruptedException {
         pool = new ChunkPool(1, 8);

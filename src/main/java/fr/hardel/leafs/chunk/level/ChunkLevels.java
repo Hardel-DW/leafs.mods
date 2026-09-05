@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.level;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
@@ -10,7 +11,6 @@ import it.unimi.dsi.fastutil.shorts.Short2ByteMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.Arrays;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  */
 public final class ChunkLevels {
     private final int none;
-    private final ConcurrentHashMap<Long, Section> sections = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Section> sections = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLinkedQueue<Section> dirty = new ConcurrentLinkedQueue<>();
     private static final ThreadLocal<ChunkLevels> DRAINING = new ThreadLocal<>();
 

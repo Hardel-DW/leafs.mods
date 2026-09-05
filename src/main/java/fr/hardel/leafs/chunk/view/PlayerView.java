@@ -48,9 +48,9 @@ public final class PlayerView {
         sources.simulationDistance(distance);
     }
 
-    /** Vanilla's queue level: the distance to the nearest player, past the view when none is near. */
-    public int level(int chunkX, int chunkZ) {
-        return players.level(ChunkPos.pack(chunkX, chunkZ));
+    /** The distance to the nearest player, no farther than the view: the halo beyond it exists for the view's edge and is as urgent as it. */
+    public int urgency(int chunkX, int chunkZ) {
+        return Math.min(players.level(ChunkPos.pack(chunkX, chunkZ)), tickets.viewDistance());
     }
 
     /** Within 8 chunks of a player, the census condition of the spawn pass. */

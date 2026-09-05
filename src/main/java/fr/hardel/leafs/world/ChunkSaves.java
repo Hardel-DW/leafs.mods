@@ -14,6 +14,7 @@ import java.util.List;
 
 /** The save primitives an owner applies to its own chunks and players: vanilla's eager saves, and the epoch walk that visits everything once per autosave. */
 public final class ChunkSaves {
+    /** The lot of a pool sweep pass over the chunks no region covers. */
     public static final int CHUNKS_PER_TICK = 20;
 
     private final ServerLevel level;
@@ -22,16 +23,11 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    /** Vanilla's saveChunksEagerly over the caller's holders, twenty per tick. */
-    public void saveEagerly(List<ChunkHolder> holders) {
-        int saved = 0;
+    /** Vanilla's saveChunksEagerly over the caller's holders, until the deadline. */
+    public void saveEagerly(List<ChunkHolder> holders, long deadlineNanos) {
         for (ChunkHolder holder : holders) {
-            if (saved == CHUNKS_PER_TICK) {
+            if (saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {
                 return;
-            }
-
-            if (saveEagerly(holder)) {
-                saved++;
             }
         }
     }

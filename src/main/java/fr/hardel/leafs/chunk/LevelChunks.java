@@ -46,10 +46,10 @@ public final class LevelChunks {
         this.timeouts = new TicketTimeoutIndex(tickets, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
         this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial);
-        this.steps = new GenerationSteps(pool, owners);
+        this.steps = new GenerationSteps(chunkMap, pool, owners, ticking.metrics());
         this.full = new FullStep(owners, ticking.metrics().chunksFull());
         this.view = new PlayerView(tickets, graphs);
-        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, ticking.metrics());
+        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, steps, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
@@ -76,7 +76,7 @@ public final class LevelChunks {
 
     /** The head of the pool while a thread waits for it, the distance to the nearest player otherwise. */
     private int urgency(int chunkX, int chunkZ) {
-        return holders.demanded(chunkX, chunkZ) ? ChunkPool.FIRST : view.level(chunkX, chunkZ);
+        return holders.demanded(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
     }
 
     public ChunkPool pool() {

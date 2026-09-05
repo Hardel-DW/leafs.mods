@@ -1,12 +1,13 @@
 package fr.hardel.leafs.chunk.pool;
 
+import fr.hardel.excess.ConcurrentLong2ObjectMap;
+
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /** Chunks held by running tasks. A blocked task parks behind the holder and is requeued when it frees, nobody waits. */
 final class Reservations {
-    private final ConcurrentHashMap<Long, Waiters> held = new ConcurrentHashMap<>();
+    private final ConcurrentLong2ObjectMap<Waiters> held = new ConcurrentLong2ObjectMap<>();
     private final Consumer<ChunkTask> requeue;
 
     private static final class Waiters extends ArrayList<ChunkTask> {

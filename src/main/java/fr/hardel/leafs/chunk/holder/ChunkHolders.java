@@ -35,18 +35,20 @@ public final class ChunkHolders implements LevelListener {
     private final PendingUnloads unloading;
     private final ChunkOwners owners;
     private final TicketStorage tickets;
+    private final GenerationSteps steps;
     private final ConcurrentLongSet demands = new ConcurrentLongSet();
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
     private final ThreadLocal<List<ChunkHolder>> batch = ThreadLocal.withInitial(ArrayList::new);
 
-    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, ServerMetrics metrics) {
+    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
         this.chunkMap = chunkMap;
         this.loading = loading;
         this.table = table;
         this.unloading = unloading;
         this.owners = owners;
         this.tickets = tickets;
+        this.steps = steps;
         this.loads = metrics.chunkLoads();
         this.unloads = metrics.chunkUnloads();
     }
@@ -83,11 +85,12 @@ public final class ChunkHolders implements LevelListener {
     }
 
     @Override
-    /** Vanilla's two passes over the changed holders, then the unloads leave for their owner. */
+    /** Vanilla's two passes over the changed holders, the queued steps a lowered level disallows leave the pool between them, then the unloads leave for their owner. */
     public void published() {
         List<ChunkHolder> changed = batch.get();
         for (ChunkHolder holder : changed) {
             holder.updateHighestAllowedStatus(chunkMap);
+            steps.cancelDisallowed(holder);
         }
 
         for (ChunkHolder holder : changed) {
