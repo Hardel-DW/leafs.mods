@@ -7,7 +7,5 @@ public interface SectionStorageAccess {
 
     void leafs$bindLevel(ServerLevel level);
 
-    ServerLevel leafs$level();
-
     SectionStorageLock leafs$lock();
 }

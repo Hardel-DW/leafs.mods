@@ -192,19 +192,16 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         return original.call(future, body, leafs$chunks.steps().loading(pos));
     }
 
-    /** The photo is a pool task, compressed there, handed to the disk thread as bytes. */
     @WrapOperation(method = "save", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<CompoundTag> leafs$photographOnThePool(Supplier<CompoundTag> photo, Executor workerMain, Operation<CompletableFuture<CompoundTag>> original, @Local(argsOnly = true) ChunkAccess chunk) {
         return leafs$chunks.writes().photograph(chunk.getPos(), photo);
     }
 
-    /** The photo future is the write; the disk thread never joins it. */
     @WrapOperation(method = "save", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;write(Lnet/minecraft/world/level/ChunkPos;Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$bytesToTheDisk(ChunkMap self, ChunkPos pos, Supplier<CompoundTag> join, Operation<CompletableFuture<Void>> original, @Local CompletableFuture<CompoundTag> photographed) {
         return ((PendingWrite) photographed).written();
     }
 
-    /** The ticking promotion body, postProcessGeneration and startTickingChunk, runs on the position's owner. */
     @WrapOperation(method = "prepareTickingChunk", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<?> leafs$tickingPromotionOnTheOwner(CompletableFuture<?> future, Function<?, ?> body, Executor pump, Operation<CompletableFuture<?>> original, @Local(argsOnly = true) ChunkHolder chunk) {
         ChunkPos pos = chunk.getPos();
@@ -213,23 +210,21 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
 
     @Inject(method = "onChunkReadyToSend", at = @At("HEAD"), cancellable = true)
     private void leafs$readyToSendOnTheOwner(ChunkHolder chunkHolder, LevelChunk chunk, CallbackInfo callbackInfo) {
-        ChunkPos pos = chunk.getPos();
-        if (leafs$owners().holds(pos.x(), pos.z())) {
-            return;
-        }
-
-        leafs$owners().submit(pos.x(), pos.z(), () -> onChunkReadyToSend(chunkHolder, chunk));
-        callbackInfo.cancel();
+        leafs$onTheOwner(chunk.getPos(), () -> onChunkReadyToSend(chunkHolder, chunk), callbackInfo);
     }
 
-    /** Promotions arrive here on the owner already; demotions arrive from a drain thread. */
     @Inject(method = "onFullChunkStatusChange", at = @At("HEAD"), cancellable = true)
     private void leafs$statusChangeOnTheOwner(ChunkPos pos, FullChunkStatus status, CallbackInfo callbackInfo) {
+        leafs$onTheOwner(pos, () -> onFullChunkStatusChange(pos, status), callbackInfo);
+    }
+
+    @Unique
+    private void leafs$onTheOwner(ChunkPos pos, Runnable body, CallbackInfo callbackInfo) {
         if (leafs$owners().holds(pos.x(), pos.z())) {
             return;
         }
 
-        leafs$owners().submit(pos.x(), pos.z(), () -> onFullChunkStatusChange(pos, status));
+        leafs$owners().submit(pos.x(), pos.z(), body);
         callbackInfo.cancel();
     }
 

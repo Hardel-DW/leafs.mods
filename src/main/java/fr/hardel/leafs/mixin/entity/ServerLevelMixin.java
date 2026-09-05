@@ -8,13 +8,12 @@ import fr.hardel.leafs.entity.EntityManagerAccess;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.world.RegionWorldData;
-import fr.hardel.leafs.world.WorldTickContext;
-import fr.hardel.leafs.ticking.RegionContext;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.global.ConcurrentWaypointManager;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.TickingBinding;
+import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -75,7 +74,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.players = new CopyOnWriteArrayList<>();
         ServerLevel self = (ServerLevel) (Object) this;
         this.waypointManager = new ConcurrentWaypointManager(self);
-        this.leafs$entityTeleports = new EntityTeleports(self, TickingBinding::of);
+        this.leafs$entityTeleports = new EntityTeleports(self);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
         this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainInboxes());
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
@@ -122,14 +121,12 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
     @Unique
     private boolean leafs$fromAnotherLevel() {
-        String here = ((ServerLevel) (Object) this).dimension().identifier().toString();
-        return RegionContext.current() instanceof RegionContext.Region(long _, String dimension) && !dimension.equals(here);
+        WorldTickContext context = WorldTickContext.current();
+        return context != null && context.level() != (Object) this;
     }
 
     @Unique
     private void leafs$onOwnerOf(Entity entity, Runnable task) {
-        ServerLevel self = (ServerLevel) (Object) this;
-        TickingBinding.of(self).toOwner(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
+        LevelChunks.of((ServerLevel) (Object) this).owners().submit(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
     }
-
 }

@@ -1,25 +1,30 @@
 package fr.hardel.leafs.scheduler;
 
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
+import fr.hardel.leafs.ticking.TickingManager;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.function.BooleanSupplier;
 
 /** One piece of work for the owner of a chunk: reason, revalidation at the destination. Dropped when revalidation fails. */
-public record DeferredWork(int chunkX, int chunkZ, DeferReason reason, BooleanSupplier revalidation, Runnable task, DeferStats stats) {
+public record DeferredWork(ChunkOwners owners, DeferStats stats, int chunkX, int chunkZ, DeferReason reason, BooleanSupplier revalidation, Runnable task) {
 
-    public static DeferredWork owner(DeferReason reason, DeferStats stats, int chunkX, int chunkZ, Runnable task) {
-        return new DeferredWork(chunkX, chunkZ, reason, () -> true, task, stats);
+    public static DeferredWork owner(ServerLevel level, DeferReason reason, int chunkX, int chunkZ, Runnable task) {
+        DeferStats stats = TickingManager.of(level.getServer()).metrics().deferStats();
+        return new DeferredWork(LevelChunks.of(level).owners(), stats, chunkX, chunkZ, reason, () -> true, task);
     }
 
     /** The "entity still alive, player still connected" test, checked at the destination. */
     public DeferredWork validIf(BooleanSupplier check) {
-        return new DeferredWork(chunkX, chunkZ, reason, check, task, stats);
+        return new DeferredWork(owners, stats, chunkX, chunkZ, reason, check, task);
     }
 
     /** True means the work is mail for a region that ticks the chunk, so the injector cancels vanilla; work that ran here counts nothing. */
-    public boolean submit(DeferredTransports transports) {
-        if (transports.toOwner(chunkX, chunkZ, this::execute)) {
+    public boolean submit() {
+        if (owners.submit(chunkX, chunkZ, this::execute)) {
             return false;
         }
 

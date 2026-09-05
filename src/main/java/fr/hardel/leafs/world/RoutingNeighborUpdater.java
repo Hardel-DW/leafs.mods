@@ -1,6 +1,6 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.scheduler.DeferredTransports;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
@@ -18,25 +18,26 @@ import java.util.function.Supplier;
 /** {@code Level.neighborUpdater} swap: an update on a chunk this thread owns joins its collector, one on a chunk it does not goes to the owner's mail. A region collects in its world data, any other owner in its thread's. */
 public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
     private final ServerLevel level;
-    private final DeferredTransports transports;
+    private final Supplier<ChunkOwners> owners;
     private final ThreadLocal<CollectingNeighborUpdater> threadCollector;
 
-    public RoutingNeighborUpdater(ServerLevel level, Supplier<CollectingNeighborUpdater> collectors, DeferredTransports transports) {
+    public RoutingNeighborUpdater(ServerLevel level, Supplier<CollectingNeighborUpdater> collectors, Supplier<ChunkOwners> owners) {
         super(level, 0);
         this.level = level;
-        this.transports = transports;
+        this.owners = owners;
         this.threadCollector = ThreadLocal.withInitial(collectors);
     }
 
     private void route(BlockPos pos, Consumer<CollectingNeighborUpdater> update) {
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        if (transports.owns(chunkX, chunkZ)) {
+        ChunkOwners resolved = owners.get();
+        if (resolved.holds(chunkX, chunkZ)) {
             update.accept(collector());
             return;
         }
 
-        transports.toOwner(chunkX, chunkZ, () -> update.accept(this));
+        resolved.submit(chunkX, chunkZ, () -> update.accept(this));
     }
 
     private CollectingNeighborUpdater collector() {

@@ -46,11 +46,6 @@ public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess 
         this.leafs$level = level;
     }
 
-    @Override
-    public ServerLevel leafs$level() {
-        return leafs$level;
-    }
-
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$swapForConcurrentFacade(CallbackInfo callbackInfo) {
         this.storage = new ConcurrentLong2ObjectMap<>();
