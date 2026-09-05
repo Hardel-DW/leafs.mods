@@ -1,5 +1,7 @@
 package fr.hardel.leafs.chunk.owner;
 
+import fr.hardel.leafs.Leafs;
+
 import java.util.ArrayDeque;
 import java.util.function.Consumer;
 
@@ -9,7 +11,13 @@ public final class RegionInbox {
     }
 
     private final ArrayDeque<Posted> tasks = new ArrayDeque<>();
+    private final long slowTaskNanos;
     private boolean closed;
+
+    /** A task longer than the threshold is logged with its class and chunk, the one place where a publication can cost a tick. */
+    public RegionInbox(long slowTaskNanos) {
+        this.slowTaskNanos = slowTaskNanos;
+    }
 
     /** False once closed: the region no longer exists, the caller resolves the owner again. */
     public synchronized boolean post(int chunkX, int chunkZ, Runnable task) {
@@ -44,7 +52,14 @@ public final class RegionInbox {
                 break;
             }
 
+            long began = System.nanoTime();
             next.task().run();
+            long took = System.nanoTime() - began;
+            if (took >= slowTaskNanos) {
+                String owner = next.task().getClass().getName();
+                Leafs.LOGGER.warn("Inbox task at [{}, {}] took {} ms: {}", next.chunkX(), next.chunkZ(), took / 1_000_000L, owner.substring(owner.lastIndexOf('.') + 1));
+            }
+
             ran++;
         }
 

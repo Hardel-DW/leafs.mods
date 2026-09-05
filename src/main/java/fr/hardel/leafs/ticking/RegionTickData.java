@@ -7,11 +7,15 @@ import fr.hardel.leafs.world.RegionWorldData;
 public final class RegionTickData {
     private static final long DEATH_WINDOW_NANOS = 60_000_000_000L;
 
-    private final RegionInbox inbox = new RegionInbox();
+    private final RegionInbox inbox;
     private volatile RegionTickHandle handle;
     private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
     private long lastDeathNanos;
+
+    RegionTickData(long slowTaskNanos) {
+        this.inbox = new RegionInbox(slowTaskNanos);
+    }
 
     public RegionInbox inbox() {
         return inbox;

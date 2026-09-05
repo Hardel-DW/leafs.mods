@@ -31,7 +31,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     private static LeafsConfig instance;
     private static Path file;
 
-    public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int chunkWaitWarnMillis) {
+    public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
     }
 
     public record Gameplay(MobCapScope mobCapScope, Map<MobCategory, Integer> mobCap) {
@@ -99,7 +99,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     private static final MapCodec<Debug> DEBUG = RecordCodecBuilder.mapCodec(builder -> builder.group(
         Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(Debug::watchdogWarnSeconds),
         Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs),
-        Codec.intRange(0, 60_000).optionalFieldOf("chunk_wait_warn_millis", 50).forGetter(Debug::chunkWaitWarnMillis)
+        Codec.intRange(0, 60_000).optionalFieldOf("slow_task_warn_millis", 50).forGetter(Debug::slowTaskWarnMillis)
     ).apply(builder, Debug::new));
 
     private static final MapCodec<Gameplay> GAMEPLAY = RecordCodecBuilder.mapCodec(builder -> builder.group(

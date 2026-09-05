@@ -36,11 +36,12 @@ public final class ChunkOwners {
     private final Urgency urgency;
     private final BooleanSupplier live;
     private final Executor serial;
+    private final long slowTaskNanos;
     private final ConcurrentLong2ObjectMap<RegionInbox> borrowed = new ConcurrentLong2ObjectMap<>();
     private final ThreadLocal<Long> poolOwned = new ThreadLocal<>();
 
     /** Before the regions run and once they stopped, the server thread owns everything and its pump runs what other threads post. */
-    public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial) {
+    public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial, long slowTaskNanos) {
         this.pool = pool;
         this.level = level;
         this.inboxes = inboxes;
@@ -48,6 +49,7 @@ public final class ChunkOwners {
         this.urgency = urgency;
         this.live = live;
         this.serial = serial;
+        this.slowTaskNanos = slowTaskNanos;
     }
 
     /** True when the task ran in line, which is what lets a caller read back what it wrote. Under a drain the owner posts to itself instead. */
@@ -141,7 +143,7 @@ public final class ChunkOwners {
 
     /** A head execution on the server thread takes a chunk no region covers: what lands there runs on the borrower until it releases. */
     public RegionInbox borrow(int chunkX, int chunkZ) {
-        RegionInbox inbox = new RegionInbox();
+        RegionInbox inbox = new RegionInbox(slowTaskNanos);
         borrowed.put(ChunkPos.pack(chunkX, chunkZ), inbox);
         return inbox;
     }
