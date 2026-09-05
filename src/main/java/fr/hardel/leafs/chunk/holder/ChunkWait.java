@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.holder;
 
+import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
@@ -58,14 +59,36 @@ public final class ChunkWait {
         return report == null ? null : report.toString();
     }
 
+    /** The first frame that is neither the wait nor the chunk read it serves: the game code that needed the chunk. */
+    private static String asker() {
+        for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
+            String owner = frame.getClassName();
+            if (owner.startsWith("java.") || owner.startsWith("fr.hardel.leafs.chunk.") || owner.endsWith("ServerChunkCache") || owner.endsWith(".Level") || owner.endsWith("LevelReader")) {
+                continue;
+            }
+
+            return owner.substring(owner.lastIndexOf('.') + 1) + "." + frame.getMethodName();
+        }
+
+        return "unknown";
+    }
+
     private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
-        WaitReport outer = WAITING.put(Thread.currentThread(), new WaitReport(level, chunkX, chunkZ, status, delivery));
+        WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery);
+        WaitReport outer = WAITING.put(Thread.currentThread(), report);
+        String found = report.toString();
         long started = System.nanoTime();
         try {
             until(level, delivery::isDone);
         } finally {
-            TickingManager.of(level.getServer()).metrics().chunkWaited(System.nanoTime() - started);
+            long waited = System.nanoTime() - started;
+            TickingManager ticking = TickingManager.of(level.getServer());
+            ticking.metrics().chunkWaited(waited);
+            if (waited >= ticking.slowTaskWarnMillis() * 1_000_000L) {
+                Leafs.LOGGER.warn("Waited {} ms for a chunk, asked by {}, found {}", waited / 1_000_000L, asker(), found);
+            }
+
             if (outer == null) {
                 WAITING.remove(Thread.currentThread());
             } else {
