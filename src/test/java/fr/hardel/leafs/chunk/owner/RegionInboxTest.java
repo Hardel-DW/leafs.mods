@@ -36,6 +36,17 @@ class RegionInboxTest {
         assertEquals(List.of("first", "second", "late"), ran);
     }
 
+    @Test
+    void aPassedDeadlineLeavesThePassForTheNextTick() {
+        inbox.post(0, 0, () -> ran.add("first"));
+        inbox.post(0, 0, () -> ran.add("second"));
+
+        assertEquals(0, inbox.drain(System.nanoTime() - 1));
+        assertEquals(2, inbox.size());
+        assertEquals(2, inbox.drain(Long.MAX_VALUE));
+        assertEquals(List.of("first", "second"), ran);
+    }
+
     /** 2026-09-05: a publication waited for a neighbour whose own publication sat behind it in the same pass, forever. */
     @Test
     void aTaskThatDrainsWhileRunningReachesWhatWasPostedAfterIt() {

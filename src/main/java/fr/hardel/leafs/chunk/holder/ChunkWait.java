@@ -3,6 +3,7 @@ package fr.hardel.leafs.chunk.holder;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerLevel;
@@ -60,9 +61,11 @@ public final class ChunkWait {
     private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
         WaitReport outer = WAITING.put(Thread.currentThread(), new WaitReport(level, chunkX, chunkZ, status, delivery));
+        long started = System.nanoTime();
         try {
             until(level, delivery::isDone);
         } finally {
+            TickingManager.of(level.getServer()).metrics().chunkWaited(System.nanoTime() - started);
             if (outer == null) {
                 WAITING.remove(Thread.currentThread());
             } else {

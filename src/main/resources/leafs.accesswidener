@@ -34,6 +34,10 @@ accessible method net/minecraft/world/level/chunk/status/ChunkStatusTasks postLo
 accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
+accessible method net/minecraft/server/level/GenerationChunkHolder isStatusDisallowed (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
+accessible method net/minecraft/server/level/GenerationChunkHolder acquireStatusBump (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
+accessible method net/minecraft/server/level/GenerationChunkHolder getOrCreateFuture (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Ljava/util/concurrent/CompletableFuture;
+accessible method net/minecraft/server/level/GenerationChunkHolder completeFuture (Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/world/level/chunk/ChunkAccess;)V
 accessible method net/minecraft/server/level/ChunkHolder updateFutures (Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/Executor;)V
 accessible field net/minecraft/server/level/ChunkMap updatingChunkMap Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;
 accessible field net/minecraft/server/level/ChunkMap visibleChunkMap Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;

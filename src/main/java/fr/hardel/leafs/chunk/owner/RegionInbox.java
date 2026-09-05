@@ -23,13 +23,18 @@ public final class RegionInbox {
 
     /** As many tasks as were posted before the call, taken one at a time: a task that waits for a chunk drains the rest itself, and a re-post waits for the next pass. */
     public int drain() {
+        return drain(Long.MAX_VALUE);
+    }
+
+    /** The same pass, stopped once the deadline is past; what is left waits in order for the next pass. */
+    public int drain(long deadlineNanos) {
         int planned;
         synchronized (this) {
             planned = tasks.size();
         }
 
         int ran = 0;
-        while (ran < planned) {
+        while (ran < planned && System.nanoTime() < deadlineNanos) {
             Posted next;
             synchronized (this) {
                 next = tasks.pollFirst();
