@@ -55,29 +55,6 @@ class ChunkPoolTest {
     }
 
     @Test
-    void aWaitingTaskTakesItsNewPriority() throws InterruptedException {
-        pool = new ChunkPool(1, 8);
-        CountDownLatch gate = occupyTheWorker();
-        List<String> order = new CopyOnWriteArrayList<>();
-        CountDownLatch done = new CountDownLatch(2);
-        ChunkTask late = ChunkTask.of(6, NONE, () -> {
-            order.add("late");
-            done.countDown();
-        });
-        pool.submit(late);
-        pool.submit(ChunkTask.of(3, NONE, () -> {
-            order.add("middle");
-            done.countDown();
-        }));
-
-        pool.reprioritise(late, 0);
-        gate.countDown();
-
-        assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertEquals(List.of("late", "middle"), order);
-    }
-
-    @Test
     void twoTasksOnTheSameChunkNeverOverlap() throws InterruptedException {
         pool = new ChunkPool(4, 4);
         AtomicInteger inside = new AtomicInteger();

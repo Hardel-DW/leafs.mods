@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.disk.ChunkWrites;
 import fr.hardel.leafs.chunk.holder.ChunkHolders;
+import fr.hardel.leafs.chunk.holder.FullStep;
 import fr.hardel.leafs.chunk.holder.GenerationSteps;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
@@ -31,6 +32,7 @@ public final class LevelChunks {
     private final ChunkOwners owners;
     private final ChunkHolders holders;
     private final GenerationSteps steps;
+    private final FullStep full;
     private final UnownedSweep sweep;
     private final ChunkWrites writes;
 
@@ -43,10 +45,11 @@ public final class LevelChunks {
         this.graphs = storage.leafs$graphs();
         this.timeouts = new TicketTimeoutIndex(tickets, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
-        this.view = new PlayerView(tickets, graphs);
         this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial);
         this.steps = new GenerationSteps(pool, owners);
-        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, steps, ticking.metrics());
+        this.full = new FullStep(owners, ticking.metrics().chunksFull());
+        this.view = new PlayerView(tickets, graphs, owners.follow());
+        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
@@ -102,6 +105,10 @@ public final class LevelChunks {
 
     public GenerationSteps steps() {
         return steps;
+    }
+
+    public FullStep full() {
+        return full;
     }
 
     public UnownedSweep sweep() {
