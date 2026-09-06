@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.metrics.ModAttribution;
@@ -19,6 +20,7 @@ import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -36,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Drives LevelRegions like the simulation feed: a chunk alternates entering and leaving simulation, one settle per tick. */
+@ExtendWith(MinecraftBootstrap.class)
 class LevelRegionsTest {
     private static final int FEED_EVENTS = 100_000;
     private static final int EVENTS_PER_TICK = 50;

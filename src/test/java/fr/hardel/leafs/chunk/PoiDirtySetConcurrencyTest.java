@@ -1,12 +1,10 @@
 package fr.hardel.leafs.chunk;
 
-import net.minecraft.SharedConstants;
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.entity.ai.village.poi.PoiType;
@@ -16,8 +14,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.chunk.storage.ChunkIOErrorReporter;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,18 +25,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+@ExtendWith(MinecraftBootstrap.class)
 class PoiDirtySetConcurrencyTest {
     private static final int CHUNKS = 64;
     private static final int PASSES = 400;
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-        MappedRegistry<PoiType> poiTypes = (MappedRegistry<PoiType>) BuiltInRegistries.POINT_OF_INTEREST_TYPE;
-        poiTypes.bindAllTagsToEmpty();
-        poiTypes.freeze();
-    }
 
     /** 2026-09-04: eight regions restarted on Index -1 in the dirty set, a save flushing while a POI write marked. */
     @Test
