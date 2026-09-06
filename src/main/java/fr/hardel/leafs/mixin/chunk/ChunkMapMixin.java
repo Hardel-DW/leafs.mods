@@ -29,7 +29,6 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -262,35 +261,26 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         }
     }
 
-    /** The epoch bump replaces the holder walk, each owner saves its own chunks; a flush waits for every chunk to reach the epoch. Vanilla's walk survives for the universal owner. */
-    @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
-    private void leafs$epochAutosave(boolean flushStorage, CallbackInfo callbackInfo) {
-        ChunkMap self = (ChunkMap) (Object) this;
-        MinecraftServer server = self.level.getServer();
+    /** The periodic autosave is the epoch bump, each owner saves its own chunks in its slice; a flush is head work, every region of the level held, then vanilla's walk as it is. */
+    @WrapMethod(method = "saveAllChunks")
+    private void leafs$autosave(boolean flushStorage, Operation<Void> original) {
         LevelRegions regions = leafs$regions();
-        if (server.getPlayerList().getPlayers().isEmpty() || !regions.live()) {
+        if (!regions.live()) {
+            original.call(flushStorage);
             return;
         }
 
-        this.nextChunkSaveTime.clear();
-        regions.bumpAutosaveEpoch(flushStorage);
-        callbackInfo.cancel();
         if (!flushStorage) {
+            this.nextChunkSaveTime.clear();
+            regions.bumpAutosaveEpoch();
             return;
         }
 
-        RegionBorrow borrow = RegionBorrow.current();
-        if (borrow != null) {
-            borrow.releaseAll();
-        }
-
-        long epoch = regions.autosaveEpoch();
-        server.managedBlock(() -> {
-            leafs$chunks.sweep().soon();
-            return regions.autosaveReached(epoch, this.visibleChunkMap.values(), self.level.players());
+        RegionBorrow.hold(borrow -> {
+            borrow.borrowAll(regions);
+            original.call(true);
+            return null;
         });
-        self.level.getPoiManager().flushAll();
-        self.synchronize(true).join();
     }
 
     /** View diffs run on the player's owner, the region ticking him; a call from anywhere else is that region's next pass. */

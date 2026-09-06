@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -129,8 +130,39 @@ class RegionBorrowTest {
         borrower.join();
     }
 
+    /** B05: a pass that returned everything for a fold and then found the folded region dead ended with nothing held, the count being back where it started. */
+    @Test
+    void borrowAllFromNothingRetakesTheSurvivorOfAFold() throws InterruptedException {
+        simulated(regions, 0, 0);
+        simulated(regions, 96, 0);
+        regions.settle();
+        Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
+        assertTrue(west.tryMarkTicking(), "a worker ticks the west region");
+        simulated(regions, 32, 0);
+        simulated(regions, 64, 0);
+        regions.settle();
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicInteger heldAfter = new AtomicInteger();
+        Thread borrower = new Thread(() -> {
+            RegionBorrow borrow = RegionBorrow.enter();
+            borrow.borrowAll(regions);
+            heldAfter.set(borrow.size());
+            done.countDown();
+            borrow.releaseAll();
+        });
+        borrower.start();
+        Thread.sleep(100);
+        west.markNotTicking();
+
+        assertTrue(done.await(5, TimeUnit.SECONDS), "borrowAll must fold the pending merge and hold the survivor");
+        borrower.join();
+        assertEquals(1, heldAfter.get(), "the survivor of the fold is held");
+        assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran");
+    }
+
     @Test
     void borrowAllTakesEveryLiveRegion() {
+
         simulated(regions, 0, 0);
         simulated(regions, 200, 200);
         simulated(regions, -200, -200);

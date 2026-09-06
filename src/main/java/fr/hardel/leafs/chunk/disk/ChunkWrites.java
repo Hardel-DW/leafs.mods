@@ -26,7 +26,7 @@ public final class ChunkWrites {
         this.files = disk.storage;
     }
 
-    /** The write is vanilla's photo future: the disk thread never joins it. */
+    /** The write is vanilla's photo future: the disk thread never joins it. The disk keeps the last photo of a chunk, like vanilla's write queue: a newer one supersedes what still waits. */
     public PendingWrite photograph(ChunkPos pos, Supplier<CompoundTag> photo) {
         PendingWrite write = new PendingWrite(photo);
         pending.put(pos.pack(), write);
@@ -41,7 +41,8 @@ public final class ChunkWrites {
                 write.completeExceptionally(failure);
             }
         });
-        write.thenCompose(_ -> store(pos, write.bytes())).whenComplete((_, failure) -> {
+        
+        write.thenCompose(_ -> store(pos, write)).whenComplete((_, failure) -> {
             pending.remove(pos.pack(), write);
             if (failure == null) {
                 write.written().complete(null);
@@ -60,8 +61,14 @@ public final class ChunkWrites {
         return CompletableFuture.allOf(pending.values().stream().map(PendingWrite::written).toArray(CompletableFuture[]::new));
     }
 
-    private CompletableFuture<Void> store(ChunkPos pos, CompressedChunk bytes) {
+    /** Decided on the disk thread, where the writes of a chunk pass in order: a write no longer the chunk's latest is skipped, the newer photo holds its data. */
+    private CompletableFuture<Void> store(ChunkPos pos, PendingWrite write) {
         return disk.submitThrowingTask(() -> {
+            if (pending.get(pos.pack()) != write) {
+                return null;
+            }
+
+            CompressedChunk bytes = write.bytes();
             RegionFile file = files.getRegionFile(pos);
             JvmProfiler.INSTANCE.onRegionFileWrite(files.info(), pos, bytes.version(), bytes.streamLength());
             file.write(pos, bytes.buffer());

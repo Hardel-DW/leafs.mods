@@ -3,7 +3,6 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.metrics.StageTimings;
@@ -42,9 +41,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
-    /** Bumped by the global autosave trigger only; each chunk and player compares it against the epoch that last saved it. A forced epoch saves everything in one pass. */
+    /** Bumped by the periodic autosave only; each chunk and player compares it against the epoch that last saved it. A flush is vanilla's walk under a head. */
     private volatile long autosaveEpoch;
-    private volatile boolean autosaveForced;
     /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
     private volatile long created;
     private volatile long destroyed;
@@ -152,34 +150,12 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return data == null ? gameTime : data.currentTick();
     }
 
-    public void bumpAutosaveEpoch(boolean forced) {
-        autosaveForced = forced;
+    public void bumpAutosaveEpoch() {
         autosaveEpoch++;
     }
 
     public long autosaveEpoch() {
         return autosaveEpoch;
-    }
-
-    public boolean autosaveForced() {
-        return autosaveForced;
-    }
-
-    /** Whether every loaded chunk and every player saved the epoch: each belongs to a region or to the pool, so each gets there. */
-    public boolean autosaveReached(long epoch, Iterable<ChunkHolder> holders, List<ServerPlayer> players) {
-        for (ChunkHolder holder : holders) {
-            if (((SavedEpochAccess) holder).leafs$savedEpoch() < epoch) {
-                return false;
-            }
-        }
-
-        for (ServerPlayer player : players) {
-            if (((SavedEpochAccess) player).leafs$savedEpoch() < epoch) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /** The simulation graph: a chunk entering or leaving block ticking is what shapes the regions. */
