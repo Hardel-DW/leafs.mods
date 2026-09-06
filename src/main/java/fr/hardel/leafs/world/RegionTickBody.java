@@ -92,7 +92,7 @@ public final class RegionTickBody {
         RegionEntityTracking.tickRegion(level, owned, entities);
         stages.mark(TickStages.regionTracking);
         if (runs) {
-            runBlockEvents(owned, worldData);
+            runBlockEvents(owned);
         }
 
         stages.mark(TickStages.regionBlockEvents);
@@ -184,9 +184,16 @@ public final class RegionTickBody {
         return spawnable;
     }
 
-    private void runBlockEvents(RegionChunks chunks, RegionWorldData worldData) {
+    private void runBlockEvents(RegionChunks chunks) {
         ServerChunkCache chunkSource = level.getChunkSource();
-        worldData.blockEvents().run(chunks.ticking(), chunk -> chunkSource.isPositionTicking(chunk.getPos().pack()), this::runBlockEvent);
+        List<ChunkBlockEvents> sets = new ArrayList<>();
+        for (LevelChunk chunk : chunks.ticking()) {
+            if (chunkSource.isPositionTicking(chunk.getPos().pack())) {
+                sets.add(((ChunkTickAccess) chunk).leafs$blockEvents());
+            }
+        }
+
+        ChunkBlockEvents.runAll(sets, this::runBlockEvent);
     }
 
     private void runBlockEvent(BlockEventData event) {

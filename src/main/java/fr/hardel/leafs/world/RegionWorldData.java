@@ -22,7 +22,6 @@ public final class RegionWorldData {
     private final PathTypeCache pathTypeCache;
     private final ScheduledTickDrain<LevelChunk, Block> blockTicks = new ScheduledTickDrain<>(chunk -> chunk.blockTicks, chunk -> chunk.getPos().pack());
     private final ScheduledTickDrain<LevelChunk, Fluid> fluidTicks = new ScheduledTickDrain<>(chunk -> chunk.fluidTicks, chunk -> chunk.getPos().pack());
-    private final BlockEventBatch<LevelChunk> blockEvents = new BlockEventBatch<>(chunk -> ((ChunkTickAccess) chunk).leafs$blockEvents());
     private final RegionChunks chunks = new RegionChunks();
     private final RegionEntities entities = new RegionEntities();
     private volatile MobCensus census = MobCensus.EMPTY;
@@ -64,10 +63,6 @@ public final class RegionWorldData {
 
     public ScheduledTickDrain<LevelChunk, Fluid> fluidTicks() {
         return fluidTicks;
-    }
-
-    public BlockEventBatch<LevelChunk> blockEvents() {
-        return blockEvents;
     }
 
     public RegionChunks chunks() {
