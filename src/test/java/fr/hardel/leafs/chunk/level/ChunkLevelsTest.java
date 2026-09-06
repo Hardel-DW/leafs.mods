@@ -61,8 +61,26 @@ class ChunkLevelsTest {
         assertEquals(NONE, level(11, 11));
     }
 
+    /** B09: a section stayed forever once its levels were gone, so the graphs grew with every place ever visited. */
+    @Test
+    void removingTheSourceRetiresItsSections() {
+        graph.setSource(63, 63, 31);
+        graph.drain(this::record);
+        assertEquals(4, graph.sectionCount(), "the wave crossed into the three neighbouring sections");
+
+        graph.setSource(63, 63, NONE);
+        graph.drain(this::record);
+
+        assertEquals(0, graph.sectionCount());
+        assertEquals(NONE, level(63, 63));
+        graph.setSource(63, 63, 31);
+        graph.drain(this::record);
+        assertEquals(31, level(63, 63), "a retired section is made again by the next source");
+    }
+
     @Test
     void anOverlappingSourceKeepsItsLevelsWhenTheOtherLeaves() {
+
         graph.setSource(0, 0, 31);
         graph.setSource(4, 0, 31);
         graph.drain(this::record);
