@@ -13,8 +13,11 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
@@ -24,8 +27,46 @@ import java.util.function.BooleanSupplier;
 public final class ChunkWait {
     private static final long PARK_NANOS = 50_000L;
     private static final ConcurrentHashMap<Thread, WaitReport> WAITING = new ConcurrentHashMap<>();
+    private static final ThreadLocal<Scope> SCOPE = new ThreadLocal<>();
+
+    private static final class Scope {
+        private final List<Runnable> releases = new ArrayList<>();
+        private int depth;
+    }
 
     private ChunkWait() {
+    }
+
+    public static void enterScope() {
+        Scope scope = SCOPE.get();
+        if (scope == null) {
+            scope = new Scope();
+            SCOPE.set(scope);
+        }
+
+        scope.depth++;
+    }
+
+    /** Only the outermost scope releases: a chunk taken inside a region tick closes before the tick, whose reads must hold. */
+    public static void exitScope() {
+        Scope scope = SCOPE.get();
+        if (scope == null || --scope.depth > 0) {
+            return;
+        }
+
+        SCOPE.remove();
+        scope.releases.forEach(Runnable::run);
+    }
+
+    /** A delivered demand: kept until the scope ends, released at once without one. */
+    static void keep(Runnable release) {
+        Scope scope = SCOPE.get();
+        if (scope == null) {
+            release.run();
+            return;
+        }
+
+        scope.releases.add(release);
     }
 
     public static ChunkAccess chunk(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
@@ -93,13 +134,15 @@ public final class ChunkWait {
     }
 
     private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
-        CompletableFuture<ChunkResult<ChunkAccess>> delivery = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
+        ChunkHolders.Demand demand = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
+        CompletableFuture<ChunkResult<ChunkAccess>> delivery = demand.delivery();
         WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
         WaitReport outer = WAITING.put(Thread.currentThread(), report);
         String found = report.toString();
         try {
             until(level, delivery::isDone);
         } finally {
+            keep(demand.release());
             long waited = System.nanoTime() - report.startedNanos();
             TickingManager ticking = TickingManager.of(level.getServer());
             ticking.metrics().chunkWaited(waited);
