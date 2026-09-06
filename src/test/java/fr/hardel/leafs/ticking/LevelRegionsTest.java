@@ -11,6 +11,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import net.minecraft.server.level.ChunkLevel;
@@ -227,7 +228,7 @@ class LevelRegionsTest {
     }
 
     private void activateRegions() {
-        LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> {
+        LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> Map.of(), _ -> {
         }, _ -> {
         });
         RegionTickScheduler scheduler = new RegionTickScheduler(1, false, watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports"), new ModAttribution(_ -> Optional.empty())), (_, _) -> {
