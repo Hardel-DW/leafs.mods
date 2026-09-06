@@ -4,7 +4,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -20,9 +24,10 @@ class LeafsWatchdogTest {
     private final ConcurrentLinkedQueue<LeafsWatchdog.Stall> kills = new ConcurrentLinkedQueue<>();
     private final CountDownLatch reported = new CountDownLatch(1);
     private final CountDownLatch killed = new CountDownLatch(1);
+    private final Map<Thread, String> stalledWaits = new ConcurrentHashMap<>();
 
     private LeafsWatchdog watchdog(Duration warnAfter, Duration killAfter) {
-        return new LeafsWatchdog(warnAfter, () -> killAfter.toNanos(), message -> {
+        return new LeafsWatchdog(warnAfter, () -> killAfter.toNanos(), _ -> new HashMap<>(stalledWaits), message -> {
             reports.add(message);
             reported.countDown();
         }, stall -> {
@@ -49,6 +54,29 @@ class LeafsWatchdogTest {
         release.countDown();
         stalled.join(5_000);
         watchdog.stop();
+    }
+
+    /** B25: the first report subtracted Long.MIN_VALUE from now, overflowed, and never fired. */
+    @Test
+    void aStalledWaitOffTheTickUnitsIsReportedAtOnce() throws InterruptedException {
+        LeafsWatchdog watchdog = watchdog(Duration.ofMillis(50), KILL_DISABLED);
+        Thread waiting = new Thread(() -> awaitQuietly(new CountDownLatch(1)), "Mod Thread");
+        waiting.setDaemon(true);
+        waiting.start();
+        stalledWaits.put(waiting, "Chunk wait stalled on a mod thread");
+        watchdog.start();
+
+        assertTrue(reported.await(5, TimeUnit.SECONDS), "a stalled wait off the tick units must be reported");
+        assertTrue(reports.peek().contains("mod thread"));
+        watchdog.stop();
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test
