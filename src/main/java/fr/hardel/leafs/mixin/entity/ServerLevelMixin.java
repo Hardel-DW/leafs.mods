@@ -127,6 +127,6 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
     @Unique
     private void leafs$onOwnerOf(Entity entity, Runnable task) {
-        LevelChunks.of((ServerLevel) (Object) this).owners().submit(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
+        LevelChunks.of((ServerLevel) (Object) this).owners().submitGame(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
     }
 }

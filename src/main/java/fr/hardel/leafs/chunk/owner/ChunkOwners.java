@@ -13,7 +13,11 @@ import org.jspecify.annotations.Nullable;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
-/** Who writes into the live world at a position: the thread that already owns it, the region covering it at its next tick, or the pool right now. */
+/**
+ * Who writes into the live world at a position: the thread that already owns it, the region covering it at its next tick, or the pool right now.
+ * Chunk work, publication, teardown, saves, light, never waits and may run on the pool under the chunk's reservation. Game work, a teleport, a respawn,
+ * a block write, may wait for a chunk, so without a region it goes to the server thread as a head that borrows the chunk, never to the pool.
+ */
 public final class ChunkOwners {
     private static final long[] NO_RESERVATION = {};
 
@@ -29,6 +33,12 @@ public final class ChunkOwners {
         boolean holds(int chunkX, int chunkZ);
     }
 
+    /** The server thread as a head that borrows the chunk for the task, in line when it already is one. */
+    @FunctionalInterface
+    public interface Head {
+        void run(int chunkX, int chunkZ, Runnable task);
+    }
+
     private final ChunkPool pool;
     private final int level;
     private final Inboxes inboxes;
@@ -36,12 +46,13 @@ public final class ChunkOwners {
     private final Urgency urgency;
     private final BooleanSupplier live;
     private final Executor serial;
+    private final Head head;
     private final long slowTaskNanos;
     private final ConcurrentLong2ObjectMap<RegionInbox> borrowed = new ConcurrentLong2ObjectMap<>();
     private final ThreadLocal<Long> poolOwned = new ThreadLocal<>();
 
     /** Before the regions run and once they stopped, the server thread owns everything and its pump runs what other threads post. */
-    public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial, long slowTaskNanos) {
+    public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial, Head head, long slowTaskNanos) {
         this.pool = pool;
         this.level = level;
         this.inboxes = inboxes;
@@ -49,10 +60,11 @@ public final class ChunkOwners {
         this.urgency = urgency;
         this.live = live;
         this.serial = serial;
+        this.head = head;
         this.slowTaskNanos = slowTaskNanos;
     }
 
-    /** True when the task ran in line, which is what lets a caller read back what it wrote. Under a drain the owner posts to itself instead. */
+    /** Chunk work. True when the task ran in line, which is what lets a caller read back what it wrote. Under a drain the owner posts to itself instead. */
     public boolean submit(int chunkX, int chunkZ, Runnable task) {
         if (holds(chunkX, chunkZ) && !ChunkLevels.draining()) {
             task.run();
@@ -68,6 +80,31 @@ public final class ChunkOwners {
             RegionInbox inbox = inboxAt(chunkX, chunkZ);
             if (inbox == null) {
                 pool.submit(ChunkTask.of(ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> owning(chunkX, chunkZ, task)));
+                return false;
+            }
+
+            if (inbox.post(chunkX, chunkZ, task)) {
+                return false;
+            }
+        }
+    }
+
+    /** Game work. Same answer as {@link #submit} for an owner or a region; a chunk no region covers goes to the server thread, which can wait for what the task loads. */
+    public boolean submitGame(int chunkX, int chunkZ, Runnable task) {
+        if (holds(chunkX, chunkZ)) {
+            task.run();
+            return true;
+        }
+
+        if (!live.getAsBoolean()) {
+            serial.execute(task);
+            return false;
+        }
+
+        while (true) {
+            RegionInbox inbox = inboxAt(chunkX, chunkZ);
+            if (inbox == null) {
+                head.run(chunkX, chunkZ, task);
                 return false;
             }
 

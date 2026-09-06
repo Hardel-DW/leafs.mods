@@ -2,8 +2,10 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.global.CommandEngine;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredWork;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -68,11 +70,32 @@ public final class RegionNetworkTick {
         }
     }
 
-    /** {@code Connection.tick}'s listener half: a game listener ticks on the region owning its player, every other listener here. */
+    /** {@code Connection.tick}'s listener half: a game listener ticks on the region that ticks its player; one no region ticks, dead or without tickets, ticks here as a head. Every other listener stays here. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
-        if (!(listener instanceof ServerGamePacketListenerImpl)) {
+        if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             original.run();
+            return;
         }
+
+        if (tickedByARegion(game.player)) {
+            return;
+        }
+
+        CommandEngine.runHead(game.player.level().getServer(), null, () -> {
+            PacketRouting.queueOf(game).drain(() -> !tickedByARegion(game.player));
+            original.run();
+        });
+    }
+
+    /** The region's photo of its entities: the player is in the world and a live region covers his chunk. */
+    private static boolean tickedByARegion(ServerPlayer player) {
+        if (player.isRemoved()) {
+            return false;
+        }
+
+        LevelRegions regions = LevelRegions.of(player.level());
+        ChunkPos chunk = player.chunkPosition();
+        return regions.live() && regions.regionizer().regionAt(chunk.x(), chunk.z()) != null;
     }
 
     /** The respawn runs on the owner of the respawn spot as that listener's packet-handling thread; this drain ends here, the rest of the queue follows the player. */

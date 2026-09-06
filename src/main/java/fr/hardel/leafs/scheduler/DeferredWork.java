@@ -22,9 +22,9 @@ public record DeferredWork(ChunkOwners owners, DeferStats stats, int chunkX, int
         return new DeferredWork(owners, stats, chunkX, chunkZ, reason, check, task);
     }
 
-    /** True means the work is mail for a region that ticks the chunk, so the injector cancels vanilla; work that ran here counts nothing. */
+    /** True means the work left for the chunk's owner, a region or the server thread, so the injector cancels vanilla; work that ran here counts nothing. */
     public boolean submit() {
-        if (owners.submit(chunkX, chunkZ, this::execute)) {
+        if (owners.submitGame(chunkX, chunkZ, this::execute)) {
             return false;
         }
 

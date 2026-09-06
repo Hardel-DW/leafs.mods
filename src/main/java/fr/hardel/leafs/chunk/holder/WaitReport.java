@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /** What a thread waits for, for a stall report. */
-record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, CompletableFuture<?> delivery) {
+record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, CompletableFuture<?> delivery, long startedNanos) {
     @Override
     public String toString() {
         LevelChunks chunks = LevelChunks.of(level);
