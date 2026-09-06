@@ -1,17 +1,16 @@
 package fr.hardel.leafs.world;
 
-import net.minecraft.SharedConstants;
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.ScheduledTick;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,14 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class ChunkScheduledTicksTest {
     private static final BlockPos POS = new BlockPos(3, 64, 3);
-
-    @BeforeAll
-    static void bootstrapVanilla() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     @Test
     void aScheduleReachesItsChunkContainerAndAnUnloadedPositionDrops() {

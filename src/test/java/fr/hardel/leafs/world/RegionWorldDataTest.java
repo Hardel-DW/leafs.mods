@@ -1,20 +1,21 @@
 package fr.hardel.leafs.world;
 
-import net.minecraft.SharedConstants;
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.ticks.ScheduledTick;
 import net.minecraft.world.ticks.TickPriority;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class RegionWorldDataTest {
 
     private static RegionWorldData worldData(AtomicLong clock) {
@@ -32,8 +33,6 @@ class RegionWorldDataTest {
     /** A delay lands on the region clock, never on game time, and the sub-tick counter orders same-tick schedules. */
     @Test
     void aTickIsCreatedOnTheRegionClockInSchedulingOrder() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
         RegionWorldData data = worldData(new AtomicLong(40));
         BlockPos pos = new BlockPos(3, 64, 3);
 

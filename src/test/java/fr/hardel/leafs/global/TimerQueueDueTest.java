@@ -1,12 +1,11 @@
 package fr.hardel.leafs.global;
 
+import fr.hardel.MinecraftBootstrap;
 import com.mojang.serialization.MapCodec;
-import net.minecraft.SharedConstants;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.timers.TimerCallback;
 import net.minecraft.world.level.timers.TimerQueue;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** 2026-08-20: the hook deferred the whole drain and opened the window every tick; only a due callback may. */
+@ExtendWith(MinecraftBootstrap.class)
 class TimerQueueDueTest {
 
     private record RecordingCallback(List<Long> calls) implements TimerCallback<Object> {
@@ -26,12 +26,6 @@ class TimerQueueDueTest {
         public MapCodec<RecordingCallback> codec() {
             throw new UnsupportedOperationException("Never serialized in this test");
         }
-    }
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
     }
 
     @Test

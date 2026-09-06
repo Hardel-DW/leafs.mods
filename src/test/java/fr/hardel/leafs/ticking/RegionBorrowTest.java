@@ -1,16 +1,15 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
-import net.minecraft.SharedConstants;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -23,14 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class RegionBorrowTest {
     private final LevelRegions regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     @AfterEach
     void exitBorrow() {

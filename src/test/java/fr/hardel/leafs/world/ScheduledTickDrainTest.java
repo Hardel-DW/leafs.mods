@@ -1,15 +1,14 @@
 package fr.hardel.leafs.world;
 
-import net.minecraft.SharedConstants;
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.ScheduledTick;
 import net.minecraft.world.ticks.TickPriority;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The region drain over chunk containers keeps vanilla's cross-chunk order without an index. */
+@ExtendWith(MinecraftBootstrap.class)
 class ScheduledTickDrainTest {
 
     private record Chunk(long key, LevelChunkTicks<Block> ticks) {
@@ -26,12 +26,6 @@ class ScheduledTickDrainTest {
 
     private static final BlockPos WEST = new BlockPos(3, 64, 3);
     private static final BlockPos EAST = new BlockPos(19, 64, 3);
-
-    @BeforeAll
-    static void bootstrapVanilla() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     private static ScheduledTickDrain<Chunk, Block> drain() {
         return new ScheduledTickDrain<>(Chunk::ticks, Chunk::key);

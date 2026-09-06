@@ -1,13 +1,12 @@
 package fr.hardel.leafs.chunk.ticket;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import net.minecraft.SharedConstants;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -19,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 2026-09-04: a region paid 30 ms of level bookkeeping at every chunk its player crossed. */
+@ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
     private final ChunkPool pool = new ChunkPool(1, 46);
     private final TicketGraphs graphs = new TicketGraphs();
@@ -36,12 +36,6 @@ class TicketGraphsTest {
             published.countDown();
         }
     };
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     @AfterEach
     void stop() {

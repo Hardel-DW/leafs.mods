@@ -1,31 +1,25 @@
 package fr.hardel.leafs.chunk.view;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
-import net.minecraft.SharedConstants;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class ViewTicketsTest {
     private static final int PLAYER_LEVELS = 34;
     private final TicketStorage tickets = new TicketStorage();
     private final ChunkLevels players = new ChunkLevels(PLAYER_LEVELS);
     private final ViewTickets view = new ViewTickets(tickets, players, 2);
     private final PlayerSources sources = new PlayerSources(tickets, players, 5);
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     private boolean holds(int chunkX, int chunkZ, TicketType type) {
         return tickets.getTickets(ChunkPos.pack(chunkX, chunkZ)).stream().anyMatch(ticket -> ticket.getType() == type);

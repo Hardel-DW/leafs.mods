@@ -1,9 +1,9 @@
 package fr.hardel.leafs.chunk.disk;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
@@ -11,9 +11,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,15 +23,10 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Timeout(30)
+@ExtendWith(MinecraftBootstrap.class)
 class ChunkWritesTest {
     private final ChunkPool pool = new ChunkPool(2, 4);
     private SimpleRegionStorage storage;
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     @AfterEach
     void stop() throws IOException {
