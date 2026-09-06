@@ -10,7 +10,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.AbortableIterationConsumer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.EntityAccess;
 import net.minecraft.world.level.entity.EntityLookup;
 import net.minecraft.world.level.entity.EntityTypeTest;
@@ -76,10 +75,8 @@ public abstract class EntityLookupMixin<T extends EntityAccess> implements Level
 
     @Unique
     private T leafs$borrowed(T found) {
-        RegionBorrow borrow = RegionBorrow.current();
-        if (borrow != null && leafs$level != null && found instanceof Entity entity) {
-            ChunkPos chunk = entity.chunkPosition();
-            borrow.borrow(LevelRegions.of(leafs$level), chunk.x(), chunk.z());
+        if (found instanceof Entity entity) {
+            RegionBorrow.atContact(entity);
         }
 
         return found;
