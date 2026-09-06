@@ -1,7 +1,7 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.region.Region;
-import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,11 +22,9 @@ public final class AnchoredTickers {
                 continue;
             }
 
-            int chunkX = SectionPos.blockToSectionCoord(anchor.pos().getX());
-            int chunkZ = SectionPos.blockToSectionCoord(anchor.pos().getZ());
-            if (region.owns(chunkX, chunkZ) && tickingChunk.test(anchor.chunkKey())) {
+            long chunkKey = anchor.chunkKey();
+            if (region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)) && tickingChunk.test(chunkKey)) {
                 anchor.body().run();
-
             }
         }
     }
