@@ -13,10 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ServerPropertiesTest {
 
     @Test
-    void aMissingFileIsCreatedWithTheKeyOff(@TempDir Path directory) throws IOException {
+    void aMissingFileIsCreatedWithTheKey(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("server.properties");
 
-        ServerProperties.disableSyncChunkWrites(file);
+        new ServerProperties(file).set("sync-chunk-writes", "false");
 
         assertEquals(List.of("sync-chunk-writes=false"), Files.readAllLines(file));
     }
@@ -26,7 +26,7 @@ class ServerPropertiesTest {
         Path file = directory.resolve("server.properties");
         Files.write(file, List.of("#Minecraft server properties", "sync-chunk-writes=true", "max-players=20"));
 
-        ServerProperties.disableSyncChunkWrites(file);
+        new ServerProperties(file).set("sync-chunk-writes", "false");
 
         assertEquals(List.of("#Minecraft server properties", "max-players=20", "sync-chunk-writes=false"), Files.readAllLines(file));
     }

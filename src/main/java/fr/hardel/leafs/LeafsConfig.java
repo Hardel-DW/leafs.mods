@@ -131,8 +131,9 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     public static void register() {
         file = FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json");
         if (Files.notExists(file)) {
-            ServerProperties.disableSyncChunkWrites(FabricLoader.getInstance().getGameDir().resolve("server.properties"));
+            new ServerProperties(FabricLoader.getInstance().getGameDir().resolve("server.properties")).set("sync-chunk-writes", "false");
         }
+
 
         instance = load(file);
     }
