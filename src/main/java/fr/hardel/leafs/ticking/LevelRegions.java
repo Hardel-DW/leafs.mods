@@ -3,6 +3,7 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.metrics.StageTimings;
@@ -113,6 +114,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     /** The level, once activated. */
     public ServerLevel level() {
         return body.level();
+    }
+
+    private ChunkOwners owners() {
+        return LevelChunks.of(body.level()).owners();
     }
 
     /** The inbox of the region covering a chunk, null without one or while the regions do not run. */
@@ -244,7 +249,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     @Override
     public RegionTickData createData(Region<RegionTickData> region) {
-        RegionTickData data = new RegionTickData(slowTaskNanos);
+        RegionTickData data = new RegionTickData(region, slowTaskNanos, this::owners);
         if (worldDataFactory != null) {
             equipWorld(data);
         }
@@ -291,7 +296,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         if (body != null) {
-            LevelChunks.of(body.level()).owners().abandon(region.data().inbox());
+            owners().abandon(region.data().inbox());
         }
     }
 
@@ -339,7 +344,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
-    /** Children start on the parent's clock once regions are equipped; each posted task follows its section to its child. */
+    /** Children start on the parent's clock once regions are equipped; each posted task follows its section to its child, one on a section the parent just lost goes back through the owners. */
     @Override
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
         if (worldDataFactory != null) {
@@ -349,10 +354,16 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         int shift = regionizer.sectionShift();
+        RegionInbox orphans = new RegionInbox(slowTaskNanos);
         parent.data().inbox().close(posted -> {
             Region<RegionTickData> child = sectionToChild.get(CoordinateKey.pack(posted.chunkX() >> shift, posted.chunkZ() >> shift));
-            child.data().inbox().post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task());
+            RegionInbox target = child == null ? orphans : child.data().inbox();
+            target.post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task());
         });
+        if (body != null && orphans.size() > 0) {
+            owners().abandon(orphans);
+        }
+
         split++;
     }
 
