@@ -9,6 +9,8 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
+import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
@@ -106,6 +108,12 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
                 return ObjectIterators.asObjectIterator(map.values().iterator());
             }
 
+            /** A stream must not trust a size the map outgrows while it runs. */
+            @Override
+            public @NonNull ObjectSpliterator<V> spliterator() {
+                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
+            }
+
             @Override
             public int size() {
                 return map.size();
@@ -141,6 +149,11 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
                         return new BasicEntry<>(LongSpread.unmix(entry.getKey()), entry.getValue());
                     }
                 };
+            }
+
+            @Override
+            public @NonNull ObjectSpliterator<Long2ObjectMap.Entry<V>> spliterator() {
+                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
             }
 
             @Override
