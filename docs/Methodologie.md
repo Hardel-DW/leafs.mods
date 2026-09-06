@@ -26,3 +26,4 @@ Je préfère sacrifier une optimisation mais permettre que les mods marchent par
 # La règle absolue
 Leafs fait ce que vanilla fait, mais en multithread. Quand une règle à nous double une règle vanilla, on retire la nôtre. Les mods ne voient pas Leafs, ils appellent les mêmes fonctions que d'habitude, et ces fonctions font la même chose qu'avant. C'est mieux de retirer de la logique pour se rapprocher de vanilla, plutôt que d'en rajouter.
 L'expérience de développement des moddeurs passe avant les optimisations.
+Quand ont parles de mods c'est les gros, Meka, Applied, Create, Ars Nouveau, qui intégres des mécaniques uniques pas connu dans minecraft, magie, pollutions, machines, énergie, sphére de dyson...
