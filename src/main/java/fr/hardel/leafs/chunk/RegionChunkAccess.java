@@ -1,9 +1,6 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.holder.ChunkWait;
-import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.RegionContext;
-import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
@@ -53,20 +50,9 @@ public final class RegionChunkAccess {
         return ChunkWait.chunk(chunkMap.level, chunkX, chunkZ, status);
     }
 
-    /** Vanilla's readiness of a chunk for the client, whoever owns it: what decides that a chunk entering a view joins the send queue. */
+    /** Vanilla's readiness of a chunk for the client, whoever owns it; the send reads a chunk like any thread does, the section writes are monitored. */
     public static LevelChunk readyToSend(ChunkMap chunkMap, long key) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
         return holder == null ? null : holder.getChunkToSend();
-    }
-
-    /** A region serializes its own chunks and the chunks no region covers; another region's chunk stays in the send queue until ownership converges. */
-    public static boolean sendable(ChunkMap chunkMap, long key) {
-        if (!(RegionContext.current() instanceof RegionContext.Region)) {
-            return true;
-        }
-
-        int chunkX = ChunkPos.getX(key);
-        int chunkZ = ChunkPos.getZ(key);
-        return WorldTickContext.ownsChunk(chunkMap.level, chunkX, chunkZ) || LevelRegions.of(chunkMap.level).regionizer().regionAt(chunkX, chunkZ) == null;
     }
 }
