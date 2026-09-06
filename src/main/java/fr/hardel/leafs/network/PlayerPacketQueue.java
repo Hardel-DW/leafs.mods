@@ -8,14 +8,12 @@ import net.minecraft.network.protocol.PacketUtils;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
 /** One player's inbound packets, drained by the owning unit. The draining thread is the packet-handling thread for that listener, and there is never more than one. */
 public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();
     private static final long QUEUE_AGE_WARN_NANOS = 250_000_000L;
-    private static final long CLAIM_WAIT_NANOS = 10_000L;
 
     private final ConcurrentLinkedDeque<Entry> packets = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean claimed = new AtomicBoolean();
@@ -49,17 +47,17 @@ public final class PlayerPacketQueue {
         handedOver = true;
     }
 
-    /** Runs one handler as this listener's packet-handling thread, once the drain in flight, if any, let go. True when it had to wait for another thread. */
+    /** Runs one handler as this listener's packet-handling thread. False when another thread holds the player, nothing ran. */
     public boolean handleAs(Runnable handler) {
         if (handledByCurrentThread()) {
             handler.run();
-            return false;
+            return true;
         }
 
         return asDrainer(handler);
     }
 
-    /** Vanilla {@code processQueuedPackets} semantics: everything queued, including what handlers queue back. */
+    /** Vanilla {@code processQueuedPackets} semantics: everything queued, including what handlers queue back. False when another thread holds the player. */
     public boolean drain() {
         return drain(() -> true);
     }
@@ -68,18 +66,16 @@ public final class PlayerPacketQueue {
     public boolean drain(BooleanSupplier ownerHolds) {
         if (handledByCurrentThread()) {
             drainLoop(ownerHolds);
-            return false;
+            return true;
         }
 
         return asDrainer(() -> drainLoop(ownerHolds));
     }
 
-    /** Waiting here means another thread held the player, the two would have run on him together before this exclusion covered his tick. */
+    /** The thread holding the player is his packet-handling thread right now and nobody waits for it. 2026-09-06: a region waiting here deadlocked with the region it waited for, over a chunk publication. */
     private boolean asDrainer(Runnable body) {
-        boolean waited = false;
-        while (!claimed.compareAndSet(false, true)) {
-            waited = true;
-            LockSupport.parkNanos(CLAIM_WAIT_NANOS);
+        if (!claimed.compareAndSet(false, true)) {
+            return false;
         }
 
         PlayerPacketQueue outer = DRAINING.get();
@@ -96,8 +92,9 @@ public final class PlayerPacketQueue {
             claimed.set(false);
         }
 
-        return waited;
+        return true;
     }
+
 
     private void drainLoop(BooleanSupplier ownerHolds) {
         handedOver = false;
