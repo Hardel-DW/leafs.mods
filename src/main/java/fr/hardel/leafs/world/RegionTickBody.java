@@ -117,9 +117,10 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionTasks);
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, then the custom spawners. */
+    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, the anchors no region owns, then the custom spawners. */
     public void tickSerial(boolean spawnEnemies) {
         LevelChunks.of(level).sweep().soon();
+        ((ServerLevelRegionAccess) level).leafs$anchors().tickUnowned(LevelRegions.of(level));
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
         }
@@ -254,7 +255,7 @@ public final class RegionTickBody {
         }
 
         if (runsNormally) {
-            ((ServerLevelRegionAccess) level).leafs$anchors().tick(region, chunkSource::isPositionTicking);
+            ((ServerLevelRegionAccess) level).leafs$anchors().tick(region);
         }
     }
 }
