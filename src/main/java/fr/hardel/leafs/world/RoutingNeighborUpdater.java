@@ -37,7 +37,7 @@ public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
             return;
         }
 
-        resolved.submit(chunkX, chunkZ, () -> update.accept(this));
+        resolved.submitGame(chunkX, chunkZ, () -> update.accept(this));
     }
 
     private CollectingNeighborUpdater collector() {

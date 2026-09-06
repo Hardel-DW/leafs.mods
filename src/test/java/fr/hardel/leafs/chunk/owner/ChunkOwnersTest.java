@@ -17,16 +17,51 @@ class ChunkOwnersTest {
     private final ChunkPool pool = new ChunkPool(1, 4);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final List<String> ran = new CopyOnWriteArrayList<>();
+    private final List<Runnable> heads = new CopyOnWriteArrayList<>();
     private boolean holding;
     private boolean covered = true;
 
     private ChunkOwners owners() {
-        return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, Long.MAX_VALUE);
+        return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, task) -> heads.add(task), Long.MAX_VALUE);
     }
 
     @AfterEach
     void stop() {
         pool.shutdown();
+    }
+
+    @Test
+    void gameWorkRunsInLineForTheOwner() {
+        holding = true;
+
+        assertTrue(owners().submitGame(1, 1, () -> ran.add("now")));
+
+        assertEquals(List.of("now"), ran);
+        assertTrue(heads.isEmpty());
+    }
+
+    @Test
+    void gameWorkOnACoveredChunkWaitsForTheRegionTick() {
+        assertFalse(owners().submitGame(1, 1, () -> ran.add("later")));
+
+        assertEquals(List.of(), ran);
+        assertTrue(heads.isEmpty());
+        assertEquals(1, inbox.drain());
+        assertEquals(List.of("later"), ran);
+    }
+
+    /** 2026-09-05: a respawn sent to the pool waited for its spawn chunk under the reservation of that same chunk, forever; game work may wait, so it goes to the server thread instead. */
+    @Test
+    void gameWorkOnAnUncoveredChunkGoesToTheServerThreadNotThePool() {
+        covered = false;
+
+        assertFalse(owners().submitGame(1, 1, () -> ran.add("head")));
+
+        assertEquals(List.of(), ran);
+        assertEquals(0, pool.queued() + pool.active(), "the pool never runs game work");
+        assertEquals(1, heads.size());
+        heads.getFirst().run();
+        assertEquals(List.of("head"), ran);
     }
 
     @Test

@@ -3,6 +3,8 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.chunk.holder.ChunkWait;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -18,6 +20,7 @@ public final class LeafsWatchdog {
     private final Consumer<String> reporter;
     private final Consumer<Stall> killer;
     private final ConcurrentHashMap<TickHandle, RunningTick> running = new ConcurrentHashMap<>();
+    private final Map<Thread, Long> reportedWaits = new HashMap<>();
     private final AtomicReference<Thread> shutdownDeadline = new AtomicReference<>();
     private volatile boolean active;
     private Thread thread;
@@ -98,7 +101,25 @@ public final class LeafsWatchdog {
                     reporter.accept(describeStall(entry.getKey(), tick, now));
                 }
             }
+
+            reportStalledWaits(now);
         }
+    }
+
+    /** A chunk wait past the threshold on a thread that is not a tick unit, a chunk worker or the server thread, once per warn interval. */
+    private void reportStalledWaits(long now) {
+        Map<Thread, String> stalled = ChunkWait.stalled(now, warnNanos);
+        reportedWaits.keySet().retainAll(stalled.keySet());
+        for (RunningTick tick : running.values()) {
+            stalled.remove(tick.thread);
+        }
+
+        stalled.forEach((thread, summary) -> {
+            if (now - reportedWaits.getOrDefault(thread, Long.MIN_VALUE) >= warnNanos) {
+                reportedWaits.put(thread, now);
+                reporter.accept(withStack(new StringBuilder(summary), thread));
+            }
+        });
     }
 
     private void awaitShutdown(Duration deadline, Thread stopping) {
@@ -123,7 +144,11 @@ public final class LeafsWatchdog {
             message.append(System.lineSeparator()).append('	').append(waiting);
         }
 
-        for (StackTraceElement element : tick.thread.getStackTrace()) {
+        return withStack(message, tick.thread);
+    }
+
+    private static String withStack(StringBuilder message, Thread thread) {
+        for (StackTraceElement element : thread.getStackTrace()) {
             message.append(System.lineSeparator()).append("\tat ").append(element);
         }
 
