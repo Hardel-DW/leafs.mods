@@ -156,7 +156,11 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     public static LeafsConfig rewrite(Setting setting, int value) {
-        JsonObject json = encode(get());
+        return rewrite(file, setting, value);
+    }
+
+    static LeafsConfig rewrite(Path file, Setting setting, int value) {
+        JsonObject json = read(file).getAsJsonObject();
         json.addProperty(setting.key(), value);
         return write(file, parse(file, json));
     }
