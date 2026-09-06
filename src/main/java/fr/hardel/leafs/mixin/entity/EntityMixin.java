@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.entity;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import fr.hardel.leafs.entity.EntityTickAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -9,13 +10,29 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.PortalProcessor;
 import net.minecraft.world.level.portal.TeleportTransition;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-// Entity hooks: every move and every portal search leave through the teleport funnel, whatever thread is running.
+import java.util.concurrent.atomic.AtomicBoolean;
+
+// Entity hooks: every move and every portal search leave through the teleport funnel, whatever thread is running; one thread ticks an entity at a time.
 @Mixin(Entity.class)
-public abstract class EntityMixin {
+public abstract class EntityMixin implements EntityTickAccess {
+    @Unique
+    private final AtomicBoolean leafs$ticking = new AtomicBoolean();
+
+    @Override
+    public boolean leafs$beginTick() {
+        return leafs$ticking.compareAndSet(false, true);
+    }
+
+    @Override
+    public void leafs$endTick() {
+        leafs$ticking.set(false);
+    }
+
 
     // Every thread routes, including a mod's own pool: the funnel replays vanilla in place when the caller already holds the destination.
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)

@@ -89,7 +89,7 @@ public final class ChunkOwners {
             }
 
             if (work == Work.CHUNK) {
-                pool.submit(ChunkTask.of(ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> owning(chunkX, chunkZ, task)));
+                pool.submit(ChunkTask.of(ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
                 return false;
             }
 
@@ -192,7 +192,18 @@ public final class ChunkOwners {
         inbox.close(posted -> submit(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
     }
 
+    /** The pool task reads the owner again when it starts: a region or a taker that arrived while it queued gets the task instead of racing it. */
+    private void onPoolStart(int chunkX, int chunkZ, Runnable task) {
+        RegionInbox inbox = inboxAt(chunkX, chunkZ);
+        if (inbox != null && inbox.post(chunkX, chunkZ, Work.CHUNK, task)) {
+            return;
+        }
+
+        owning(chunkX, chunkZ, task);
+    }
+
     private void owning(int chunkX, int chunkZ, Runnable task) {
+
         Long previous = poolOwned.get();
         poolOwned.set(ChunkPos.pack(chunkX, chunkZ));
         try {
