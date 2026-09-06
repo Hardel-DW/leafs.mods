@@ -162,4 +162,9 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     public LongSet leafs$chunksToUnload() {
         return chunksToUnload;
     }
+
+    @Override
+    public boolean leafs$knows(UUID uuid) {
+        return knownUuids.contains(uuid);
+    }
 }

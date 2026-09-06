@@ -8,6 +8,8 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.LinkedHashMap;
@@ -65,6 +67,15 @@ public final class RegionBorrow {
     /** Null on every thread that is not borrowing. */
     public static RegionBorrow current() {
         return CURRENT.get();
+    }
+
+    /** A borrowing thread meets an entity: it takes the region of the entity's position, as it does for a chunk it reads. Nothing happens without a borrow. */
+    public static void atContact(Entity entity) {
+        RegionBorrow borrow = CURRENT.get();
+        if (borrow != null && entity.level() instanceof ServerLevel level) {
+            ChunkPos chunk = entity.chunkPosition();
+            borrow.borrow(LevelRegions.of(level), chunk.x(), chunk.z());
+        }
     }
 
     /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */

@@ -34,7 +34,6 @@ public abstract class EntityMixin implements EntityTickAccess {
     }
 
 
-    // Every thread routes, including a mod's own pool: the funnel replays vanilla in place when the caller already holds the destination.
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffOwnerTeleport(TeleportTransition transition, CallbackInfoReturnable<Entity> callbackInfo) {
         Entity self = (Entity) (Object) this;
@@ -44,7 +43,7 @@ public abstract class EntityMixin implements EntityTickAccess {
 
         if (self.level() instanceof ServerLevel origin && !self.isRemoved()
             && ((ServerLevelEntityAccess) origin).leafs$entityTeleports().route(self, transition)) {
-            callbackInfo.setReturnValue(null);
+            callbackInfo.setReturnValue(transition.newLevel() == origin ? self : null);
         }
     }
 

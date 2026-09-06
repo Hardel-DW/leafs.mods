@@ -13,6 +13,7 @@ import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.global.ConcurrentWaypointManager;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -34,7 +35,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Facade swap (dragonParts, players COW, waypoints), teleport routing, passenger membership from the region photo. */
+/** Facade swap (dragonParts, players COW, waypoints), the entity adds and removes on their owner, passenger membership from the region photo. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
@@ -88,7 +89,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return data != null && data.entities().contains(entity);
     }
 
-    /** From a region of another level the add hops to this level's owner of the position; here two regions serialize on the level-wide player maps. */
+    /** From a region of another level the add hops to this level's owner of the position; here a head takes the region at contact, and two regions serialize on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
         if (leafs$fromAnotherLevel()) {
@@ -96,18 +97,24 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return;
         }
 
+        RegionBorrow.atContact(player);
         SharedStateMonitor.run(this, () -> original.call(player));
     }
 
-    /** A hop answers true: the duplicate-UUID check happens at delivery, on the owner. */
+    /** A hop answers what vanilla answers before touching the sections, an entity already removed or a UUID already known is refused here too. */
     @WrapMethod(method = "addEntity")
     private boolean leafs$addEntityOnTheOwner(Entity entity, Operation<Boolean> original) {
-        if (leafs$fromAnotherLevel()) {
-            leafs$onOwnerOf(entity, () -> original.call(entity));
-            return true;
+        if (!leafs$fromAnotherLevel()) {
+            RegionBorrow.atContact(entity);
+            return original.call(entity);
         }
 
-        return original.call(entity);
+        if (entity.isRemoved() || ((EntityManagerAccess) ((ServerLevel) (Object) this).entityManager).leafs$knows(entity.getUUID())) {
+            return false;
+        }
+
+        leafs$onOwnerOf(entity, () -> original.call(entity));
+        return true;
     }
 
     @WrapMethod(method = "removePlayerImmediately")
@@ -117,6 +124,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return;
         }
 
+        RegionBorrow.atContact(player);
         SharedStateMonitor.run(this, () -> original.call(player, reason));
     }
 
