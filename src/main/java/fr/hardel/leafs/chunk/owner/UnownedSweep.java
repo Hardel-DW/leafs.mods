@@ -125,7 +125,7 @@ public final class UnownedSweep {
             }
         }
 
-        int budget = regions.autosaveForced() ? epochBacklog.size() : Math.min(ChunkSaves.CHUNKS_PER_TICK, epochBacklog.size());
+        int budget = Math.min(ChunkSaves.CHUNKS_PER_TICK, epochBacklog.size());
         for (int index = 0; index < budget; index++) {
             long chunkKey = epochBacklog.popLong();
             ChunkHolder holder = table.get(chunkKey);

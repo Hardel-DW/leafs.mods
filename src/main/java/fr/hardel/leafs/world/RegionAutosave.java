@@ -14,9 +14,8 @@ public final class RegionAutosave {
         this.saves = new ChunkSaves(level);
     }
 
-    /** Runs while TICKING on the owner, where the chunk walk and the entity photo are legal. The walk stops at the deadline and resumes next tick; once through, the epoch is done for this region until the next one. A forced epoch saves everything in this pass. */
-    public void tick(Region<?> region, RegionWorldData worldData, long epoch, boolean forced, long deadlineNanos) {
-        long deadline = forced ? Long.MAX_VALUE : deadlineNanos;
+    /** Runs while TICKING on the owner, where the chunk walk and the entity photo are legal. The walk stops at the deadline and resumes next tick; once through, the epoch is done for this region until the next one. */
+    public void tick(Region<?> region, RegionWorldData worldData, long epoch, long deadline) {
         saves.saveEagerly(key -> region.owns(ChunkPos.getX(key), ChunkPos.getZ(key)), deadline);
         worldData.entities().forEach(entity -> {
             if (entity instanceof ServerPlayer player) {

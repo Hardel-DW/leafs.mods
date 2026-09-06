@@ -29,6 +29,7 @@ public final class RegionBorrow {
 
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
     private final Map<LevelRegions, Long2ObjectOpenHashMap<RegionInbox>> heldChunks = new LinkedHashMap<>();
+    private boolean released;
 
     private RegionBorrow() {
     }
@@ -86,15 +87,18 @@ public final class RegionBorrow {
         }
     }
 
-    /** Every region of the level, looping until a full pass adds nothing: the feed may create one while the pass runs, a fold may replace some. */
+    /** Every region of the level, looping until a full pass neither takes nor returns anything: the feed may create one while the pass runs, a fold returns everything and replaces some. */
     public void borrowAll(LevelRegions regions) {
-        int before;
+        boolean changed;
         do {
-            before = held.size();
+            released = false;
+            int before = held.size();
             for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
                 take(regions, region);
             }
-        } while (held.size() != before);
+
+            changed = released || held.size() != before;
+        } while (changed);
     }
 
     /** Waits for a tick in flight. A region idle yet untakeable is owed a merge with one this thread holds: everything is returned so the regionizer folds, and the survivor is taken again. False once the region is dead. */
@@ -158,6 +162,7 @@ public final class RegionBorrow {
 
     /** The regions go back first; a released chunk hands its leftover game work back through the owners, which may take the chunk again on this thread, hence the loop. */
     public void releaseAll() {
+        released = !held.isEmpty();
         for (Region<RegionTickData> region : held) {
             region.markNotTicking();
         }
