@@ -4,8 +4,9 @@ import fr.hardel.leafs.Leafs;
 
 import java.util.ArrayDeque;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
-/** What a region runs at its next pass, chunk work and game work each in posting order. Closed once the region is gone, its remainder goes back through the owners. */
+/** What an owner runs at its next pass, chunk work and game work each in posting order; what it no longer owns leaves through the owners instead. Closed once the owner is gone, its remainder goes back the same way. */
 public final class RegionInbox {
     public record Posted(int chunkX, int chunkZ, Work work, Runnable task) {
     }
@@ -13,11 +14,20 @@ public final class RegionInbox {
     private final ArrayDeque<Posted> chunkWork = new ArrayDeque<>();
     private final ArrayDeque<Posted> gameWork = new ArrayDeque<>();
     private final long slowTaskNanos;
+    private final Predicate<Posted> owns;
+    private final Consumer<Posted> elsewhere;
     private boolean closed;
 
-    /** A task longer than the threshold is logged with its class and chunk, the one place where a publication can cost a tick. */
+    /** The box of a chunk another thread took: every task in it is for that chunk. */
     public RegionInbox(long slowTaskNanos) {
+        this(slowTaskNanos, _ -> true, _ -> { });
+    }
+
+    /** A task longer than the threshold is logged with its class and chunk, the one place where a publication can cost a tick. A task on a chunk the owner lost, a section reclaimed from a region, leaves through {@code elsewhere}. */
+    public RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere) {
         this.slowTaskNanos = slowTaskNanos;
+        this.owns = owns;
+        this.elsewhere = elsewhere;
     }
 
     /** False once closed: the region no longer exists, the caller resolves the owner again. */
@@ -63,6 +73,12 @@ public final class RegionInbox {
                 break;
             }
 
+            ran++;
+            if (!owns.test(next)) {
+                elsewhere.accept(next);
+                continue;
+            }
+
             long began = System.nanoTime();
             next.task().run();
             long took = System.nanoTime() - began;
@@ -70,8 +86,6 @@ public final class RegionInbox {
                 String owner = next.task().getClass().getName();
                 Leafs.LOGGER.warn("Inbox task at [{}, {}] took {} ms: {}", next.chunkX(), next.chunkZ(), took / 1_000_000L, owner.substring(owner.lastIndexOf('.') + 1));
             }
-
-            ran++;
         }
 
         return ran;
