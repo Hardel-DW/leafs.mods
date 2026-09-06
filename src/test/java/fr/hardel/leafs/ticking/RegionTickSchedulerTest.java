@@ -122,31 +122,13 @@ class RegionTickSchedulerTest {
         }
     }
 
-    /** A unit that recovers keeps the report, swallows the failure and stays schedulable; the failure policy never hears of it. */
-    @Test
-    void aRecoveredCrashWritesTheReportAndDoesNotPropagate(@TempDir Path crashDirectory) throws IOException {
-        RegionTickScheduler attached = createScheduler(1, crashDirectory);
-        TestTickHandle handle = new TestTickHandle(10, () -> {
-            throw new IllegalStateException("boom");
-        }, false, true);
-
-        attached.runAttached(handle);
-
-        assertEquals(1, handle.recoveries());
-        assertFalse(handle.isCancelled());
-        assertNull(RegionContext.current());
-        try (Stream<Path> files = Files.list(crashDirectory)) {
-            assertEquals(1, files.count());
-        }
-    }
-
     /** A crash path must not crash: a report that cannot be built must not hide what actually failed. */
     @Test
     void aFailingCrashReportNeverReplacesTheOriginalFailure(@TempDir Path crashDirectory) {
         RegionTickScheduler attached = createScheduler(1, crashDirectory);
         TestTickHandle handle = new TestTickHandle(11, () -> {
             throw new IllegalStateException("boom");
-        }, true, false);
+        }, true);
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> attached.runAttached(handle));
 

@@ -182,9 +182,8 @@ public final class TickingManager {
         }
     }
 
-    /** Only an unrecoverable unit lands here, the server-thread unit or a region dead twice in a minute; the report is already written. */
     private void onRegionTickFailure(TickHandle handle, Throwable throwable) {
-        Leafs.LOGGER.error("Tick unit #{} in {} is not recoverable - stopping the server", handle.id(), handle.dimension(), throwable);
+        Leafs.LOGGER.error("Tick unit #{} in {} threw - stopping the server", handle.id(), handle.dimension(), throwable);
         handle.cancel();
         server.halt(false);
     }

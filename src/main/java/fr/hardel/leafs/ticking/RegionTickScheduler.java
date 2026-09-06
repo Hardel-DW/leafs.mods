@@ -125,9 +125,7 @@ public final class RegionTickScheduler {
                 throwable.addSuppressed(reportFailure);
             }
 
-            if (!handle.recover()) {
-                throw throwable;
-            }
+            throw throwable;
         } finally {
             watchdog.endTick(handle);
             RegionContext.exit();

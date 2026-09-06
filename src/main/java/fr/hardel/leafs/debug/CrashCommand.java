@@ -13,11 +13,10 @@ import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 
-/** {@code /leafs crash <dimension> <id>}: throws inside the next tick of that region, the test tool of crash isolation. */
+/** {@code /leafs crash <dimension> <id>}: throws inside the next tick of that region, the test tool of the region crash report. */
 public final class CrashCommand {
 
-    private CrashCommand() {
-    }
+    private CrashCommand() {}
 
     static LiteralArgumentBuilder<CommandSourceStack> tree() {
         return Commands.literal("crash")
