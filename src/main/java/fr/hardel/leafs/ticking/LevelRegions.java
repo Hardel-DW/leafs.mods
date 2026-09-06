@@ -16,14 +16,11 @@ import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongList;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.jspecify.annotations.Nullable;
 
@@ -259,70 +256,19 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return data;
     }
 
-    /**
-     * A crashed region: its players reconnect through the normal join, its chunks keep their in-memory
-     * state but count as saved, its tick payload is dropped and it reschedules. A second death within the window is not recoverable.
-     */
-    boolean restart(Region<RegionTickData> region) {
-        RegionTickData data = region.data();
-        if (!data.recordDeath(System.nanoTime())) {
-            return false;
-        }
-
-        int players = disconnectPlayers(region);
-        keepChunksAsSaved(region);
-        equipWorld(data);
-        scheduler.schedule(newHandle(region));
-        Leafs.LOGGER.warn("Region #{} in {} restarted after a crash, {} players disconnected", region.id(), dimension, players);
-        return true;
-    }
-
-    private int disconnectPlayers(Region<RegionTickData> region) {
-        Component reason = Component.literal("Your region crashed, please reconnect");
-        int count = 0;
-        for (ServerPlayer player : body.level().players()) {
-            ChunkPos chunk = player.chunkPosition();
-            if (region.owns(chunk.x(), chunk.z())) {
-                player.connection.disconnect(reason);
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    /** Only what changes after the crash reaches the disk; a restart of the server returns the area to its last save, as a vanilla crash would. */
-    private void keepChunksAsSaved(Region<RegionTickData> region) {
-        ChunkMap chunkMap = body.level().getChunkSource().chunkMap;
-        region.forEachChunk((chunkX, chunkZ) -> {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
-            ChunkAccess chunk = holder == null ? null : holder.getLatestChunk();
-            if (chunk != null) {
-                chunk.tryMarkSaved();
-            }
-        });
-    }
-
     /** A clock starts at game time, so ticks unpacked before the region existed keep their delays. */
     private void equipWorld(RegionTickData data) {
         RegionClock clock = new RegionClock(gameTime.getAsLong());
         data.equipWorld(clock, worldDataFactory.apply(clock::currentTick));
     }
 
-    /** The previous handle, if any, must never be requeued by the worker that ran it. */
     private RegionTickHandle newHandle(Region<RegionTickData> region) {
-        RegionTickHandle previous = region.data().handle();
-        if (previous != null) {
-            previous.cancel();
-            retire(previous);
-        }
-
         RegionTickHandle handle = new RegionTickHandle(region, dimension, this);
         region.data().attachHandle(handle);
         return handle;
     }
 
-    /** Called wherever a handle stops being used, a crash restart or the region's death, so no work goes missing. */
+    /** A dead region's handle stops being used; its totals stay in the level's, so no work goes missing. */
     private void retire(RegionTickHandle handle) {
         StageTimings stages = handle.stages();
         retiredBusyNanos += stages.busyNanos();

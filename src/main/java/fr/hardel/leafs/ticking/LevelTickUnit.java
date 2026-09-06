@@ -100,11 +100,6 @@ public final class LevelTickUnit extends TickHandle {
     }
 
     @Override
-    protected boolean recover() {
-        return false;
-    }
-
-    @Override
     protected RegionCrashReport buildCrashReport() {
         return new RegionCrashReport(id(), dimension(), currentTick(), chunkCount(), entityCount());
     }
