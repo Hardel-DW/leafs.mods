@@ -3,9 +3,11 @@ package fr.hardel.leafs.mixin.world;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.Router;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.world.ChunkBlockEvents;
 import fr.hardel.leafs.world.ChunkScheduledTicks;
-import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.LevelBlockUpdates;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -55,32 +57,22 @@ public abstract class ServerLevelMixin {
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$chunkKeyedTicks(CallbackInfo callbackInfo) {
-        this.blockTicks = new ChunkScheduledTicks<>(self(), RegionWorldData::blockTicks);
-        this.fluidTicks = new ChunkScheduledTicks<>(self(), RegionWorldData::fluidTicks);
+        Router owners = LevelChunks.of(self()).owners();
+        this.blockTicks = new ChunkScheduledTicks<>(self(), RegionWorldData::blockTicks, owners);
+        this.fluidTicks = new ChunkScheduledTicks<>(self(), RegionWorldData::fluidTicks, owners);
     }
 
     /** A loaded chunk keeps its own events; an unloaded position keeps vanilla's level set, drained serially. */
     @Inject(method = "blockEvent", at = @At("HEAD"), cancellable = true)
     private void leafs$blockEventOnTheChunk(BlockPos pos, Block block, int b0, int b1, CallbackInfo callbackInfo) {
-        LevelChunk chunk = self().getChunkSource().getChunkNow(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
-        if (chunk == null) {
-            return;
+        if (ChunkBlockEvents.post(self(), new BlockEventData(pos.immutable(), block, b0, b1), leafs$blockEventSequence.getAndIncrement())) {
+            callbackInfo.cancel();
         }
-
-        ((ChunkTickAccess) chunk).leafs$blockEvents().add(new BlockEventData(pos.immutable(), block, b0, b1), leafs$blockEventSequence.getAndIncrement());
-        callbackInfo.cancel();
     }
 
     @Inject(method = "clearBlockEvents", at = @At("HEAD"))
     private void leafs$clearChunkBlockEvents(BoundingBox area, CallbackInfo callbackInfo) {
-        for (int chunkX = SectionPos.blockToSectionCoord(area.minX()); chunkX <= SectionPos.blockToSectionCoord(area.maxX()); chunkX++) {
-            for (int chunkZ = SectionPos.blockToSectionCoord(area.minZ()); chunkZ <= SectionPos.blockToSectionCoord(area.maxZ()); chunkZ++) {
-                LevelChunk chunk = self().getChunkSource().getChunkNow(chunkX, chunkZ);
-                if (chunk != null) {
-                    ((ChunkTickAccess) chunk).leafs$blockEvents().clearArea(area);
-                }
-            }
-        }
+        ChunkBlockEvents.clearArea(self(), area);
     }
 
     /** Region bodies are the level tick for their chunks: block-event consumers (pistons) must see it that way. */
