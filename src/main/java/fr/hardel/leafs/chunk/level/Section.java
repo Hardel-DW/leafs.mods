@@ -8,9 +8,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 
-/** 64 by 64 chunks of one graph: the settled levels, the sources, and the source changes not yet propagated. */
+/** 64 by 64 chunks of one graph: the settled levels, the sources, and the source changes not yet propagated. Exists while a level does, retired once empty. */
 final class Section {
     static final int SHIFT = 6;
     static final int SIZE = 1 << SHIFT;
@@ -18,14 +17,17 @@ final class Section {
     private static final VarHandle LEVELS = MethodHandles.arrayElementVarHandle(byte[].class);
 
     final long key;
-    final ReentrantLock lock = new ReentrantLock();
     final AtomicBoolean queued = new AtomicBoolean();
+    private final int none;
     private final byte[] levels = new byte[SIZE * SIZE];
     private final byte[] sources = new byte[SIZE * SIZE];
     private final Short2ByteOpenHashMap pending = new Short2ByteOpenHashMap();
+    private int occupied;
+    private boolean retired;
 
     Section(long key, int none) {
         this.key = key;
+        this.none = none;
         Arrays.fill(levels, (byte) none);
         Arrays.fill(sources, (byte) none);
     }
@@ -38,10 +40,15 @@ final class Section {
         return ((chunkX >> SHIFT) & 0xFFFFFFFFL) | (((long) (chunkZ >> SHIFT) & 0xFFFFFFFFL) << 32);
     }
 
-    /** Last write wins until the next drain takes the batch. */
-    void post(int index, int level) {
+    /** Last write wins until the next drain takes the batch. False once retired: the writer asks the graph for the section again. */
+    boolean post(int index, int level) {
         synchronized (pending) {
+            if (retired) {
+                return false;
+            }
+
             pending.put((short) index, (byte) level);
+            return true;
         }
     }
 
@@ -50,6 +57,18 @@ final class Section {
             Short2ByteOpenHashMap batch = pending.clone();
             pending.clear();
             return batch;
+        }
+    }
+
+    /** Under the drain's locks, once its levels are all gone: nothing pending and nothing queued, or a source posted meanwhile would be lost. */
+    boolean retire() {
+        synchronized (pending) {
+            if (occupied > 0 || !pending.isEmpty() || queued.get()) {
+                return false;
+            }
+
+            retired = true;
+            return true;
         }
     }
 
@@ -68,6 +87,8 @@ final class Section {
     }
 
     void publish(int index, int level) {
+        int before = levels[index];
+        occupied += (before == none ? 1 : 0) - (level == none ? 1 : 0);
         LEVELS.setRelease(levels, index, (byte) level);
     }
 
