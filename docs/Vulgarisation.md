@@ -33,7 +33,6 @@ Les workers de chunks sont parfaitement indépendants des workers de régions. I
 Ces workers tournent en priorité système minimale sur le système d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
 - Un joueur qui explore ne fait plus laguer les autres joueurs, même de sa propre région.
 - Une zone très dense, avec un TPS bas, n'affecte pas la vitesse de génération du monde donc il peut continuer à se déplacer fluidement.
-- Chaque joueur est plafonné à 5 chunks par tick. (Configurable par `player_chunk_loads_per_tick`)
 
 # Emprunts et Courrier
 Deux concepts de Multithread de Leafs simples.

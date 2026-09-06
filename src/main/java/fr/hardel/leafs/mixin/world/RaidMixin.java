@@ -63,6 +63,7 @@ public abstract class RaidMixin implements RaidTickerAccess {
         }
 
         leafs$ticker = true;
-        ((ServerLevelRegionAccess) level).leafs$anchors().add(new AnchoredTicker(getCenter(), "raid", () -> tick(level), this::isStopped));
+        ((ServerLevelRegionAccess) level).leafs$anchors().add(new AnchoredTicker(getCenter(), () -> tick(level), this::isStopped)
+);
     }
 }

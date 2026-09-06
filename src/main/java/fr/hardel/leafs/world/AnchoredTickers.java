@@ -25,7 +25,8 @@ public final class AnchoredTickers {
             int chunkX = SectionPos.blockToSectionCoord(anchor.pos().getX());
             int chunkZ = SectionPos.blockToSectionCoord(anchor.pos().getZ());
             if (region.owns(chunkX, chunkZ) && tickingChunk.test(anchor.chunkKey())) {
-                anchor.tick();
+                anchor.body().run();
+
             }
         }
     }

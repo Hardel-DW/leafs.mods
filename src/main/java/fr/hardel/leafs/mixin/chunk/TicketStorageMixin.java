@@ -30,10 +30,6 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         return leafs$graphs;
     }
 
-    @Override
-    public TicketTimeoutIndex leafs$timeouts() {
-        return leafs$timeouts;
-    }
 
     @Override
     public void leafs$bindTimeouts(TicketTimeoutIndex timeouts) {

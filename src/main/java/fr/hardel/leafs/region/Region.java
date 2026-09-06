@@ -78,9 +78,6 @@ public final class Region<R> {
         return regionizer.sectionKeysOf(this);
     }
 
-    public long[] tickingSectionKeySnapshot() {
-        return regionizer.tickingSectionKeysOf(this);
-    }
 
     void setState(RegionState state) {
         this.state = state;

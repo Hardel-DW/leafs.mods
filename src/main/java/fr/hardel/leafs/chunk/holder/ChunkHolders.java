@@ -94,7 +94,8 @@ public final class ChunkHolders implements LevelListener {
         }
 
         for (ChunkHolder holder : changed) {
-            updateFutures(holder);
+            ChunkPos pos = holder.getPos();
+            holder.updateFutures(chunkMap, owners.executor(pos.x(), pos.z()));
         }
 
         for (ChunkHolder holder : changed) {
@@ -171,10 +172,6 @@ public final class ChunkHolders implements LevelListener {
         setQueueLevel.accept(newLevel);
     }
 
-    private void updateFutures(ChunkHolder holder) {
-        ChunkPos pos = holder.getPos();
-        holder.updateFutures(chunkMap, owners.executor(pos.x(), pos.z()));
-    }
 
     private void unload(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();

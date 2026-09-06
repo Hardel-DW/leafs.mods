@@ -176,19 +176,6 @@ public final class Regionizer<R> {
         }
     }
 
-    /** The sections that tick, without the ring; a debug read for the map. */
-    long[] tickingSectionKeysOf(Region<R> region) {
-        long[] keys = sectionKeysOf(region);
-        LongArrayList ticking = new LongArrayList(keys.length);
-        for (long key : keys) {
-            RegionSection<R> section = sections.get(key);
-            if (section != null && !section.isEmpty()) {
-                ticking.add(key);
-            }
-        }
-
-        return ticking.toLongArray();
-    }
 
     /** The bypass is what lets a callback read a count: taking the read lock while owning the write lock deadlocks a {@link StampedLock}. */
     private int readCount(IntSupplier count) {

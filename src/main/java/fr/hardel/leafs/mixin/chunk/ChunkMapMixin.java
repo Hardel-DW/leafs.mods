@@ -156,8 +156,9 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     /** Each step is a pool task under the radius it writes. */
     @WrapOperation(method = "applyStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/status/ChunkStep;apply(Lnet/minecraft/world/level/chunk/status/WorldGenContext;Lnet/minecraft/util/StaticCache2D;Lnet/minecraft/world/level/chunk/ChunkAccess;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkAccess> leafs$stepOnThePool(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Operation<CompletableFuture<ChunkAccess>> original) {
-        return leafs$chunks.steps().apply(step, context, cache, chunk);
+        return leafs$chunks.steps().apply(step, cache, chunk, () -> original.call(step, context, cache, chunk));
     }
+
 
     @Inject(method = "runGenerationTask", at = @At("HEAD"), cancellable = true)
     private void leafs$driveOnThePool(ChunkGenerationTask task, CallbackInfo callbackInfo) {
