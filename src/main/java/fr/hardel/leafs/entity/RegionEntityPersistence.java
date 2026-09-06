@@ -1,6 +1,7 @@
 package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.Work;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -26,7 +27,7 @@ public final class RegionEntityPersistence {
 
     /** A loaded entity chunk lands on its owner; an empty chunk completes on the requesting owner and runs in place. */
     public void deliver(ChunkPos pos, Runnable delivery) {
-        LevelChunks.of(level).owners().submit(pos.x(), pos.z(), delivery);
+        LevelChunks.of(level).owners().submit(pos.x(), pos.z(), Work.CHUNK, delivery);
     }
 
     public LongSet pendingUnloads() {

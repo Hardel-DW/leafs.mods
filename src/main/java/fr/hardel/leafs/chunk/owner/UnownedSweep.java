@@ -69,7 +69,7 @@ public final class UnownedSweep {
     }
 
     private void dispatch(long chunkKey, Runnable task) {
-        owners.submit(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey), task);
+        owners.submit(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey), Work.CHUNK, task);
     }
 
     private void purgeTimeouts() {
