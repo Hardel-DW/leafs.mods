@@ -102,13 +102,17 @@ public final class TickingManager {
         return globalTicking && server.isSameThread() && globalScheduler.drain();
     }
 
-    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. */
+    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. The task runs as a head, borrowing at contact like a command. */
     public boolean divertExecute(Runnable task) {
         if (!globalTicking || server.isSameThread()) {
             return false;
         }
 
-        globalScheduler.run(task);
+        globalScheduler.run(() -> RegionBorrow.hold(borrow -> {
+            task.run();
+            return null;
+        }));
+        
         return true;
     }
 
