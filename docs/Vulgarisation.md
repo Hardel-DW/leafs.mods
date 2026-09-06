@@ -16,7 +16,7 @@ Deux joueurs éloignés sont donc dans une région différente chacun. Les régi
 Une région possède ses chunks, ses entités, ses joueurs, ses block entities, les paquets réseau de ses joueurs et son propre générateur aléatoire. Pendant son tick, personne d'autre n'écrit dans son contenu. Lire chez une autre région reste libre pour tout le monde.
 
 # Thread
-**Le thread serveur vanilla existe toujours.** Les régions tickent en même temps que lui. Il fait une fois par tick ce qui est global par nature, l'heure du monde, la météo, la bordure, la liste des joueurs et le déclencheur d'autosave. Il exécute aussi toutes les commandes. Son coût est fixe et minime, sans dépendre du nombre de chunks ou d'entités. Seule la liste des joueurs grandit avec eux, et son coût par joueur est infime.
+**Le thread serveur vanilla existe toujours.** Les régions tickent en même temps que lui. Il fait une fois par tick ce qui est global par nature, l'heure du monde, la météo, la bordure, la liste des joueurs et le déclencheur d'autosave. Il exécute aussi toutes les commandes. Son coût est fixe et minime, sans dépendre du nombre de chunks ou d'entités. Seule la liste des joueurs grandit avec eux, et son coût par joueur est infime. 
 
 ## Workers de Région
 Une région n'est pas un thread ! Une région est une tâche. Les régions attendent dans une seule liste, triée par le moment du prochain tick. Un worker libre prend la première, la tick. Un worker occupé par une grosse région ne bloque personne, les autres prennent la suite.
@@ -33,6 +33,10 @@ Les workers de chunks sont parfaitement indépendants des workers de régions. I
 Ces workers tournent en priorité système minimale sur le système d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
 - Un joueur qui explore ne fait plus laguer les autres joueurs, même de sa propre région.
 - Une zone très dense, avec un TPS bas, n'affecte pas la vitesse de génération du monde donc il peut continuer à se déplacer fluidement.
+
+# La sauvegarde
+- La commande `/save-all flush`  et l'arrêt du serveur, figent toutes les régions le temps de la sauvegarde, comme vanilla fige le serveur.
+- L'autosave périodique, lui est fait par les régions.
 
 # Emprunts et Courrier
 Deux concepts de Multithread de Leafs simples.
