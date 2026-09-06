@@ -22,3 +22,7 @@ On pense long terme : pas de fix rapide qui devient une dette, pas de cas par ca
 Si, lorsqu'on modifie des concepts du jeu comme des fonctions primitives (lire/écrire des blocs, des chunks, les mécanismes de téléportation ou autres), un mod qui les utilise doit fonctionner de manière parfaitement identique à avant.
 Si on a connaissance d'un décalage, ou d'un écart/bug qui pourrait survenir, on doit juste changer l'archi, les règles, et repenser Leafs. Les mods/moddeurs ne doivent avoir aucune différence dans leur expérience de développement. C'est le point le plus important et il passe avant tout le reste. La compatibilité des mods est prioritaire sur tout.
 Je préfère sacrifier une optimisation mais permettre que les mods marchent parfaitement. Leur dire que ce qu'ils font fonctionnera, mais différemment, n'est pas non plus une option
+
+# La règle absolue
+Leafs fait ce que vanilla fait, mais en multithread. Quand une règle à nous double une règle vanilla, on retire la nôtre. Les mods ne voient pas Leafs, ils appellent les mêmes fonctions que d'habitude, et ces fonctions font la même chose qu'avant. C'est mieux de retirer de la logique pour se rapprocher de vanilla, plutôt que d'en rajouter.
+L'expérience de développement des moddeurs passe avant les optimisations.
