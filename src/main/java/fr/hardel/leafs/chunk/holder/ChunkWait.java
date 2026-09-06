@@ -13,6 +13,8 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
@@ -59,6 +61,18 @@ public final class ChunkWait {
         return report == null ? null : report.toString();
     }
 
+    /** The waits older than the threshold, whatever the thread: the watchdog's view beyond the tick units it follows. */
+    public static Map<Thread, String> stalled(long nowNanos, long thresholdNanos) {
+        Map<Thread, String> stalled = new HashMap<>();
+        WAITING.forEach((thread, report) -> {
+            long waited = nowNanos - report.startedNanos();
+            if (waited >= thresholdNanos) {
+                stalled.put(thread, "Chunk wait stalled for " + waited / 1_000_000_000L + "s on thread '" + thread.getName() + "': " + report);
+            }
+        });
+        return stalled;
+    }
+
     /** The first frame that is neither the wait nor the chunk read it serves: the game code that needed the chunk. */
     private static String asker() {
         for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
@@ -75,14 +89,13 @@ public final class ChunkWait {
 
     private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
-        WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery);
+        WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
         WaitReport outer = WAITING.put(Thread.currentThread(), report);
         String found = report.toString();
-        long started = System.nanoTime();
         try {
             until(level, delivery::isDone);
         } finally {
-            long waited = System.nanoTime() - started;
+            long waited = System.nanoTime() - report.startedNanos();
             TickingManager ticking = TickingManager.of(level.getServer());
             ticking.metrics().chunkWaited(waited);
             if (waited >= ticking.slowTaskWarnMillis() * 1_000_000L) {

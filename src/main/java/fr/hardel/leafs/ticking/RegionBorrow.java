@@ -67,7 +67,7 @@ public final class RegionBorrow {
                 return;
             }
 
-            if (take(region)) {
+            if (take(regions, region)) {
                 return;
             }
         }
@@ -79,13 +79,13 @@ public final class RegionBorrow {
         do {
             before = held.size();
             for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-                take(region);
+                take(regions, region);
             }
         } while (held.size() != before);
     }
 
     /** Waits for a tick in flight. A region idle yet untakeable is owed a merge with one this thread holds: everything is returned so the regionizer folds, and the survivor is taken again. False once the region is dead. */
-    private boolean take(Region<RegionTickData> region) {
+    private boolean take(LevelRegions regions, Region<RegionTickData> region) {
         while (region.state() != RegionState.DEAD) {
             if (held.contains(region) || region.tryMarkTicking()) {
                 held.add(region);
@@ -95,11 +95,20 @@ public final class RegionBorrow {
             if (region.state() != RegionState.TICKING && !held.isEmpty()) {
                 releaseAll();
             } else {
-                LockSupport.parkNanos(WAIT_NANOS);
+                awaitTick(regions, region);
             }
         }
 
         return false;
+    }
+
+    /** The server thread pumps its queues while the tick in flight runs: that tick may be waiting for one of them, a spawn search ends on the server thread. */
+    private static void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
+        if (regions.live() && regions.level().getServer().isSameThread()) {
+            regions.level().getServer().managedBlock(() -> region.state() != RegionState.TICKING);
+        }
+
+        LockSupport.parkNanos(WAIT_NANOS);
     }
 
     /** Whether this thread holds the region of the position, or the chunk itself when no region covers it. */
