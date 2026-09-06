@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 
 /** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill (vanilla's max-tick-time, zero disables) runs once; the same killer covers a shutdown that never finishes. */
@@ -17,6 +18,7 @@ public final class LeafsWatchdog {
 
     private final long warnNanos;
     private final LongSupplier killNanos;
+    private final LongFunction<Map<Thread, String>> stalledWaits;
     private final Consumer<String> reporter;
     private final Consumer<Stall> killer;
     private final ConcurrentHashMap<TickHandle, RunningTick> running = new ConcurrentHashMap<>();
@@ -29,9 +31,11 @@ public final class LeafsWatchdog {
     public record Stall(String summary, Thread thread) {
     }
 
-    public LeafsWatchdog(Duration warnAfter, LongSupplier killNanos, Consumer<String> reporter, Consumer<Stall> killer) {
+    /** The stalled waits are the chunk waits older than the warn threshold at a given time, on any thread. */
+    public LeafsWatchdog(Duration warnAfter, LongSupplier killNanos, LongFunction<Map<Thread, String>> stalledWaits, Consumer<String> reporter, Consumer<Stall> killer) {
         this.warnNanos = warnAfter.toNanos();
         this.killNanos = killNanos;
+        this.stalledWaits = stalledWaits;
         this.reporter = reporter;
         this.killer = killer;
     }
@@ -106,21 +110,23 @@ public final class LeafsWatchdog {
         }
     }
 
-    /** A chunk wait past the threshold on a thread that is not a tick unit, a chunk worker or the server thread, once per warn interval. */
+    /** A chunk wait past the threshold on a thread that is not a tick unit, a chunk worker or the server thread: at once, then once per warn interval. */
     private void reportStalledWaits(long now) {
-        Map<Thread, String> stalled = ChunkWait.stalled(now, warnNanos);
+        Map<Thread, String> stalled = stalledWaits.apply(now);
         reportedWaits.keySet().retainAll(stalled.keySet());
         for (RunningTick tick : running.values()) {
             stalled.remove(tick.thread);
         }
 
         stalled.forEach((thread, summary) -> {
-            if (now - reportedWaits.getOrDefault(thread, Long.MIN_VALUE) >= warnNanos) {
+            Long lastReport = reportedWaits.get(thread);
+            if (lastReport == null || now - lastReport >= warnNanos) {
                 reportedWaits.put(thread, now);
                 reporter.accept(withStack(new StringBuilder(summary), thread));
             }
         });
     }
+
 
     private void awaitShutdown(Duration deadline, Thread stopping) {
         try {

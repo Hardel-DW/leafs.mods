@@ -3,6 +3,7 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.holder.ChunkWait;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
@@ -36,7 +37,8 @@ public final class TickingManager {
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
-        this.watchdog = new LeafsWatchdog(Duration.ofSeconds(config.debug().watchdogWarnSeconds()), () -> killAfterNanos(server), Leafs.LOGGER::error, new WatchdogKill(server));
+        Duration warnAfter = Duration.ofSeconds(config.debug().watchdogWarnSeconds());
+        this.watchdog = new LeafsWatchdog(warnAfter, () -> killAfterNanos(server), now -> ChunkWait.stalled(now, warnAfter.toNanos()), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), ModAttribution.fromLoader());
         this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
@@ -163,6 +165,7 @@ public final class TickingManager {
         chunkPool.shutdown();
         for (ServerLevel level : server.getAllLevels()) {
             LevelChunks.of(level).holders().logWaitingTeardowns(level.dimension().identifier().toString());
+            Leafs.LOGGER.info("{} graph sections left in {}", LevelChunks.of(level).graphs().sectionCount(), level.dimension().identifier());
         }
 
         globalTicking = false;
