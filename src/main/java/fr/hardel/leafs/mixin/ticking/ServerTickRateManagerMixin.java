@@ -14,6 +14,6 @@ public abstract class ServerTickRateManagerMixin {
     @Inject(method = "setTickRate", at = @At("TAIL"))
     private void leafs$propagateTickRate(float rate, CallbackInfo callbackInfo) {
         ServerTickRateManager manager = (ServerTickRateManager) (Object) this;
-        TickingManager.of(manager.server).setTickPeriodNanos(manager.nanosecondsPerTick());
+        TickingManager.of(manager.server).scheduler().setPeriodNanos(manager.nanosecondsPerTick());
     }
 }

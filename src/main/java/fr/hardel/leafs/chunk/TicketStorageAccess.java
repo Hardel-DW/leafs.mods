@@ -7,7 +7,6 @@ import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 public interface TicketStorageAccess {
     TicketGraphs leafs$graphs();
 
-    TicketTimeoutIndex leafs$timeouts();
 
     /** Bound with the chunk system, whose region sections shard the index. */
     void leafs$bindTimeouts(TicketTimeoutIndex timeouts);

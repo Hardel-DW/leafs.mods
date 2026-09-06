@@ -116,7 +116,7 @@ public final class TickingManager {
 
     public void tickLevel(ServerLevel level, Runnable vanillaTick) {
         globalTicking = true;
-        LevelTickUnit unit = unitFor(level);
+        LevelTickUnit unit = levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler));
         unit.ensureActivated();
         unit.prepareAttached(vanillaTick);
         scheduler.runAttached(unit);
@@ -136,10 +136,6 @@ public final class TickingManager {
         for (LevelTickUnit unit : levelUnits.values()) {
             unit.tickPausedNetwork();
         }
-    }
-
-    public void setTickPeriodNanos(long periodNanos) {
-        scheduler.setPeriodNanos(periodNanos);
     }
 
     /** Every region's inbox runs inline, looped because a task can post a follow-up on another level (cross-dimension teleport). */
@@ -208,8 +204,5 @@ public final class TickingManager {
             Leafs.LOGGER.error("Leafs regions NOT drained: {} regions and {} sections outlived the simulation that feeds them", regions, sections);
         }
     }
-
-    private LevelTickUnit unitFor(ServerLevel level) {
-        return levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler));
-    }
 }
+

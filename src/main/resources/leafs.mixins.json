@@ -18,7 +18,6 @@
 		"chunk.SectionStorageMixin",
 		"chunk.ServerChunkCacheMixin",
 		"chunk.ServerLevelMixin",
-		"chunk.SimpleRegionStorageMixin",
 		"chunk.StructureTemplatePaletteMixin",
 		"chunk.TicketStorageMixin",
 		"compat.ArrayBackedEventShim",

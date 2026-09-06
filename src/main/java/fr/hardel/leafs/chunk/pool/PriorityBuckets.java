@@ -19,9 +19,6 @@ final class PriorityBuckets {
         buckets = List.copyOf(created);
     }
 
-    int count() {
-        return buckets.size();
-    }
 
     void add(ChunkTask task) {
         int bucket = clamp(task.priority());
