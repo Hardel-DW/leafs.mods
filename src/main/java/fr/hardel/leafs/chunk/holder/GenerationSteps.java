@@ -17,13 +17,14 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.status.ChunkStep;
-import net.minecraft.world.level.chunk.status.WorldGenContext;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
+
 
 /** Vanilla's generation on the pool: each step reserves the radius it writes, placed at the chunk it writes and the centre it serves, and leaves the queue when its status is no longer allowed. */
 public final class GenerationSteps {
@@ -87,10 +88,11 @@ public final class GenerationSteps {
         });
     }
 
-    public CompletableFuture<ChunkAccess> apply(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk) {
+    /** The body is the wrapped call of {@code ChunkStep.apply}, so what another mod wraps around it runs on the pool too. */
+    public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
         ChunkPos pos = chunk.getPos();
         ChunkTask.Place place = owners.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
-        StepTask task = new StepTask(place, owners.area(pos.x(), pos.z(), step.blockStateWriteRadius()), step, context, cache, chunk);
+        StepTask task = new StepTask(place, owners.area(pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
         queued.compute(pos.pack(), (_, slots) -> {
             StepTask[] target = slots == null ? new StepTask[STATUSES] : slots;
             target[step.targetStatus().getIndex()] = task;
@@ -142,18 +144,16 @@ public final class GenerationSteps {
     /** One step of one chunk in the pool: taken once, by its run or by its cancellation. */
     private final class StepTask extends ChunkTask {
         private final ChunkStep step;
-        private final WorldGenContext context;
-        private final StaticCache2D<GenerationChunkHolder> cache;
         private final ChunkAccess chunk;
+        private final Supplier<CompletableFuture<ChunkAccess>> body;
         private final CompletableFuture<ChunkAccess> result = new CompletableFuture<>();
         private final AtomicBoolean taken = new AtomicBoolean();
 
-        private StepTask(Place place, long[] reserved, ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk) {
+        private StepTask(Place place, long[] reserved, ChunkStep step, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
             super(place, reserved);
             this.step = step;
-            this.context = context;
-            this.cache = cache;
             this.chunk = chunk;
+            this.body = body;
         }
 
         @Override
@@ -166,7 +166,7 @@ public final class GenerationSteps {
             metrics.stepRan(step.targetStatus());
             CompletableFuture<ChunkAccess> applied;
             try {
-                applied = step.apply(context, cache, chunk);
+                applied = body.get();
             } catch (Throwable failure) {
                 fail(failure);
                 return null;

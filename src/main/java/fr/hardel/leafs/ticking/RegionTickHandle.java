@@ -8,7 +8,6 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
 /** The schedulable side of one region; the gate only tries, a worker never parks, a skipped pass is a tick that never happened. */
@@ -54,7 +53,6 @@ public final class RegionTickHandle extends TickHandle {
 
             WorldTickContext.enter(body.level(), region, worldData);
             try {
-                // Paused solo: the inbox still drains, like the main-thread queue of vanilla.
                 if (body.level().getServer().isPaused()) {
                     data.inbox().drain();
                     return;
@@ -64,7 +62,7 @@ public final class RegionTickHandle extends TickHandle {
                 long startNanos = System.nanoTime();
                 stages.recordLag(startNanos - scheduledStartNanos());
                 stages.beginTick(startNanos);
-                unloadHiddenEntities(body.level());
+                ((ServerLevelEntityAccess) body.level()).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
                 stages.mark(TickStages.regionUnloads);
                 body.tick(region, data.clock(), worldData, stages, regions, startNanos + regions.tickPeriodNanos());
                 chunkCensus = region.chunkCount();
@@ -93,10 +91,6 @@ public final class RegionTickHandle extends TickHandle {
         }
     }
 
-    /** The entity sections the region's chunks left behind; the chunks themselves leave through the loading graph. */
-    private void unloadHiddenEntities(ServerLevel level) {
-        ((ServerLevelEntityAccess) level).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
-    }
 
     @Override
     protected RegionCrashReport buildCrashReport() {
