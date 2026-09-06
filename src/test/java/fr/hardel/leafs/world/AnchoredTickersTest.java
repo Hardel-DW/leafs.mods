@@ -58,10 +58,26 @@ class AnchoredTickersTest {
         AnchoredTickers anchors = new AnchoredTickers();
         anchors.add(new AnchoredTicker(centre::get, ticks::incrementAndGet, () -> false));
 
-        anchors.tick(region, _ -> true);
+        anchors.tick(region);
         centre.set(new BlockPos(8, 64, 8));
-        anchors.tick(region, _ -> true);
+        anchors.tick(region);
 
         assertEquals(1, ticks.get(), "far away first, then inside the region");
+    }
+
+    /** A region owns its ring without ticking it; an anchor there is still its work, the raid or the fight handles an unloaded chunk itself. */
+    @Test
+    void anAnchorInTheRingTicksOnItsRegion() {
+        Regionizer<Object> regionizer = new Regionizer<>(1, 1, 1, NO_CALLBACKS);
+        regionizer.addChunk(0, 0);
+        Region<Object> region = regionizer.regionAt(0, 0);
+        AtomicInteger ticks = new AtomicInteger();
+        AnchoredTickers anchors = new AnchoredTickers();
+        anchors.add(new AnchoredTicker(() -> new BlockPos(40, 64, 40), ticks::incrementAndGet, () -> false));
+
+        anchors.tick(region);
+
+        assertEquals(region, regionizer.regionAt(2, 2), "chunk 2,2 is in the ring");
+        assertEquals(1, ticks.get());
     }
 }

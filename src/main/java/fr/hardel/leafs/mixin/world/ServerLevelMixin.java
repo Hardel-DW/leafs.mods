@@ -103,7 +103,7 @@ public abstract class ServerLevelMixin {
         callbackInfo.cancel();
     }
 
-    /** The fight ticks as an anchored block entity; the level tick no longer calls it. */
+    /** The fight is an anchor, the owner of its origin chunk ticks it; the level tick does not. */
     @WrapOperation(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/dimension/end/EnderDragonFight;tick()V"))
     private void leafs$dragonFightTicksAsAnchored(EnderDragonFight fight, Operation<Void> original) {
     }
