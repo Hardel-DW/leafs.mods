@@ -11,12 +11,17 @@ import net.minecraft.world.level.ChunkPos;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
-/** What the server thread holds for one piece of head work, taken at first contact and kept until released: regions, and the chunks no region covers. A region never borrows. */
+/**
+ * What a thread holds for one piece of game work, taken at first contact and kept until released. The server thread's head takes regions and the chunks no
+ * region covers, and waits for them. Any other thread only reads a region, takes a chunk no region covers, and never waits: a region never borrows a region.
+ */
 public final class RegionBorrow {
     private static final ThreadLocal<RegionBorrow> CURRENT = new ThreadLocal<>();
     private static final long WAIT_NANOS = 50_000L;
@@ -58,16 +63,21 @@ public final class RegionBorrow {
         return CURRENT.get();
     }
 
-    /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. */
+    /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
+        boolean head = !regions.live() || regions.level().getServer().isSameThread();
         while (true) {
             Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
             if (region == null) {
-                borrowChunk(regions, chunkX, chunkZ);
+                if (tryBorrowChunk(regions, chunkX, chunkZ) || !head) {
+                    return;
+                }
+
+                regions.level().getServer().managedBlock(() -> tryBorrowChunk(regions, chunkX, chunkZ));
                 return;
             }
 
-            if (take(regions, region)) {
+            if (!head || take(regions, region)) {
                 return;
             }
         }
@@ -122,44 +132,56 @@ public final class RegionBorrow {
         return chunks != null && chunks.containsKey(ChunkPos.pack(chunkX, chunkZ));
     }
 
-    /** What lands on a borrowed chunk waits in its inbox for the borrower; the pool owns the chunk again at the release. */
-    private void borrowChunk(LevelRegions regions, int chunkX, int chunkZ) {
+    /** A chunk no region covers, taken once for the game work in flight: what lands there waits in its inbox for this thread. False when another thread holds it; before the regions run the server thread owns everything. */
+    public boolean tryBorrowChunk(LevelRegions regions, int chunkX, int chunkZ) {
         if (!regions.live()) {
-            return;
+            return true;
         }
 
         long key = ChunkPos.pack(chunkX, chunkZ);
         Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.computeIfAbsent(regions, _ -> new Long2ObjectOpenHashMap<>());
-        if (!chunks.containsKey(key)) {
-            chunks.put(key, LevelChunks.of(regions.level()).owners().borrow(chunkX, chunkZ));
+        if (chunks.containsKey(key)) {
+            return true;
         }
+
+        RegionInbox taken = LevelChunks.of(regions.level()).owners().borrow(chunkX, chunkZ);
+        if (taken == null) {
+            return false;
+        }
+
+        chunks.put(key, taken);
+        return true;
     }
 
+    /** The regions go back first; a released chunk hands its leftover game work back through the owners, which may take the chunk again on this thread, hence the loop. */
     public void releaseAll() {
         for (Region<RegionTickData> region : held) {
             region.markNotTicking();
         }
 
         held.clear();
-        heldChunks.forEach((regions, chunks) -> {
-            ChunkOwners owners = LevelChunks.of(regions.level()).owners();
-            for (Long2ObjectMap.Entry<RegionInbox> entry : chunks.long2ObjectEntrySet()) {
-                owners.release(ChunkPos.getX(entry.getLongKey()), ChunkPos.getZ(entry.getLongKey()), entry.getValue());
-            }
-        });
-        heldChunks.clear();
+        while (!heldChunks.isEmpty()) {
+            Map<LevelRegions, Long2ObjectOpenHashMap<RegionInbox>> releasing = new LinkedHashMap<>(heldChunks);
+            heldChunks.clear();
+            releasing.forEach((regions, chunks) -> {
+                ChunkOwners owners = LevelChunks.of(regions.level()).owners();
+                for (Long2ObjectMap.Entry<RegionInbox> entry : chunks.long2ObjectEntrySet()) {
+                    owners.release(ChunkPos.getX(entry.getLongKey()), ChunkPos.getZ(entry.getLongKey()), entry.getValue());
+                }
+            });
+        }
     }
 
-    /** What this thread holds runs here while it waits: the inboxes of its regions and of its chunks. */
+    /** What this thread holds runs here while it waits: the chunk work of its regions and of its chunks, never their game work. A promotion may take a neighbour chunk on this thread meanwhile, so the walk is a snapshot. */
     public int drainInboxes() {
         int drained = 0;
         for (Region<RegionTickData> region : held) {
-            drained += region.data().inbox().drain();
+            drained += region.data().inbox().drainChunkWork();
         }
 
-        for (Long2ObjectOpenHashMap<RegionInbox> chunks : heldChunks.values()) {
-            for (RegionInbox inbox : chunks.values()) {
-                drained += inbox.drain();
+        for (Long2ObjectOpenHashMap<RegionInbox> chunks : List.copyOf(heldChunks.values())) {
+            for (RegionInbox inbox : List.copyOf(chunks.values())) {
+                drained += inbox.drainChunkWork();
             }
         }
 

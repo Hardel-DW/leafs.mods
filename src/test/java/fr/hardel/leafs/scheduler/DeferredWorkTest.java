@@ -24,7 +24,7 @@ class DeferredWorkTest {
 
     /** Every chunk is covered by one region, whose inbox only runs when the test drains it. */
     private DeferredWork work(DeferReason reason, Runnable task) {
-        ChunkOwners owners = new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, work) -> work.run(), Long.MAX_VALUE);
+        ChunkOwners owners = new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, work) -> { work.run(); return true; }, new GlobalScheduler(), Long.MAX_VALUE);
         return new DeferredWork(owners, stats, 0, 0, reason, () -> true, task);
     }
 

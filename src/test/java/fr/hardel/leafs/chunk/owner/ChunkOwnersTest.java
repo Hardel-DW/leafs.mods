@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.scheduler.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,18 +12,33 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChunkOwnersTest {
     private final ChunkPool pool = new ChunkPool(1, 4);
+    private final GlobalScheduler server = new GlobalScheduler();
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final List<String> ran = new CopyOnWriteArrayList<>();
-    private final List<Runnable> heads = new CopyOnWriteArrayList<>();
+    private final List<String> taken = new CopyOnWriteArrayList<>();
     private boolean holding;
     private boolean covered = true;
+    private boolean chunkHeldByAnother;
 
+    /** The fake taker runs the task on the caller like the real one, or refuses when another thread holds the chunk. */
     private ChunkOwners owners() {
-        return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, task) -> heads.add(task), Long.MAX_VALUE);
+        return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, this::take, server, Long.MAX_VALUE);
+    }
+
+    private boolean take(int chunkX, int chunkZ, Runnable task) {
+        if (chunkHeldByAnother) {
+            return false;
+        }
+
+        taken.add(chunkX + "," + chunkZ);
+        task.run();
+        return true;
     }
 
     @AfterEach
@@ -34,41 +50,85 @@ class ChunkOwnersTest {
     void gameWorkRunsInLineForTheOwner() {
         holding = true;
 
-        assertTrue(owners().submitGame(1, 1, () -> ran.add("now")));
+        assertTrue(owners().submit(1, 1, Work.GAME, () -> ran.add("now")));
 
         assertEquals(List.of("now"), ran);
-        assertTrue(heads.isEmpty());
+        assertTrue(taken.isEmpty());
     }
 
     @Test
     void gameWorkOnACoveredChunkWaitsForTheRegionTick() {
-        assertFalse(owners().submitGame(1, 1, () -> ran.add("later")));
+        assertFalse(owners().submit(1, 1, Work.GAME, () -> ran.add("later")));
 
         assertEquals(List.of(), ran);
-        assertTrue(heads.isEmpty());
+        assertTrue(taken.isEmpty());
         assertEquals(1, inbox.drain());
         assertEquals(List.of("later"), ran);
     }
 
-    /** 2026-09-05: a respawn sent to the pool waited for its spawn chunk under the reservation of that same chunk, forever; game work may wait, so it goes to the server thread instead. */
+    /** 2026-09-06: a gateway placed on the server thread later could not be read back by the feature that placed it, and never got its exit. */
     @Test
-    void gameWorkOnAnUncoveredChunkGoesToTheServerThreadNotThePool() {
+    void gameWorkOnAnUncoveredChunkRunsOnTheCallerWhichTakesTheChunk() {
         covered = false;
 
-        assertFalse(owners().submitGame(1, 1, () -> ran.add("head")));
+        assertTrue(owners().submit(1, 1, Work.GAME, () -> ran.add("now")));
+
+        assertEquals(List.of("now"), ran);
+        assertEquals(List.of("1,1"), taken);
+        assertEquals(0, pool.queued() + pool.active(), "the pool never runs game work");
+    }
+
+    /** The taker refuses, the chunk is found in the holder's inbox on the next turn. */
+    @Test
+    void gameWorkOnAChunkAnotherThreadHoldsIsMailForThatThread() {
+        chunkHeldByAnother = true;
+        ChunkOwners owners = owners();
+        RegionInbox held = owners.borrow(1, 1);
+        covered = false;
+
+        assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("later")));
 
         assertEquals(List.of(), ran);
-        assertEquals(0, pool.queued() + pool.active(), "the pool never runs game work");
-        assertEquals(1, heads.size());
-        heads.getFirst().run();
-        assertEquals(List.of("head"), ran);
+        assertEquals(1, held.size());
+        assertTrue(taken.isEmpty());
+    }
+
+    /** 2026-09-05: a respawn sent to the pool waited for its spawn chunk under the reservation of that same chunk, forever. */
+    @Test
+    void gameWorkFromThePoolGoesToTheServerThread() throws InterruptedException {
+        covered = false;
+        ChunkOwners owners = owners();
+        CountDownLatch posted = new CountDownLatch(1);
+
+        owners.submit(1, 1, Work.CHUNK, () -> {
+            assertFalse(owners.submit(2, 2, Work.GAME, () -> ran.add("game")));
+            posted.countDown();
+        });
+
+        assertTrue(posted.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of(), ran);
+        assertTrue(server.drain());
+        assertEquals(List.of("game"), ran);
+        assertEquals(List.of("2,2"), taken);
+    }
+
+    @Test
+    void aChunkIsTakenOnceUntilReleased() {
+        ChunkOwners owners = owners();
+
+        RegionInbox first = owners.borrow(1, 1);
+        assertNotNull(first);
+        assertNull(owners.borrow(1, 1), "another thread finds the chunk held");
+
+        owners.release(1, 1, first);
+        assertNotNull(owners.borrow(1, 1));
     }
 
     @Test
     void theOwningThreadRunsInLine() {
         holding = true;
 
-        assertTrue(owners().submit(1, 1, () -> ran.add("now")));
+        assertTrue(owners().submit(1, 1, Work.CHUNK, () -> ran.add("now")));
 
         assertEquals(List.of("now"), ran);
         assertEquals(0, inbox.size());
@@ -76,7 +136,7 @@ class ChunkOwnersTest {
 
     @Test
     void aCoveredChunkWaitsForTheRegionTick() {
-        assertFalse(owners().submit(1, 1, () -> ran.add("later")));
+        assertFalse(owners().submit(1, 1, Work.CHUNK, () -> ran.add("later")));
 
         assertEquals(List.of(), ran);
         assertEquals(1, inbox.drain());
@@ -88,7 +148,7 @@ class ChunkOwnersTest {
         covered = false;
         CountDownLatch done = new CountDownLatch(1);
 
-        assertFalse(owners().submit(1, 1, done::countDown));
+        assertFalse(owners().submit(1, 1, Work.CHUNK, done::countDown));
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
         assertEquals(0, inbox.size());
@@ -102,8 +162,8 @@ class ChunkOwnersTest {
         CountDownLatch done = new CountDownLatch(1);
         boolean[] inLine = new boolean[1];
 
-        owners.submit(1, 1, () -> {
-            inLine[0] = owners.holds(1, 1) && owners.submit(1, 1, () -> ran.add("nested"));
+        owners.submit(1, 1, Work.CHUNK, () -> {
+            inLine[0] = owners.holds(1, 1) && owners.submit(1, 1, Work.CHUNK, () -> ran.add("nested"));
             done.countDown();
         });
 
@@ -116,9 +176,9 @@ class ChunkOwnersTest {
     @Test
     void aDrainRunsWhatWasPostedBeforeIt() {
         ChunkOwners owners = owners();
-        owners.submit(1, 1, () -> {
+        owners.submit(1, 1, Work.CHUNK, () -> {
             ran.add("first");
-            owners.submit(1, 1, () -> ran.add("second"));
+            owners.submit(1, 1, Work.CHUNK, () -> ran.add("second"));
         });
 
         assertEquals(1, inbox.drain());
@@ -127,17 +187,20 @@ class ChunkOwnersTest {
         assertEquals(List.of("first", "second"), ran);
     }
 
+    /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. */
     @Test
-    void aDeadRegionHandsItsTasksBack() throws InterruptedException {
+    void aDeadRegionHandsItsTasksBackAsTheWorkTheyAre() throws InterruptedException {
         ChunkOwners owners = owners();
-        CountDownLatch done = new CountDownLatch(1);
-        owners.submit(1, 1, done::countDown);
+        CountDownLatch chunkWork = new CountDownLatch(1);
+        owners.submit(1, 1, Work.CHUNK, chunkWork::countDown);
+        owners.submit(1, 1, Work.GAME, () -> ran.add("game"));
 
         covered = false;
         owners.resubmit(inbox);
 
-        assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertFalse(inbox.post(1, 1, () -> {
-        }));
+        assertTrue(chunkWork.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of("game"), ran);
+        assertEquals(List.of("1,1"), taken);
+        assertFalse(inbox.post(1, 1, Work.CHUNK, () -> ran.add("too late")), "a closed inbox refuses, the caller routes again");
     }
 }

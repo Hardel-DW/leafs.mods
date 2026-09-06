@@ -17,11 +17,10 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Optional;
 
-/** Concurrent storage facade, and the storage's lock: its writes, its saves and the graphs of its subclass take it. */
+/** Concurrent storage facade, and the storage's lock: its writes, its reads from disk, its saves and the graphs of its subclass take it. */
 @Mixin(SectionStorage.class)
 public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess {
 
@@ -33,17 +32,9 @@ public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess 
     @Unique
     private final SectionStorageLock leafs$lock = new SectionStorageLock();
 
-    @Unique
-    private ServerLevel leafs$level;
-
     @Override
     public SectionStorageLock leafs$lock() {
         return leafs$lock;
-    }
-
-    @Override
-    public void leafs$bindLevel(ServerLevel level) {
-        this.leafs$level = level;
     }
 
     @Inject(method = "<init>", at = @At("TAIL"))
@@ -51,19 +42,13 @@ public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess 
         this.storage = new ConcurrentLong2ObjectMap<>();
     }
 
-    /** Off the server thread a section answers from what is unpacked, never a disk read; unloaded terrain answers "no POI" like vanilla. */
-    @Inject(method = "getOrLoad", at = @At("HEAD"), cancellable = true)
-    private void leafs$presentOnlyOffOwner(long sectionPos, CallbackInfoReturnable<Optional<R>> callbackInfo) {
-        ServerLevel level = leafs$level;
-        if (level == null || level.getServer().isSameThread()) {
-            return;
-        }
-
-        Optional<R> present = this.storage.get(sectionPos);
-        callbackInfo.setReturnValue(present == null ? Optional.empty() : present);
+    @WrapMethod(method = "unpackChunk(Lnet/minecraft/world/level/ChunkPos;)V")
+    private void leafs$readFromDiskUnderTheLock(ChunkPos chunkPos, Operation<Void> original) {
+        leafs$lock.runLocked(() -> original.call(chunkPos));
     }
 
     @WrapMethod(method = "flushAll")
+
     private void leafs$flushUnderTheLock(Operation<Void> original) {
         leafs$lock.runLocked(original::call);
     }
