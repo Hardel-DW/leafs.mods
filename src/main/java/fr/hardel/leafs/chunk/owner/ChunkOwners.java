@@ -18,7 +18,7 @@ import java.util.function.BooleanSupplier;
  * Who writes into the live world at a position: the thread that already owns it, the region covering it at its next tick, or without a region the pool for
  * chunk work and the calling thread for game work, which takes the chunk for the task and reads back what it writes, like vanilla. See {@link Work}.
  */
-public final class ChunkOwners {
+public final class ChunkOwners implements Router {
     private static final long[] NO_RESERVATION = {};
 
     /** The region's inbox at a chunk, null where no region covers it. */
@@ -104,6 +104,11 @@ public final class ChunkOwners {
                 return true;
             }
         }
+    }
+
+    @Override
+    public void route(int chunkX, int chunkZ, Runnable task) {
+        submit(chunkX, chunkZ, Work.GAME, task);
     }
 
     /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
