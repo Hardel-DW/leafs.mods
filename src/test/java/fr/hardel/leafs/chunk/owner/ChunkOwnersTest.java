@@ -112,6 +112,44 @@ class ChunkOwnersTest {
         assertEquals(List.of("2,2"), taken);
     }
 
+    /** B02: a pool task queued before a thread took the chunk would have run beside it; it reads the owner again when it starts. */
+    @Test
+    void aQueuedPoolTaskFindsTheChunkTakenWhenItStartsAndHandsItOver() throws InterruptedException {
+        covered = false;
+        ChunkOwners owners = owners();
+        CountDownLatch workerBusy = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        owners.submit(2, 2, Work.CHUNK, () -> {
+            workerBusy.countDown();
+            awaitQuietly(release);
+        });
+        assertTrue(workerBusy.await(5, TimeUnit.SECONDS));
+        owners.submit(1, 1, Work.CHUNK, () -> ran.add("chunk work"));
+        RegionInbox taken = owners.borrow(1, 1);
+
+        release.countDown();
+        for (int attempt = 0; attempt < 500 && taken.size() == 0; attempt++) {
+            Thread.sleep(10);
+        }
+
+        assertEquals(List.of(), ran, "the pool task never ran beside the taker");
+        assertEquals(1, taken.size());
+        owners.release(1, 1, taken);
+        for (int attempt = 0; attempt < 500 && ran.isEmpty(); attempt++) {
+            Thread.sleep(10);
+        }
+
+        assertEquals(List.of("chunk work"), ran);
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Test
     void aChunkIsTakenOnceUntilReleased() {
         ChunkOwners owners = owners();

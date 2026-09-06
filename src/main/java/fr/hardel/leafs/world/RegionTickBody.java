@@ -5,6 +5,7 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.chunk.view.PlayerView;
+import fr.hardel.leafs.entity.EntityTickAccess;
 import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
@@ -203,22 +204,39 @@ public final class RegionTickBody {
                 return;
             }
 
-            entity.checkDespawn();
-            long chunk = entity.chunkPosition().pack();
-            if (entity instanceof ServerPlayer || distanceManager.inEntityTickingRange(chunk)) {
-                Entity vehicle = entity.getVehicle();
-                if (vehicle != null) {
-                    if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
-                        return;
-                    }
+            // An entity moved far during its tick lands in the next region's photo while that tick still runs: the same rule as the player's queue, it is skipped.
+            EntityTickAccess claim = (EntityTickAccess) entity;
+            if (!claim.leafs$beginTick()) {
+                return;
+            }
 
-                    entity.stopRiding();
-                }
-
-                level.guardEntityTick(level::tickNonPassenger, entity);
+            try {
+                tickEntity(entity, distanceManager);
+            } finally {
+                claim.leafs$endTick();
             }
         });
     }
+
+    private void tickEntity(Entity entity, DistanceManager distanceManager) {
+        entity.checkDespawn();
+        long chunk = entity.chunkPosition().pack();
+        if (!(entity instanceof ServerPlayer) && !distanceManager.inEntityTickingRange(chunk)) {
+            return;
+        }
+
+        Entity vehicle = entity.getVehicle();
+        if (vehicle != null) {
+            if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
+                return;
+            }
+
+            entity.stopRiding();
+        }
+
+        level.guardEntityTick(level::tickNonPassenger, entity);
+    }
+
 
     private void tickBlockEntities(Region<?> region, boolean runsNormally, RegionChunks chunks) {
         ServerChunkCache chunkSource = level.getChunkSource();
