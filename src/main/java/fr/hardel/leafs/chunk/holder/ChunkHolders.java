@@ -108,20 +108,24 @@ public final class ChunkHolders implements LevelListener {
         changed.clear();
     }
 
-    /** The chunk heads the pool until it lands; the request follows once its own ticket has settled, and its ticket leaves with the delivery. */
-    public CompletableFuture<ChunkResult<ChunkAccess>> require(int chunkX, int chunkZ, ChunkStatus status) {
+    /** A chunk a thread waits for: its delivery, and the release of the ticket that keeps it, due when the waiter's tick or head ends. */
+    public record Demand(CompletableFuture<ChunkResult<ChunkAccess>> delivery, Runnable release) {
+    }
+
+    /** The chunk heads the pool until it lands; the request follows once its own ticket has settled. Like vanilla's one-tick ticket, the chunk stays until the waiter's tick or head ends. */
+    public Demand require(int chunkX, int chunkZ, ChunkStatus status) {
         long key = ChunkPos.pack(chunkX, chunkZ);
-        Ticket demand = new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status));
+        Ticket ticket = new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status));
         demands.add(key);
-        tickets.addTicket(key, demand);
+        tickets.addTicket(key, ticket);
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
         owners.expedite(chunkX, chunkZ);
-        delivery.whenComplete((_, _) -> {
+        return new Demand(delivery, () -> {
             demands.remove(key);
-            tickets.removeTicket(key, demand);
+            tickets.removeTicket(key, ticket);
         });
-        return delivery;
     }
+
 
     /** Under the graph locks, the demand's level is settled, so the holder is there; the message says what the graph and the tickets think when it is not. */
     private ChunkHolder demanded(long key, ChunkStatus status) {

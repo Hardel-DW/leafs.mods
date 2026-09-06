@@ -1,6 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.holder.ChunkWait;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.region.Region;
@@ -35,10 +36,12 @@ public final class RegionBorrow {
     public static RegionBorrow enter() {
         RegionBorrow borrow = new RegionBorrow();
         CURRENT.set(borrow);
+        ChunkWait.enterScope();
         return borrow;
     }
 
     public static void exit() {
+        ChunkWait.exitScope();
         CURRENT.remove();
     }
 
