@@ -6,28 +6,15 @@ final class TestTickHandle extends TickHandle {
     private final Runnable body;
     private long ticks;
     private final boolean crashReportFails;
-    private final boolean recovers;
-    private int recoveries;
 
     TestTickHandle(long id, Runnable body) {
-        this(id, body, false, false);
+        this(id, body, false);
     }
 
-    TestTickHandle(long id, Runnable body, boolean crashReportFails, boolean recovers) {
+    TestTickHandle(long id, Runnable body, boolean crashReportFails) {
         super(new RegionContext.Region(id, "test:world"), 1);
         this.body = body;
         this.crashReportFails = crashReportFails;
-        this.recovers = recovers;
-    }
-
-    int recoveries() {
-        return recoveries;
-    }
-
-    @Override
-    protected boolean recover() {
-        recoveries++;
-        return recovers;
     }
 
     @Override

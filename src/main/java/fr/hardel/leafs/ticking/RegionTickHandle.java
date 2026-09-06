@@ -42,7 +42,6 @@ public final class RegionTickHandle extends TickHandle {
             return;
         }
 
-        boolean failed = false;
         try {
             RegionTickData data = region.data();
             RegionWorldData worldData = data.worldData();
@@ -71,26 +70,10 @@ public final class RegionTickHandle extends TickHandle {
             } finally {
                 WorldTickContext.exit();
             }
-        } catch (Throwable throwable) {
-            failed = true;
-            throw throwable;
-        } finally {
-            if (!failed) {
-                region.markNotTicking();
-            }
-        }
-    }
-
-    /** Still marked ticking from the failed pass: a pending merge cannot take the broken payload before it is dropped. */
-    @Override
-    protected boolean recover() {
-        try {
-            return regions.restart(region);
         } finally {
             region.markNotTicking();
         }
     }
-
 
     @Override
     protected RegionCrashReport buildCrashReport() {
