@@ -292,13 +292,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         }
     }
 
-    /** The chunks a batch may serialize: this region's own and the ones no region covers; the rest waits in the queue. */
-    @WrapMethod(method = "getChunkToSend")
-    private LevelChunk leafs$sendOwnedOrUncoveredChunks(long pos, Operation<LevelChunk> original) {
-        return RegionChunkAccess.sendable((ChunkMap) (Object) this, pos) ? original.call(pos) : null;
-    }
-
-    /** A chunk entering a view joins the queue on vanilla's readiness, whoever owns it; the send above decides when it leaves. */
+    /** A chunk entering a view joins the queue on vanilla's readiness, whoever owns it. */
     @WrapOperation(method = "markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkToSend(J)Lnet/minecraft/world/level/chunk/LevelChunk;"))
     private LevelChunk leafs$queueOnVanillaReadiness(ChunkMap chunkMap, long pos, Operation<LevelChunk> original) {
         return RegionChunkAccess.readyToSend(chunkMap, pos);
