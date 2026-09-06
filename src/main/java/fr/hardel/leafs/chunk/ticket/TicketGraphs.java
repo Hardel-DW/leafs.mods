@@ -34,6 +34,11 @@ public final class TicketGraphs {
         return simulation;
     }
 
+    /** The sections the three graphs hold, what grows if levels are never forgotten. */
+    public int sectionCount() {
+        return loading.sectionCount() + simulation.sectionCount() + players.sectionCount();
+    }
+
     /** Where the players stand, one level per chunk of distance to the nearest. */
     public ChunkLevels players() {
         return players;
