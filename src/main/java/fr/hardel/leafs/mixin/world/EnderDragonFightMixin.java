@@ -21,7 +21,6 @@ public abstract class EnderDragonFightMixin {
     @Inject(method = "init", at = @At("TAIL"))
     private void leafs$tickAsAnchored(ServerLevel level, long seed, BlockPos origin, CallbackInfo callbackInfo) {
         EnderDragonFight self = (EnderDragonFight) (Object) this;
-        ((ServerLevelRegionAccess) level).leafs$anchors().add(new AnchoredTicker(origin, this::tick, () -> level.getDragonFight() != self)
-);
+        ((ServerLevelRegionAccess) level).leafs$anchors().add(new AnchoredTicker(() -> origin, this::tick, () -> level.getDragonFight() != self));
     }
 }
