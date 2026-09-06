@@ -6,6 +6,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.Visibility;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,6 +49,11 @@ class RegionEntityPersistenceTest {
         @Override
         public LongSet leafs$chunksToUnload() {
             return chunksToUnload;
+        }
+
+        @Override
+        public boolean leafs$knows(UUID uuid) {
+            return false;
         }
     }
 
