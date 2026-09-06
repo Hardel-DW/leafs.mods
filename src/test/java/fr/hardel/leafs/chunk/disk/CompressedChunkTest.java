@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.disk;
 
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.visitors.CollectFields;
@@ -10,6 +11,7 @@ import net.minecraft.world.level.chunk.storage.RegionFile;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,6 +19,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@ExtendWith(MinecraftBootstrap.class)
 class CompressedChunkTest {
     private static CompoundTag chunkTag() {
         CompoundTag tag = new CompoundTag();
