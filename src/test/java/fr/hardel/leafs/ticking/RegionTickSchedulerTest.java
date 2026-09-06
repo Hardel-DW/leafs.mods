@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -64,6 +65,29 @@ class RegionTickSchedulerTest {
         }
 
         assertTrue(worker.get().getName().startsWith("Leafs Region Worker"));
+    }
+
+    /** The drain that follows on the server thread must find every region idle: a tick in flight ends before shutdown returns, however long it takes. */
+    @Test
+    void shutdownWaitsForATickInFlight(@TempDir Path crashDirectory) throws InterruptedException {
+        RegionTickScheduler scheduler = createScheduler(1, crashDirectory);
+        scheduler.start();
+        CountDownLatch started = new CountDownLatch(1);
+        AtomicBoolean ticking = new AtomicBoolean();
+        
+        scheduler.schedule(new TestTickHandle(1, () -> {
+            ticking.set(true);
+            started.countDown();
+            long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
+            while (System.nanoTime() < end) {
+                Thread.onSpinWait();
+            }
+            ticking.set(false);
+        }));
+
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        scheduler.shutdown();
+        assertFalse(ticking.get());
     }
 
     @Test

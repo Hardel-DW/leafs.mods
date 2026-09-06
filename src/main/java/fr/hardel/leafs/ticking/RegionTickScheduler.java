@@ -40,13 +40,12 @@ public final class RegionTickScheduler {
         }
     }
 
-    /** Lets a mid-flight tick release its region before the drain. */
     public void shutdown() {
         running = false;
         workers.forEach(Thread::interrupt);
         for (Thread worker : workers) {
             try {
-                worker.join(5_000);
+                worker.join();
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 return;
@@ -59,7 +58,6 @@ public final class RegionTickScheduler {
         queue.add(new ScheduledTick(handle));
     }
 
-    /** From the tick-rate manager, applied at the next scheduling. */
     public void setPeriodNanos(long periodNanos) {
         this.periodNanos = Math.max(1, periodNanos);
     }

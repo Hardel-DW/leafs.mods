@@ -30,6 +30,18 @@ class LeafsConfigTest {
         assertEquals(70, written.gameplay().mobCap(MobCategory.MONSTER));
     }
 
+    /** The file is the persisted config: a second change starts from it, not from the config the server booted with. */
+    @Test
+    void aSecondRewriteKeepsTheFirstChange(@TempDir Path directory) {
+        Path file = directory.resolve("leafs.json");
+        LeafsConfig.load(file);
+        LeafsConfig.rewrite(file, LeafsConfig.Setting.SECTION_SIZE, 4);
+        LeafsConfig.rewrite(file, LeafsConfig.Setting.REGION_MERGE_DISTANCE, 3);
+        LeafsConfig written = LeafsConfig.load(file);
+        assertEquals(4, written.sectionSize());
+        assertEquals(3, written.regionMergeDistance());
+    }
+
     @Test
     void gameplayOverridesOneCapAndKeepsVanillaForTheRest(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");
