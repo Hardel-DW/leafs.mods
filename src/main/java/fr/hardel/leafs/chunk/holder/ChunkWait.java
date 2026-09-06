@@ -39,7 +39,7 @@ public final class ChunkWait {
         });
     }
 
-    /** The server thread pumps, its borrowed inboxes with it; a region drains its own inbox, so a promotion routed to itself completes. */
+    /** The server thread pumps, its borrowed inboxes with it; any other thread drains the chunk work of its region and of the chunks it took, so a publication routed to itself completes. */
     public static void until(ServerLevel level, BooleanSupplier done) {
         if (level.getServer().isSameThread()) {
             level.getServer().managedBlock(done);
@@ -47,9 +47,14 @@ public final class ChunkWait {
         }
 
         WorldTickContext mine = WorldTickContext.current();
+        RegionBorrow taken = RegionBorrow.current();
         while (!done.getAsBoolean()) {
             if (mine != null) {
-                mine.region().data().inbox().drain();
+                mine.region().data().inbox().drainChunkWork();
+            }
+
+            if (taken != null) {
+                taken.drainInboxes();
             }
 
             LockSupport.parkNanos(PARK_NANOS);

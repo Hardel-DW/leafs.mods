@@ -13,6 +13,7 @@ import fr.hardel.leafs.chunk.disk.PendingWrite;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -225,14 +226,14 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
             return;
         }
 
-        leafs$owners().submit(pos.x(), pos.z(), body);
+        leafs$owners().submit(pos.x(), pos.z(), Work.CHUNK, body);
         callbackInfo.cancel();
     }
 
     /** The send dependency is holder state the owner writes: each chunk of the area takes vanilla's step on its owner. */
     @WrapOperation(method = "waitForLightBeforeSending", at = @At(value = "INVOKE", target = "Ljava/util/stream/Stream;forEach(Ljava/util/function/Consumer;)V"))
     private void leafs$sendDependenciesOnTheOwner(Stream<ChunkPos> chunks, Consumer<ChunkPos> perChunk, Operation<Void> original) {
-        original.call(chunks, (Consumer<ChunkPos>) pos -> leafs$owners().submit(pos.x(), pos.z(), () -> perChunk.accept(pos)));
+        original.call(chunks, (Consumer<ChunkPos>) pos -> leafs$owners().submit(pos.x(), pos.z(), Work.CHUNK, () -> perChunk.accept(pos)));
     }
 
     /** The unload leaves from the loading graph to the owner; vanilla's drop loop, unload queue and eager pass have nothing left. */

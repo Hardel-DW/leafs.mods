@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import net.minecraft.core.SectionPos;
@@ -73,7 +74,7 @@ public abstract class ServerChunkCacheMixin {
     /** A light change marks its section on the chunk's owner, like a block change; the owner broadcasts at its next pass. */
     @WrapOperation(method = "onLightUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache$MainThreadExecutor;execute(Ljava/lang/Runnable;)V"))
     private void leafs$lightChangeOnTheOwner(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original, @Local(argsOnly = true) SectionPos pos) {
-        LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), mark);
+        LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
     }
 
     /** Vanilla reads the holder right after runAllUpdates: the chunk's own section settles on this thread. */

@@ -399,7 +399,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         RegionInbox survivor = into.data().inbox();
-        from.data().inbox().close(posted -> survivor.post(posted.chunkX(), posted.chunkZ(), posted.task()));
+        from.data().inbox().close(posted -> survivor.post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
         merged++;
     }
 
@@ -429,7 +429,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         int shift = regionizer.sectionShift();
         parent.data().inbox().close(posted -> {
             Region<RegionTickData> child = sectionToChild.get(CoordinateKey.pack(posted.chunkX() >> shift, posted.chunkZ() >> shift));
-            child.data().inbox().post(posted.chunkX(), posted.chunkZ(), posted.task());
+            child.data().inbox().post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task());
         });
         split++;
     }

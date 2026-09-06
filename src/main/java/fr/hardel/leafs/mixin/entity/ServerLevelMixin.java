@@ -9,6 +9,7 @@ import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.global.ConcurrentWaypointManager;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -127,6 +128,6 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
     @Unique
     private void leafs$onOwnerOf(Entity entity, Runnable task) {
-        LevelChunks.of((ServerLevel) (Object) this).owners().submitGame(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
+        LevelChunks.of((ServerLevel) (Object) this).owners().submit(entity.chunkPosition().x(), entity.chunkPosition().z(), Work.GAME, task);
     }
 }

@@ -1,6 +1,7 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.Work;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
@@ -37,7 +38,7 @@ public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
             return;
         }
 
-        resolved.submitGame(chunkX, chunkZ, () -> update.accept(this));
+        resolved.submit(chunkX, chunkZ, Work.GAME, () -> update.accept(this));
     }
 
     private CollectingNeighborUpdater collector() {

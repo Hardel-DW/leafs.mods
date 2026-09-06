@@ -12,8 +12,8 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.view.PlayerView;
-import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.ticking.LevelRegions;
+
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -46,8 +46,8 @@ public final class LevelChunks {
         this.graphs = storage.leafs$graphs();
         this.timeouts = new TicketTimeoutIndex(tickets, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
-        ChunkOwners.Head head = (chunkX, chunkZ, task) -> onHead(level, regions, ticking.globalScheduler(), chunkX, chunkZ, task);
-        this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial, head, regions.slowTaskNanos());
+        ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
+        this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
         this.steps = new GenerationSteps(chunkMap, pool, owners, ticking.metrics());
         this.full = new FullStep(owners, ticking.metrics().chunksFull());
         this.view = new PlayerView(tickets, graphs);
@@ -76,19 +76,16 @@ public final class LevelChunks {
         return !regions.live() && level.getServer().isSameThread();
     }
 
-    /** A head already open on the server thread takes the chunk and runs now; any other thread hands the task to the next global drain, which opens one. */
-    private static void onHead(ServerLevel level, LevelRegions regions, GlobalScheduler scheduler, int chunkX, int chunkZ, Runnable task) {
-        Runnable borrowing = () -> RegionBorrow.hold(borrow -> {
-            borrow.borrow(regions, chunkX, chunkZ);
-            task.run();
-            return null;
-        });
-        if (level.getServer().isSameThread() && RegionBorrow.current() != null) {
-            borrowing.run();
-            return;
-        }
+    /** Game work on a chunk no region covers: the calling thread takes the chunk for the task and reads back what it writes, like vanilla; false when another thread holds it. */
+    private static boolean take(LevelRegions regions, int chunkX, int chunkZ, Runnable task) {
+        return RegionBorrow.hold(borrow -> {
+            if (!borrow.tryBorrowChunk(regions, chunkX, chunkZ)) {
+                return false;
+            }
 
-        scheduler.run(borrowing);
+            task.run();
+            return true;
+        });
     }
 
     /** The head of the pool while a thread waits for it, the distance to the nearest player otherwise. */

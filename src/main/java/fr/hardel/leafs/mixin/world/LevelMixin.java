@@ -20,7 +20,9 @@ import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.spongepowered.asm.mixin.Final;
+
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
@@ -51,7 +53,7 @@ public abstract class LevelMixin {
         }
     }
 
-    /** A block write is the owner's, its side effects with it; only a region that ticks the chunk turns it into mail, and then it answers like a write that happened. */
+    /** A block write is the owner's, its side effects with it. A region that ticks the chunk gets it as mail, and the call answers like a write that happened; anywhere else the caller takes the chunk, writes now and answers vanilla's result. */
     @WrapMethod(method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z")
     private boolean leafs$writeOnTheOwner(BlockPos pos, BlockState state, int flags, int updateLimit, Operation<Boolean> original) {
         if (!((Object) this instanceof ServerLevel level)) {
@@ -65,8 +67,9 @@ public abstract class LevelMixin {
         }
 
         BlockPos target = pos.immutable();
-        DeferredWork.owner(level, DeferReason.BLOCK_WRITE, chunkX, chunkZ, () -> original.call(target, state, flags, updateLimit)).submit();
-        return true;
+        MutableBoolean placed = new MutableBoolean(true);
+        DeferredWork.owner(level, DeferReason.BLOCK_WRITE, chunkX, chunkZ, () -> placed.setValue(original.call(target, state, flags, updateLimit))).submit();
+        return placed.booleanValue();
     }
 
     /** The chunk contract decides what any thread may read; only the chunk's owner creates a block entity, another thread reads what exists. */

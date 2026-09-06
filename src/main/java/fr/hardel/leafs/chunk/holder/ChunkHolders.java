@@ -6,6 +6,7 @@ import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import it.unimi.dsi.fastutil.longs.LongIterator;
@@ -113,7 +114,7 @@ public final class ChunkHolders implements LevelListener {
         Ticket demand = new Ticket(LeafsTicketTypes.demand, ChunkLevel.byStatus(status));
         demands.add(key);
         tickets.addTicket(key, demand);
-        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> table.get(key).scheduleChunkGenerationTask(status, chunkMap));
+        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
         owners.expedite(chunkX, chunkZ);
         delivery.whenComplete((_, _) -> {
             demands.remove(key);
@@ -122,7 +123,19 @@ public final class ChunkHolders implements LevelListener {
         return delivery;
     }
 
+    /** Under the graph locks, the demand's level is settled, so the holder is there; the message says what the graph and the tickets think when it is not. */
+    private ChunkHolder demanded(long key, ChunkStatus status) {
+        ChunkHolder holder = table.get(key);
+        if (holder == null) {
+            throw new IllegalStateException("Chunk " + ChunkPos.unpack(key) + " demanded at " + status + " has no holder: loading level " + loading.level(key) + ", awaiting teardown " + unloading.containsKey(key)
+                + ", draining " + ChunkLevels.draining() + ", tickets " + tickets.getTicketDebugString(key, false));
+        }
+
+        return holder;
+    }
+
     public boolean demanded(int chunkX, int chunkZ) {
+
         for (LongIterator demand = demands.iterator(); demand.hasNext(); ) {
             long key = demand.nextLong();
             int distance = Math.max(Math.abs(ChunkPos.getX(key) - chunkX), Math.abs(ChunkPos.getZ(key) - chunkZ));
@@ -176,6 +189,6 @@ public final class ChunkHolders implements LevelListener {
     private void unload(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();
         unloads.increment();
-        owners.submit(pos.x(), pos.z(), () -> chunkMap.scheduleUnload(pos.pack(), holder));
+        owners.submit(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
     }
 }
