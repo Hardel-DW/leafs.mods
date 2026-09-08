@@ -1,9 +1,6 @@
 package fr.hardel.leafs.chunk;
 
-import fr.hardel.leafs.chunk.core.ChunkScheduling;
-import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
-import fr.hardel.leafs.ticking.RegionContext;
-import fr.hardel.leafs.world.WorldTickContext;
+import fr.hardel.leafs.chunk.holder.ChunkWait;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
@@ -14,7 +11,6 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 /** The chunk contract, decided here, never at call sites: any thread reads what is published, and a required read of an absent chunk waits for it. */
 public final class RegionChunkAccess {
-
     private RegionChunkAccess() {
     }
 
@@ -34,7 +30,7 @@ public final class RegionChunkAccess {
         };
     }
 
-    /** Presence, never the ticket level: a ticket only says the chunk is DUE, vanilla hasChunk's lie. */
+    /** Presence, never the ticket level: a ticket only says the chunk is due. */
     public static LevelChunk fullChunkOrNull(ChunkHolder holder) {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
@@ -51,30 +47,12 @@ public final class RegionChunkAccess {
             return chunk;
         }
 
-        return ChunkWait.chunk(chunkMap, chunkX, chunkZ, status);
+        return ChunkWait.chunk(chunkMap.level, chunkX, chunkZ, status);
     }
 
-    /** The one holder table, read by section: the regions take their photo from it. */
-    public static ConcurrentChunkTable holders(ChunkMap chunkMap) {
-        return (ConcurrentChunkTable) chunkMap.updatingChunkMap;
-    }
-
-    /** Vanilla's readiness of a chunk for the client, whoever owns it: what decides that a chunk entering a view joins the send queue. */
+    /** Vanilla's readiness of a chunk for the client, whoever owns it; the send reads a chunk like any thread does, the section writes are monitored. */
     public static LevelChunk readyToSend(ChunkMap chunkMap, long key) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
         return holder == null ? null : holder.getChunkToSend();
-    }
-
-    /** A region serializes its own chunks and the chunks no region owns; another region's chunk stays in the send queue until ownership converges. */
-    public static boolean sendable(ChunkMap chunkMap, long key) {
-        if (!(RegionContext.current() instanceof RegionContext.Region)) {
-            return true;
-        }
-
-        return WorldTickContext.ownsChunk(chunkMap.level, ChunkPos.getX(key), ChunkPos.getZ(key)) || ((ChunkUnloadAccess) chunkMap).leafs$workerChunks().owns(key);
-    }
-
-    public static ChunkScheduling scheduling(ChunkMap chunkMap) {
-        return ((PropagatorAccess) chunkMap.getDistanceManager()).leafs$propagator().scheduling();
     }
 }

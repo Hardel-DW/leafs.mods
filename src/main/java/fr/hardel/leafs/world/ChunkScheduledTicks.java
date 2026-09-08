@@ -1,6 +1,7 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import fr.hardel.leafs.chunk.owner.Router;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.Vec3i;
@@ -15,20 +16,27 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LongSummaryStatistics;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-/** The level's tick field: a concurrent map of the chunk containers, nothing else. The drain belongs to the owning region, see {@link ScheduledTickDrain}. */
+/** The level's tick field: a concurrent map of the chunk containers, nothing else. A write reaches a container on the chunk's owner; the drain belongs to the owning region, see {@link ScheduledTickDrain}. */
 public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     private final ConcurrentLong2ObjectMap<LevelChunkTicks<T>> containers = new ConcurrentLong2ObjectMap<>();
     private final ServerLevel level;
     private final Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf;
+    private final Router owners;
 
-    public ChunkScheduledTicks(ServerLevel level, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf) {
+    private interface ContainerVisit<C> {
+        void visit(int chunkX, int chunkZ, LevelChunkTicks<C> container);
+    }
+
+    public ChunkScheduledTicks(ServerLevel level, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf, Router owners) {
         super(_ -> true);
         this.level = level;
         this.drainOf = drainOf;
+        this.owners = owners;
     }
 
     @Override
@@ -43,9 +51,11 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
 
     @Override
     public void schedule(ScheduledTick<T> tick) {
-        LevelChunkTicks<T> container = containers.get(ChunkPos.pack(tick.pos()));
+        int chunkX = SectionPos.blockToSectionCoord(tick.pos().getX());
+        int chunkZ = SectionPos.blockToSectionCoord(tick.pos().getZ());
+        LevelChunkTicks<T> container = containers.get(ChunkPos.pack(chunkX, chunkZ));
         if (container != null) {
-            container.schedule(tick);
+            owners.route(chunkX, chunkZ, () -> container.schedule(tick));
         }
     }
 
@@ -69,10 +79,7 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     @Override
     public void clearArea(@NonNull BoundingBox area) {
         Predicate<ScheduledTick<T>> inside = tick -> area.isInside(tick.pos());
-        for (LevelChunkTicks<T> container : containersIn(area)) {
-            container.removeIf(inside);
-        }
-
+        forEachContainerIn(area, (chunkX, chunkZ, container) -> owners.route(chunkX, chunkZ, () -> container.removeIf(inside)));
         ScheduledTickDrain<LevelChunk, T> drain = activeDrain();
         if (drain != null) {
             drain.clearArea(area);
@@ -84,7 +91,7 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         copyAreaFrom(this, area, offset);
     }
 
-    /** A foreign source keeps vanilla's walk of its own containers; ours has no such walk, so the area is collected here. */
+    /** A foreign source keeps vanilla's walk of its own containers; ours has no such walk, so the area is collected here. The copies land after the originals in sub-tick order, as vanilla's do. */
     @Override
     public void copyAreaFrom(@NonNull LevelTicks<T> source, @NonNull BoundingBox area, @NonNull Vec3i offset) {
         if (!(source instanceof ChunkScheduledTicks<T> chunked)) {
@@ -93,12 +100,11 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
 
         List<ScheduledTick<T>> collected = new ArrayList<>();
-        for (LevelChunkTicks<T> container : chunked.containersIn(area)) {
-            container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(collected::add);
-        }
-
+        chunked.forEachContainerIn(area, (_, _, container) -> container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(collected::add));
+        LongSummaryStatistics subTicks = collected.stream().mapToLong(ScheduledTick::subTickOrder).summaryStatistics();
+        long shift = subTicks.getMax() - subTicks.getMin() + 1;
         for (ScheduledTick<T> tick : collected) {
-            schedule(new ScheduledTick<>(tick.type(), tick.pos().offset(offset), tick.triggerTick(), tick.priority(), tick.subTickOrder()));
+            schedule(new ScheduledTick<>(tick.type(), tick.pos().offset(offset), tick.triggerTick(), tick.priority(), tick.subTickOrder() + shift));
         }
     }
 
@@ -129,22 +135,19 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         return total;
     }
 
-    private List<LevelChunkTicks<T>> containersIn(BoundingBox area) {
-        List<LevelChunkTicks<T>> found = new ArrayList<>();
+    private void forEachContainerIn(BoundingBox area, ContainerVisit<T> visit) {
         int minX = SectionPos.posToSectionCoord(area.minX());
         int maxX = SectionPos.posToSectionCoord(area.maxX());
         int minZ = SectionPos.posToSectionCoord(area.minZ());
         int maxZ = SectionPos.posToSectionCoord(area.maxZ());
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                LevelChunkTicks<T> container = containers.get(ChunkPos.pack(x, z));
+        for (int chunkX = minX; chunkX <= maxX; chunkX++) {
+            for (int chunkZ = minZ; chunkZ <= maxZ; chunkZ++) {
+                LevelChunkTicks<T> container = containers.get(ChunkPos.pack(chunkX, chunkZ));
                 if (container != null) {
-                    found.add(container);
+                    visit.visit(chunkX, chunkZ, container);
                 }
             }
         }
-
-        return found;
     }
 
     private ScheduledTickDrain<LevelChunk, T> activeDrain() {

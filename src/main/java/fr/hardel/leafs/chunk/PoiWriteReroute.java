@@ -30,6 +30,7 @@ public final class PoiWriteReroute {
             level.getPoiManager().remove(immutable);
             level.debugSynchronizers().dropPoi(immutable);
         }));
+        
         newType.ifPresent(type -> owner.accept(() -> {
             PoiRecord record = level.getPoiManager().add(immutable, type);
             if (record != null) {

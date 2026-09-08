@@ -33,8 +33,23 @@ class GlobalSchedulerTest {
         assertEquals(List.of("survivor"), executed);
     }
 
+    /** 2026-09-06: the server thread pumped its queue inside a task waiting for a chunk, so the writes behind it ran first and erased a fresh nether portal. */
+    @Test
+    void aTaskThatPumpsWhileItWaitsNeverRunsTheTasksBehindIt() {
+        scheduler.run(() -> {
+            executed.add("write air");
+            scheduler.drain();
+            executed.add("air written");
+        });
+        scheduler.run(() -> executed.add("write portal"));
+
+        scheduler.drain();
+        assertEquals(List.of("write air", "air written", "write portal"), executed);
+    }
+
     @Test
     void tasksQueuedDuringADrainWaitForTheNext() {
+
         scheduler.run(() -> scheduler.run(() -> executed.add("requeued")));
 
         scheduler.drain();

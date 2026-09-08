@@ -5,16 +5,17 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import fr.hardel.leafs.entity.EntityManagerAccess;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.entity.EntityTeleports;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.world.RegionWorldData;
-import fr.hardel.leafs.world.WorldTickContext;
-import fr.hardel.leafs.ticking.RegionContext;
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.global.ConcurrentWaypointManager;
 import fr.hardel.leafs.global.SharedStateMonitor;
-import fr.hardel.leafs.ticking.TickingBinding;
+import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,7 +35,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Facade swap (dragonParts, players COW, waypoints), teleport routing, passenger membership from the region photo. */
+/** Facade swap (dragonParts, players COW, waypoints), the entity adds and removes on their owner, passenger membership from the region photo. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
@@ -75,9 +76,9 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.players = new CopyOnWriteArrayList<>();
         ServerLevel self = (ServerLevel) (Object) this;
         this.waypointManager = new ConcurrentWaypointManager(self);
-        this.leafs$entityTeleports = new EntityTeleports(self, TickingBinding::of);
+        this.leafs$entityTeleports = new EntityTeleports(self);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
-        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> RegionChunkAccess.scheduling(self.getChunkSource().chunkMap).mailbox().drainAll());
+        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainInboxes());
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 
@@ -88,7 +89,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return data != null && data.entities().contains(entity);
     }
 
-    /** From a region of another level the add hops to this level's owner of the position; here two regions serialize on the level-wide player maps. */
+    /** From a region of another level the add hops to this level's owner of the position; here a head takes the region at contact, and two regions serialize on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
         if (leafs$fromAnotherLevel()) {
@@ -96,18 +97,24 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return;
         }
 
+        RegionBorrow.atContact(player);
         SharedStateMonitor.run(this, () -> original.call(player));
     }
 
-    /** A hop answers true: the duplicate-UUID check happens at delivery, on the owner. */
+    /** A hop answers what vanilla answers before touching the sections, an entity already removed or a UUID already known is refused here too. */
     @WrapMethod(method = "addEntity")
     private boolean leafs$addEntityOnTheOwner(Entity entity, Operation<Boolean> original) {
-        if (leafs$fromAnotherLevel()) {
-            leafs$onOwnerOf(entity, () -> original.call(entity));
-            return true;
+        if (!leafs$fromAnotherLevel()) {
+            RegionBorrow.atContact(entity);
+            return original.call(entity);
         }
 
-        return original.call(entity);
+        if (entity.isRemoved() || ((EntityManagerAccess) ((ServerLevel) (Object) this).entityManager).leafs$knows(entity.getUUID())) {
+            return false;
+        }
+
+        leafs$onOwnerOf(entity, () -> original.call(entity));
+        return true;
     }
 
     @WrapMethod(method = "removePlayerImmediately")
@@ -117,19 +124,18 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return;
         }
 
+        RegionBorrow.atContact(player);
         SharedStateMonitor.run(this, () -> original.call(player, reason));
     }
 
     @Unique
     private boolean leafs$fromAnotherLevel() {
-        String here = ((ServerLevel) (Object) this).dimension().identifier().toString();
-        return RegionContext.current() instanceof RegionContext.Region(long _, String dimension) && !dimension.equals(here);
+        WorldTickContext context = WorldTickContext.current();
+        return context != null && context.level() != (Object) this;
     }
 
     @Unique
     private void leafs$onOwnerOf(Entity entity, Runnable task) {
-        ServerLevel self = (ServerLevel) (Object) this;
-        TickingBinding.of(self).toOwner(entity.chunkPosition().x(), entity.chunkPosition().z(), task);
+        LevelChunks.of((ServerLevel) (Object) this).owners().submit(entity.chunkPosition().x(), entity.chunkPosition().z(), Work.GAME, task);
     }
-
 }

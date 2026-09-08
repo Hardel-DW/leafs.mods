@@ -60,7 +60,6 @@ public final class RegionsCommand {
             .append(Component.literal(CommandText.shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("regions", live.size()))
             .append(CommandText.stat("chunks", unit.chunkCount()))
-            .append(CommandText.stat("view", unit.viewChunks()))
             .append(CommandText.stat("entities", unit.entityCount()))
             .append(CommandText.stat("serial", CommandText.rate(unit.stages().sample(now))));
 

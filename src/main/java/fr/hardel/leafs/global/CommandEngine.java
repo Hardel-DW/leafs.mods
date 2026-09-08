@@ -42,7 +42,11 @@ public final class CommandEngine {
             return execution.get();
         }
 
-        return head(borrow -> borrowEntity(borrow, first), execution);
+        return head(_ -> {
+            if (first != null) {
+                RegionBorrow.atContact(first);
+            }
+        }, execution);
     }
 
     public static void runHead(MinecraftServer server, @Nullable Entity first, Runnable execution) {
@@ -97,12 +101,5 @@ public final class CommandEngine {
             firstContact.accept(borrow);
             return body.get();
         });
-    }
-
-    private static void borrowEntity(RegionBorrow borrow, Entity entity) {
-        if (entity != null && entity.level() instanceof ServerLevel level) {
-            ChunkPos chunk = entity.chunkPosition();
-            borrow.borrow(LevelRegions.of(level), chunk.x(), chunk.z());
-        }
     }
 }

@@ -1,7 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.PlayerLoaderAccess;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
@@ -11,8 +9,6 @@ import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 /** The server-thread remainder of the level tick. Activation schedules the regions before any of them ticks. */
 public final class LevelTickUnit extends TickHandle {
     private static final int CENSUS_INTERVAL_TICKS = 100;
@@ -20,19 +16,15 @@ public final class LevelTickUnit extends TickHandle {
     private final ServerLevel level;
     private final LevelRegions regions;
     private final RegionTickScheduler scheduler;
-    private final int slowTaskWarnMillis;
-    private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private Runnable pendingWork;
     private boolean activated;
     private volatile int lastChunkCount;
-    private volatile int lastViewChunks;
 
-    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler, int slowTaskWarnMillis) {
+    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
         super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
-        this.slowTaskWarnMillis = slowTaskWarnMillis;
     }
 
     public LevelRegions regions() {
@@ -53,10 +45,6 @@ public final class LevelTickUnit extends TickHandle {
         pendingWork = work;
     }
 
-    void submit(Runnable task) {
-        tasks.add(task);
-    }
-
     @Override
     public long currentTick() {
         return level.getGameTime();
@@ -72,14 +60,11 @@ public final class LevelTickUnit extends TickHandle {
         pendingWork = null;
         StageTimings stages = stages();
         stages.beginTick(System.nanoTime());
-        runQueuedTasks();
-        stages.mark(TickStages.serialTasks);
         work.run();
         regions.rethrowFeedFailure();
 
         if (level.getGameTime() % CENSUS_INTERVAL_TICKS == 0) {
             lastChunkCount = level.getChunkSource().getLoadedChunksCount();
-            lastViewChunks = ((PlayerLoaderAccess) level.getChunkSource().chunkMap).leafs$playerLoader().retainedChunks();
         }
 
         stages.mark(TickStages.serialManagement);
@@ -96,27 +81,9 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** Everything queued runs; a slow one logs its class. */
-    private void runQueuedTasks() {
-        Runnable task;
-        while ((task = tasks.poll()) != null) {
-            long start = System.nanoTime();
-            task.run();
-            long millis = (System.nanoTime() - start) / 1_000_000L;
-            if (slowTaskWarnMillis > 0 && millis > slowTaskWarnMillis) {
-                Leafs.LOGGER.warn("Level-serial task {} ran {} ms on {}", task.getClass().getName(), millis, dimension());
-            }
-        }
-    }
-
     /** Last on-owner census; readable from any thread, at most {@value #CENSUS_INTERVAL_TICKS} ticks old. */
     public int chunkCount() {
         return lastChunkCount;
-    }
-
-    /** Chunks the player view pipelines retain a ticket on; a count that never falls back after a wave names a leak. */
-    public int viewChunks() {
-        return lastViewChunks;
     }
 
     /** Sum of the region censuses, O(regions), any thread. */
@@ -130,11 +97,6 @@ public final class LevelTickUnit extends TickHandle {
         }
 
         return entities;
-    }
-
-    @Override
-    protected boolean recover() {
-        return false;
     }
 
     @Override

@@ -1,27 +1,21 @@
 package fr.hardel.leafs.chunk;
 
-import net.minecraft.SharedConstants;
-import net.minecraft.server.Bootstrap;
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class RegionChunkAccessTest {
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     private static final LevelHeightAccessor HEIGHT = new LevelHeightAccessor() {
         @Override

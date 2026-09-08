@@ -1,6 +1,5 @@
 accessWidener v2 official
 
-accessible field net/minecraft/world/level/Level neighborUpdater Lnet/minecraft/world/level/redstone/CollectingNeighborUpdater;
 accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
 accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/minecraft/world/level/TicketStorage;
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
@@ -24,30 +23,40 @@ accessible field net/minecraft/server/level/ChunkMap$TrackedEntity serverEntity 
 accessible field net/minecraft/server/level/ChunkMap$TrackedEntity entity Lnet/minecraft/world/entity/Entity;
 accessible field net/minecraft/server/level/ChunkMap$TrackedEntity lastSectionPos Lnet/minecraft/core/SectionPos;
 accessible field net/minecraft/server/level/ChunkMap$TrackedEntity seenBy Ljava/util/Set;
-accessible class net/minecraft/server/level/DistanceManager$FixedPlayerDistanceChunkTracker
 accessible field net/minecraft/world/level/entity/PersistentEntitySectionManager sectionStorage Lnet/minecraft/world/level/entity/EntitySectionStorage;
 accessible field net/minecraft/world/level/entity/EntitySectionStorage sections Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;
 accessible method net/minecraft/world/level/entity/EntitySectionStorage getChunkSections (II)Lit/unimi/dsi/fastutil/longs/LongSortedSet;
 accessible class net/minecraft/world/level/entity/PersistentEntitySectionManager$ChunkLoadStatus
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
-accessible method net/minecraft/server/level/ChunkMap onLevelChange (Lnet/minecraft/world/level/ChunkPos;Ljava/util/function/IntSupplier;ILjava/util/function/IntConsumer;)V
-accessible method net/minecraft/server/level/ChunkHolder setQueueLevel (I)V
-accessible method net/minecraft/server/level/DistanceManager getChunk (J)Lnet/minecraft/server/level/ChunkHolder;
-accessible method net/minecraft/server/level/DistanceManager updateChunkScheduling (JILnet/minecraft/server/level/ChunkHolder;I)Lnet/minecraft/server/level/ChunkHolder;
+accessible method net/minecraft/world/level/chunk/status/ChunkStatusTasks postLoadProtoChunk (Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/storage/ValueInput$ValueInputList;)V
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
+accessible method net/minecraft/server/level/GenerationChunkHolder isStatusDisallowed (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
+accessible method net/minecraft/server/level/GenerationChunkHolder acquireStatusBump (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
+accessible method net/minecraft/server/level/GenerationChunkHolder getOrCreateFuture (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Ljava/util/concurrent/CompletableFuture;
+accessible method net/minecraft/server/level/GenerationChunkHolder completeFuture (Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/world/level/chunk/ChunkAccess;)V
 accessible method net/minecraft/server/level/ChunkHolder updateFutures (Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/Executor;)V
-accessible field net/minecraft/server/level/ChunkMap updatingChunkMap Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;
-accessible field net/minecraft/server/level/ChunkMap visibleChunkMap Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;
-accessible field net/minecraft/server/level/ChunkMap pendingUnloads Lit/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap;
 accessible field net/minecraft/server/level/ChunkMap serverViewDistance I
-accessible field net/minecraft/server/level/DistanceManager simulationDistance I
-accessible class net/minecraft/server/level/DistanceManager$PlayerTicketTracker
 accessible method net/minecraft/server/players/PlayerList save (Lnet/minecraft/server/level/ServerPlayer;)V
-accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLoad (J)Ljava/util/Optional;
-accessible field net/minecraft/world/entity/ai/village/poi/PoiManager loadedChunks Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/server/level/ChunkMap chunksToEagerlySave Lit/unimi/dsi/fastutil/longs/LongSet;
 accessible field net/minecraft/world/level/chunk/LevelChunk blockTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
 accessible field net/minecraft/world/level/chunk/LevelChunk fluidTicks Lnet/minecraft/world/ticks/LevelChunkTicks;
 accessible class net/minecraft/server/MinecraftServer$ReloadableResources
-accessible field net/minecraft/server/level/ChunkMap activeChunkWrites Ljava/util/concurrent/atomic/AtomicInteger;
-accessible field net/minecraft/server/level/ChunkMap MAX_ACTIVE_CHUNK_WRITES I
+accessible method net/minecraft/server/level/ChunkMap scheduleUnload (JLnet/minecraft/server/level/ChunkHolder;)V
+accessible field net/minecraft/server/level/ChunkMap lightEngine Lnet/minecraft/server/level/ThreadedLevelLightEngine;
+accessible field net/minecraft/util/StaticCache2D minX I
+accessible field net/minecraft/util/StaticCache2D minZ I
+accessible field net/minecraft/util/StaticCache2D sizeX I
+accessible field net/minecraft/util/StaticCache2D sizeZ I
+accessible field net/minecraft/world/level/chunk/storage/SimpleRegionStorage worker Lnet/minecraft/world/level/chunk/storage/IOWorker;
+accessible field net/minecraft/world/level/chunk/storage/IOWorker storage Lnet/minecraft/world/level/chunk/storage/RegionFileStorage;
+accessible method net/minecraft/world/level/chunk/storage/IOWorker submitThrowingTask (Lnet/minecraft/world/level/chunk/storage/IOWorker$ThrowingSupplier;)Ljava/util/concurrent/CompletableFuture;
+accessible class net/minecraft/world/level/chunk/storage/IOWorker$ThrowingSupplier
+accessible method net/minecraft/world/level/chunk/storage/RegionFileStorage getRegionFile (Lnet/minecraft/world/level/ChunkPos;)Lnet/minecraft/world/level/chunk/storage/RegionFile;
+accessible method net/minecraft/world/level/chunk/storage/RegionFile write (Lnet/minecraft/world/level/ChunkPos;Ljava/nio/ByteBuffer;)V
+accessible field net/minecraft/server/level/GenerationChunkHolder startedWork Ljava/util/concurrent/atomic/AtomicReference;
+accessible field net/minecraft/server/level/GenerationChunkHolder futures Ljava/util/concurrent/atomic/AtomicReferenceArray;
+accessible field net/minecraft/server/level/GenerationChunkHolder task Ljava/util/concurrent/atomic/AtomicReference;
+accessible field net/minecraft/server/level/GenerationChunkHolder generationRefCount Ljava/util/concurrent/atomic/AtomicInteger;
+accessible field net/minecraft/server/level/ChunkGenerationTask scheduledStatus Lnet/minecraft/world/level/chunk/status/ChunkStatus;
+accessible field net/minecraft/server/level/ChunkGenerationTask markedForCancellation Z
+accessible field net/minecraft/server/level/ChunkGenerationTask cache Lnet/minecraft/util/StaticCache2D;

@@ -4,16 +4,29 @@ import fr.hardel.leafs.Leafs;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** Global-phase tasks, submittable from any thread, where off-thread {@code MinecraftServer.execute} lands. */
+/** Global-phase tasks, submittable from any thread, where off-thread {@code MinecraftServer.execute} lands. Drained by the server thread only. */
 public final class GlobalScheduler {
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
+    private boolean draining;
 
     public void run(Runnable task) {
         tasks.add(task);
     }
 
-    /** Runs what was queued before the call; true when anything ran. */
     public boolean drain() {
+        if (draining) {
+            return false;
+        }
+
+        draining = true;
+        try {
+            return runQueued();
+        } finally {
+            draining = false;
+        }
+    }
+
+    private boolean runQueued() {
         int budget = tasks.size();
         boolean ran = false;
         Runnable task;

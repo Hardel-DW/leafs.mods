@@ -1,12 +1,11 @@
 package fr.hardel.leafs.network;
 
-import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.loader.PlayerChunkLoader;
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.global.CommandEngine;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
-import fr.hardel.leafs.ticking.TickingBinding;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -20,8 +19,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelData;
-
 
 /** Player network split: the owning region drains his packets and runs his pass, both as his packet-handling thread; the global loop keeps transport. */
 public final class RegionNetworkTick {
@@ -31,15 +30,14 @@ public final class RegionNetworkTick {
     /** Region tick start: the owned player's packets, stopped if a handler moves the player off-level. */
     public static void drainOnRegion(ServerPlayer player, ServerLevel level) {
         ServerGamePacketListenerImpl listener = player.connection;
-        countIfShared(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
+        countIfHeld(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
     }
 
     /** Region tick end: the player's whole pass, as his packet-handling thread, so no other thread touches him while it runs. The view and the chunk sends run for every player, as vanilla's; the listener ticks only behind a channel, as vanilla's connection list. */
-    public static void tickPlayerOnRegion(ServerPlayer player, PlayerChunkLoader loader, MinecraftServer server) {
+    public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
-        countIfShared(server, PacketRouting.queueOf(listener).handleAs(() -> {
-            loader.tick(player);
+        countIfHeld(server, PacketRouting.queueOf(listener).handleAs(() -> {
             if (!connection.isConnecting()) {
                 tickListener(listener, connection, server);
             }
@@ -49,9 +47,9 @@ public final class RegionNetworkTick {
         }));
     }
 
-    /** A wait is a collision that the exclusion just prevented, so the counter says how often two threads wanted the same player. */
-    private static void countIfShared(MinecraftServer server, boolean waited) {
-        if (waited) {
+    /** A region tick never waits for another thread: a player another thread holds is skipped this tick, and the counter says how often two threads wanted the same player. */
+    private static void countIfHeld(MinecraftServer server, boolean handled) {
+        if (!handled) {
             TickingManager.of(server).metrics().sharedPlayers().increment();
         }
     }
@@ -72,11 +70,33 @@ public final class RegionNetworkTick {
         }
     }
 
-    /** {@code Connection.tick}'s listener half: a game listener ticks on the region owning its player, every other listener here. */
+    /** {@code Connection.tick}'s listener half: a game listener ticks on the region that ticks its player; one no region ticks, dead or without tickets, ticks here as a head. Every other listener stays here. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
-        if (!(listener instanceof ServerGamePacketListenerImpl)) {
+        if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             original.run();
+            return;
         }
+
+        if (tickedByARegion(game.player)) {
+            return;
+        }
+
+        MinecraftServer server = game.player.level().getServer();
+        CommandEngine.runHead(server, null, () -> countIfHeld(server, PacketRouting.queueOf(game).handleAs(() -> {
+            PacketRouting.queueOf(game).drain(() -> !tickedByARegion(game.player));
+            original.run();
+        })));
+    }
+
+    /** The region's photo of its entities: the player is in the world and a live region covers his chunk. */
+    private static boolean tickedByARegion(ServerPlayer player) {
+        if (player.isRemoved()) {
+            return false;
+        }
+
+        LevelRegions regions = LevelRegions.of(player.level());
+        ChunkPos chunk = player.chunkPosition();
+        return regions.live() && regions.regionizer().regionAt(chunk.x(), chunk.z()) != null;
     }
 
     /** The respawn runs on the owner of the respawn spot as that listener's packet-handling thread; this drain ends here, the rest of the queue follows the player. */
@@ -92,19 +112,25 @@ public final class RegionNetworkTick {
         ServerLevel level = server.getLevel(spot.dimension());
         ServerLevel target = level == null ? server.overworld() : level;
         ChunkPos chunk = ChunkPos.containing(spot.pos());
-        DeferredTransports transports = TickingBinding.of(target);
-        if (transports.owns(chunk.x(), chunk.z()) && PacketRouting.queueOf(listener).handledByCurrentThread()) {
+        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
+        if (LevelChunks.of(target).owners().holds(chunk.x(), chunk.z()) && queue.handledByCurrentThread()) {
             return false;
         }
 
-        PlayerPacketQueue queue = PacketRouting.queueOf(listener);
         queue.handOver();
-        DeferredWork.owner(DeferReason.RESPAWN, transports.stats(), chunk.x(), chunk.z(), () -> queue.handleAs(() -> listener.handleClientCommand(packet)))
-            .validIf(listener.connection::isConnected)
-            .submit(transports);
-
+        respawnOnTheOwner(target, chunk, queue, listener, packet);
         return true;
     }
+
+    /** The owner of the spot runs the respawn as the player's packet-handling thread; a queue still held by the drain that posted it is posted again, that drain ends with its handler. */
+    private static void respawnOnTheOwner(ServerLevel target, ChunkPos chunk, PlayerPacketQueue queue, ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
+        DeferredWork.owner(target, DeferReason.RESPAWN, chunk.x(), chunk.z(), () -> {
+            if (!queue.handleAs(() -> listener.handleClientCommand(packet))) {
+                respawnOnTheOwner(target, chunk, queue, listener, packet);
+            }
+        }).validIf(listener.connection::isConnected).submit();
+    }
+
 
     /** Paused integrated server: vanilla only drains while paused, no listener tick (solo keepalive is exempt anyway). */
     public static void drainPaused(ServerLevel level) {
