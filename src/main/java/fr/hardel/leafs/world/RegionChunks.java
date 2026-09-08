@@ -1,7 +1,7 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.chunk.RegionChunkAccess;
-import fr.hardel.leafs.chunk.core.ConcurrentChunkTable;
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.region.Region;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
@@ -28,7 +28,7 @@ public final class RegionChunks {
         minZ = Integer.MAX_VALUE;
         maxX = Integer.MIN_VALUE;
         maxZ = Integer.MIN_VALUE;
-        ConcurrentChunkTable table = RegionChunkAccess.holders(chunkMap);
+        HolderTable table = LevelChunks.of(chunkMap.level).holders().table();
         for (long section : region.sectionKeySnapshot()) {
             table.forEachHolderIn(section, this::collect);
         }

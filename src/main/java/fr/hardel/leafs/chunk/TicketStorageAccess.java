@@ -1,12 +1,13 @@
 package fr.hardel.leafs.chunk;
 
-import net.minecraft.server.level.ServerLevel;
+import fr.hardel.leafs.chunk.ticket.TicketGraphs;
+import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 
-/** Binds the owning level onto the ticket storage, which vanilla constructs level-blind as saved data. */
+/** Implemented onto {@code TicketStorage} by mixin: what its tickets feed. */
 public interface TicketStorageAccess {
+    TicketGraphs leafs$graphs();
 
-    void leafs$bindLevel(ServerLevel level);
 
-    /** Null until the first timeout ticket lands; the purgers treat null as an empty index. */
-    TicketTimeoutIndex leafs$timeouts();
+    /** Bound with the chunk system, whose region sections shard the index. */
+    void leafs$bindTimeouts(TicketTimeoutIndex timeouts);
 }

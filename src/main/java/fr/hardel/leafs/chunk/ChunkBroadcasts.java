@@ -5,9 +5,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 
 /** Vanilla's broadcast pass over the holders an owner walks: the changed ones send their blocks and light to their players. */
 public final class ChunkBroadcasts {
-
-    private ChunkBroadcasts() {
-    }
+    private ChunkBroadcasts() {}
 
     public static void changed(Iterable<ChunkHolder> holders) {
         for (ChunkHolder holder : holders) {

@@ -2,12 +2,12 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.chunk.PoiLockAccess;
-import fr.hardel.leafs.chunk.PoiVillageLock;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
+import fr.hardel.leafs.chunk.SectionStorageLock;
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.SectionStorage;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,13 +17,12 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Optional;
 
-/** Concurrent storage facade. Carries the village lock shared with the POI subclass; held over the dirty-set save. */
+/** Concurrent storage facade, and the storage's lock: its writes, its reads from disk, its saves and the graphs of its subclass take it. */
 @Mixin(SectionStorage.class)
-public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, SectionStorageAccess {
+public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess {
 
     @Mutable
     @Shadow
@@ -31,24 +30,11 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
     private Long2ObjectMap<Optional<R>> storage;
 
     @Unique
-    private final PoiVillageLock leafs$villageLock = new PoiVillageLock();
-
-    @Unique
-    private ServerLevel leafs$level;
+    private final SectionStorageLock leafs$lock = new SectionStorageLock();
 
     @Override
-    public PoiVillageLock leafs$villageLock() {
-        return leafs$villageLock;
-    }
-
-    @Override
-    public void leafs$bindLevel(ServerLevel level) {
-        this.leafs$level = level;
-    }
-
-    @Override
-    public ServerLevel leafs$level() {
-        return leafs$level;
+    public SectionStorageLock leafs$lock() {
+        return leafs$lock;
     }
 
     @Inject(method = "<init>", at = @At("TAIL"))
@@ -56,20 +42,20 @@ public abstract class SectionStorageMixin<R, P> implements PoiLockAccess, Sectio
         this.storage = new ConcurrentLong2ObjectMap<>();
     }
 
-    /** Off the server thread a section answers from what is unpacked, never a disk read; unloaded terrain answers "no POI" like vanilla. */
-    @Inject(method = "getOrLoad", at = @At("HEAD"), cancellable = true)
-    private void leafs$presentOnlyOffOwner(long sectionPos, CallbackInfoReturnable<Optional<R>> callbackInfo) {
-        ServerLevel level = leafs$level;
-        if (level == null || level.getServer().isSameThread()) {
-            return;
-        }
-
-        Optional<R> present = this.storage.get(sectionPos);
-        callbackInfo.setReturnValue(present == null ? Optional.empty() : present);
+    @WrapMethod(method = "unpackChunk(Lnet/minecraft/world/level/ChunkPos;)V")
+    private void leafs$readFromDiskUnderTheLock(ChunkPos chunkPos, Operation<Void> original) {
+        leafs$lock.runLocked(() -> original.call(chunkPos));
     }
 
     @WrapMethod(method = "flushAll")
-    private void leafs$flushUnderVillageLock(Operation<Void> original) {
-        leafs$villageLock.runLocked(original::call);
+
+    private void leafs$flushUnderTheLock(Operation<Void> original) {
+        leafs$lock.runLocked(original::call);
+    }
+
+    /** A chunk save packs the sections the writes touch: same lock. */
+    @WrapMethod(method = "flush")
+    private void leafs$chunkFlushUnderTheLock(ChunkPos chunkPos, Operation<Void> original) {
+        leafs$lock.runLocked(() -> original.call(chunkPos));
     }
 }

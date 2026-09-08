@@ -143,9 +143,9 @@ class PlayerPacketQueueTest {
         assertEquals(1, listener.errors.size());
     }
 
-    /** Two units racing a handover never run handlers concurrently: the second waits for the first to let go. */
+    /** 2026-09-06: a region waiting here for the region holding the player deadlocked with it over a chunk publication. A held player is refused, never waited for. */
     @Test
-    void aSecondDrainerWaitsForTheFirst() throws InterruptedException {
+    void aSecondDrainerIsRefusedWhileTheFirstHandles() throws InterruptedException {
         FakeListener listener = new FakeListener(true);
         CountDownLatch insideDrain = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -162,19 +162,12 @@ class PlayerPacketQueueTest {
         regionDrainer.start();
         assertTrue(insideDrain.await(5, TimeUnit.SECONDS));
 
-        AtomicBoolean drainedSecond = new AtomicBoolean();
-        Thread secondDrainer = new Thread(() -> {
-            queue.drain();
-            drainedSecond.set(true);
-        });
-        secondDrainer.start();
-        secondDrainer.join(200);
-        assertFalse(drainedSecond.get(), "the second drainer waits while the first handles");
+        assertFalse(queue.drain(), "a held player is refused, not waited for");
+        assertFalse(PlayerPacketQueue.handlingPackets(), "a refusal leaves no handling scope behind");
 
         release.countDown();
         regionDrainer.join();
-        secondDrainer.join();
-        assertTrue(drainedSecond.get());
+        assertTrue(queue.drain(), "a released player is handled again");
     }
 
     /** 2026-08-31: the player's own pass ran outside this exclusion, so the new owner's drain wrote his movement list while the old owner read it. */
@@ -196,16 +189,15 @@ class PlayerPacketQueueTest {
         previousOwner.start();
         assertTrue(passStarted.await(5, TimeUnit.SECONDS));
 
-        Thread newOwner = new Thread(queue::drain);
-        newOwner.start();
-        newOwner.join(200);
-        assertTrue(newOwner.isAlive(), "the new owner waits for the pass instead of handling packets under it");
+        assertFalse(queue.drain(), "the new owner is refused while the pass runs, the packet stays queued");
+        assertEquals(1, queue.pending());
 
         release.countDown();
         previousOwner.join();
-        newOwner.join();
+        assertTrue(queue.drain());
         assertFalse(overlapped.get(), "no packet may be handled while the player's pass runs");
     }
+
 
     private static void awaitQuietly(CountDownLatch latch) {
         try {

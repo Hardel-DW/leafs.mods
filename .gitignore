@@ -40,3 +40,7 @@ replay_*.log
 *.jfr
 logs/
 roadmap
+libs/
+.fabric/
+.mixin.out/
+config/

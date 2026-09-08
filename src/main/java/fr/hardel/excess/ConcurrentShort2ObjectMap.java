@@ -1,0 +1,133 @@
+package fr.hardel.excess;
+
+import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
+import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import it.unimi.dsi.fastutil.objects.ObjectIterators;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
+import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
+import it.unimi.dsi.fastutil.shorts.AbstractShort2ObjectMap;
+import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
+import org.jspecify.annotations.NonNull;
+
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/** ConcurrentHashMap-backed Short2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
+public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<V> {
+    private final ConcurrentHashMap<Short, V> map = new ConcurrentHashMap<>();
+
+    @Override
+    public V get(short key) {
+        V value = map.get(key);
+        return value == null ? defaultReturnValue() : value;
+    }
+
+    @Override
+    public V put(short key, V value) {
+        V previous = map.put(key, value);
+        return previous == null ? defaultReturnValue() : previous;
+    }
+
+    @Override
+    public V remove(short key) {
+        V previous = map.remove(key);
+        return previous == null ? defaultReturnValue() : previous;
+    }
+
+    @Override
+    public boolean containsKey(short key) {
+        return map.containsKey(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        return map.containsValue(value);
+    }
+
+    @Override
+    public int size() {
+        return map.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return map.isEmpty();
+    }
+
+    @Override
+    public void clear() {
+        map.clear();
+    }
+
+    @Override
+    public @NonNull ObjectCollection<V> values() {
+        return new AbstractObjectCollection<>() {
+            @Override
+            public @NonNull ObjectIterator<V> iterator() {
+                return ObjectIterators.asObjectIterator(map.values().iterator());
+            }
+
+            /** A stream must not trust a size the map outgrows while it runs. */
+            @Override
+            public @NonNull ObjectSpliterator<V> spliterator() {
+                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
+            }
+
+            @Override
+            public int size() {
+                return map.size();
+            }
+
+            @Override
+            public boolean contains(Object value) {
+                return map.containsValue(value);
+            }
+
+            @Override
+            public void clear() {
+                map.clear();
+            }
+        };
+    }
+
+    @Override
+    public ObjectSet<Short2ObjectMap.Entry<V>> short2ObjectEntrySet() {
+        return new AbstractObjectSet<>() {
+            @Override
+            public @NonNull ObjectIterator<Short2ObjectMap.Entry<V>> iterator() {
+                Iterator<Map.Entry<Short, V>> backing = map.entrySet().iterator();
+                return new ObjectIterator<>() {
+                    @Override
+                    public boolean hasNext() {
+                        return backing.hasNext();
+                    }
+
+                    @Override
+                    public Short2ObjectMap.Entry<V> next() {
+                        Map.Entry<Short, V> entry = backing.next();
+                        return new BasicEntry<>(entry.getKey(), entry.getValue());
+                    }
+                };
+            }
+
+            @Override
+            public @NonNull ObjectSpliterator<Short2ObjectMap.Entry<V>> spliterator() {
+                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
+            }
+
+            @Override
+            public int size() {
+                return map.size();
+            }
+
+            @Override
+            public boolean contains(Object object) {
+                return object instanceof Map.Entry<?, ?> entry && entry.getKey() instanceof Short key && entry.getValue() != null && entry.getValue().equals(map.get(key));
+            }
+        };
+    }
+}

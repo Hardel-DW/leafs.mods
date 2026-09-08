@@ -1,6 +1,11 @@
 package fr.hardel.leafs.metrics;
 
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.atomic.LongAccumulator;
 
 /** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
@@ -12,7 +17,11 @@ public final class ServerMetrics {
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
     private final MinuteCounter chunksFull = new MinuteCounter();
+    private final AtomicLongArray stepsRan = new AtomicLongArray(ChunkStatus.getStatusList().size());
     private final MinuteCounter sharedPlayers = new MinuteCounter();
+    private final MinuteCounter chunkWaits = new MinuteCounter();
+    private final AtomicLong chunkWaitNanos = new AtomicLong();
+    private final LongAccumulator longestChunkWaitNanos = new LongAccumulator(Math::max, 0L);
 
     /** Server tick events emitted with a subscriber, each one a borrow scope on the server thread. */
     public MinuteCounter fabricEventBorrows() {
@@ -47,9 +56,37 @@ public final class ServerMetrics {
         return chunkUnloads;
     }
 
+    /** Generation steps the pool ran, by target status: against the FULL count, the work spent on chunks that never completed. */
+    public void stepRan(ChunkStatus status) {
+        stepsRan.incrementAndGet(status.getIndex());
+    }
+
+    public long stepsRan(ChunkStatus status) {
+        return stepsRan.get(status.getIndex());
+    }
+
     /** Chunks that ran their FULL step, the generation pipeline's output. */
     public MinuteCounter chunksFull() {
         return chunksFull;
+    }
+
+    /** A thread that needed an absent chunk and waited for it. */
+    public void chunkWaited(long nanos) {
+        chunkWaits.increment();
+        chunkWaitNanos.addAndGet(nanos);
+        longestChunkWaitNanos.accumulate(nanos);
+    }
+
+    public MinuteCounter chunkWaits() {
+        return chunkWaits;
+    }
+
+    public long chunkWaitNanos() {
+        return chunkWaitNanos.get();
+    }
+
+    public long longestChunkWaitNanos() {
+        return longestChunkWaitNanos.get();
     }
 
     /** Times a thread waited for a player another thread held: before his tick joined that exclusion, the two ran on him together. */

@@ -1,14 +1,13 @@
 package fr.hardel.leafs.chunk;
 
-import net.minecraft.SharedConstants;
-import net.minecraft.server.Bootstrap;
+import fr.hardel.MinecraftBootstrap;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.HashMapPalette;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.Strategy;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,13 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Block states read from any thread while the owner writes; writers and serializers must not crash each other. */
+@ExtendWith(MinecraftBootstrap.class)
 class PalettedContainerConcurrencyTest {
-
-    @BeforeAll
-    static void bootstrap() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-    }
 
     private static List<BlockState> states(int count) {
         List<BlockState> states = new ArrayList<>(count);

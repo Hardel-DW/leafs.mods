@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
-public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, int playerChunkLoadsPerTick, Debug debug, Gameplay gameplay) {
+public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug, Gameplay gameplay) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static LeafsConfig instance;
@@ -56,14 +56,12 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         }
     }
 
-    /** The keys {@code /leafs config} may rewrite; the debug and gameplay groups stay a file-only matter. */
     public enum Setting {
         REGION_THREADS("region_threads", LeafsConfig::regionThreads),
         CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
         SECTION_SIZE("section_size", LeafsConfig::sectionSize),
         REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance),
-        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance),
-        PLAYER_CHUNK_LOADS_PER_TICK("player_chunk_loads_per_tick", LeafsConfig::playerChunkLoadsPerTick);
+        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance);
 
         private final String key;
         private final ToIntFunction<LeafsConfig> getter;
@@ -86,7 +84,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         }
     }
 
-    /** Their sum may exceed the machine on purpose: chunk workers hold the lowest priority, so each pool absorbs the other's slack. */
     private static Codec<Integer> threads(Setting setting) {
         return Codec.intRange(ALL_CORES, 1024)
             .validate(value -> value == 0
@@ -116,7 +113,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         SECTION_SIZE.optionalFieldOf(Setting.SECTION_SIZE.key(), 2).forGetter(LeafsConfig::sectionSize),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
         Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
-        Codec.intRange(1, 1000).optionalFieldOf(Setting.PLAYER_CHUNK_LOADS_PER_TICK.key(), 5).forGetter(LeafsConfig::playerChunkLoadsPerTick),
         DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug),
         GAMEPLAY.codec().optionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
     ).apply(builder, LeafsConfig::new));
@@ -134,8 +130,14 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
 
     public static void register() {
         file = FabricLoader.getInstance().getConfigDir().resolve(Leafs.MOD_ID + ".json");
+        if (Files.notExists(file)) {
+            new ServerProperties(FabricLoader.getInstance().getGameDir().resolve("server.properties")).set("sync-chunk-writes", "false");
+        }
+
+
         instance = load(file);
     }
+
 
     public static LeafsConfig get() {
         if (instance == null) {
@@ -149,28 +151,30 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         return defaultsOf(CODEC);
     }
 
-    /** A missing file is written with the defaults; unknown keys are ignored, an invalid value stops the boot naming the file. */
     static LeafsConfig load(Path file) {
         return Files.notExists(file) ? write(file, defaults()) : parse(file, read(file));
     }
 
-    /** One key rewritten through the same codec as the load, so the same ranges apply; live at the next start. */
     public static LeafsConfig rewrite(Setting setting, int value) {
-        JsonObject json = encode(get());
+        return rewrite(file, setting, value);
+    }
+
+    static LeafsConfig rewrite(Path file, Setting setting, int value) {
+        JsonObject json = read(file).getAsJsonObject();
         json.addProperty(setting.key(), value);
         return write(file, parse(file, json));
     }
 
     public int effectiveRegionThreads() {
-        return effective(regionThreads);
+        return effective(regionThreads, Runtime.getRuntime().availableProcessors());
     }
 
     public int effectiveChunkThreads() {
-        return effective(chunkThreads);
+        return effective(chunkThreads, Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
     }
 
-    private static int effective(int threads) {
-        return threads > 0 ? threads : Runtime.getRuntime().availableProcessors();
+    private static int effective(int threads, int allCores) {
+        return threads > 0 ? threads : allCores;
     }
 
     public int sectionShift() {

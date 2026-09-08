@@ -1,9 +1,14 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.chunk.holder.ChunkWait;
+
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 
 /** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill (vanilla's max-tick-time, zero disables) runs once; the same killer covers a shutdown that never finishes. */
@@ -13,9 +18,11 @@ public final class LeafsWatchdog {
 
     private final long warnNanos;
     private final LongSupplier killNanos;
+    private final LongFunction<Map<Thread, String>> stalledWaits;
     private final Consumer<String> reporter;
     private final Consumer<Stall> killer;
     private final ConcurrentHashMap<TickHandle, RunningTick> running = new ConcurrentHashMap<>();
+    private final Map<Thread, Long> reportedWaits = new HashMap<>();
     private final AtomicReference<Thread> shutdownDeadline = new AtomicReference<>();
     private volatile boolean active;
     private Thread thread;
@@ -24,9 +31,11 @@ public final class LeafsWatchdog {
     public record Stall(String summary, Thread thread) {
     }
 
-    public LeafsWatchdog(Duration warnAfter, LongSupplier killNanos, Consumer<String> reporter, Consumer<Stall> killer) {
+    /** The stalled waits are the chunk waits older than the warn threshold at a given time, on any thread. */
+    public LeafsWatchdog(Duration warnAfter, LongSupplier killNanos, LongFunction<Map<Thread, String>> stalledWaits, Consumer<String> reporter, Consumer<Stall> killer) {
         this.warnNanos = warnAfter.toNanos();
         this.killNanos = killNanos;
+        this.stalledWaits = stalledWaits;
         this.reporter = reporter;
         this.killer = killer;
     }
@@ -96,8 +105,28 @@ public final class LeafsWatchdog {
                     reporter.accept(describeStall(entry.getKey(), tick, now));
                 }
             }
+
+            reportStalledWaits(now);
         }
     }
+
+    /** A chunk wait past the threshold on a thread that is not a tick unit, a chunk worker or the server thread: at once, then once per warn interval. */
+    private void reportStalledWaits(long now) {
+        Map<Thread, String> stalled = stalledWaits.apply(now);
+        reportedWaits.keySet().retainAll(stalled.keySet());
+        for (RunningTick tick : running.values()) {
+            stalled.remove(tick.thread);
+        }
+
+        stalled.forEach((thread, summary) -> {
+            Long lastReport = reportedWaits.get(thread);
+            if (lastReport == null || now - lastReport >= warnNanos) {
+                reportedWaits.put(thread, now);
+                reporter.accept(withStack(new StringBuilder(summary), thread));
+            }
+        });
+    }
+
 
     private void awaitShutdown(Duration deadline, Thread stopping) {
         try {
@@ -116,7 +145,16 @@ public final class LeafsWatchdog {
 
     private String describeStall(TickHandle handle, RunningTick tick, long now) {
         StringBuilder message = new StringBuilder(headerLine(handle, tick, now));
-        for (StackTraceElement element : tick.thread.getStackTrace()) {
+        String waiting = ChunkWait.describe(tick.thread);
+        if (waiting != null) {
+            message.append(System.lineSeparator()).append('	').append(waiting);
+        }
+
+        return withStack(message, tick.thread);
+    }
+
+    private static String withStack(StringBuilder message, Thread thread) {
+        for (StackTraceElement element : thread.getStackTrace()) {
             message.append(System.lineSeparator()).append("\tat ").append(element);
         }
 

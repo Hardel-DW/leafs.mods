@@ -30,7 +30,7 @@ public final class TimingsCommand {
 
     static LiteralArgumentBuilder<CommandSourceStack> tree() {
         return Commands.literal("timings")
-            .then(Commands.literal("global").executes(context -> global(context.getSource())))
+            .executes(context -> global(context.getSource()))
             .then(Commands.argument("dimension", DimensionArgument.dimension())
                 .executes(context -> serial(context.getSource(), DimensionArgument.getDimension(context, "dimension")))
                 .then(Commands.argument("region", IntegerArgumentType.integer(0))

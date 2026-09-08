@@ -22,12 +22,12 @@ public final class RegionWorldData {
     private final PathTypeCache pathTypeCache;
     private final ScheduledTickDrain<LevelChunk, Block> blockTicks = new ScheduledTickDrain<>(chunk -> chunk.blockTicks, chunk -> chunk.getPos().pack());
     private final ScheduledTickDrain<LevelChunk, Fluid> fluidTicks = new ScheduledTickDrain<>(chunk -> chunk.fluidTicks, chunk -> chunk.getPos().pack());
-    private final BlockEventBatch<LevelChunk> blockEvents = new BlockEventBatch<>(chunk -> ((ChunkTickAccess) chunk).leafs$blockEvents());
     private final RegionChunks chunks = new RegionChunks();
     private final RegionEntities entities = new RegionEntities();
     private volatile MobCensus census = MobCensus.EMPTY;
     private long subTick;
     private long lastInhabitedUpdate;
+    private long savedEpoch;
 
     public RegionWorldData(LongSupplier time, RandomSource random, CollectingNeighborUpdater neighborUpdater, PathTypeCache pathTypeCache, long inhabitedFrom) {
         this.time = time;
@@ -65,10 +65,6 @@ public final class RegionWorldData {
         return fluidTicks;
     }
 
-    public BlockEventBatch<LevelChunk> blockEvents() {
-        return blockEvents;
-    }
-
     public RegionChunks chunks() {
         return chunks;
     }
@@ -92,6 +88,20 @@ public final class RegionWorldData {
 
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay) {
         return new ScheduledTick<>(type, pos, currentTick() + delay, subTick++);
+    }
+
+    /** The autosave epoch every chunk of the region has reached; the walk that found them all done set it. */
+    public long savedEpoch() {
+        return savedEpoch;
+    }
+
+    public void markEpochSaved(long epoch) {
+        savedEpoch = epoch;
+    }
+
+    /** Chunks joined the region: the next pass walks them. */
+    public void forgetEpoch() {
+        savedEpoch = Long.MIN_VALUE;
     }
 
     public long advanceInhabitedTime(long gameTime) {

@@ -6,7 +6,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.chunk.ChunkWait;
+import fr.hardel.leafs.chunk.holder.ChunkWait;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -72,7 +72,6 @@ public abstract class ServerPlayerMixin implements PlayerMoveAccess, SavedEpochA
         ChunkWait.until(level, done);
     }
 
-    // Every thread routes, including a mod's own pool: the funnel replays vanilla in place when the caller already holds the destination.
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/server/level/ServerPlayer;", at = @At("HEAD"), cancellable = true)
     private void leafs$deferOffOwnerPlayerMove(TeleportTransition transition, CallbackInfoReturnable<ServerPlayer> callbackInfo) {
         ServerPlayer self = (ServerPlayer) (Object) this;
@@ -81,7 +80,7 @@ public abstract class ServerPlayerMixin implements PlayerMoveAccess, SavedEpochA
         }
 
         if (!self.isRemoved() && ((ServerLevelEntityAccess) origin).leafs$entityTeleports().route(self, transition)) {
-            callbackInfo.setReturnValue(null);
+            callbackInfo.setReturnValue(self);
         }
     }
 }

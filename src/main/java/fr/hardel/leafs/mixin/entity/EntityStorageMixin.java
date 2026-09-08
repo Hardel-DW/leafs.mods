@@ -35,6 +35,6 @@ public abstract class EntityStorageMixin {
 
     @WrapOperation(method = "<init>", at = @At(value = "NEW", target = "net/minecraft/util/thread/ConsecutiveExecutor"))
     private ConsecutiveExecutor leafs$deserializeOnTheChunkWorkers(Executor dispatcher, String name, Operation<ConsecutiveExecutor> original, @Local(argsOnly = true) ServerLevel level) {
-        return original.call(TickingManager.of(level.getServer()).chunkWorkers(), name);
+        return original.call(TickingManager.of(level.getServer()).chunkPool(), name);
     }
 }

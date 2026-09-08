@@ -2,6 +2,7 @@ package fr.hardel.leafs.mixin.compat;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.global.SharedStateMonitor;
 import net.fabricmc.fabric.impl.lookup.block.BlockApiCacheImpl;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -13,15 +14,11 @@ public abstract class FabricApiLookupCacheShim {
 
     @WrapMethod(method = "fabric_registerCache", remap = false)
     private void leafs$lockedRegister(BlockPos pos, BlockApiCacheImpl<?, ?> cache, Operation<Void> original) {
-        synchronized (this) {
-            original.call(pos, cache);
-        }
+        SharedStateMonitor.run(this, () -> original.call(pos, cache));
     }
 
     @WrapMethod(method = "fabric_invalidateCache", remap = false)
     private void leafs$lockedInvalidate(BlockPos pos, Operation<Void> original) {
-        synchronized (this) {
-            original.call(pos);
-        }
+        SharedStateMonitor.run(this, () -> original.call(pos));
     }
 }

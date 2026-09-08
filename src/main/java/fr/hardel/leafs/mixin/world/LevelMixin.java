@@ -2,12 +2,11 @@ package fr.hardel.leafs.mixin.world;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredTransports;
 import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
-import fr.hardel.leafs.ticking.TickingBinding;
 import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
@@ -21,7 +20,9 @@ import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.spongepowered.asm.mixin.Final;
+
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
@@ -48,27 +49,27 @@ public abstract class LevelMixin {
     private void leafs$routeUnitState(CallbackInfo callbackInfo) {
         if ((Object) this instanceof ServerLevel level) {
             this.random = new RoutingRandomSource(level, this.random);
-            this.neighborUpdater = new RoutingNeighborUpdater(level, () -> new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), TickingBinding.of(level));
+            this.neighborUpdater = new RoutingNeighborUpdater(level, () -> new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), () -> LevelChunks.of(level).owners());
         }
     }
 
-    /** A block write is the owner's, its side effects with it; only a region that ticks the chunk turns it into mail, and then it answers like a write that happened. */
+    /** A block write is the owner's, its side effects with it. A region that ticks the chunk gets it as mail, and the call answers like a write that happened; anywhere else the caller takes the chunk, writes now and answers vanilla's result. */
     @WrapMethod(method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z")
     private boolean leafs$writeOnTheOwner(BlockPos pos, BlockState state, int flags, int updateLimit, Operation<Boolean> original) {
         if (!((Object) this instanceof ServerLevel level)) {
             return original.call(pos, state, flags, updateLimit);
         }
 
-        DeferredTransports transports = TickingBinding.of(level);
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        if (transports.owns(chunkX, chunkZ)) {
+        if (LevelChunks.of(level).owners().holds(chunkX, chunkZ)) {
             return original.call(pos, state, flags, updateLimit);
         }
 
         BlockPos target = pos.immutable();
-        DeferredWork.owner(DeferReason.BLOCK_WRITE, transports.stats(), chunkX, chunkZ, () -> original.call(target, state, flags, updateLimit)).submit(transports);
-        return true;
+        MutableBoolean placed = new MutableBoolean(true);
+        DeferredWork.owner(level, DeferReason.BLOCK_WRITE, chunkX, chunkZ, () -> placed.setValue(original.call(target, state, flags, updateLimit))).submit();
+        return placed.booleanValue();
     }
 
     /** The chunk contract decides what any thread may read; only the chunk's owner creates a block entity, another thread reads what exists. */
@@ -79,7 +80,7 @@ public abstract class LevelMixin {
         }
 
         LevelChunk chunk = level.getChunkAt(pos);
-        boolean owner = TickingBinding.of(level).owns(chunk.getPos().x(), chunk.getPos().z());
+        boolean owner = LevelChunks.of(level).owners().holds(chunk.getPos().x(), chunk.getPos().z());
         callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : ((ChunkTickAccess) chunk).leafs$existingBlockEntity(pos));
     }
 

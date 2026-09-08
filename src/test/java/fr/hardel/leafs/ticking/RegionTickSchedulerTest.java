@@ -1,6 +1,8 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.metrics.ModAttribution;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -34,13 +37,13 @@ class RegionTickSchedulerTest {
     }
 
     private RegionTickScheduler createScheduler(int threads, Path crashDirectory) {
-        scheduler = new RegionTickScheduler(threads, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, ModAttribution.none()), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(threads, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> { });
         return scheduler;
     }
 
     @Test
     void regionThreadNamesScopeTheWorkerDuringItsTick(@TempDir Path crashDirectory) throws InterruptedException {
-        scheduler = new RegionTickScheduler(1, true, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, ModAttribution.none()), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(1, true, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> { });
         scheduler.start();
         CountDownLatch ticked = new CountDownLatch(1);
         AtomicReference<String> nameDuringTick = new AtomicReference<>();
@@ -62,6 +65,29 @@ class RegionTickSchedulerTest {
         }
 
         assertTrue(worker.get().getName().startsWith("Leafs Region Worker"));
+    }
+
+    /** The drain that follows on the server thread must find every region idle: a tick in flight ends before shutdown returns, however long it takes. */
+    @Test
+    void shutdownWaitsForATickInFlight(@TempDir Path crashDirectory) throws InterruptedException {
+        RegionTickScheduler scheduler = createScheduler(1, crashDirectory);
+        scheduler.start();
+        CountDownLatch started = new CountDownLatch(1);
+        AtomicBoolean ticking = new AtomicBoolean();
+        
+        scheduler.schedule(new TestTickHandle(1, () -> {
+            ticking.set(true);
+            started.countDown();
+            long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
+            while (System.nanoTime() < end) {
+                Thread.onSpinWait();
+            }
+            ticking.set(false);
+        }));
+
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        scheduler.shutdown();
+        assertFalse(ticking.get());
     }
 
     @Test
@@ -96,31 +122,13 @@ class RegionTickSchedulerTest {
         }
     }
 
-    /** A unit that recovers keeps the report, swallows the failure and stays schedulable; the failure policy never hears of it. */
-    @Test
-    void aRecoveredCrashWritesTheReportAndDoesNotPropagate(@TempDir Path crashDirectory) throws IOException {
-        RegionTickScheduler attached = createScheduler(1, crashDirectory);
-        TestTickHandle handle = new TestTickHandle(10, () -> {
-            throw new IllegalStateException("boom");
-        }, false, true);
-
-        attached.runAttached(handle);
-
-        assertEquals(1, handle.recoveries());
-        assertFalse(handle.isCancelled());
-        assertNull(RegionContext.current());
-        try (Stream<Path> files = Files.list(crashDirectory)) {
-            assertEquals(1, files.count());
-        }
-    }
-
     /** A crash path must not crash: a report that cannot be built must not hide what actually failed. */
     @Test
     void aFailingCrashReportNeverReplacesTheOriginalFailure(@TempDir Path crashDirectory) {
         RegionTickScheduler attached = createScheduler(1, crashDirectory);
         TestTickHandle handle = new TestTickHandle(11, () -> {
             throw new IllegalStateException("boom");
-        }, true, false);
+        }, true);
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> attached.runAttached(handle));
 
@@ -154,7 +162,7 @@ class RegionTickSchedulerTest {
     void poolTickFailureInvokesThePolicyAndStopsRescheduling(@TempDir Path crashDirectory) throws InterruptedException {
         CountDownLatch failed = new CountDownLatch(1);
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        scheduler = new RegionTickScheduler(1, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, ModAttribution.none()), (handle, throwable) -> {
+        scheduler = new RegionTickScheduler(1, false, new LeafsWatchdog(Duration.ofSeconds(60), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> {
             failures.add(throwable);
             failed.countDown();
         });

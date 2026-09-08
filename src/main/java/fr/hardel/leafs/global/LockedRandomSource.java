@@ -4,7 +4,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.jspecify.annotations.NonNull;
 
-/** A shared sequence RandomSource serialized on its owner: loot rolls reach it from any region (#26c). */
+/** A shared sequence RandomSource serialized on the monitor the save encode takes: a roll and a save exclude each other. */
 public final class LockedRandomSource implements RandomSource {
     private final RandomSource delegate;
     private final Object monitor;

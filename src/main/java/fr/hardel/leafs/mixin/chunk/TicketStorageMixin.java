@@ -1,16 +1,11 @@
 package fr.hardel.leafs.mixin.chunk;
 
-import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.chunk.PropagatorAccess;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
-import fr.hardel.leafs.chunk.TicketTimeoutIndex;
-import fr.hardel.leafs.chunk.propagator.LevelTicketPropagator;
-import fr.hardel.leafs.chunk.propagator.SimulationLevels;
-import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.TickingManager;
+import fr.hardel.leafs.chunk.ticket.TicketGraphs;
+import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
@@ -21,94 +16,99 @@ import org.spongepowered.asm.mixin.Unique;
 import java.util.List;
 import java.util.function.BiConsumer;
 
-/** The ticket table takes writers from any thread under one monitor; the listeners feed the Leafs authorities inline. */
+/** The ticket table takes writers from any thread under one monitor; a write drains the graphs once the monitor is released. */
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
+    @Unique
+    private final TicketGraphs leafs$graphs = new TicketGraphs();
 
     @Unique
-    private volatile ServerLevel leafs$level;
-
-    @Unique
-    private volatile TicketTimeoutIndex leafs$timeouts;
+    private TicketTimeoutIndex leafs$timeouts;
 
     @Override
-    public void leafs$bindLevel(ServerLevel level) {
-        this.leafs$level = level;
+    public TicketGraphs leafs$graphs() {
+        return leafs$graphs;
     }
 
+
     @Override
-    public TicketTimeoutIndex leafs$timeouts() {
-        return leafs$timeouts;
+    public void leafs$bindTimeouts(TicketTimeoutIndex timeouts) {
+        leafs$timeouts = timeouts;
+    }
+
+    /** Vanilla's two trackers never hear a ticket again; the graphs do. */
+    @WrapMethod(method = "setLoadingChunkUpdatedListener")
+    private void leafs$feedTheLoadingGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
+        original.call(leafs$graphs.loadingFeed());
+    }
+
+    @WrapMethod(method = "setSimulationChunkUpdatedListener")
+    private void leafs$feedTheSimulationGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
+        original.call(leafs$graphs.simulationFeed());
     }
 
     /** A stored timeout ticket enters the index with its identity; a reset re-uses the instance tracked at its first add. */
     @WrapMethod(method = "addTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
-        synchronized (this) {
-            boolean added = original.call(key, ticket);
-            if (added && ticket.getType().hasTimeout())
-                leafs$timeoutIndex().track(key, ticket);
+        return leafs$graphs.batch(() -> {
+            synchronized (this) {
+                boolean added = original.call(key, ticket);
+                if (added && ticket.getType().hasTimeout()) {
+                    leafs$timeouts.track(key, ticket);
+                }
 
-            return added;
-        }
-    }
-
-    /** Built under the monitor on first use, because the chunk source does not exist yet when the storage binds its level. */
-    @Unique
-    private TicketTimeoutIndex leafs$timeoutIndex() {
-        if (leafs$timeouts == null) {
-            ServerLevel owner = leafs$level;
-            leafs$timeouts = new TicketTimeoutIndex((TicketStorage) (Object) this, owner.getChunkSource().chunkMap, LevelRegions.of(owner).regionizer().sectionShift());
-        }
-
-        return leafs$timeouts;
+                return added;
+            }
+        });
     }
 
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredRemove(long key, Ticket ticket, Operation<Boolean> original) {
-        synchronized (this) {
-            boolean removed = original.call(key, ticket);
-            if (removed && leafs$timeouts != null) {
-                leafs$timeouts.untrack(key, ticket);
-            }
+        return leafs$graphs.batch(() -> {
+            synchronized (this) {
+                boolean removed = original.call(key, ticket);
+                if (removed && ticket.getType().hasTimeout()) {
+                    leafs$timeouts.untrack(key, ticket);
+                }
 
-            return removed;
-        }
+                return removed;
+            }
+        });
     }
 
     /** The predicate decides the removal, so it is where the index learns of it. */
     @WrapMethod(method = "removeTicketIf")
     private void leafs$monitoredRemoveIf(TicketStorage.TicketPredicate predicate, Long2ObjectOpenHashMap<List<Ticket>> removedTickets, Operation<Void> original) {
-        synchronized (this) {
-            TicketTimeoutIndex timeouts = leafs$timeouts;
-            if (timeouts == null) {
-                original.call(predicate, removedTickets);
-                return;
+        leafs$graphs.batch(() -> {
+            synchronized (this) {
+                original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
+                    boolean removed = predicate.test(ticket, chunkPos);
+                    if (removed && ticket.getType().hasTimeout()) {
+                        leafs$timeouts.untrack(chunkPos, ticket);
+                    }
+
+                    return removed;
+                }, removedTickets);
             }
-
-            original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
-                boolean removed = predicate.test(ticket, chunkPos);
-                if (removed) {
-                    timeouts.untrack(chunkPos, ticket);
-                }
-
-                return removed;
-            }, removedTickets);
-        }
+        });
     }
 
     @WrapMethod(method = "replaceTicketLevelOfType")
     private void leafs$monitoredReplace(int newLevel, TicketType ticketType, Operation<Void> original) {
-        synchronized (this) {
-            original.call(newLevel, ticketType);
-        }
+        leafs$graphs.batch(() -> {
+            synchronized (this) {
+                original.call(newLevel, ticketType);
+            }
+        });
     }
 
     @WrapMethod(method = "activateAllDeactivatedTickets")
     private void leafs$monitoredActivate(Operation<Void> original) {
-        synchronized (this) {
-            original.call();
-        }
+        leafs$graphs.batch(() -> {
+            synchronized (this) {
+                original.call();
+            }
+        });
     }
 
     @WrapMethod(method = "getTicketLevelAt(JZ)I")
@@ -145,71 +145,5 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         synchronized (this) {
             return original.call();
         }
-    }
-
-    /** The loading listener feeds the propagator inline under the monitor; vanilla's graph only sees pre-binding strays. */
-    @WrapMethod(method = "setLoadingChunkUpdatedListener")
-    private void leafs$routeLoadingListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        TicketStorage.ChunkUpdated strays = leafs$routed(listener);
-        TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
-            LevelTicketPropagator propagator = leafs$propagator();
-            if (propagator == null) {
-                strays.update(key, level, onlyDecreased);
-                return;
-            }
-
-            propagator.feed(key, level);
-        };
-        original.call(shim);
-    }
-
-    @WrapMethod(method = "setSimulationChunkUpdatedListener")
-    private void leafs$routeSimulationListener(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        TicketStorage.ChunkUpdated strays = leafs$routed(listener);
-        TicketStorage.ChunkUpdated shim = (key, level, onlyDecreased) -> {
-            SimulationLevels simulation = leafs$simulation();
-            if (simulation == null) {
-                strays.update(key, level, onlyDecreased);
-                return;
-            }
-
-            simulation.feed(key, level);
-        };
-        original.call(shim);
-    }
-
-    @Unique
-    private LevelTicketPropagator leafs$propagator() {
-        PropagatorAccess access = leafs$distanceAccess();
-        return access == null ? null : access.leafs$propagator();
-    }
-
-    @Unique
-    private SimulationLevels leafs$simulation() {
-        PropagatorAccess access = leafs$distanceAccess();
-        return access == null ? null : access.leafs$simulation();
-    }
-
-    @Unique
-    private PropagatorAccess leafs$distanceAccess() {
-        ServerLevel owner = leafs$level;
-        return owner == null ? null : (PropagatorAccess) owner.getChunkSource().chunkMap.getDistanceManager();
-    }
-
-    @Unique
-    private TicketStorage.ChunkUpdated leafs$routed(TicketStorage.ChunkUpdated listener) {
-        if (listener == null) {
-            return null;
-        }
-
-        return (key, level, onlyDecreased) -> {
-            ServerLevel owner = leafs$level;
-            if (owner == null || owner.getServer().isSameThread()) {
-                listener.update(key, level, onlyDecreased);
-                return;
-            }
-
-            TickingManager.of(owner.getServer()).submitToLevel(owner, () -> listener.update(key, level, onlyDecreased));
-        };
     }
 }

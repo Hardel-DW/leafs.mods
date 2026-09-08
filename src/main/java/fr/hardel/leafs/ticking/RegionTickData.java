@@ -1,14 +1,28 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.RegionInbox;
+import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.world.RegionWorldData;
 
-/** The per-region composite: a clock and a tick payload that a crash renews, a handle once the level activated. */
+import java.util.function.Supplier;
+
+/** The per-region composite: its inbox, its clock and tick payload once the level equips it, a handle once the level activated. */
 public final class RegionTickData {
-    private static final long DEATH_WINDOW_NANOS = 60_000_000_000L;
+    private final RegionInbox inbox;
     private volatile RegionTickHandle handle;
     private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
-    private long lastDeathNanos;
+
+    /** The inbox runs what the region owns, ring included; a task on a section the region lost goes back through the owners. */
+    RegionTickData(Region<RegionTickData> region, long slowTaskNanos, Supplier<ChunkOwners> owners) {
+        this.inbox = new RegionInbox(slowTaskNanos, posted -> region.owns(posted.chunkX(), posted.chunkZ()),
+            posted -> owners.get().submit(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
+    }
+
+    public RegionInbox inbox() {
+        return inbox;
+    }
 
     public RegionTickHandle handle() {
         return handle;
@@ -29,12 +43,5 @@ public final class RegionTickData {
     void equipWorld(RegionClock clock, RegionWorldData worldData) {
         this.clock = clock;
         this.worldData = worldData;
-    }
-
-    /** False on a second death inside the window: the region is not recoverable and the server stops as vanilla would. */
-    boolean recordDeath(long nowNanos) {
-        boolean recoverable = nowNanos - lastDeathNanos >= DEATH_WINDOW_NANOS;
-        lastDeathNanos = nowNanos;
-        return recoverable;
     }
 }

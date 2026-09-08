@@ -4,20 +4,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
-/** Level-wide work with a position, run by the owner of that position's chunk while it ticks. */
-public record AnchoredTicker(BlockPos pos, String type, Runnable body, BooleanSupplier finished) {
-
-    public void tick() {
-        body.run();
-    }
+/** Level-wide work with a position that may move, a raid centre for one, run by the owner of that position's chunk while it ticks. */
+public record AnchoredTicker(Supplier<BlockPos> pos, Runnable body, BooleanSupplier finished) {
 
     public long chunkKey() {
-        return ChunkPos.pack(pos);
-    }
-
-    @Override
-    public String toString() {
-        return type + " at " + pos;
+        return ChunkPos.pack(pos.get());
     }
 }

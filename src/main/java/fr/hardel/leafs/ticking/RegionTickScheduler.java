@@ -4,7 +4,6 @@ package fr.hardel.leafs.ticking;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +20,6 @@ public final class RegionTickScheduler {
     private final LeafsWatchdog watchdog;
     private final RegionCrashWriter crashWriter;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
-    private final ConcurrentHashMap<Thread, TickHandle> active = new ConcurrentHashMap<>();
     private volatile long periodNanos = TICK_PERIOD_NANOS;
     private volatile boolean running = true;
 
@@ -42,13 +40,12 @@ public final class RegionTickScheduler {
         }
     }
 
-    /** Lets a mid-flight tick release its region before the drain. */
     public void shutdown() {
         running = false;
         workers.forEach(Thread::interrupt);
         for (Thread worker : workers) {
             try {
-                worker.join(5_000);
+                worker.join();
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 return;
@@ -61,9 +58,12 @@ public final class RegionTickScheduler {
         queue.add(new ScheduledTick(handle));
     }
 
-    /** From the tick-rate manager, applied at the next scheduling. */
     public void setPeriodNanos(long periodNanos) {
         this.periodNanos = Math.max(1, periodNanos);
+    }
+
+    public long periodNanos() {
+        return periodNanos;
     }
 
     public void runAttached(TickHandle handle) {
@@ -72,11 +72,6 @@ public final class RegionTickScheduler {
 
     public List<Thread> workerThreads() {
         return Collections.unmodifiableList(workers);
-    }
-
-    /** The unit a thread is ticking right now, null between two ticks; a debug read. */
-    public TickHandle activeHandle(Thread thread) {
-        return active.get(thread);
     }
 
     private void workerLoop() {
@@ -120,7 +115,6 @@ public final class RegionTickScheduler {
 
     private void executeTick(TickHandle handle) {
         RegionContext.enter(handle.context());
-        active.put(Thread.currentThread(), handle);
         try {
             watchdog.beginTick(handle);
             handle.tick();
@@ -131,11 +125,8 @@ public final class RegionTickScheduler {
                 throwable.addSuppressed(reportFailure);
             }
 
-            if (!handle.recover()) {
-                throw throwable;
-            }
+            throw throwable;
         } finally {
-            active.remove(Thread.currentThread());
             watchdog.endTick(handle);
             RegionContext.exit();
         }

@@ -6,38 +6,16 @@ import fr.hardel.leafs.global.LockedRandomSource;
 import fr.hardel.leafs.global.SharedStateMonitor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.RandomSequence;
 import net.minecraft.world.RandomSequences;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 
-import java.util.Map;
-import java.util.function.BiConsumer;
-
-/** A roll locks its own sequence, the map stays under the instance monitor. Lock order: instance then sequence. */
+/** Loot rolls reach the sequences from every region; the map, the rolls and the save encode all take the instance monitor. */
 @Mixin(RandomSequences.class)
 public abstract class RandomSequencesMixin {
 
-    @Shadow
-    @Final
-    private Map<Identifier, RandomSequence> sequences;
-
     @WrapMethod(method = "get")
     private RandomSource leafs$lockedGet(Identifier key, long worldSeed, Operation<RandomSource> original) {
-        RandomSource source = SharedStateMonitor.call(this, () -> original.call(key, worldSeed));
-        return new LockedRandomSource(source, sequences.get(key));
-    }
-
-    /** The visit holds each sequence in turn, which is what orders a save encode against a concurrent roll. */
-    @WrapMethod(method = "forAllSequences")
-    private void leafs$lockedForAllSequences(BiConsumer<Identifier, RandomSequence> action, Operation<Void> original) {
-        BiConsumer<Identifier, RandomSequence> locked = (id, sequence) -> {
-            synchronized (sequence) {
-                action.accept(id, sequence);
-            }
-        };
-        SharedStateMonitor.run(this, () -> original.call(locked));
+        return SharedStateMonitor.call(this, () -> new LockedRandomSource(original.call(key, worldSeed), this));
     }
 
     @WrapMethod(method = "setSeedDefaults")

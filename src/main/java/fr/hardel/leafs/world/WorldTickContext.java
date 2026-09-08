@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.holder.ChunkWait;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.server.level.ServerLevel;
@@ -20,9 +21,11 @@ public final class WorldTickContext {
 
     public static void enter(ServerLevel level, Region<RegionTickData> region, RegionWorldData worldData) {
         CURRENT.set(new WorldTickContext(level, region, worldData));
+        ChunkWait.enterScope();
     }
 
     public static void exit() {
+        ChunkWait.exitScope();
         CURRENT.remove();
     }
 
