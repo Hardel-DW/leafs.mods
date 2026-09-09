@@ -1,0 +1,74 @@
+plugins {
+	id 'net.fabricmc.fabric-loom'
+}
+
+base {
+	archivesName = "Leafs-fabric-${minecraftMajor}"
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+	compileOnly rootProject.files("libs/${rootProject.scalablelux_fabric}")
+	localRuntime "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
+	localRuntime rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}")
+	testRuntimeOnly "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
+	testRuntimeOnly rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}")
+
+	testImplementation platform("org.junit:junit-bom:5.12.2")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testImplementation "net.fabricmc:fabric-loader-junit:${rootProject.loader_version}"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+loom {
+	accessWidenerPath = project(':common').file('src/main/resources/leafs.accesswidener')
+
+	runs {
+		configureEach {
+			vmArg "-ea"
+			vmArg "-XX:+UseZGC"
+		}
+
+		client {
+			vmArg "-Xmx3G"
+		}
+
+		server {
+			vmArg "-Xms14G"
+			vmArg "-Xmx14G"
+			vmArg "-XX:+AlwaysPreTouch"
+		}
+	}
+}
+
+tasks.named('compileJava') {
+	source(project(':common').sourceSets.main.allJava)
+}
+
+tasks.named('sourcesJar') {
+	from(project(':common').sourceSets.main.allSource)
+}
+
+test {
+	useJUnitPlatform()
+}
+
+processResources {
+	from(project(':common').sourceSets.main.resources)
+	inputs.property 'version', project.version
+
+	filesMatching('fabric.mod.json') {
+		expand version: project.version
+	}
+}
+
+publishing {
+	publications {
+		create('mavenJava', MavenPublication) {
+			artifactId = "leafs-fabric-${minecraftMajor}"
+			from components.java
+		}
+	}
+}

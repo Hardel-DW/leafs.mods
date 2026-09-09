@@ -1,0 +1,82 @@
+plugins {
+	id 'net.neoforged.moddev'
+}
+
+base {
+	archivesName = "Leafs-neoforge-${minecraftMajor}"
+}
+
+/** The one access widener of common, written in NeoForge's transformer syntax: same names, the Mojang ones, on both loaders. */
+def accessTransformer = tasks.register('accessTransformer') {
+	def widener = project(':common').file('src/main/resources/leafs.accesswidener')
+	def output = layout.buildDirectory.file('generated/accesstransformer/META-INF/accesstransformer.cfg')
+	inputs.file(widener)
+	outputs.file(output)
+	doLast {
+		def lines = widener.readLines().findAll { it.startsWith('accessible') }.collect { line ->
+			def parts = line.split(/\s+/)
+			def owner = parts[2].replace('/', '.')
+			switch (parts[1]) {
+				case 'class': return "public ${owner}"
+				case 'field': return "public ${owner} ${parts[3]}"
+				default: return "public ${owner} ${parts[3]}${parts[4]}"
+			}
+		}
+		def file = output.get().asFile
+		file.parentFile.mkdirs()
+		file.text = lines.join('\n') + '\n'
+	}
+}
+
+sourceSets.main.resources.srcDir(accessTransformer.map { layout.buildDirectory.dir('generated/accesstransformer').get() })
+
+neoForge {
+	version = rootProject.neoforge_version
+	accessTransformers.from(accessTransformer.map { it.outputs.files.singleFile })
+
+	runs {
+		server {
+			server()
+			programArguments.add('nogui')
+			jvmArguments.addAll('-ea', '-XX:+UseZGC', '-Xms14G', '-Xmx14G', '-XX:+AlwaysPreTouch')
+		}
+	}
+
+	mods {
+		leafs {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+dependencies {
+	compileOnly rootProject.files("libs/${rootProject.scalablelux_neoforge}")
+}
+
+tasks.named('compileJava') {
+	source(project(':common').sourceSets.main.allJava)
+}
+
+tasks.named('sourcesJar') {
+	from(project(':common').sourceSets.main.allSource)
+}
+
+processResources {
+	from(project(':common').sourceSets.main.resources) {
+		exclude '*.accesswidener'
+	}
+
+	inputs.property 'version', project.version
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand version: project.version, minecraft_range: "[${rootProject.minecraft_version},)"
+	}
+}
+
+publishing {
+	publications {
+		create('mavenJava', MavenPublication) {
+			artifactId = "leafs-neoforge-${minecraftMajor}"
+			from components.java
+		}
+	}
+}

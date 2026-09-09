@@ -1,0 +1,17 @@
+plugins {
+	id 'net.fabricmc.fabric-loom'
+}
+
+base {
+	archivesName = "Leafs-common-${minecraftMajor}"
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+	compileOnly "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+	compileOnly rootProject.files("libs/${rootProject.scalablelux_fabric}")
+}
+
+loom {
+	accessWidenerPath = file('src/main/resources/leafs.accesswidener')
+}
