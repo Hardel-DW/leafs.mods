@@ -94,8 +94,7 @@ public final class RegionsCommand {
             .append(CommandText.stat("created", regions.created()))
             .append(CommandText.stat("destroyed", regions.destroyed()))
             .append(CommandText.stat("merged", regions.merged()))
-            .append(CommandText.stat("split", regions.split()))
-            .append(CommandText.stat("deferred", regions.deferredHandshakes())), false);
+            .append(CommandText.stat("split", regions.split())), false);
 
         ServerPlayer player = source.getPlayer();
         Region<RegionTickData> playerRegion = player == null || player.level() != level ? null
