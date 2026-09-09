@@ -5,6 +5,7 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
+import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import net.minecraft.CrashReport;
 import net.minecraft.server.level.ChunkGenerationTask;
@@ -49,7 +50,7 @@ public final class GenerationSteps {
     /** A new task starts at the urgency of its centre. */
     public void run(ChunkGenerationTask task) {
         ChunkPos pos = task.getCenter().getPos();
-        pool.submit(ChunkTask.of(owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> drive(task)));
+        pool.submit(ChunkTask.of(Kind.STEP, owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> drive(task)));
     }
 
     /** A layer done, the task schedules the next one or releases its claims on 289 holders: a continuation, so it heads the pool like every continuation. */
@@ -117,7 +118,7 @@ public final class GenerationSteps {
     }
 
     public Executor loading(ChunkPos pos) {
-        return task -> owners.onPool(pos.x(), pos.z(), 0, task);
+        return task -> owners.onPool(Kind.STEP, pos.x(), pos.z(), 0, task);
     }
 
     private void forget(StepTask task) {
@@ -150,7 +151,7 @@ public final class GenerationSteps {
         private final AtomicBoolean taken = new AtomicBoolean();
 
         private StepTask(Place place, long[] reserved, ChunkStep step, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
-            super(place, reserved);
+            super(Kind.STEP, place, reserved);
             this.step = step;
             this.chunk = chunk;
             this.body = body;
