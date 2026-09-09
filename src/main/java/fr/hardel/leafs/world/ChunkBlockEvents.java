@@ -73,7 +73,7 @@ public final class ChunkBlockEvents {
 
             batch.sort(ORDER);
             for (Pending pending : batch) {
-                if (pending.from().take(pending.event())) {
+                if (pending.take()) {
                     runner.accept(pending.event());
                 }
             }
@@ -91,10 +91,5 @@ public final class ChunkBlockEvents {
 
     public void removeInside(BoundingBox area) {
         events.keySet().removeIf(event -> area.isInside(event.pos()));
-    }
-
-    /** False when an earlier event of the pass cleared it. */
-    private boolean take(BlockEventData event) {
-        return events.remove(event) != null;
     }
 }
