@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.LongSummaryStatistics;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -29,7 +30,7 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     private final Router owners;
 
     private interface ContainerVisit<C> {
-        void visit(int chunkX, int chunkZ, LevelChunkTicks<C> container);
+        void visit(long chunkKey, LevelChunkTicks<C> container);
     }
 
     public ChunkScheduledTicks(ServerLevel level, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf, Router owners) {
@@ -51,11 +52,9 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
 
     @Override
     public void schedule(ScheduledTick<T> tick) {
-        int chunkX = SectionPos.blockToSectionCoord(tick.pos().getX());
-        int chunkZ = SectionPos.blockToSectionCoord(tick.pos().getZ());
-        LevelChunkTicks<T> container = containers.get(ChunkPos.pack(chunkX, chunkZ));
-        if (container != null) {
-            owners.route(chunkX, chunkZ, () -> container.schedule(tick));
+        long chunkKey = ChunkPos.pack(tick.pos());
+        if (containers.containsKey(chunkKey)) {
+            write(chunkKey, container -> container.schedule(tick));
         }
     }
 
@@ -79,7 +78,7 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     @Override
     public void clearArea(@NonNull BoundingBox area) {
         Predicate<ScheduledTick<T>> inside = tick -> area.isInside(tick.pos());
-        forEachContainerIn(area, (chunkX, chunkZ, container) -> owners.route(chunkX, chunkZ, () -> container.removeIf(inside)));
+        forEachContainerIn(area, (chunkKey, _) -> write(chunkKey, container -> container.removeIf(inside)));
         ScheduledTickDrain<LevelChunk, T> drain = activeDrain();
         if (drain != null) {
             drain.clearArea(area);
@@ -100,7 +99,7 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
 
         List<ScheduledTick<T>> collected = new ArrayList<>();
-        chunked.forEachContainerIn(area, (_, _, container) -> container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(collected::add));
+        chunked.forEachContainerIn(area, (_, container) -> container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(collected::add));
         LongSummaryStatistics subTicks = collected.stream().mapToLong(ScheduledTick::subTickOrder).summaryStatistics();
         long shift = subTicks.getMax() - subTicks.getMin() + 1;
         for (ScheduledTick<T> tick : collected) {
@@ -142,12 +141,23 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         int maxZ = SectionPos.posToSectionCoord(area.maxZ());
         for (int chunkX = minX; chunkX <= maxX; chunkX++) {
             for (int chunkZ = minZ; chunkZ <= maxZ; chunkZ++) {
-                LevelChunkTicks<T> container = containers.get(ChunkPos.pack(chunkX, chunkZ));
+                long chunkKey = ChunkPos.pack(chunkX, chunkZ);
+                LevelChunkTicks<T> container = containers.get(chunkKey);
                 if (container != null) {
-                    visit.visit(chunkX, chunkZ, container);
+                    visit.visit(chunkKey, container);
                 }
             }
         }
+    }
+
+    /** The owner finds the container when it runs the write: mail outlives an unload and a reload, and a chunk gone since drops it like vanilla's unloaded position. */
+    private void write(long chunkKey, Consumer<LevelChunkTicks<T>> write) {
+        owners.route(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey), () -> {
+            LevelChunkTicks<T> container = containers.get(chunkKey);
+            if (container != null) {
+                write.accept(container);
+            }
+        });
     }
 
     private ScheduledTickDrain<LevelChunk, T> activeDrain() {
