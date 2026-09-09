@@ -118,21 +118,19 @@ public final class RegionNetworkTick {
         }
 
         queue.handOver();
-        respawnOnTheOwner(target, chunk, queue, listener, packet);
+        respawnOnTheOwner(target, chunk, queue, listener, packet).submit();
         return true;
     }
 
-    /** The owner of the spot runs the respawn as the player's packet-handling thread; a queue still held by the drain that posted it is posted again, that drain ends with its handler. */
-    private static void respawnOnTheOwner(ServerLevel target, ChunkPos chunk, PlayerPacketQueue queue, ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
-        DeferredWork.owner(target, DeferReason.RESPAWN, chunk.x(), chunk.z(), () -> {
+    private static DeferredWork respawnOnTheOwner(ServerLevel target, ChunkPos chunk, PlayerPacketQueue queue, ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
+        return DeferredWork.owner(target, DeferReason.RESPAWN, chunk.x(), chunk.z(), () -> {
             if (!queue.handleAs(() -> listener.handleClientCommand(packet))) {
-                respawnOnTheOwner(target, chunk, queue, listener, packet);
+                respawnOnTheOwner(target, chunk, queue, listener, packet).later();
             }
-        }).validIf(listener.connection::isConnected).submit();
+        }).validIf(listener.connection::isConnected);
     }
 
 
-    /** Paused integrated server: vanilla only drains while paused, no listener tick (solo keepalive is exempt anyway). */
     public static void drainPaused(ServerLevel level) {
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (player.level() == level) {

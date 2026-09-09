@@ -111,6 +111,15 @@ public final class ChunkOwners implements Router {
         submit(chunkX, chunkZ, Work.GAME, task);
     }
 
+    public void later(int chunkX, int chunkZ, Work work, Runnable task) {
+        RegionInbox inbox = inboxAt(chunkX, chunkZ);
+        if (live.getAsBoolean() && inbox != null && inbox.post(chunkX, chunkZ, work, task)) {
+            return;
+        }
+
+        server.run(() -> submit(chunkX, chunkZ, work, task));
+    }
+
     /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
     public void onPool(int chunkX, int chunkZ, int radius, Runnable task) {
         pool.submit(ChunkTask.of(place(chunkX, chunkZ, chunkX, chunkZ), area(chunkX, chunkZ, radius), task));

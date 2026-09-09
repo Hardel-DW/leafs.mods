@@ -56,6 +56,32 @@ class ChunkOwnersTest {
         assertTrue(taken.isEmpty());
     }
 
+    /** N01: a respawn refused by the queue of its player called itself back in line until the stack overflowed; it yields to the next pass instead. */
+    @Test
+    void laterNeverRunsInLineEvenForTheOwner() {
+        holding = true;
+        ChunkOwners owners = owners();
+
+        owners.later(1, 1, Work.GAME, () -> ran.add("next pass"));
+
+        assertEquals(List.of(), ran);
+        assertEquals(1, inbox.drain());
+        assertEquals(List.of("next pass"), ran);
+    }
+
+    @Test
+    void laterOnAnUncoveredChunkGoesThroughTheServerThread() {
+        covered = false;
+        holding = true;
+        ChunkOwners owners = owners();
+
+        owners.later(1, 1, Work.GAME, () -> ran.add("next tick"));
+
+        assertEquals(List.of(), ran);
+        assertTrue(server.drain());
+        assertEquals(List.of("next tick"), ran);
+    }
+
     @Test
     void gameWorkOnACoveredChunkWaitsForTheRegionTick() {
         assertFalse(owners().submit(1, 1, Work.GAME, () -> ran.add("later")));
