@@ -3,11 +3,16 @@ package fr.hardel.leafs.mixin.chunk;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.chunk.PoiClaims;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
 import fr.hardel.leafs.chunk.SectionStorageLock;
 import fr.hardel.excess.ConcurrentLongSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,7 +23,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.Optional;
+import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /** Concurrent loadedChunks facade; the village distance graph and the section consistency pass take the storage's lock, no facade can carry a graph. */
 @Mixin(PoiManager.class)
@@ -28,6 +37,9 @@ public abstract class PoiManagerMixin {
     @Shadow
     @Final
     private LongSet loadedChunks;
+
+    @Shadow
+    public abstract Stream<PoiRecord> getInRange(Predicate<Holder<PoiType>> predicate, BlockPos center, int radius, PoiManager.Occupancy occupancy);
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$swapForConcurrentFacade(CallbackInfo callbackInfo) {
@@ -53,6 +65,11 @@ public abstract class PoiManagerMixin {
     @WrapMethod(method = "checkConsistencyWithBlocks")
     private void leafs$consistencyUnderTheLock(SectionPos sectionPos, LevelChunkSection blockSection, Operation<Void> original) {
         leafs$lock().runLocked(() -> original.call(sectionPos, blockSection));
+    }
+
+    @WrapMethod(method = "take")
+    private Optional<BlockPos> leafs$takeWhatWasAcquired(Predicate<Holder<PoiType>> predicate, BiPredicate<Holder<PoiType>, BlockPos> filter, BlockPos center, int radius, Operation<Optional<BlockPos>> original) {
+        return PoiClaims.firstAcquired(getInRange(predicate, center, radius, PoiManager.Occupancy.HAS_SPACE).filter(poi -> filter.test(poi.getPoiType(), poi.getPos())));
     }
 
     @WrapMethod(method = "sectionsToVillage")
