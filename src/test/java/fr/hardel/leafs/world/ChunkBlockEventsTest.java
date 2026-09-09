@@ -85,6 +85,27 @@ class ChunkBlockEventsTest {
         assertEquals(List.of(1), ran);
     }
 
+    /** Vanilla removes one event at a time, so an event cleared then posted again goes to the end of the set. */
+    @Test
+    void anEventClearedThenPostedAgainRunsLast() {
+        ChunkBlockEvents chunk = new ChunkBlockEvents();
+        chunk.add(at(1), 1);
+        chunk.add(at(10), 2);
+        chunk.add(at(3), 3);
+        List<Integer> ran = new ArrayList<>();
+
+        ChunkBlockEvents.runAll(List.of(chunk), event -> {
+            ran.add(event.pos().getX());
+            if (event.pos().getX() == 1) {
+                chunk.removeInside(new BoundingBox(8, 0, 0, 12, 128, 5));
+                chunk.add(at(4), 4);
+                chunk.add(at(10), 5);
+            }
+        });
+
+        assertEquals(List.of(1, 3, 4, 10), ran);
+    }
+
     @Test
     void aSetLeftOutOfThePassKeepsItsEvents() {
         ChunkBlockEvents idle = new ChunkBlockEvents();
