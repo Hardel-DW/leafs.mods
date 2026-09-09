@@ -90,7 +90,7 @@ public final class LevelChunks {
 
     /** The head of the pool while a thread waits for it, the distance to the nearest player otherwise. */
     private int urgency(int chunkX, int chunkZ) {
-        return holders.demanded(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
+        return holders.demands().near(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
     }
 
     public ChunkPool pool() {
