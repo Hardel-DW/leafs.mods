@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.leafs.fabric.FabricRegistryFreeze;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
@@ -25,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-@ExtendWith(MinecraftBootstrap.class)
+@ExtendWith({MinecraftBootstrap.class, FabricRegistryFreeze.class})
 class PoiDirtySetConcurrencyTest {
     private static final int CHUNKS = 64;
     private static final int PASSES = 400;

@@ -10,6 +10,14 @@ dependencies {
 	minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
 	compileOnly "net.fabricmc:fabric-loader:${rootProject.loader_version}"
 	compileOnly rootProject.files("libs/${rootProject.scalablelux_fabric}")
+
+	testImplementation platform("org.junit:junit-bom:5.12.2")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+	useJUnitPlatform()
 }
 
 loom {
