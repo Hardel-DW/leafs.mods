@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeferredWorkTest {
-    private final ChunkPool pool = new ChunkPool(1, 4);
+    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final DeferStats stats = new DeferStats();
     private final List<String> ran = new ArrayList<>();
