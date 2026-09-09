@@ -115,6 +115,47 @@ class RegionBorrowTest {
         assertEquals(RegionState.READY, survivor.state());
     }
 
+    /** N03: the fold returns every region of every level; what the head asked for before, in another level, is taken again. */
+    @Test
+    void aFoldInOneLevelRetakesWhatWasHeldInAnother() {
+        LevelRegions nether = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
+        simulated(regions, 0, 0);
+        simulated(nether, 0, 0);
+        simulated(nether, 96, 0);
+        nether.settle();
+        RegionBorrow borrow = RegionBorrow.enter();
+        borrow.borrow(regions, 0, 0);
+        borrow.borrow(nether, 0, 0);
+
+        simulated(nether, 32, 0);
+        simulated(nether, 64, 0);
+        borrow.borrow(nether, 96, 0);
+
+        assertSame(nether.regionizer().regionAt(96, 0), nether.regionizer().regionAt(0, 0), "the merge ran");
+        assertEquals(2, borrow.size(), "the nether survivor and the overworld region");
+        assertEquals(RegionState.TICKING, regions.regionizer().regionAt(0, 0).state(), "the overworld region was taken again after the fold");
+    }
+
+    @Test
+    void borrowAllOnASecondLevelRetakesTheFirstAfterAFold() {
+        LevelRegions nether = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
+        simulated(regions, 0, 0);
+        simulated(nether, 0, 0);
+        simulated(nether, 96, 0);
+        nether.settle();
+        RegionBorrow borrow = RegionBorrow.enter();
+        borrow.borrowAll(regions);
+        borrow.borrow(nether, 0, 0);
+        simulated(nether, 32, 0);
+        simulated(nether, 64, 0);
+
+        borrow.borrowAll(nether);
+
+        assertEquals(2, borrow.size());
+        assertEquals(RegionState.TICKING, regions.regionizer().regionAt(0, 0).state());
+        assertEquals(RegionState.TICKING, nether.regionizer().regionAt(0, 0).state());
+    }
+
     /** The same fold for the whole level: a region owed to one this thread holds cannot be taken until the held one is returned. */
     @Test
     void borrowAllFoldsAPendingMergeWithAHeldRegion() throws InterruptedException {

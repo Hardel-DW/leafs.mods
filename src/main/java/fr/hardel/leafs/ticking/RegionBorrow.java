@@ -8,6 +8,9 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
@@ -31,6 +34,9 @@ public final class RegionBorrow {
 
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
     private final Map<LevelRegions, Long2ObjectOpenHashMap<RegionInbox>> heldChunks = new LinkedHashMap<>();
+    /** What this thread asked for, positions and whole levels: a fold returns everything, and the demand is what gets taken again. */
+    private final Map<LevelRegions, LongSet> contacts = new LinkedHashMap<>();
+    private final Set<LevelRegions> wholeLevels = new LinkedHashSet<>();
     private boolean released;
 
     private RegionBorrow() {
@@ -84,8 +90,46 @@ public final class RegionBorrow {
         }
     }
 
-    /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */
+    /** One more position in the demand; a fold met on the way returned everything, so the whole demand is taken again. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
+        contacts.computeIfAbsent(regions, _ -> new LongOpenHashSet()).add(ChunkPos.pack(chunkX, chunkZ));
+        released = false;
+        takeAt(regions, chunkX, chunkZ);
+        if (released) {
+            reacquire();
+        }
+    }
+
+    /** Every region of the level joins the demand, now and after any fold. */
+    public void borrowAll(LevelRegions regions) {
+        wholeLevels.add(regions);
+        reacquire();
+    }
+
+    /** The whole demand, looping until a pass neither takes nor returns anything: the feed may create a region while the pass runs, a fold returns everything and replaces some. */
+    private void reacquire() {
+        boolean changed;
+        do {
+            released = false;
+            int before = held.size();
+            for (LevelRegions regions : wholeLevels) {
+                for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+                    take(regions, region);
+                }
+            }
+
+            contacts.forEach((regions, keys) -> {
+                for (LongIterator key = keys.iterator(); key.hasNext(); ) {
+                    long chunkKey = key.nextLong();
+                    takeAt(regions, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
+                }
+            });
+            changed = released || held.size() != before;
+        } while (changed);
+    }
+
+    /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */
+    private void takeAt(LevelRegions regions, int chunkX, int chunkZ) {
         boolean head = !regions.live() || regions.level().getServer().isSameThread();
         while (true) {
             Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
@@ -102,20 +146,6 @@ public final class RegionBorrow {
                 return;
             }
         }
-    }
-
-    /** Every region of the level, looping until a full pass neither takes nor returns anything: the feed may create one while the pass runs, a fold returns everything and replaces some. */
-    public void borrowAll(LevelRegions regions) {
-        boolean changed;
-        do {
-            released = false;
-            int before = held.size();
-            for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-                take(regions, region);
-            }
-
-            changed = released || held.size() != before;
-        } while (changed);
     }
 
     /** Waits for a tick in flight. A region idle yet untakeable is owed a merge with one this thread holds: everything is returned so the regionizer folds, and the survivor is taken again. False once the region is dead. */
