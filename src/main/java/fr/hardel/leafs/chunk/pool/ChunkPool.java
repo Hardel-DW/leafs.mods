@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.pool;
 
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.metrics.MinuteCounter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -24,6 +25,7 @@ public final class ChunkPool implements Executor {
     private final List<Thread> workers;
     private final AtomicInteger queued = new AtomicInteger();
     private final AtomicInteger active = new AtomicInteger();
+    private final MinuteCounter blocked = new MinuteCounter();
     private volatile boolean running = true;
 
     public ChunkPool(int threads, int priorities) {
@@ -60,6 +62,11 @@ public final class ChunkPool implements Executor {
     /** In a bucket or parked. */
     public int queued() {
         return queued.get();
+    }
+
+    /** Tasks that could not start because a running task reserved one of their chunks, the cost of one reservation space for light and generation alike. */
+    public MinuteCounter blocked() {
+        return blocked;
     }
 
     public int active() {
@@ -145,6 +152,7 @@ public final class ChunkPool implements Executor {
             }
 
             if (!reservations.acquire(task)) {
+                blocked.increment();
                 continue;
             }
 
