@@ -27,11 +27,11 @@ public final class ChunkPool implements Executor {
     private final ReservationBlocks blocks = new ReservationBlocks();
     private volatile boolean running = true;
 
-    public ChunkPool(int threads, int priorities) {
+    public ChunkPool(ThreadGroup serverThreads, int threads, int priorities) {
         this.buckets = new PriorityBuckets(priorities);
         List<Thread> started = new ArrayList<>(threads);
         for (int index = 1; index <= threads; index++) {
-            Thread worker = new Worker(this::work, index);
+            Thread worker = new Worker(serverThreads, this::work, index);
             worker.setDaemon(true);
             started.add(worker);
             worker.start();
@@ -186,8 +186,8 @@ public final class ChunkPool implements Executor {
     }
 
     private static final class Worker extends Thread {
-        private Worker(Runnable work, int index) {
-            super(work, "Leafs Chunk Worker #" + index);
+        private Worker(ThreadGroup group, Runnable work, int index) {
+            super(group, work, "Leafs Chunk Worker #" + index);
         }
     }
 }

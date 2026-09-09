@@ -22,7 +22,7 @@ public final class LeafsFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         FabricLoader loader = FabricLoader.getInstance();
-        Leafs.bootstrap(new Leafs.Platform(loader.getConfigDir(), loader.getGameDir(), ModAttribution.fromOrigins(origins(loader))));
+        Leafs.bootstrap(new Leafs.Platform(loader.getConfigDir(), loader.getGameDir(), ModAttribution.fromOrigins(origins(loader)), Thread.currentThread().getThreadGroup()));
         Registry.register(BuiltInRegistries.TICKET_TYPE, LeafsTicketTypes.DEMAND, LeafsTicketTypes.demand);
         CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> dispatcher.register(LeafsCommand.node()));
     }
