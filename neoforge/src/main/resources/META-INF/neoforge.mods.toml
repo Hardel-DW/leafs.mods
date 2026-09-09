@@ -6,7 +6,7 @@ license = "All-Rights-Reserved"
 modId = "leafs"
 version = "${version}"
 displayName = "Leafs"
-iconFile = "assets/leafs/icon.png"
+logoFile = "assets/leafs/icon.png"
 authors = "Hardel"
 description = '''
 Regionised multithreading for the dedicated server: the world is cut into independent regions, each ticking in parallel on its own thread - like Folia, redesigned for modern vanilla and NeoForge.
