@@ -3,7 +3,6 @@ accessWidener v2 official
 accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
 accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/minecraft/world/level/TicketStorage;
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
-accessible field net/minecraft/server/level/ServerChunkCache level Lnet/minecraft/server/level/ServerLevel;
 accessible field net/minecraft/server/ServerTickRateManager server Lnet/minecraft/server/MinecraftServer;
 
 accessible method net/minecraft/server/level/ServerLevel tickBlock (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/Block;)V
