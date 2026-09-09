@@ -6,7 +6,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.chunk.holder.ChunkWait;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -69,7 +69,7 @@ public abstract class ServerPlayerMixin implements PlayerMoveAccess, SavedEpochA
     /** The search loads chunks on its own future; the waiter drains what it must meanwhile, server thread or region alike. */
     @WrapOperation(method = "adjustSpawnLocation", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;managedBlock(Ljava/util/function/BooleanSupplier;)V"))
     private void leafs$spawnSearchWaits(MinecraftServer server, BooleanSupplier done, Operation<Void> original, @Local(argsOnly = true) ServerLevel level) {
-        ChunkWait.until(level, done);
+        TickingManager.of(server).await(done);
     }
 
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/server/level/ServerPlayer;", at = @At("HEAD"), cancellable = true)

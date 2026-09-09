@@ -138,7 +138,7 @@ public final class RegionBorrow {
                     return;
                 }
 
-                regions.level().getServer().managedBlock(() -> tryBorrowChunk(regions, chunkX, chunkZ));
+                TickingManager.of(regions.level().getServer()).await(() -> tryBorrowChunk(regions, chunkX, chunkZ));
                 return;
             }
 
@@ -166,13 +166,14 @@ public final class RegionBorrow {
         return false;
     }
 
-    /** The server thread pumps its queues while the tick in flight runs: that tick may be waiting for one of them, a spawn search ends on the server thread. */
+    /** Waits for the tick in flight, running what this thread owns meanwhile: that tick may be waiting for a task it handed the server thread, a spawn search ends there. */
     private static void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
-        if (regions.live() && regions.level().getServer().isSameThread()) {
-            regions.level().getServer().managedBlock(() -> region.state() != RegionState.TICKING);
+        if (!regions.live()) {
+            LockSupport.parkNanos(WAIT_NANOS);
+            return;
         }
 
-        LockSupport.parkNanos(WAIT_NANOS);
+        TickingManager.of(regions.level().getServer()).await(() -> region.state() != RegionState.TICKING);
     }
 
     /** Whether this thread holds the region of the position, or the chunk itself when no region covers it. */
