@@ -5,6 +5,12 @@ accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
 accessible field net/minecraft/server/ServerTickRateManager server Lnet/minecraft/server/MinecraftServer;
 accessible method net/minecraft/world/entity/ai/village/poi/PoiRecord acquireTicket ()Z
+accessible field net/minecraft/world/level/levelgen/structure/StructureCheck loadedChunks Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;
+accessible field net/minecraft/world/level/levelgen/structure/StructureCheck featureChecks Ljava/util/Map;
+accessible field net/minecraft/world/level/levelgen/structure/StructureCheck seed J
+accessible method net/minecraft/world/level/levelgen/structure/StructureCheck tryLoadFromStorage (Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/levelgen/structure/Structure;ZJ)Lnet/minecraft/world/level/levelgen/structure/StructureCheckResult;
+accessible method net/minecraft/world/level/levelgen/structure/StructureCheck canCreateStructure (Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/levelgen/structure/Structure;)Z
+accessible method net/minecraft/world/level/levelgen/structure/StructureCheck checkStructureInfo (Lit/unimi/dsi/fastutil/objects/Object2IntMap;Lnet/minecraft/world/level/levelgen/structure/Structure;Z)Lnet/minecraft/world/level/levelgen/structure/StructureCheckResult;
 
 accessible method net/minecraft/server/level/ServerLevel tickBlock (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/Block;)V
 accessible method net/minecraft/server/level/ServerLevel tickFluid (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/material/Fluid;)V
