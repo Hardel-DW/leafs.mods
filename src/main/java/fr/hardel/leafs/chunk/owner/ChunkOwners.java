@@ -206,24 +206,35 @@ public final class ChunkOwners implements Router {
         inbox.close(posted -> submit(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
     }
 
-    /** The pool task reads the owner again when it starts: a region or a taker that arrived while it queued gets the task instead of racing it. */
+    /** The pool task reads the owner again when it starts: a region or a taker that arrived while it queued gets the task instead of racing it. Otherwise it takes the chunk like a taker, for the task, so a taker meanwhile finds it held. */
     private void onPoolStart(int chunkX, int chunkZ, Runnable task) {
-        RegionInbox inbox = inboxAt(chunkX, chunkZ);
-        if (inbox != null && inbox.post(chunkX, chunkZ, Work.CHUNK, task)) {
-            return;
-        }
+        while (true) {
+            RegionInbox inbox = inboxAt(chunkX, chunkZ);
+            if (inbox != null) {
+                if (inbox.post(chunkX, chunkZ, Work.CHUNK, task)) {
+                    return;
+                }
 
-        owning(chunkX, chunkZ, task);
+                continue;
+            }
+
+            RegionInbox claim = borrow(chunkX, chunkZ);
+            if (claim != null) {
+                owning(chunkX, chunkZ, claim, task);
+                return;
+            }
+        }
     }
 
-    private void owning(int chunkX, int chunkZ, Runnable task) {
-
+    /** What lands on the chunk meanwhile waits in the claim and finds its owner again at release. */
+    private void owning(int chunkX, int chunkZ, RegionInbox claim, Runnable task) {
         Long previous = poolOwned.get();
         poolOwned.set(ChunkPos.pack(chunkX, chunkZ));
         try {
             task.run();
         } finally {
             poolOwned.set(previous);
+            release(chunkX, chunkZ, claim);
         }
     }
 

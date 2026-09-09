@@ -138,6 +138,43 @@ class ChunkOwnersTest {
         assertEquals(List.of("2,2"), taken);
     }
 
+    /** N02: the pool and a taker kept two registries of the same chunk; the pool task now takes the chunk for its duration, so a taker meanwhile finds it held and its work waits for the release. */
+    @Test
+    void aPoolTaskHoldsItsChunkAgainstATakerUntilItEnds() throws InterruptedException {
+        covered = false;
+        ChunkOwners owners = owners();
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch finish = new CountDownLatch(1);
+
+        owners.submit(1, 1, Work.CHUNK, () -> {
+            started.countDown();
+            await(finish);
+        });
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+
+        assertNull(owners.borrow(1, 1), "the chunk is held by the running pool task");
+        assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("after")), "game work meanwhile is mail for the pool task");
+        assertEquals(List.of(), ran);
+        finish.countDown();
+
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!server.drain()) {
+            assertTrue(System.nanoTime() < deadline, "the mail finds its owner again at release: game work from the pool goes to the server thread");
+            Thread.onSpinWait();
+        }
+
+        assertEquals(List.of("after"), ran);
+        assertNotNull(owners.borrow(1, 1), "the chunk is free again");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /** B02: a pool task queued before a thread took the chunk would have run beside it; it reads the owner again when it starts. */
     @Test
     void aQueuedPoolTaskFindsTheChunkTakenWhenItStartsAndHandsItOver() throws InterruptedException {
