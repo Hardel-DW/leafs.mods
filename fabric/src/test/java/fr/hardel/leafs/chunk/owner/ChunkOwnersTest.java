@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChunkOwnersTest {
-    private final ChunkPool pool = new ChunkPool(1, 4);
+    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4);
     private final GlobalScheduler server = new GlobalScheduler();
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final List<String> ran = new CopyOnWriteArrayList<>();

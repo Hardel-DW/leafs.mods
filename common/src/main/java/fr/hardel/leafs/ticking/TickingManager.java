@@ -39,9 +39,10 @@ public final class TickingManager {
         Duration warnAfter = Duration.ofSeconds(config.debug().watchdogWarnSeconds());
         this.watchdog = new LeafsWatchdog(warnAfter, () -> killAfterNanos(server), now -> ChunkWait.stalled(now, warnAfter.toNanos()), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), Leafs.platform().attribution());
-        this.scheduler = new RegionTickScheduler(config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
+        ThreadGroup serverThreads = Leafs.platform().serverThreads();
+        this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
-        this.chunkPool = new ChunkPool(config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
+        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",

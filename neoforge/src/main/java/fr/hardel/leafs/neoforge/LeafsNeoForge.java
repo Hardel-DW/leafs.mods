@@ -10,6 +10,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.fml.util.thread.SidedThreadGroups;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
@@ -23,7 +24,7 @@ import java.util.Map;
 public final class LeafsNeoForge {
 
     public LeafsNeoForge(IEventBus modBus) {
-        Leafs.bootstrap(new Leafs.Platform(FMLPaths.CONFIGDIR.get(), FMLPaths.GAMEDIR.get(), ModAttribution.fromOrigins(origins())));
+        Leafs.bootstrap(new Leafs.Platform(FMLPaths.CONFIGDIR.get(), FMLPaths.GAMEDIR.get(), ModAttribution.fromOrigins(origins()), SidedThreadGroups.SERVER));
         modBus.addListener((RegisterEvent event) -> event.register(Registries.TICKET_TYPE, LeafsTicketTypes.DEMAND, () -> LeafsTicketTypes.demand));
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> event.getDispatcher().register(LeafsCommand.node()));
     }

@@ -19,7 +19,7 @@ class PlacedTasksTest {
     private static final long[] NONE = {};
     private static final int FAR = 10;
 
-    private final ChunkPool pool = new ChunkPool(1, 46);
+    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 46);
     private final Long2IntOpenHashMap distances = new Long2IntOpenHashMap();
     private final Urgency urgency = (chunkX, chunkZ) -> distances.getOrDefault(ChunkPos.pack(chunkX, chunkZ), FAR);
     private final List<String> order = new CopyOnWriteArrayList<>();
