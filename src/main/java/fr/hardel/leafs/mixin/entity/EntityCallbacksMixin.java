@@ -5,10 +5,9 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.entity.EntityTickList;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
 
@@ -16,9 +15,12 @@ import java.util.Set;
 @Mixin(targets = "net.minecraft.server.level.ServerLevel$EntityCallbacks")
 public abstract class EntityCallbacksMixin {
 
-    @Inject(method = {"onTickingStart(Lnet/minecraft/world/entity/Entity;)V", "onTickingEnd(Lnet/minecraft/world/entity/Entity;)V"}, at = @At("HEAD"), cancellable = true)
-    private void leafs$noLevelTickList(Entity entity, CallbackInfo callbackInfo) {
-        callbackInfo.cancel();
+    @WrapOperation(method = "onTickingStart(Lnet/minecraft/world/entity/Entity;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/EntityTickList;add(Lnet/minecraft/world/entity/Entity;)V"))
+    private void leafs$noLevelTickList(EntityTickList instance, Entity entity, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "onTickingEnd(Lnet/minecraft/world/entity/Entity;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/EntityTickList;remove(Lnet/minecraft/world/entity/Entity;)V"))
+    private void leafs$noLevelTickListRemoval(EntityTickList instance, Entity entity, Operation<Void> original) {
     }
 
     @WrapOperation(method = "onTrackingStart(Lnet/minecraft/world/entity/Entity;)V", at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))
