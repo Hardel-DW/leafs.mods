@@ -50,7 +50,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     private volatile long retiredBusyNanos;
     private volatile long retiredLagNanos;
     private volatile long retiredTicks;
-    private volatile int deferredHandshakes;
     private volatile Throwable feedFailure;
     private final long slowTaskNanos;
 
@@ -194,16 +193,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     /** An empty tick on every region triggers splits, destroys and reclaims; for the shutdown drain and levels whose pool never bound. */
     public void settle() {
         rethrowFeedFailure();
-        int deferred = 0;
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.tryMarkTicking()) {
                 region.markNotTicking();
-            } else if (region.state() != RegionState.DEAD) {
-                deferred++;
             }
         }
-
-        deferredHandshakes = deferred;
     }
 
     public int sections() {
@@ -240,11 +234,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     public long split() {
         return split;
-    }
-
-    /** Regions that could not complete the handshake this tick, i.e. blocked by a merge that is still pending. */
-    public int deferredHandshakes() {
-        return deferredHandshakes;
     }
 
     @Override
@@ -376,7 +365,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return total;
     }
 
-    /** The feed can run where exceptions are swallowed, so the first failure is kept and rethrown by quiesce or settle. */
+    /** The feed can run where exceptions are swallowed, so the first failure is kept and rethrown by the tick unit or settle. */
     private RuntimeException recordFeedFailure(String operation, int chunkX, int chunkZ, RuntimeException exception) {
         Leafs.LOGGER.error("Leafs region feed failed to {} chunk [{}, {}]", operation, chunkX, chunkZ, exception);
         if (feedFailure == null) {

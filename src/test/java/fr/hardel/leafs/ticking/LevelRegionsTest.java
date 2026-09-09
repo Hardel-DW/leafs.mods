@@ -74,7 +74,6 @@ class LevelRegionsTest {
             if (event % EVENTS_PER_TICK == EVENTS_PER_TICK - 1) {
                 regions.settle();
                 RegionizerAssertions.assertInvariants(regions.regionizer(), true);
-                assertEquals(0, regions.deferredHandshakes());
             }
         }
 
@@ -85,7 +84,6 @@ class LevelRegionsTest {
 
         assertEquals(0, regionCount(), "regions survived an empty chunk-holder map");
         assertEquals(0, regions.sections());
-        assertEquals(0, regions.deferredHandshakes());
         assertTrue(regions.created() > 1, "the replay never created a second region");
         assertTrue(regions.merged() > 0, "the replay never merged two regions");
         assertTrue(regions.split() > 0, "the replay never split a region");
@@ -129,7 +127,6 @@ class LevelRegionsTest {
 
         assertEquals(2, regionCount());
         assertEquals(1, regions.split());
-        assertEquals(0, regions.deferredHandshakes());
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             assertEquals(RegionState.READY, region.state());
         }
@@ -162,7 +159,6 @@ class LevelRegionsTest {
         assertEquals(0, regionCount());
         assertEquals(0, regions.sections());
         assertEquals(0, regions.deadSections());
-        assertEquals(0, regions.deferredHandshakes());
     }
 
     @Test
