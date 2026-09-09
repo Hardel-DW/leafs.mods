@@ -15,6 +15,7 @@ public final class RegionTickScheduler {
 
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
+    private final ThreadGroup serverThreads;
     private final int threadCount;
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
@@ -23,7 +24,8 @@ public final class RegionTickScheduler {
     private volatile long periodNanos = TICK_PERIOD_NANOS;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(int threadCount, boolean regionThreadNames, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, boolean regionThreadNames, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
+        this.serverThreads = serverThreads;
         this.threadCount = threadCount;
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
@@ -33,7 +35,7 @@ public final class RegionTickScheduler {
 
     public void start() {
         for (int index = 1; index <= threadCount; index++) {
-            Thread worker = new Thread(this::workerLoop, "Leafs Region Worker #" + index);
+            Thread worker = new Thread(serverThreads, this::workerLoop, "Leafs Region Worker #" + index);
             worker.setDaemon(true);
             workers.add(worker);
             worker.start();

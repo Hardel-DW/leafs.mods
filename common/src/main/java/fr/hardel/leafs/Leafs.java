@@ -13,8 +13,8 @@ public final class Leafs {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static Platform platform;
 
-    /** The loader's side of the world: where its files are, and which mod owns a class. */
-    public record Platform(Path configDir, Path gameDir, ModAttribution attribution) {
+    /** The loader's side of the world: where its files are, which mod owns a class, and the thread group it reads as the server's. Every Leafs thread running game code is born in that group. */
+    public record Platform(Path configDir, Path gameDir, ModAttribution attribution, ThreadGroup serverThreads) {
     }
 
     private Leafs() {

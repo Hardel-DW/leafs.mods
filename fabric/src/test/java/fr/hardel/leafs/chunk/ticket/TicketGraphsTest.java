@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** 2026-09-04: a region paid 30 ms of level bookkeeping at every chunk its player crossed. */
 @ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
-    private final ChunkPool pool = new ChunkPool(1, 46);
+    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 46);
     private final TicketGraphs graphs = new TicketGraphs();
     private final List<String> threads = new CopyOnWriteArrayList<>();
     private final CountDownLatch published = new CountDownLatch(1);
