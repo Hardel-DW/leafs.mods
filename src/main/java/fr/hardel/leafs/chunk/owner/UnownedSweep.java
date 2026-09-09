@@ -94,7 +94,7 @@ public final class UnownedSweep {
         }
     }
 
-    /** Vanilla's twenty attempts per tick from the head of the set; a chunk that is not ready stays for the next pass. */
+    /** Vanilla's twenty attempts per tick from the head of the set; a chunk that is not ready stays for the next pass. The one walk of the whole set, so a key whose chunk left goes here. */
     private void saveEagerly() {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         int attempts = 0;
@@ -104,7 +104,9 @@ public final class UnownedSweep {
             }
 
             ChunkHolder holder = table.get(chunkKey);
-            if (holder != null && unowned(chunkKey)) {
+            if (holder == null) {
+                chunkMap.chunksToEagerlySave.remove(chunkKey);
+            } else if (unowned(chunkKey)) {
                 dispatch(chunkKey, () -> saves.saveEagerly(holder));
                 attempts++;
             }

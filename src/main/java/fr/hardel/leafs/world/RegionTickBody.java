@@ -110,7 +110,7 @@ public final class RegionTickBody {
         });
         stages.mark(TickStages.regionPlayers);
         long slice = regions.tickPeriodNanos() / 10;
-        autosave.tick(region, worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
+        autosave.tick(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
         stages.mark(TickStages.regionAutosave);
         RegionInbox inbox = region.data().inbox();
         inbox.drain(Math.max(tickDeadlineNanos, System.nanoTime() + slice));

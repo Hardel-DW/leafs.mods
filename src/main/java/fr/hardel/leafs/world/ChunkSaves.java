@@ -10,9 +10,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongSet;
 
-import java.util.function.LongPredicate;
+import java.util.List;
 
 /** The save primitives an owner applies to its own chunks and players: vanilla's eager saves, and the epoch walk that visits everything once per autosave. */
 public final class ChunkSaves {
@@ -25,19 +25,11 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    /** Vanilla's saveChunksEagerly over the owner's share of the level's dirty set, until the deadline; a key without holder left with its chunk. */
-    public void saveEagerly(LongPredicate owned, long deadlineNanos) {
-        ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        for (LongIterator dirty = chunkMap.chunksToEagerlySave.iterator(); dirty.hasNext(); ) {
-            long key = dirty.nextLong();
-            if (!owned.test(key)) {
-                continue;
-            }
-
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
-            if (holder == null) {
-                chunkMap.chunksToEagerlySave.remove(key);
-            } else if (saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {
+    /** Vanilla's saveChunksEagerly over the owner's chunks that sit in the level's dirty set, until the deadline: the owner walks its own chunks, never the whole set. */
+    public void saveEagerly(List<ChunkHolder> holders, long deadlineNanos) {
+        LongSet dirty = level.getChunkSource().chunkMap.chunksToEagerlySave;
+        for (ChunkHolder holder : holders) {
+            if (dirty.contains(holder.getPos().pack()) && saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {
                 return;
             }
         }
