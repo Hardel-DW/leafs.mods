@@ -35,6 +35,14 @@ neoForge {
 	accessTransformers.from(accessTransformer.map { it.outputs.files.singleFile })
 
 	runs {
+		client {
+			client()
+			jvmArguments.addAll('-ea', '-XX:+UseZGC', '-Xmx6G')
+			if (project.hasProperty('world')) {
+				programArguments.addAll('--quickPlaySingleplayer', project.world)
+			}
+		}
+
 		server {
 			server()
 			programArguments.add('nogui')
