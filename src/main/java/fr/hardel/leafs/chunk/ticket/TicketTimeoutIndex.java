@@ -19,12 +19,14 @@ public final class TicketTimeoutIndex {
     }
 
     private final TicketStorage storage;
+    private final TicketGraphs graphs;
     private final int sectionShift;
     private final ConcurrentLong2ObjectMap<ConcurrentLinkedQueue<TrackedTicket>> sections = new ConcurrentLong2ObjectMap<>();
     private volatile LongPredicate busy = _ -> false;
 
-    public TicketTimeoutIndex(TicketStorage storage, int sectionShift) {
+    public TicketTimeoutIndex(TicketStorage storage, TicketGraphs graphs, int sectionShift) {
         this.storage = storage;
+        this.graphs = graphs;
         this.sectionShift = sectionShift;
     }
 
@@ -76,13 +78,21 @@ public final class TicketTimeoutIndex {
         return expired;
     }
 
-    /** An expired ticket leaves through the storage, whose removal untracks it here. */
     private int purgeSection(long sectionKey) {
         ConcurrentLinkedQueue<TrackedTicket> queue = sections.get(sectionKey);
         if (queue == null) {
             return 0;
         }
 
+        return graphs.batch(() -> {
+            synchronized (storage) {
+                return countDown(queue);
+            }
+        });
+    }
+
+    /** An expired ticket leaves through the storage, whose removal untracks it here. */
+    private int countDown(Iterable<TrackedTicket> queue) {
         int expired = 0;
         for (TrackedTicket tracked : queue) {
             if (!canExpire(tracked.ticket(), tracked.chunkPos())) {
