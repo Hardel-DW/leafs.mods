@@ -4,6 +4,7 @@ import fr.hardel.MinecraftBootstrap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.ScheduledTick;
 import net.minecraft.world.ticks.TickPriority;
@@ -61,6 +62,27 @@ class ScheduledTickDrainTest {
 
         assertTrue(drained.isEmpty());
         assertEquals(1, west.ticks().count());
+    }
+
+    /** Vanilla's copy during a callback sees the pass in progress, run and still to run, not only the containers. */
+    @Test
+    void aCopyDuringACallbackSeesThePassInProgress() {
+        Chunk west = chunk(0);
+        west.ticks().schedule(new ScheduledTick<>(Blocks.STONE, WEST, 5, 1));
+        west.ticks().schedule(new ScheduledTick<>(Blocks.STONE, WEST.above(), 5, 2));
+        west.ticks().schedule(new ScheduledTick<>(Blocks.STONE, WEST.above(2), 5, 3));
+        ScheduledTickDrain<Chunk, Block> drain = drain();
+        List<BlockPos> seen = new ArrayList<>();
+
+        drain.drain(List.of(west), _ -> true, 10, (pos, _) -> {
+            if (pos.equals(WEST.above())) {
+                drain.collectInside(new BoundingBox(0, 0, 0, 15, 128, 15), tick -> seen.add(tick.pos()));
+            }
+        });
+
+        assertEquals(List.of(WEST, WEST.above(), WEST.above(2)), seen, "already run, the running one, then the one still to run");
+        drain.collectInside(new BoundingBox(0, 0, 0, 15, 128, 15), tick -> seen.add(tick.pos()));
+        assertEquals(3, seen.size(), "nothing outlives the pass");
     }
 
     @Test
