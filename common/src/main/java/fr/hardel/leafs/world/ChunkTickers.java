@@ -10,14 +10,25 @@ import java.util.List;
 public final class ChunkTickers {
     private final List<TickingBlockEntity> tickers = new ArrayList<>();
     private final List<TickingBlockEntity> pending = new ArrayList<>();
+    private final List<Runnable> openers = new ArrayList<>();
     private boolean ticking;
 
     public void add(TickingBlockEntity ticker) {
         (ticking ? pending : tickers).add(ticker);
     }
 
+    /** Runs at the head of the chunk's next pass, before any ticker, frozen or not: a loader's load callback lands here. */
+    public void beforePass(Runnable work) {
+        openers.add(work);
+    }
+
     public void tickAll(boolean runsNormally) {
         ticking = true;
+        for (int i = 0; i < openers.size(); i++) {
+            openers.get(i).run();
+        }
+
+        openers.clear();
         if (!pending.isEmpty()) {
             tickers.addAll(pending);
             pending.clear();

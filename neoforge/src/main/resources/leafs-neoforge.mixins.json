@@ -3,6 +3,11 @@
 	"package": "fr.hardel.leafs.neoforge.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"BlockCaptureShim",
+		"FreshBlockEntitiesShim",
+		"LevelSnapshotCaptureShim",
+		"PlacementSnapshotCaptureShim",
+		"PlayerListViewShim",
 		"ServerTickEventsShim"
 	],
 	"injectors": {
