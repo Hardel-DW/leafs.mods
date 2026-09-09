@@ -1,0 +1,73 @@
+modLoader = "javafml"
+loaderVersion = "*"
+license = "All-Rights-Reserved"
+
+[[mods]]
+modId = "leafs"
+version = "${version}"
+displayName = "Leafs"
+iconFile = "assets/leafs/icon.png"
+authors = "Hardel"
+description = '''
+Regionised multithreading for the dedicated server: the world is cut into independent regions, each ticking in parallel on its own thread - like Folia, redesigned for modern vanilla and NeoForge.
+'''
+
+[[dependencies.leafs]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.leafs]]
+modId = "mapple"
+type = "required"
+versionRange = "*"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.leafs]]
+modId = "scalablelux"
+type = "required"
+versionRange = "*"
+ordering = "BEFORE"
+side = "BOTH"
+
+[[dependencies.leafs]]
+modId = "zfastnoise"
+type = "required"
+versionRange = "*"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.leafs]]
+modId = "c2me"
+type = "incompatible"
+versionRange = "*"
+
+[[dependencies.leafs]]
+modId = "moonrise"
+type = "incompatible"
+versionRange = "*"
+
+[[dependencies.leafs]]
+modId = "vmp"
+type = "incompatible"
+versionRange = "*"
+
+[[mixins]]
+config = "leafs.mixins.json"
+
+[[mixins]]
+config = "leafs-neoforge.mixins.json"
+
+["lithium:options"]
+"mixin.ai.poi" = false
+"mixin.alloc.chunk_random" = false
+"mixin.alloc.nbt" = false
+"mixin.chunk.no_locking" = false
+"mixin.chunk.palette" = false
+"mixin.util.chunk_status_tracking" = false
+"mixin.util.section_data_storage" = false
+"mixin.util.data_storage" = false
+"mixin.world.chunk_ticking.random_block_ticking" = false

@@ -1,94 +1,33 @@
 plugins {
-	id 'net.fabricmc.fabric-loom' version "${loom_version}"
-	id 'maven-publish'
+	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+	id 'net.neoforged.moddev' version "${moddev_version}" apply false
 }
 
-def minecraftMajor = project.minecraft_version.tokenize('.').take(2).join('.')
-version = "${project.mod_version}+${project.minecraft_version}"
-group = project.maven_group
+subprojects {
+	apply plugin: 'java'
+	apply plugin: 'maven-publish'
 
-base {
-	archivesName = "Leafs-${minecraftMajor}"
-}
-
-tasks.withType(AbstractArchiveTask).configureEach {
-	archiveVersion = project.mod_version
-}
-
-repositories {
-	mavenLocal()
-}
-
-dependencies {
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	localRuntime "fr.hardel:mapple-${minecraftMajor}:${project.mapple_version}"
-	compileOnly files("libs/ScalableLux-fabric-0.3.0-alpha.0.2-all.jar")
-	localRuntime files("libs/ScalableLux-fabric-0.3.0-alpha.0.2-all.jar", "libs/zfastnoise-1.0.40+26.1.2.jar")
-	testRuntimeOnly "fr.hardel:mapple-${minecraftMajor}:${project.mapple_version}"
-	testRuntimeOnly files("libs/ScalableLux-fabric-0.3.0-alpha.0.2-all.jar", "libs/zfastnoise-1.0.40+26.1.2.jar")
-
-	testImplementation platform("org.junit:junit-bom:5.12.2")
-	testImplementation "org.junit.jupiter:junit-jupiter"
-	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
-	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-}
-
-loom {
-	accessWidenerPath = file("src/main/resources/leafs.accesswidener")
-
-	runs {
-		configureEach {
-			vmArg "-ea"
-			vmArg "-XX:+UseZGC"
-		}
-
-		client {
-			vmArg "-Xmx3G"
-		}
-
-		server {
-			vmArg "-Xms14G"
-			vmArg "-Xmx14G"
-			vmArg "-XX:+AlwaysPreTouch"
-		}
-	}
-}
-
-test {
-	useJUnitPlatform()
-}
-
-processResources {
-	def version = project.version
-	inputs.property "version", version
-
-	filesMatching("fabric.mod.json") {
-		expand "version": version
-	}
-}
-
-tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
-}
-
-java {
-	withSourcesJar()
-
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
-	}
-}
-
-publishing {
-	publications {
-		create("mavenJava", MavenPublication) {
-			artifactId = "leafs-${minecraftMajor}"
-			from components.java
-		}
-	}
+	ext.minecraftMajor = rootProject.minecraft_version.tokenize('.').take(2).join('.')
+	version = "${rootProject.mod_version}+${rootProject.minecraft_version}"
+	group = rootProject.maven_group
 
 	repositories {
+		mavenLocal()
+	}
+
+	java {
+		withSourcesJar()
+
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(25)
+		}
+	}
+
+	tasks.withType(JavaCompile).configureEach {
+		it.options.release = 25
+	}
+
+	tasks.withType(AbstractArchiveTask).configureEach {
+		archiveVersion = rootProject.mod_version
 	}
 }
