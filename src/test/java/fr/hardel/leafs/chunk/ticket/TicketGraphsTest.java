@@ -77,6 +77,19 @@ class TicketGraphsTest {
         assertTrue(simulation.stream().allMatch(Thread.currentThread().getName()::equals));
     }
 
+    /** B30: Lithium reads the holder right after runDistanceManagerUpdates without passing through vanilla's caller, so the primitive itself settles what was added. */
+    @Test
+    void aTicketAddedOffThePoolSettlesOnTheCallerAtRunDistanceManagerUpdates() {
+        graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
+
+        graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, true);
+        graphs.settleWritten(loading);
+
+        assertEquals(List.of(Thread.currentThread().getName()), threads, "the holder exists before the call returns, on this thread");
+        graphs.settleWritten(loading);
+        assertEquals(1, threads.size(), "settled once");
+    }
+
     @Test
     void aWorkerDrainsInLine() throws InterruptedException {
         graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);

@@ -135,10 +135,6 @@ public final class ChunkHolders implements LevelListener {
         return holder;
     }
 
-    public void settle(int chunkX, int chunkZ) {
-        loading.settled(chunkX, chunkZ, this, () -> null);
-    }
-
     public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
         return loading.settled(chunkX, chunkZ, this, body);
     }

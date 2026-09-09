@@ -76,18 +76,12 @@ public abstract class ServerChunkCacheMixin {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
     }
 
-    /** Vanilla reads the holder right after runAllUpdates: the chunk's own section settles on this thread. */
-    @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
-    private boolean leafs$settleTheRequestedChunk(ServerChunkCache self, Operation<Boolean> original, @Local(argsOnly = true, ordinal = 0) int x, @Local(argsOnly = true, ordinal = 1) int z) {
-        boolean changed = original.call(self);
-        LevelChunks.of(this.level).holders().settle(x, z);
-        return changed;
-    }
-
-    @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
-    private boolean leafs$settleTheRadiusCentre(ServerChunkCache self, Operation<Boolean> original, @Local(argsOnly = true) ChunkPos pos) {
-        boolean changed = original.call(self);
-        LevelChunks.of(this.level).holders().settle(pos.x(), pos.z());
+    /** Vanilla reads a holder right after this call, from any caller: the chunks whose tickets were added since settle on this thread. */
+    @WrapMethod(method = "runDistanceManagerUpdates")
+    private boolean leafs$settleTheAddedTickets(Operation<Boolean> original) {
+        boolean changed = original.call();
+        LevelChunks chunks = LevelChunks.of(this.level);
+        chunks.graphs().settleWritten(chunks.holders());
         return changed;
     }
 
