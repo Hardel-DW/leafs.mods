@@ -19,6 +19,14 @@ public abstract class ChunkTask {
         }
     }
 
+    /** What a task is for; the reservation counts say which kind waits behind which. */
+    public enum Kind {
+        STEP,
+        LIGHT,
+        OWNER,
+        HOUSEKEEPING
+    }
+
     /** Where a task works, in reservation keys: the chunk it writes and the centre it serves. The more urgent of the two is its priority, so a dependency inherits the urgency of its user. */
     public record Place(long chunkKey, long centerKey, Urgency urgency) {
         public int priority() {
@@ -27,27 +35,30 @@ public abstract class ChunkTask {
         }
     }
 
+    private final Kind kind;
     private final long[] reserved;
     private final @Nullable Place place;
     private volatile int priority;
     private volatile int bucket = UNQUEUED;
     private volatile boolean withdrawn;
 
-    /** Housekeeping with a fixed priority, invisible to the re-prioritisation. */
-    protected ChunkTask(int priority, long... reserved) {
+    /** A fixed priority, invisible to the re-prioritisation. */
+    protected ChunkTask(Kind kind, int priority, long... reserved) {
+        this.kind = kind;
         this.place = null;
         this.priority = priority;
         this.reserved = reserved;
     }
 
-    protected ChunkTask(Place place, long... reserved) {
+    protected ChunkTask(Kind kind, Place place, long... reserved) {
+        this.kind = kind;
         this.place = place;
         this.priority = place.priority();
         this.reserved = reserved;
     }
 
-    public static ChunkTask of(int priority, long[] reserved, Runnable body) {
-        return new ChunkTask(priority, reserved) {
+    public static ChunkTask of(Kind kind, int priority, long[] reserved, Runnable body) {
+        return new ChunkTask(kind, priority, reserved) {
             @Override
             protected @Nullable CompletableFuture<?> run() {
                 body.run();
@@ -56,8 +67,8 @@ public abstract class ChunkTask {
         };
     }
 
-    public static ChunkTask of(Place place, long[] reserved, Runnable body) {
-        return new ChunkTask(place, reserved) {
+    public static ChunkTask of(Kind kind, Place place, long[] reserved, Runnable body) {
+        return new ChunkTask(kind, place, reserved) {
             @Override
             protected @Nullable CompletableFuture<?> run() {
                 body.run();
@@ -77,6 +88,10 @@ public abstract class ChunkTask {
 
     public static int chunkZ(long key) {
         return (int) (key << 42 >> 42);
+    }
+
+    public final Kind kind() {
+        return kind;
     }
 
     public final long[] reserved() {

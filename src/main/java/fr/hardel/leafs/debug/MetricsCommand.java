@@ -1,6 +1,8 @@
 package fr.hardel.leafs.debug;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import fr.hardel.leafs.chunk.pool.ChunkTask;
+import fr.hardel.leafs.chunk.pool.ReservationBlocks;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.metrics.ServerMetrics;
@@ -53,8 +55,18 @@ public final class MetricsCommand {
             .append(CommandText.stat("packets in", perMinute(metrics.packetsIn().perMinute())))
             .append(CommandText.stat("out", perMinute(metrics.packetsOut().perMinute())))
             .append(CommandText.stat("chunk loads", perMinute(metrics.chunkLoads().perMinute())))
-            .append(CommandText.stat("unloads", perMinute(metrics.chunkUnloads().perMinute())))
-            .append(CommandText.stat("pool tasks blocked by a reservation", perMinute(ticking.chunkPool().blocked().perMinute()))), false);
+            .append(CommandText.stat("unloads", perMinute(metrics.chunkUnloads().perMinute()))), false);
+
+        ReservationBlocks blocks = ticking.chunkPool().blocks();
+        for (ChunkTask.Kind blocked : ChunkTask.Kind.values()) {
+            for (ChunkTask.Kind holder : ChunkTask.Kind.values()) {
+                long count = blocks.of(blocked, holder).perMinute();
+                if (count > 0) {
+                    String pair = blocked.name().toLowerCase(Locale.ROOT) + " behind " + holder.name().toLowerCase(Locale.ROOT);
+                    source.sendSuccess(() -> Component.empty().append(CommandText.gray("  pool tasks parked, " + pair)).append(CommandText.stat("", perMinute(count))), false);
+                }
+            }
+        }
 
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("players").withStyle(ChatFormatting.AQUA))

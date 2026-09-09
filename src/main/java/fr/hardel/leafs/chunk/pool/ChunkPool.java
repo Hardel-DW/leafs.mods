@@ -1,7 +1,6 @@
 package fr.hardel.leafs.chunk.pool;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.metrics.MinuteCounter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -25,7 +24,7 @@ public final class ChunkPool implements Executor {
     private final List<Thread> workers;
     private final AtomicInteger queued = new AtomicInteger();
     private final AtomicInteger active = new AtomicInteger();
-    private final MinuteCounter blocked = new MinuteCounter();
+    private final ReservationBlocks blocks = new ReservationBlocks();
     private volatile boolean running = true;
 
     public ChunkPool(int threads, int priorities) {
@@ -64,9 +63,8 @@ public final class ChunkPool implements Executor {
         return queued.get();
     }
 
-    /** Tasks that could not start because a running task reserved one of their chunks, the cost of one reservation space for light and generation alike. */
-    public MinuteCounter blocked() {
-        return blocked;
+    public ReservationBlocks blocks() {
+        return blocks;
     }
 
     public int active() {
@@ -103,7 +101,7 @@ public final class ChunkPool implements Executor {
 
     @Override
     public void execute(@NonNull Runnable task) {
-        submit(ChunkTask.of(FIRST, NO_RESERVATION, task));
+        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, FIRST, NO_RESERVATION, task));
     }
 
     /** Queued work still runs, within ten seconds. */
@@ -151,8 +149,9 @@ public final class ChunkPool implements Executor {
                 continue;
             }
 
-            if (!reservations.acquire(task)) {
-                blocked.increment();
+            ChunkTask holder = reservations.acquire(task);
+            if (holder != null) {
+                blocks.count(task, holder);
                 continue;
             }
 

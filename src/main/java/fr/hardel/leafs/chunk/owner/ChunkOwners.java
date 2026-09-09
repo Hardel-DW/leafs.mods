@@ -89,7 +89,7 @@ public final class ChunkOwners implements Router {
             }
 
             if (work == Work.CHUNK) {
-                pool.submit(ChunkTask.of(ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
+                pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
                 return false;
             }
 
@@ -121,8 +121,8 @@ public final class ChunkOwners implements Router {
     }
 
     /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
-    public void onPool(int chunkX, int chunkZ, int radius, Runnable task) {
-        pool.submit(ChunkTask.of(place(chunkX, chunkZ, chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
+    public void onPool(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius, Runnable task) {
+        pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
     }
 
     public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ) {

@@ -2,6 +2,8 @@ package fr.hardel.leafs.chunk.pool;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.function.Consumer;
 
@@ -11,18 +13,24 @@ final class Reservations {
     private final Consumer<ChunkTask> requeue;
 
     private static final class Waiters extends ArrayList<ChunkTask> {
+        private final ChunkTask holder;
         private boolean freed;
+
+        private Waiters(ChunkTask holder) {
+            this.holder = holder;
+        }
     }
 
     Reservations(Consumer<ChunkTask> requeue) {
         this.requeue = requeue;
     }
 
-    boolean acquire(ChunkTask task) {
+    /** Null once the task holds every chunk it reserves; otherwise the running task it parked behind. */
+    @Nullable ChunkTask acquire(ChunkTask task) {
         long[] keys = task.reserved();
         retry:
         while (true) {
-            Waiters mine = new Waiters();
+            Waiters mine = new Waiters(task);
             for (int index = 0; index < keys.length; index++) {
                 Waiters present = held.putIfAbsent(keys[index], mine);
                 if (present == null) {
@@ -42,10 +50,10 @@ final class Reservations {
                     present.add(task);
                 }
 
-                return false;
+                return present.holder;
             }
 
-            return true;
+            return null;
         }
     }
 

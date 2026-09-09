@@ -81,7 +81,7 @@ class PlacedTasksTest {
 
     private void queue(String name, int chunkX, int chunkZ, int centerX, int centerZ, CountDownLatch done) {
         ChunkTask.Place place = new ChunkTask.Place(key(chunkX, chunkZ), key(centerX, centerZ), urgency);
-        pool.submit(ChunkTask.of(place, NONE, () -> {
+        pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, place, NONE, () -> {
             order.add(name);
             done.countDown();
         }));
