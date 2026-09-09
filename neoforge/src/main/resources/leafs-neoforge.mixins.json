@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "fr.hardel.leafs.neoforge.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"ServerTickEventsShim"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
