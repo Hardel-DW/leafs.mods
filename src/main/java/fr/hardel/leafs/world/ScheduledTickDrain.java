@@ -7,12 +7,14 @@ import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.ScheduledTick;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongPredicate;
 import java.util.function.ToLongFunction;
@@ -26,6 +28,7 @@ public final class ScheduledTickDrain<C, T> {
     private final ToLongFunction<C> keyOf;
     private final Queue<LevelChunkTicks<T>> containersToTick = new PriorityQueue<>(CONTAINER_DRAIN_ORDER);
     private final Queue<ScheduledTick<T>> toRunThisTick = new ArrayDeque<>();
+    private final List<ScheduledTick<T>> alreadyRunThisTick = new ArrayList<>();
     private final Set<ScheduledTick<?>> toRunThisTickSet = new ObjectOpenCustomHashSet<>(ScheduledTick.UNIQUE_TICK_HASH);
 
     public ScheduledTickDrain(Function<C, LevelChunkTicks<T>> containerOf, ToLongFunction<C> keyOf) {
@@ -41,11 +44,18 @@ public final class ScheduledTickDrain<C, T> {
                 toRunThisTickSet.remove(tick);
             }
 
+            alreadyRunThisTick.add(tick);
             output.accept(tick.pos(), tick.type());
         }
 
         containersToTick.clear();
+        alreadyRunThisTick.clear();
         toRunThisTickSet.clear();
+    }
+
+    public void collectInside(BoundingBox area, Consumer<ScheduledTick<T>> out) {
+        alreadyRunThisTick.stream().filter(tick -> area.isInside(tick.pos())).forEach(out);
+        toRunThisTick.stream().filter(tick -> area.isInside(tick.pos())).forEach(out);
     }
 
     public boolean willTickThisTick(BlockPos pos, T type) {
@@ -57,6 +67,7 @@ public final class ScheduledTickDrain<C, T> {
     }
 
     public void clearArea(BoundingBox area) {
+        alreadyRunThisTick.removeIf(tick -> area.isInside(tick.pos()));
         toRunThisTick.removeIf(tick -> area.isInside(tick.pos()));
         toRunThisTickSet.clear();
     }

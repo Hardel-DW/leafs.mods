@@ -102,7 +102,7 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         copyAreaFrom(this, area, offset);
     }
 
-    /** A foreign source keeps vanilla's walk of its own containers; ours has no such walk, so the area is collected here. The copies land after the originals in sub-tick order, as vanilla's do. */
+    /** A foreign source keeps vanilla's walk of its own containers; ours has no such walk, so the area is collected here, the pass in progress first. The copies land after the originals in sub-tick order, as vanilla's do. */
     @Override
     public void copyAreaFrom(@NonNull LevelTicks<T> source, @NonNull BoundingBox area, @NonNull Vec3i offset) {
         if (!(source instanceof ChunkScheduledTicks<T> chunked)) {
@@ -111,6 +111,11 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
 
         List<ScheduledTick<T>> collected = new ArrayList<>();
+        ScheduledTickDrain<LevelChunk, T> drain = chunked.activeDrain();
+        if (drain != null) {
+            drain.collectInside(area, collected::add);
+        }
+
         chunked.forEachContainerIn(area, (_, container) -> container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(collected::add));
         LongSummaryStatistics subTicks = collected.stream().mapToLong(ScheduledTick::subTickOrder).summaryStatistics();
         long shift = subTicks.getMax() - subTicks.getMin() + 1;
