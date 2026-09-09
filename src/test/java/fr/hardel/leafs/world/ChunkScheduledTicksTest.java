@@ -81,4 +81,25 @@ class ChunkScheduledTicksTest {
         mailed.forEach(Runnable::run);
         assertTrue(index.hasScheduledTick(POS, Blocks.STONE));
     }
+
+    /** Mail outlives an unload and a reload of its chunk: the write lands in the container the owner has when it runs, never in the detached one. */
+    @Test
+    void mailReachesTheContainerLiveWhenItRuns() {
+        List<Runnable> mailed = new ArrayList<>();
+        ChunkScheduledTicks<Block> index = new ChunkScheduledTicks<>(null, RegionWorldData::blockTicks, (_, _, task) -> mailed.add(task));
+        LevelChunkTicks<Block> detached = new LevelChunkTicks<>();
+        index.addContainer(new ChunkPos(0, 0), detached);
+        index.schedule(new ScheduledTick<>(Blocks.STONE, POS, 5, 0));
+        index.clearArea(new BoundingBox(0, 65, 0, 7, 128, 7));
+
+        index.removeContainer(new ChunkPos(0, 0));
+        LevelChunkTicks<Block> reloaded = new LevelChunkTicks<>();
+        reloaded.schedule(new ScheduledTick<>(Blocks.STONE, POS.above(), 5, 0));
+        index.addContainer(new ChunkPos(0, 0), reloaded);
+        mailed.forEach(Runnable::run);
+
+        assertEquals(0, detached.count());
+        assertTrue(reloaded.hasScheduledTick(POS, Blocks.STONE), "the schedule reached the reloaded container");
+        assertFalse(reloaded.hasScheduledTick(POS.above(), Blocks.STONE), "the clear reached the reloaded container");
+    }
 }

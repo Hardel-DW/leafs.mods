@@ -2,7 +2,6 @@ package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
-import fr.hardel.leafs.chunk.owner.Router;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -22,6 +21,9 @@ public final class ChunkBlockEvents {
     private static final Comparator<Pending> ORDER = Comparator.comparingLong(Pending::sequence);
 
     private record Pending(ChunkBlockEvents from, long sequence, BlockEventData event) {
+        boolean take() {
+            return from.events.remove(event, sequence);
+        }
     }
 
     private final Map<BlockEventData, Long> events = new LinkedHashMap<>();
@@ -30,27 +32,34 @@ public final class ChunkBlockEvents {
     public static boolean post(ServerLevel level, BlockEventData event, long sequence) {
         int chunkX = SectionPos.blockToSectionCoord(event.pos().getX());
         int chunkZ = SectionPos.blockToSectionCoord(event.pos().getZ());
-        LevelChunk chunk = RegionChunkAccess.levelChunkOrNull(level.getChunkSource().chunkMap, chunkX, chunkZ);
-        if (chunk == null) {
+        if (RegionChunkAccess.levelChunkOrNull(level.getChunkSource().chunkMap, chunkX, chunkZ) == null) {
             return false;
         }
 
-        LevelChunks.of(level).owners().route(chunkX, chunkZ, () -> of(chunk).add(event, sequence));
+        write(level, chunkX, chunkZ, set -> set.add(event, sequence));
         return true;
     }
 
     /** Vanilla's clearBlockEvents over the loaded chunks of the box, each on its owner. */
     public static void clearArea(ServerLevel level, BoundingBox area) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        Router owners = LevelChunks.of(level).owners();
         for (int chunkX = SectionPos.blockToSectionCoord(area.minX()); chunkX <= SectionPos.blockToSectionCoord(area.maxX()); chunkX++) {
             for (int chunkZ = SectionPos.blockToSectionCoord(area.minZ()); chunkZ <= SectionPos.blockToSectionCoord(area.maxZ()); chunkZ++) {
-                LevelChunk chunk = RegionChunkAccess.levelChunkOrNull(chunkMap, chunkX, chunkZ);
-                if (chunk != null) {
-                    owners.route(chunkX, chunkZ, () -> of(chunk).removeInside(area));
+                if (RegionChunkAccess.levelChunkOrNull(chunkMap, chunkX, chunkZ) != null) {
+                    write(level, chunkX, chunkZ, set -> set.removeInside(area));
                 }
             }
         }
+    }
+
+    private static void write(ServerLevel level, int chunkX, int chunkZ, Consumer<ChunkBlockEvents> write) {
+        ChunkMap chunkMap = level.getChunkSource().chunkMap;
+        LevelChunks.of(level).owners().route(chunkX, chunkZ, () -> {
+            LevelChunk chunk = RegionChunkAccess.levelChunkOrNull(chunkMap, chunkX, chunkZ);
+            if (chunk != null) {
+                write.accept(of(chunk));
+            }
+        });
     }
 
     /** Vanilla's runBlockEvents over the sets of one region's ticking chunks: sequence order across chunks, an event leaves its set as it runs, cascades replay until nothing is left. */
