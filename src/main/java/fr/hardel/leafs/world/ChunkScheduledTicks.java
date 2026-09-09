@@ -7,11 +7,13 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.LevelTicks;
 import net.minecraft.world.ticks.ScheduledTick;
+import net.minecraft.world.ticks.TickPriority;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.function.Predicate;
 public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     private final ConcurrentLong2ObjectMap<LevelChunkTicks<T>> containers = new ConcurrentLong2ObjectMap<>();
     private final ServerLevel level;
+    private final ScheduledTickAccess ticks;
     private final Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf;
     private final Router owners;
 
@@ -33,9 +36,10 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         void visit(long chunkKey, LevelChunkTicks<C> container);
     }
 
-    public ChunkScheduledTicks(ServerLevel level, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf, Router owners) {
+    public ChunkScheduledTicks(ServerLevel level, ScheduledTickAccess ticks, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf, Router owners) {
         super(_ -> true);
         this.level = level;
+        this.ticks = ticks;
         this.drainOf = drainOf;
         this.owners = owners;
     }
@@ -55,6 +59,14 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         long chunkKey = ChunkPos.pack(tick.pos());
         if (containers.containsKey(chunkKey)) {
             write(chunkKey, container -> container.schedule(tick));
+        }
+    }
+
+    /** Vanilla's scheduleTick as one write: the owner stamps its clock and its order counter when it runs it, so a tick from another thread lands in step with its own. */
+    public void schedule(BlockPos pos, T type, int delay, TickPriority priority) {
+        long chunkKey = ChunkPos.pack(pos);
+        if (containers.containsKey(chunkKey)) {
+            write(chunkKey, container -> container.schedule(ticks.createTick(pos, type, delay, priority)));
         }
     }
 
