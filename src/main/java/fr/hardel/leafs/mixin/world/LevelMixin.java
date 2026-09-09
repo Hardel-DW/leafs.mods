@@ -6,6 +6,8 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredWork;
+import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
@@ -53,15 +55,15 @@ public abstract class LevelMixin {
         }
     }
 
-    /** A block write is the owner's, its side effects with it. A region that ticks the chunk gets it as mail, and the call answers like a write that happened; anywhere else the caller takes the chunk, writes now and answers vanilla's result. */
     @WrapMethod(method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z")
     private boolean leafs$writeOnTheOwner(BlockPos pos, BlockState state, int flags, int updateLimit, Operation<Boolean> original) {
-        if (!((Object) this instanceof ServerLevel level)) {
+        if (!((Object) this instanceof ServerLevel level) || !level.isInValidBounds(pos)) {
             return original.call(pos, state, flags, updateLimit);
         }
 
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
+        RegionBorrow.atContact(LevelRegions.of(level), chunkX, chunkZ);
         if (LevelChunks.of(level).owners().holds(chunkX, chunkZ)) {
             return original.call(pos, state, flags, updateLimit);
         }

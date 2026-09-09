@@ -50,6 +50,21 @@ class RegionBorrowTest {
         region.markNotTicking();
     }
 
+    /** A write is a contact like a read: the head takes the region of the chunk before deciding whether to defer. */
+    @Test
+    void aBorrowingThreadTakesTheRegionOfAChunkItMeets() {
+        simulated(regions, 0, 0);
+        Region<RegionTickData> region = regions.regionizer().regionAt(0, 0);
+
+        RegionBorrow.atContact(regions, 0, 0);
+        assertEquals(RegionState.READY, region.state(), "nothing happens without a borrow");
+
+        RegionBorrow borrow = RegionBorrow.enter();
+        RegionBorrow.atContact(regions, 0, 0);
+        assertEquals(1, borrow.size());
+        assertEquals(RegionState.TICKING, region.state());
+    }
+
     @Test
     void aBorrowWaitsForTheTickInFlightAndNothingElse() throws InterruptedException {
         simulated(regions, 0, 0);
