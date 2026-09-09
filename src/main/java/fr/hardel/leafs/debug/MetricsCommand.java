@@ -24,7 +24,8 @@ public final class MetricsCommand {
     }
 
     private static int report(CommandSourceStack source) {
-        ServerMetrics metrics = TickingManager.of(source.getServer()).metrics();
+        TickingManager ticking = TickingManager.of(source.getServer());
+        ServerMetrics metrics = ticking.metrics();
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("borrows").withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("fabric events", perMinute(metrics.fabricEventBorrows().perMinute()))), false);
@@ -52,7 +53,8 @@ public final class MetricsCommand {
             .append(CommandText.stat("packets in", perMinute(metrics.packetsIn().perMinute())))
             .append(CommandText.stat("out", perMinute(metrics.packetsOut().perMinute())))
             .append(CommandText.stat("chunk loads", perMinute(metrics.chunkLoads().perMinute())))
-            .append(CommandText.stat("unloads", perMinute(metrics.chunkUnloads().perMinute()))), false);
+            .append(CommandText.stat("unloads", perMinute(metrics.chunkUnloads().perMinute())))
+            .append(CommandText.stat("pool tasks blocked by a reservation", perMinute(ticking.chunkPool().blocked().perMinute()))), false);
 
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("players").withStyle(ChatFormatting.AQUA))

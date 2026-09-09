@@ -63,6 +63,40 @@ class ChunkPoolTest {
         assertEquals(0, pool.queued());
     }
 
+    /** Roadmap, two reservation spaces: the count of tasks parked behind a reservation comes before any decision. */
+    @Test
+    void aTaskParkedBehindAReservationIsCounted() throws InterruptedException {
+        pool = new ChunkPool(2, 4);
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(1);
+        long[] chunk = {ChunkTask.key(0, 1, 1)};
+        pool.submit(ChunkTask.of(1, chunk, () -> {
+            holding.countDown();
+            await(release);
+        }));
+        assertTrue(holding.await(5, TimeUnit.SECONDS));
+
+        pool.submit(ChunkTask.of(1, chunk, done::countDown));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (pool.blocked().total() == 0) {
+            assertTrue(System.nanoTime() < deadline, "the second task parks behind the first");
+            Thread.onSpinWait();
+        }
+
+        release.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        assertEquals(1, pool.blocked().total());
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Test
     void theMostUrgentQueuedTaskRunsFirst() throws InterruptedException {
         pool = new ChunkPool(1, 8);
