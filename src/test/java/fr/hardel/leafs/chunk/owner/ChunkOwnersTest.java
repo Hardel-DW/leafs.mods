@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -136,6 +137,15 @@ class ChunkOwnersTest {
         assertTrue(server.drain());
         assertEquals(List.of("game"), ran);
         assertEquals(List.of("2,2"), taken);
+    }
+
+    /** Roadmap, two reservation spaces: a light task and a generation step on the same chunk do not wait for each other. */
+    @Test
+    void lightReservesInItsOwnSpace() {
+        ChunkOwners owners = owners();
+
+        assertEquals(owners.area(ChunkTask.Kind.STEP, 1, 1, 0)[0], owners.area(ChunkTask.Kind.OWNER, 1, 1, 0)[0], "publication and generation write the blocks");
+        assertFalse(owners.area(ChunkTask.Kind.STEP, 1, 1, 0)[0] == owners.area(ChunkTask.Kind.LIGHT, 1, 1, 0)[0], "light writes the light arrays");
     }
 
     /** N02: the pool and a taker kept two registries of the same chunk; the pool task now takes the chunk for its duration, so a taker meanwhile finds it held and its work waits for the release. */

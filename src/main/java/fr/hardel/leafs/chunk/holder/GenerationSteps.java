@@ -93,7 +93,7 @@ public final class GenerationSteps {
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
         ChunkPos pos = chunk.getPos();
         ChunkTask.Place place = owners.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
-        StepTask task = new StepTask(place, owners.area(pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
+        StepTask task = new StepTask(place, owners.area(Kind.STEP, pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
         queued.compute(pos.pack(), (_, slots) -> {
             StepTask[] target = slots == null ? new StepTask[STATUSES] : slots;
             target[step.targetStatus().getIndex()] = task;

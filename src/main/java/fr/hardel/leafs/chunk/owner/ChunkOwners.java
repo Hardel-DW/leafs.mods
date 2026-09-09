@@ -89,7 +89,7 @@ public final class ChunkOwners implements Router {
             }
 
             if (work == Work.CHUNK) {
-                pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
+                pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
                 return false;
             }
 
@@ -122,7 +122,7 @@ public final class ChunkOwners implements Router {
 
     /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
     public void onPool(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius, Runnable task) {
-        pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(chunkX, chunkZ, radius), task));
+        pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(kind, chunkX, chunkZ, radius), task));
     }
 
     public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ) {
@@ -167,22 +167,26 @@ public final class ChunkOwners implements Router {
         return task -> submit(chunkX, chunkZ, Work.CHUNK, task);
     }
 
-    /** The keys of the square around a chunk; a negative radius reserves nothing. */
-    public long[] area(int chunkX, int chunkZ, int radius) {
+    public long[] area(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius) {
         if (radius < 0) {
             return NO_RESERVATION;
         }
 
+        int space = space(kind);
         int side = 2 * radius + 1;
         long[] keys = new long[side * side];
         int count = 0;
         for (int dz = -radius; dz <= radius; dz++) {
             for (int dx = -radius; dx <= radius; dx++) {
-                keys[count++] = ChunkTask.key(level, chunkX + dx, chunkZ + dz);
+                keys[count++] = ChunkTask.key(space, chunkX + dx, chunkZ + dz);
             }
         }
 
         return keys;
+    }
+
+    private int space(ChunkTask.Kind kind) {
+        return kind == ChunkTask.Kind.LIGHT ? level * 2 + 1 : level * 2;
     }
 
     /** A thread takes a chunk no region covers: what lands there waits in the inbox for the taker until it releases. Null when another thread holds it. */
