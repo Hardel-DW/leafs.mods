@@ -33,6 +33,11 @@ public record DeferredWork(ChunkOwners owners, DeferStats stats, int chunkX, int
         return true;
     }
 
+    public void later() {
+        owners.later(chunkX, chunkZ, Work.GAME, this::execute);
+        stats.countDeferral(reason);
+    }
+
     private void execute() {
         if (!revalidation.getAsBoolean()) {
             stats.countDrop(reason);
