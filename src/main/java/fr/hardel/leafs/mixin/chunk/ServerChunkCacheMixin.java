@@ -55,9 +55,8 @@ public abstract class ServerChunkCacheMixin {
     private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
         LevelRegions regions = LevelRegions.of(this.level);
         ChunkAccess chunk = regions.live() ? RegionChunkAccess.contractedChunk(leafs$chunkMap(), x, z, targetStatus, loadOrGenerate) : original.call(x, z, targetStatus, loadOrGenerate);
-        RegionBorrow borrow = RegionBorrow.current();
-        if (chunk != null && borrow != null) {
-            borrow.borrow(regions, x, z);
+        if (chunk != null) {
+            RegionBorrow.atContact(regions, x, z);
         }
 
         return chunk;

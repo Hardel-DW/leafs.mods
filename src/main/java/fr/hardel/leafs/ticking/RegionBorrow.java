@@ -69,12 +69,18 @@ public final class RegionBorrow {
         return CURRENT.get();
     }
 
-    /** A borrowing thread meets an entity: it takes the region of the entity's position, as it does for a chunk it reads. Nothing happens without a borrow. */
+    /** A borrowing thread meets an entity: it takes the region of the entity's position, as it does for a chunk it reads or writes. Nothing happens without a borrow. */
     public static void atContact(Entity entity) {
-        RegionBorrow borrow = CURRENT.get();
-        if (borrow != null && entity.level() instanceof ServerLevel level) {
+        if (entity.level() instanceof ServerLevel level) {
             ChunkPos chunk = entity.chunkPosition();
-            borrow.borrow(LevelRegions.of(level), chunk.x(), chunk.z());
+            atContact(LevelRegions.of(level), chunk.x(), chunk.z());
+        }
+    }
+
+    public static void atContact(LevelRegions regions, int chunkX, int chunkZ) {
+        RegionBorrow borrow = CURRENT.get();
+        if (borrow != null) {
+            borrow.borrow(regions, chunkX, chunkZ);
         }
     }
 
