@@ -20,12 +20,9 @@ import java.util.Map;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.LockSupport;
-import java.util.function.BooleanSupplier;
 
 /** A required chunk that is not there: the thread asks for it and runs what it owns until it lands. The server thread borrows first. */
 public final class ChunkWait {
-    private static final long PARK_NANOS = 50_000L;
     private static final ConcurrentHashMap<Thread, WaitReport> WAITING = new ConcurrentHashMap<>();
     private static final ThreadLocal<Scope> SCOPE = new ThreadLocal<>();
 
@@ -80,28 +77,6 @@ public final class ChunkWait {
         });
     }
 
-    /** The server thread pumps, its borrowed inboxes with it; any other thread drains the chunk work of its region and of the chunks it took, so a publication routed to itself completes. */
-    public static void until(ServerLevel level, BooleanSupplier done) {
-        if (level.getServer().isSameThread()) {
-            level.getServer().managedBlock(done);
-            return;
-        }
-
-        WorldTickContext mine = WorldTickContext.current();
-        RegionBorrow taken = RegionBorrow.current();
-        while (!done.getAsBoolean()) {
-            if (mine != null) {
-                mine.region().data().inbox().drainChunkWork();
-            }
-
-            if (taken != null) {
-                taken.drainInboxes();
-            }
-
-            LockSupport.parkNanos(PARK_NANOS);
-        }
-    }
-
     public static @Nullable String describe(Thread thread) {
         WaitReport report = WAITING.get(thread);
         return report == null ? null : report.toString();
@@ -139,12 +114,12 @@ public final class ChunkWait {
         WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
         WaitReport outer = WAITING.put(Thread.currentThread(), report);
         String found = report.toString();
+        TickingManager ticking = TickingManager.of(level.getServer());
         try {
-            until(level, delivery::isDone);
+            ticking.await(delivery::isDone);
         } finally {
             keep(demand.release());
             long waited = System.nanoTime() - report.startedNanos();
-            TickingManager ticking = TickingManager.of(level.getServer());
             ticking.metrics().chunkWaited(waited);
             if (waited >= ticking.slowTaskWarnMillis() * 1_000_000L) {
                 Leafs.LOGGER.warn("Waited {} ms for a chunk, asked by {}, found {}", waited / 1_000_000L, asker(), found);

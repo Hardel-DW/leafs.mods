@@ -8,6 +8,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ChunkTaskPriorityQueue;
@@ -19,6 +20,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 
 /** Server-scoped orchestrator of the region tick machinery, one per server, reached by {@link #of}. */
 public final class TickingManager {
@@ -28,6 +30,7 @@ public final class TickingManager {
     private final RegionTickScheduler scheduler;
     private final ChunkPool chunkPool;
     private final GlobalScheduler globalScheduler = new GlobalScheduler();
+    private final OwnWork serverWork = new OwnWork(this::pumpServer);
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
@@ -100,6 +103,26 @@ public final class TickingManager {
     /** The server thread pumping while it waits (managedBlock) also runs the diverted tasks, or a wait on one of them never ends. */
     public boolean pumpDiverted() {
         return globalTicking && server.isSameThread() && globalScheduler.drain();
+    }
+
+    /** A wait on Leafs, region or chunk: the server thread runs the tasks the regions handed it and the chunk work of every level, a region the chunk work of its inbox. */
+    public void await(BooleanSupplier done) {
+        if (server.isSameThread()) {
+            serverWork.until(done);
+            return;
+        }
+
+        WorldTickContext mine = WorldTickContext.current();
+        new OwnWork(() -> mine != null && mine.region().data().inbox().drainChunkWork() > 0).until(done);
+    }
+
+    private boolean pumpServer() {
+        boolean worked = globalScheduler.drain();
+        for (ServerLevel level : server.getAllLevels()) {
+            worked |= level.getChunkSource().pollTask();
+        }
+
+        return worked;
     }
 
     /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. The task runs as a head, borrowing at contact like a command. */
