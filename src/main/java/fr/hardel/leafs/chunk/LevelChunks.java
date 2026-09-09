@@ -44,7 +44,7 @@ public final class LevelChunks {
         this.pool = ticking.chunkPool();
         TicketStorageAccess storage = (TicketStorageAccess) tickets;
         this.graphs = storage.leafs$graphs();
-        this.timeouts = new TicketTimeoutIndex(tickets, regions.regionizer().sectionShift());
+        this.timeouts = new TicketTimeoutIndex(tickets, graphs, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
         this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
