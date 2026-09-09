@@ -3,12 +3,17 @@ package fr.hardel.leafs.world;
 import fr.hardel.MinecraftBootstrap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import fr.hardel.leafs.chunk.owner.Router;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.ticks.LevelChunkTicks;
+import net.minecraft.world.ticks.LevelTickAccess;
 import net.minecraft.world.ticks.ScheduledTick;
+import net.minecraft.world.ticks.TickPriority;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -23,9 +28,41 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChunkScheduledTicksTest {
     private static final BlockPos POS = new BlockPos(3, 64, 3);
 
+    /** The level as tick factory: a clock and an order counter the test moves by hand. */
+    private static final class StampingLevel implements ScheduledTickAccess {
+        private long time = 100;
+        private long order;
+
+        @Override
+        public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
+            return new ScheduledTick<>(type, pos, time + delay, priority, order++);
+        }
+
+        @Override
+        public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay) {
+            return createTick(pos, type, delay, TickPriority.NORMAL);
+        }
+
+        @Override
+        public LevelTickAccess<Block> getBlockTicks() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public LevelTickAccess<Fluid> getFluidTicks() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private final StampingLevel level = new StampingLevel();
+
+    private ChunkScheduledTicks<Block> index(Router owners) {
+        return new ChunkScheduledTicks<>(null, level, RegionWorldData::blockTicks, owners);
+    }
+
     @Test
     void aScheduleReachesItsChunkContainerAndAnUnloadedPositionDrops() {
-        ChunkScheduledTicks<Block> index = new ChunkScheduledTicks<>(null, RegionWorldData::blockTicks, (_, _, task) -> task.run());
+        ChunkScheduledTicks<Block> index = index((_, _, task) -> task.run());
         LevelChunkTicks<Block> container = new LevelChunkTicks<>();
         index.addContainer(new ChunkPos(0, 0), container);
 
@@ -55,7 +92,7 @@ class ChunkScheduledTicksTest {
     /** Vanilla shifts the copies past the originals, so a clone ticks after what it was cloned from. */
     @Test
     void aCopyLandsAfterTheOriginalsInSubTickOrder() {
-        ChunkScheduledTicks<Block> index = new ChunkScheduledTicks<>(null, RegionWorldData::blockTicks, (_, _, task) -> task.run());
+        ChunkScheduledTicks<Block> index = index((_, _, task) -> task.run());
         LevelChunkTicks<Block> container = new LevelChunkTicks<>();
         index.addContainer(new ChunkPos(0, 0), container);
         index.schedule(new ScheduledTick<>(Blocks.STONE, POS, 5, 4));
@@ -71,7 +108,7 @@ class ChunkScheduledTicksTest {
     @Test
     void aScheduleOnAChunkThisThreadDoesNotHoldGoesToTheOwner() {
         List<Runnable> mailed = new ArrayList<>();
-        ChunkScheduledTicks<Block> index = new ChunkScheduledTicks<>(null, RegionWorldData::blockTicks, (_, _, task) -> mailed.add(task));
+        ChunkScheduledTicks<Block> index = index((_, _, task) -> mailed.add(task));
         LevelChunkTicks<Block> container = new LevelChunkTicks<>();
         index.addContainer(new ChunkPos(0, 0), container);
 
@@ -86,7 +123,7 @@ class ChunkScheduledTicksTest {
     @Test
     void mailReachesTheContainerLiveWhenItRuns() {
         List<Runnable> mailed = new ArrayList<>();
-        ChunkScheduledTicks<Block> index = new ChunkScheduledTicks<>(null, RegionWorldData::blockTicks, (_, _, task) -> mailed.add(task));
+        ChunkScheduledTicks<Block> index = index((_, _, task) -> mailed.add(task));
         LevelChunkTicks<Block> detached = new LevelChunkTicks<>();
         index.addContainer(new ChunkPos(0, 0), detached);
         index.schedule(new ScheduledTick<>(Blocks.STONE, POS, 5, 0));
@@ -101,5 +138,24 @@ class ChunkScheduledTicksTest {
         assertEquals(0, detached.count());
         assertTrue(reloaded.hasScheduledTick(POS, Blocks.STONE), "the schedule reached the reloaded container");
         assertFalse(reloaded.hasScheduledTick(POS.above(), Blocks.STONE), "the clear reached the reloaded container");
+    }
+
+    /** Vanilla stamps clock and order in the same call as the insert; mailed, the owner stamps them when it runs the write, in step with its own ticks. */
+    @Test
+    void aMailedScheduleIsStampedWhenTheOwnerRunsIt() {
+        List<Runnable> mailed = new ArrayList<>();
+        ChunkScheduledTicks<Block> index = index((_, _, task) -> mailed.add(task));
+        LevelChunkTicks<Block> container = new LevelChunkTicks<>();
+        index.addContainer(new ChunkPos(0, 0), container);
+
+        index.schedule(POS, Blocks.STONE, 5, TickPriority.HIGH);
+        level.time = 200;
+        level.order = 7;
+        mailed.forEach(Runnable::run);
+
+        ScheduledTick<Block> tick = container.peek();
+        assertEquals(205, tick.triggerTick());
+        assertEquals(TickPriority.HIGH, tick.priority());
+        assertEquals(7, tick.subTickOrder());
     }
 }

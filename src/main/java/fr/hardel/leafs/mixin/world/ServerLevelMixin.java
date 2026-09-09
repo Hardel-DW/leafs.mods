@@ -55,11 +55,36 @@ public abstract class ServerLevelMixin {
     @Unique
     private final AtomicLong leafs$blockEventSequence = new AtomicLong();
 
+    @Unique
+    private ChunkScheduledTicks<Block> leafs$blockTicks;
+
+    @Unique
+    private ChunkScheduledTicks<Fluid> leafs$fluidTicks;
+
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$chunkKeyedTicks(CallbackInfo callbackInfo) {
         Router owners = LevelChunks.of(self()).owners();
-        this.blockTicks = new ChunkScheduledTicks<>(self(), RegionWorldData::blockTicks, owners);
-        this.fluidTicks = new ChunkScheduledTicks<>(self(), RegionWorldData::fluidTicks, owners);
+        leafs$blockTicks = new ChunkScheduledTicks<>(self(), self(), RegionWorldData::blockTicks, owners);
+        leafs$fluidTicks = new ChunkScheduledTicks<>(self(), self(), RegionWorldData::fluidTicks, owners);
+        this.blockTicks = leafs$blockTicks;
+        this.fluidTicks = leafs$fluidTicks;
+    }
+
+    /** Vanilla's create and insert as one write on the chunk's owner, which stamps clock and order where the tick lands. */
+    public void scheduleTick(BlockPos pos, Block type, int delay, TickPriority priority) {
+        leafs$blockTicks.schedule(pos, type, delay, priority);
+    }
+
+    public void scheduleTick(BlockPos pos, Block type, int delay) {
+        leafs$blockTicks.schedule(pos, type, delay, TickPriority.NORMAL);
+    }
+
+    public void scheduleTick(BlockPos pos, Fluid type, int delay, TickPriority priority) {
+        leafs$fluidTicks.schedule(pos, type, delay, priority);
+    }
+
+    public void scheduleTick(BlockPos pos, Fluid type, int delay) {
+        leafs$fluidTicks.schedule(pos, type, delay, TickPriority.NORMAL);
     }
 
     /** A loaded chunk keeps its own events; an unloaded position keeps vanilla's level set, drained serially. */
