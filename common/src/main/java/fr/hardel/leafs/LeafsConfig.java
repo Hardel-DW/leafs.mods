@@ -31,6 +31,19 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     private static Path file;
 
     public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
+        public static final int DISABLED = -1;
+
+        public long watchdogWarnNanos() {
+            return nanos(watchdogWarnSeconds, 1_000_000_000L);
+        }
+
+        public long slowTaskNanos() {
+            return nanos(slowTaskWarnMillis, 1_000_000L);
+        }
+
+        private static long nanos(int value, long unit) {
+            return value < 0 ? Long.MAX_VALUE : value * unit;
+        }
     }
 
     public record Gameplay(MobCapScope mobCapScope, Map<MobCategory, Integer> mobCap) {
@@ -84,9 +97,9 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     private static Codec<Integer> threads(Setting setting) {
-        return Codec.intRange(ALL_CORES, 1024)
+        return atMost(setting.key(), 1024, "negative uses all cores")
             .validate(value -> value == 0
-                ? DataResult.error(() -> setting.key() + " 0 is invalid: -1 uses all cores")
+                ? DataResult.error(() -> setting.key() + " 0 is invalid: negative uses all cores")
                 : DataResult.success(value));
     }
 
@@ -95,10 +108,21 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
             ? DataResult.success(value)
             : DataResult.error(() -> "section_size must be a power of two: 2, 4, 8, 16, 32, 64, 128 or 256"));
 
+    private static Codec<Integer> atMost(String key, int max, String negative) {
+        return Codec.INT.validate(value -> value > max
+            ? DataResult.error(() -> key + " must be at most " + max + ", " + negative)
+            : DataResult.success(value));
+    }
+
+    private static final Codec<Integer> WATCHDOG_WARN_SECONDS = atMost("watchdog_warn_seconds", 600, "negative disables it")
+        .validate(value -> value == 0
+            ? DataResult.error(() -> "watchdog_warn_seconds 0 is invalid: negative disables it")
+            : DataResult.success(value));
+
     private static final MapCodec<Debug> DEBUG = RecordCodecBuilder.mapCodec(builder -> builder.group(
-        Codec.intRange(1, 600).optionalFieldOf("watchdog_warn_seconds", 15).forGetter(Debug::watchdogWarnSeconds),
+        WATCHDOG_WARN_SECONDS.optionalFieldOf("watchdog_warn_seconds", Debug.DISABLED).forGetter(Debug::watchdogWarnSeconds),
         Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs),
-        Codec.intRange(0, 60_000).optionalFieldOf("slow_task_warn_millis", 50).forGetter(Debug::slowTaskWarnMillis)
+        atMost("slow_task_warn_millis", 60_000, "negative disables it").optionalFieldOf("slow_task_warn_millis", Debug.DISABLED).forGetter(Debug::slowTaskWarnMillis)
     ).apply(builder, Debug::new));
 
     private static final MapCodec<Gameplay> GAMEPLAY = RecordCodecBuilder.mapCodec(builder -> builder.group(
