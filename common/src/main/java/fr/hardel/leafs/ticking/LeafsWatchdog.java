@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.chunk.holder.ChunkWait;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -32,8 +31,8 @@ public final class LeafsWatchdog {
     }
 
     /** The stalled waits are the chunk waits older than the warn threshold at a given time, on any thread. */
-    public LeafsWatchdog(Duration warnAfter, LongSupplier killNanos, LongFunction<Map<Thread, String>> stalledWaits, Consumer<String> reporter, Consumer<Stall> killer) {
-        this.warnNanos = warnAfter.toNanos();
+    public LeafsWatchdog(long warnNanos, LongSupplier killNanos, LongFunction<Map<Thread, String>> stalledWaits, Consumer<String> reporter, Consumer<Stall> killer) {
+        this.warnNanos = warnNanos;
         this.killNanos = killNanos;
         this.stalledWaits = stalledWaits;
         this.reporter = reporter;
@@ -110,7 +109,7 @@ public final class LeafsWatchdog {
         }
     }
 
-    /** A chunk wait past the threshold on a thread that is not a tick unit, a chunk worker or the server thread: at once, then once per warn interval. */
+    /** A wait past the threshold on a thread that is not inside a tick unit: at once, then once per warn interval. */
     private void reportStalledWaits(long now) {
         Map<Thread, String> stalled = stalledWaits.apply(now);
         reportedWaits.keySet().retainAll(stalled.keySet());
@@ -145,7 +144,7 @@ public final class LeafsWatchdog {
 
     private String describeStall(TickHandle handle, RunningTick tick, long now) {
         StringBuilder message = new StringBuilder(headerLine(handle, tick, now));
-        String waiting = ChunkWait.describe(tick.thread);
+        String waiting = ThreadWaits.describe(tick.thread);
         if (waiting != null) {
             message.append(System.lineSeparator()).append('	').append(waiting);
         }
