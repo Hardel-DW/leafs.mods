@@ -45,7 +45,7 @@ The number of full chunks per second is lower in this scenario because the regio
 | Server thread mspt | 1.3 ms |
 
 ## Comparing to C2ME
-Leafs has relatively identical values on 12 threads, `329` for C2ME, and `383` measured for Leafs, slightly higher by a few chunks per second thanks to the region system which lets the chunk threads focus exclusively on chunk generation, and to Mapple.
+Leafs has relatively identical values on 12 threads, `329` announced by C2ME but internally we obtained `366`. For Leafs it obtains `383`. That is slightly higher by a few chunks per second, the gain is explained by measurement noise.
 C2ME and Leafs are both based on ScalableLux and FastNoise, and the approach stays relatively similar.
 Like C2ME the gains scale linearly with the number of threads.
 Lithium/VMP/Chunky were not used for the benchmarks.

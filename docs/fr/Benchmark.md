@@ -45,7 +45,7 @@ Le nombre de chunks complets par seconde est plus faible dans ce scénario car l
 | Mspt du thread serveur | 1,3 ms |
 
 ## Comparer à C2ME
-Leafs possède des valeurs relativement identiques sur 12 threads, `329` annoncés par C2ME mais en interne ont a obtenu `366`, Pour Leafs il obtient `383`. Sois légèrement supérieurs de quelques chunks par seconde, le gains s'expliques par du bruit de mesure.
+Leafs possède des valeurs relativement identiques sur 12 threads, `329` annoncés par C2ME mais en interne on a obtenu `366`. Pour Leafs il obtient `383`. Soit légèrement supérieur de quelques chunks par seconde, le gain s'explique par du bruit de mesure.
 C2ME et Leafs sont tous deux basés sur ScalableLux et FastNoise, et l'approche reste relativement similaire.
 Comme C2ME les gains scalent linéairement avec le nombre de threads.
 Lithium/VMP/Chunky n'ont pas été utilisés pour les benchmarks.
