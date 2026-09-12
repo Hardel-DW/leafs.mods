@@ -4,6 +4,7 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.ticking.ThreadWaits;
 import fr.hardel.leafs.ticking.TickingManager;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkResult;
@@ -11,19 +12,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** A required chunk that is not there: the thread asks for it and runs what it owns until it lands. The server thread borrows first. */
 public final class ChunkWait {
-    private static final ConcurrentHashMap<Thread, WaitReport> WAITING = new ConcurrentHashMap<>();
     private static final ThreadLocal<Scope> SCOPE = new ThreadLocal<>();
 
     private static final class Scope {
@@ -77,23 +73,6 @@ public final class ChunkWait {
         });
     }
 
-    public static @Nullable String describe(Thread thread) {
-        WaitReport report = WAITING.get(thread);
-        return report == null ? null : report.toString();
-    }
-
-    /** The waits older than the threshold, whatever the thread: the watchdog's view beyond the tick units it follows. */
-    public static Map<Thread, String> stalled(long nowNanos, long thresholdNanos) {
-        Map<Thread, String> stalled = new HashMap<>();
-        WAITING.forEach((thread, report) -> {
-            long waited = nowNanos - report.startedNanos();
-            if (waited >= thresholdNanos) {
-                stalled.put(thread, "Chunk wait stalled for " + waited / 1_000_000_000L + "s on thread '" + thread.getName() + "': " + report);
-            }
-        });
-        return stalled;
-    }
-
     /** The first frame that is neither the wait nor the chunk read it serves: the game code that needed the chunk. */
     private static String asker() {
         for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
@@ -112,7 +91,7 @@ public final class ChunkWait {
         ChunkHolders.Demand demand = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = demand.delivery();
         WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
-        WaitReport outer = WAITING.put(Thread.currentThread(), report);
+        ThreadWaits.Wait outer = ThreadWaits.open(report::toString);
         String found = report.toString();
         TickingManager ticking = TickingManager.of(level.getServer());
         try {
@@ -121,15 +100,11 @@ public final class ChunkWait {
             keep(demand.release());
             long waited = System.nanoTime() - report.startedNanos();
             ticking.metrics().chunkWaited(waited);
-            if (waited >= ticking.slowTaskWarnMillis() * 1_000_000L) {
+            if (waited >= ticking.slowTaskNanos()) {
                 Leafs.LOGGER.warn("Waited {} ms for a chunk, asked by {}, found {}", waited / 1_000_000L, asker(), found);
             }
 
-            if (outer == null) {
-                WAITING.remove(Thread.currentThread());
-            } else {
-                WAITING.put(Thread.currentThread(), outer);
-            }
+            ThreadWaits.close(outer);
         }
 
         ChunkResult<ChunkAccess> result = delivery.join();

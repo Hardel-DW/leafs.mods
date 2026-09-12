@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.LeafsConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -27,7 +28,7 @@ class LeafsWatchdogTest {
     private final Map<Thread, String> stalledWaits = new ConcurrentHashMap<>();
 
     private LeafsWatchdog watchdog(Duration warnAfter, Duration killAfter) {
-        return new LeafsWatchdog(warnAfter, () -> killAfter.toNanos(), _ -> new HashMap<>(stalledWaits), message -> {
+        return new LeafsWatchdog(warnAfter.toNanos(), () -> killAfter.toNanos(), _ -> new HashMap<>(stalledWaits), message -> {
             reports.add(message);
             reported.countDown();
         }, stall -> {
@@ -93,6 +94,23 @@ class LeafsWatchdogTest {
         LeafsWatchdog.Stall stall = kills.peek();
         assertTrue(stall.summary().contains("region #9"));
         assertSame(stalled, stall.thread(), "the killer must receive the stuck thread for the dump");
+
+        release.countDown();
+        stalled.join(5_000);
+        watchdog.stop();
+    }
+
+    /** The config maps a disabled warn to a threshold never reached; the kill is untouched by it. */
+    @Test
+    void disabledWarnStaysSilentAndStillKills() throws InterruptedException {
+        LeafsConfig.Debug debug = new LeafsConfig.Debug(LeafsConfig.Debug.DISABLED, false, LeafsConfig.Debug.DISABLED);
+        LeafsWatchdog watchdog = watchdog(Duration.ofNanos(debug.watchdogWarnNanos()), Duration.ofMillis(120));
+        watchdog.start();
+        CountDownLatch release = new CountDownLatch(1);
+        Thread stalled = stalledTick(watchdog, new TestTickHandle(3, () -> { }), release);
+
+        assertTrue(killed.await(5, TimeUnit.SECONDS), "the kill threshold must still fire");
+        assertTrue(reports.isEmpty(), "a disabled warn must never report");
 
         release.countDown();
         stalled.join(5_000);
