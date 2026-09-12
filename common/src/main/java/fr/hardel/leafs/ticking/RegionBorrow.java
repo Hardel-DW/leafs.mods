@@ -173,7 +173,12 @@ public final class RegionBorrow {
             return;
         }
 
-        TickingManager.of(regions.level().getServer()).await(() -> region.state() != RegionState.TICKING);
+        ThreadWaits.Wait outer = ThreadWaits.open(() -> "waiting for " + region + " in " + regions.level().dimension().identifier());
+        try {
+            TickingManager.of(regions.level().getServer()).await(() -> region.state() != RegionState.TICKING);
+        } finally {
+            ThreadWaits.close(outer);
+        }
     }
 
     /** Whether this thread holds the region of the position, or the chunk itself when no region covers it. */

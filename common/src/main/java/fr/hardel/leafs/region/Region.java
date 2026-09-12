@@ -17,6 +17,7 @@ public final class Region<R> {
     final Set<Region<R>> expectingMergeFrom = new LinkedHashSet<>();
 
     private volatile RegionState state = RegionState.READY;
+    private volatile Thread tickingThread;
 
     Region(long id, Regionizer<R> regionizer, RegionCallbacks<R> callbacks) {
         this.id = id;
@@ -81,10 +82,12 @@ public final class Region<R> {
 
     void setState(RegionState state) {
         this.state = state;
+        this.tickingThread = state == RegionState.TICKING ? Thread.currentThread() : null;
     }
 
     @Override
     public String toString() {
-        return "Region[#" + id + " " + state + " sections=" + sectionKeys.size() + "]";
+        Thread ticker = tickingThread;
+        return "Region[#" + id + " " + state + " sections=" + sectionKeys.size() + (ticker == null ? "" : " on thread '" + ticker.getName() + "'") + "]";
     }
 }

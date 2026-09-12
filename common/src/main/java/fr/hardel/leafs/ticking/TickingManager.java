@@ -3,7 +3,6 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.holder.ChunkWait;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
@@ -34,17 +33,17 @@ public final class TickingManager {
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private volatile boolean globalTicking;
-    private final int slowTaskWarnMillis;
+    private final long slowTaskNanos;
     private volatile boolean halted;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
-        Duration warnAfter = Duration.ofSeconds(config.debug().watchdogWarnSeconds());
-        this.watchdog = new LeafsWatchdog(warnAfter, () -> killAfterNanos(server), now -> ChunkWait.stalled(now, warnAfter.toNanos()), Leafs.LOGGER::error, new WatchdogKill(server));
+        long warnNanos = config.debug().watchdogWarnNanos();
+        this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), Leafs.platform().attribution());
         ThreadGroup serverThreads = Leafs.platform().serverThreads();
         this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
-        this.slowTaskWarnMillis = config.debug().slowTaskWarnMillis();
+        this.slowTaskNanos = config.debug().slowTaskNanos();
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
         watchdog.start();
         scheduler.start();
@@ -87,8 +86,8 @@ public final class TickingManager {
     }
 
     /** Above this, a chunk wait or an inbox task is logged with what it was. */
-    public int slowTaskWarnMillis() {
-        return slowTaskWarnMillis;
+    public long slowTaskNanos() {
+        return slowTaskNanos;
     }
 
     /** True once {@code stopServer} began: the shutdown drains remaining work in line. */

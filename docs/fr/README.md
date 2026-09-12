@@ -10,3 +10,4 @@ Les mods C2ME, Moonrises, VPM sont Incompatibles.
 4. [Arborescence.md](Arborescence.md) - Décrit les dossiers du code, un dossier égale une responsabilité.
 5. [Config](Config.md) - Affiche les options de config et les commandes
 6. [Q&A](Q&A.md) - Les questions courantes des joueurs.
+7. [Benchmark](Benchmark.md) - Ce que Leafs vise et ce que le banc mesure.

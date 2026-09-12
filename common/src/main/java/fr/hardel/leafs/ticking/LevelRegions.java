@@ -55,7 +55,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     public LevelRegions(LeafsConfig config) {
         this.regionizer = new Regionizer<>(config.sectionShift(), config.regionMergeDistance(), config.regionBufferDistance(), this);
-        this.slowTaskNanos = config.debug().slowTaskWarnMillis() * 1_000_000L;
+        this.slowTaskNanos = config.debug().slowTaskNanos();
     }
 
     /** Above this, an inbox task is logged with its class and chunk. */

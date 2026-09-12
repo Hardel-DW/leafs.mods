@@ -24,7 +24,8 @@ class LeafsConfigTest {
         assertTrue(Files.exists(file));
         assertEquals(written, LeafsConfig.load(file));
         assertEquals(LeafsConfig.defaults(), written);
-        assertEquals(15, written.debug().watchdogWarnSeconds());
+        assertEquals(LeafsConfig.Debug.DISABLED, written.debug().watchdogWarnSeconds());
+        assertEquals(LeafsConfig.Debug.DISABLED, written.debug().slowTaskWarnMillis());
         assertEquals(LeafsConfig.MobCapScope.LEVEL, written.gameplay().mobCapScope());
         assertEquals(7, written.gameplay().mobCap().size());
         assertEquals(70, written.gameplay().mobCap(MobCategory.MONSTER));
@@ -83,6 +84,22 @@ class LeafsConfigTest {
         assertEquals(Runtime.getRuntime().availableProcessors() / 2, LeafsConfig.defaults().effectiveChunkThreads());
     }
 
+    /** A negative threshold is one the consumers never reach; the log stays off without a branch on their side. */
+    @Test
+    void negativeThresholdsAreNeverReached(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        Files.writeString(file, "{\"region_threads\": -3, \"debug\": {\"watchdog_warn_seconds\": -5, \"slow_task_warn_millis\": -1}}");
+
+        LeafsConfig config = LeafsConfig.load(file);
+        LeafsConfig.Debug off = config.debug();
+
+        assertEquals(Runtime.getRuntime().availableProcessors(), config.effectiveRegionThreads());
+        assertEquals(Long.MAX_VALUE, off.watchdogWarnNanos());
+        assertEquals(Long.MAX_VALUE, off.slowTaskNanos());
+        assertEquals(15_000_000_000L, new LeafsConfig.Debug(15, false, 50).watchdogWarnNanos());
+        assertEquals(50_000_000L, new LeafsConfig.Debug(15, false, 50).slowTaskNanos());
+    }
+
     @Test
     void invalidFilesFailTheBootNamingFileAndCause(@TempDir Path directory) throws IOException {
         record Invalid(String json, String cause) {
@@ -92,6 +109,8 @@ class LeafsConfigTest {
             new Invalid("{\"region_threads\": 0}", "region_threads"),
             new Invalid("{\"chunk_threads\": 0}", "chunk_threads"),
             new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 0}}", null),
+            new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 601}}", "watchdog_warn_seconds"),
+            new Invalid("{\"debug\": {\"slow_task_warn_millis\": 60001}}", "slow_task_warn_millis"),
             new Invalid("{\"section_size\": 20}", "section_size"),
             new Invalid("{\"section_size\": 512}", null),
             new Invalid("{\"region_threads\": \"lots\"}", null),
