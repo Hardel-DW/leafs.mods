@@ -85,13 +85,13 @@ public final class RegionTickScheduler {
         while (running) {
             ScheduledTick next;
             try {
-                next = queue.poll(100, TimeUnit.MILLISECONDS);
+                next = queue.take();
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 return;
             }
 
-            if (next == null || next.handle.isCancelled()) {
+            if (next.handle.isCancelled()) {
                 continue;
             }
 
@@ -153,7 +153,7 @@ public final class RegionTickScheduler {
 
         @Override
         public int compareTo(Delayed other) {
-            return Long.compare(getDelay(TimeUnit.NANOSECONDS), other.getDelay(TimeUnit.NANOSECONDS));
+            return Long.compare(handle.scheduledStartNanos(), ((ScheduledTick) other).handle.scheduledStartNanos());
         }
     }
 }
