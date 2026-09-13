@@ -12,7 +12,6 @@ import java.util.function.BiConsumer;
 /** Region worker pool, one tick per pass, a late region restarts from now instead of catching up. */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
-
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
@@ -35,7 +34,7 @@ public final class RegionTickScheduler {
 
     public void start() {
         for (int index = 1; index <= threadCount; index++) {
-            Thread worker = new Thread(serverThreads, this::workerLoop, "Leafs Region Worker #" + index);
+            Thread worker = new Worker(serverThreads, this::workerLoop, index);
             worker.setDaemon(true);
             workers.add(worker);
             worker.start();
@@ -72,21 +71,27 @@ public final class RegionTickScheduler {
         executeTick(handle);
     }
 
+    // Vanilla and mods see it as the server thread
+    public static boolean onWorker() {
+        return Thread.currentThread() instanceof Worker;
+    }
+
     public List<Thread> workerThreads() {
         return Collections.unmodifiableList(workers);
     }
 
+    // There's a mod who wants “server” in the thread title IDK why, but ok
     private void workerLoop() {
         while (running) {
             ScheduledTick next;
             try {
-                next = queue.poll(100, TimeUnit.MILLISECONDS);
+                next = queue.take();
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 return;
             }
 
-            if (next == null || next.handle.isCancelled()) {
+            if (next.handle.isCancelled()) {
                 continue;
             }
 
@@ -94,7 +99,7 @@ public final class RegionTickScheduler {
             Thread worker = Thread.currentThread();
             String workerName = worker.getName();
             if (regionThreadNames) {
-                worker.setName("R#" + handle.id() + " " + handle.dimension());
+                worker.setName("Leafs Server R#" + handle.id() + " " + handle.dimension());
             }
 
             try {
@@ -134,6 +139,12 @@ public final class RegionTickScheduler {
         }
     }
 
+    private static final class Worker extends Thread {
+        private Worker(ThreadGroup group, Runnable loop, int index) {
+            super(group, loop, "Leafs Server Region Worker #" + index);
+        }
+    }
+
     private record ScheduledTick(TickHandle handle) implements Delayed {
         @Override
         public long getDelay(TimeUnit unit) {
@@ -142,7 +153,7 @@ public final class RegionTickScheduler {
 
         @Override
         public int compareTo(Delayed other) {
-            return Long.compare(getDelay(TimeUnit.NANOSECONDS), other.getDelay(TimeUnit.NANOSECONDS));
+            return Long.compare(handle.scheduledStartNanos(), ((ScheduledTick) other).handle.scheduledStartNanos());
         }
     }
 }

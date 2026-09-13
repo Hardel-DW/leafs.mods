@@ -71,3 +71,4 @@ config = "leafs-neoforge.mixins.json"
 "mixin.util.section_data_storage" = false
 "mixin.util.data_storage" = false
 "mixin.world.chunk_ticking.random_block_ticking" = false
+"mixin.world.game_events.dispatch" = false
