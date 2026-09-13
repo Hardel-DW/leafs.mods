@@ -15,6 +15,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntFunction;
 
 /** ConcurrentHashMap-backed Int2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
@@ -36,6 +37,12 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     public V remove(int key) {
         V previous = map.remove(key);
         return previous == null ? defaultReturnValue() : previous;
+    }
+
+    @Override
+    public V computeIfAbsent(int key, IntFunction<? extends V> mapping) {
+        V value = map.computeIfAbsent(key, mapping::apply);
+        return value == null ? defaultReturnValue() : value;
     }
 
     @Override
