@@ -23,7 +23,7 @@ public final class CommandEngine {
 
     /** True when the execution moved: off the server thread it is posted whole to the global phase, one tick later. */
     public static boolean divert(MinecraftServer server, Runnable execution) {
-        if (server.isSameThread()) {
+        if (TickingManager.of(server).onServerThread()) {
             return false;
         }
 
@@ -38,7 +38,7 @@ public final class CommandEngine {
 
     /** The head: the entity it starts from is taken first, the rest at contact. Any other thread already runs under its own ownership rules. */
     public static <T> T runHead(MinecraftServer server, @Nullable Entity first, Supplier<T> execution) {
-        if (!server.isSameThread()) {
+        if (!TickingManager.of(server).onServerThread()) {
             return execution.get();
         }
 

@@ -99,14 +99,18 @@ public final class TickingManager {
         return chunkPool;
     }
 
+    public boolean onServerThread() {
+        return Thread.currentThread() == server.getRunningThread();
+    }
+
     /** The server thread pumping while it waits (managedBlock) also runs the diverted tasks, or a wait on one of them never ends. */
     public boolean pumpDiverted() {
-        return globalTicking && server.isSameThread() && globalScheduler.drain();
+        return globalTicking && onServerThread() && globalScheduler.drain();
     }
 
     /** A wait on Leafs, region or chunk: the server thread runs the tasks the regions handed it and the chunk work of every level, a region the chunk work of its inbox. */
     public void await(BooleanSupplier done) {
-        if (server.isSameThread()) {
+        if (onServerThread()) {
             serverWork.until(done);
             return;
         }
@@ -124,17 +128,21 @@ public final class TickingManager {
         return worked;
     }
 
-    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. The task runs as a head, borrowing at contact like a command. */
+    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. A region worker runs it now, as vanilla would on its game thread; any other thread's task runs as a head, borrowing at contact like a command. */
     public boolean divertExecute(Runnable task) {
-        if (!globalTicking || server.isSameThread()) {
+        if (!globalTicking || onServerThread()) {
             return false;
+        }
+
+        if (RegionTickScheduler.onWorker()) {
+            task.run();
+            return true;
         }
 
         globalScheduler.run(() -> RegionBorrow.hold(borrow -> {
             task.run();
             return null;
         }));
-        
         return true;
     }
 

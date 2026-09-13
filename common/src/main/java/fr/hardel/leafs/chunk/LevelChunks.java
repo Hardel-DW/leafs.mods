@@ -73,7 +73,7 @@ public final class LevelChunks {
             return true;
         }
 
-        return !regions.live() && level.getServer().isSameThread();
+        return !regions.live() && TickingManager.of(level.getServer()).onServerThread();
     }
 
     /** Game work on a chunk no region covers: the calling thread takes the chunk for the task and reads back what it writes, like vanilla; false when another thread holds it. */
