@@ -1,5 +1,6 @@
 package fr.hardel.leafs.mixin.ticking;
 
+import fr.hardel.leafs.ticking.RegionTickScheduler;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.thread.BlockableEventLoop;
@@ -9,9 +10,16 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Hook only, the logic lives in ticking/TickingManager: off-thread server executes land in the global phase, and the server thread's own pump runs them too. */
+/** Hook only, the logic lives in ticking/: a region worker is a game thread, off-thread server executes land in the global phase, and the server thread's own pump runs them too. */
 @Mixin(BlockableEventLoop.class)
 public abstract class BlockableEventLoopMixin {
+
+    @Inject(method = "isSameThread", at = @At("HEAD"), cancellable = true)
+    private void leafs$regionWorkerIsAGameThread(CallbackInfoReturnable<Boolean> callbackInfo) {
+        if ((Object) this instanceof MinecraftServer && RegionTickScheduler.onWorker()) {
+            callbackInfo.setReturnValue(true);
+        }
+    }
 
     @Inject(method = "pollTask", at = @At("HEAD"), cancellable = true)
     private void leafs$pumpDivertedTasks(CallbackInfoReturnable<Boolean> callbackInfo) {

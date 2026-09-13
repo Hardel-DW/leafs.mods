@@ -130,7 +130,7 @@ public final class RegionBorrow {
 
     /** The region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */
     private void takeAt(LevelRegions regions, int chunkX, int chunkZ) {
-        boolean head = !regions.live() || regions.level().getServer().isSameThread();
+        boolean head = !regions.live() || TickingManager.of(regions.level().getServer()).onServerThread();
         while (true) {
             Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
             if (region == null) {
@@ -166,8 +166,8 @@ public final class RegionBorrow {
         return false;
     }
 
-    /** Waits for the tick in flight, running what this thread owns meanwhile: that tick may be waiting for a task it handed the server thread, a spawn search ends there. */
-    private static void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
+    /** Waits for the tick in flight, running what this thread owns meanwhile: that tick may be waiting for a task it handed the server thread, a spawn search ends there. The work run meanwhile may take the region for this very borrow, which ends the wait too. */
+    private void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
         if (!regions.live()) {
             LockSupport.parkNanos(WAIT_NANOS);
             return;
@@ -175,7 +175,7 @@ public final class RegionBorrow {
 
         ThreadWaits.Wait outer = ThreadWaits.open(() -> "waiting for " + region + " in " + regions.level().dimension().identifier());
         try {
-            TickingManager.of(regions.level().getServer()).await(() -> region.state() != RegionState.TICKING);
+            TickingManager.of(regions.level().getServer()).await(() -> held.contains(region) || region.state() != RegionState.TICKING);
         } finally {
             ThreadWaits.close(outer);
         }
