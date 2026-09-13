@@ -58,13 +58,32 @@ class RegionTickSchedulerTest {
 
         assertTrue(ticked.await(5, TimeUnit.SECONDS));
         handle.cancel();
-        assertEquals("R#4 test:world", nameDuringTick.get());
+        assertEquals("Leafs Server R#4 test:world", nameDuringTick.get());
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (!worker.get().getName().startsWith("Leafs Region Worker") && System.nanoTime() < deadline) {
+        while (!worker.get().getName().startsWith("Leafs Server Region Worker") && System.nanoTime() < deadline) {
             Thread.onSpinWait();
         }
 
-        assertTrue(worker.get().getName().startsWith("Leafs Region Worker"));
+        assertTrue(worker.get().getName().startsWith("Leafs Server Region Worker"));
+    }
+
+    @Test
+    void onlyARegionWorkerIsRecognisedAsOne(@TempDir Path crashDirectory) throws InterruptedException {
+        RegionTickScheduler scheduler = createScheduler(1, crashDirectory);
+        scheduler.start();
+        CountDownLatch ticked = new CountDownLatch(1);
+        AtomicBoolean onWorker = new AtomicBoolean();
+        TestTickHandle handle = new TestTickHandle(1, () -> {
+            onWorker.set(RegionTickScheduler.onWorker());
+            ticked.countDown();
+        });
+
+        scheduler.schedule(handle);
+
+        assertTrue(ticked.await(5, TimeUnit.SECONDS));
+        handle.cancel();
+        assertTrue(onWorker.get());
+        assertFalse(RegionTickScheduler.onWorker());
     }
 
     /** The drain that follows on the server thread must find every region idle: a tick in flight ends before shutdown returns, however long it takes. */

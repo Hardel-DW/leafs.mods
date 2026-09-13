@@ -38,7 +38,7 @@ public final class PacketRouting {
 
     /** Off the server thread the blocking teardown deadlocks; it queues fire-and-forget instead. */
     public static void runTeardown(MinecraftServer server, Runnable teardown, Runnable vanillaBlocking) {
-        if (server.isSameThread()) {
+        if (TickingManager.of(server).onServerThread()) {
             vanillaBlocking.run();
         } else {
             server.execute(teardown);
