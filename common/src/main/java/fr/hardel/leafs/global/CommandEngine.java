@@ -40,9 +40,8 @@ public final class CommandEngine {
     }
 
     public static void runBorrowingAll(MinecraftServer server, Runnable body) {
-        RegionBorrow borrow = RegionBorrow.current();
         for (ServerLevel level : server.getAllLevels()) {
-            borrow.borrowAll(LevelRegions.of(level));
+            RegionBorrow.lockAll(LevelRegions.of(level));
         }
 
         body.run();
