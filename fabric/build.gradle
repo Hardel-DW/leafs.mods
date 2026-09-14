@@ -47,6 +47,14 @@ loom {
 	}
 }
 
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "leafs-gametest"
+		eula = true
+	}
+}
+
 tasks.named('compileJava') {
 	source(project(':common').sourceSets.main.allJava)
 }
