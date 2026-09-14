@@ -24,7 +24,7 @@ public abstract class MinecraftServerMixin {
         return List.of();
     }
 
-    /** The periodic save writes each player from his region's epoch walk; a flush is head work, every region held, then vanilla's pass, which also survives once the pool stopped. */
+    /** The periodic save writes each player from his region's epoch walk; a flush runs on the server thread with every region locked, then vanilla's pass, which also survives once the pool stopped. */
     @WrapOperation(method = "saveEverything", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;saveAll()V"))
     private void leafs$savePlayersOnTheirRegions(PlayerList playerList, Operation<Void> original, @Local(argsOnly = true, ordinal = 1) boolean flush) {
         MinecraftServer server = (MinecraftServer) (Object) this;
@@ -37,13 +37,11 @@ public abstract class MinecraftServerMixin {
             return;
         }
 
-        RegionBorrow.hold(borrow -> {
-            for (ServerLevel level : server.getAllLevels()) {
-                borrow.borrowAll(LevelRegions.of(level));
-            }
+        RegionBorrow borrow = RegionBorrow.current();
+        for (ServerLevel level : server.getAllLevels()) {
+            borrow.borrowAll(LevelRegions.of(level));
+        }
 
-            original.call(playerList);
-            return null;
-        });
+        original.call(playerList);
     }
 }

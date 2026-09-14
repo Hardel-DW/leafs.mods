@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChunkOwnersTest {
     private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4);
-    private final GlobalScheduler server = new GlobalScheduler();
+    private final GlobalScheduler server = new GlobalScheduler(Runnable::run);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final List<String> ran = new CopyOnWriteArrayList<>();
     private final List<String> taken = new CopyOnWriteArrayList<>();
@@ -107,17 +108,26 @@ class ChunkOwnersTest {
 
     /** The taker refuses, the chunk is found in the holder's inbox on the next turn. */
     @Test
-    void gameWorkOnAChunkAnotherThreadHoldsIsMailForThatThread() {
+    void gameWorkOnAChunkAnotherThreadHoldsIsMailForThatThread() throws InterruptedException {
         chunkHeldByAnother = true;
-        ChunkOwners owners = owners();
-        RegionInbox held = owners.borrow(1, 1);
         covered = false;
+        ChunkOwners owners = owners();
+        RegionInbox held = takenOnAnotherThread(owners);
 
         assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("later")));
 
         assertEquals(List.of(), ran);
         assertEquals(1, held.size());
         assertTrue(taken.isEmpty());
+    }
+
+    /** A chunk taken by a thread that never releases it, for the tests of what the others see. */
+    private static RegionInbox takenOnAnotherThread(ChunkOwners owners) throws InterruptedException {
+        AtomicReference<RegionInbox> held = new AtomicReference<>();
+        Thread holder = new Thread(() -> held.set(owners.borrow(1, 1)));
+        holder.start();
+        holder.join();
+        return held.get();
     }
 
     /** 2026-09-05: a respawn sent to the pool waited for its spawn chunk under the reservation of that same chunk, forever. */
@@ -223,6 +233,35 @@ class ChunkOwnersTest {
         }
     }
 
+    /** A region born over a chunk a thread took: the chunk stays that thread's until it releases, the mail goes to it, the region does not hold it. */
+    @Test
+    void aChunkATakerHoldsStaysItsOnceARegionCoversIt() throws InterruptedException {
+        covered = false;
+        holding = true;
+        ChunkOwners owners = owners();
+        AtomicReference<RegionInbox> taken = new AtomicReference<>();
+        CountDownLatch took = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread taker = new Thread(() -> {
+            taken.set(owners.borrow(1, 1));
+            took.countDown();
+            awaitQuietly(release);
+            owners.release(1, 1, taken.get());
+        });
+        taker.start();
+        assertTrue(took.await(5, TimeUnit.SECONDS));
+        covered = true;
+
+        assertFalse(owners.holds(1, 1), "the region does not hold a chunk another thread took");
+        assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("mail")));
+        assertEquals(1, taken.get().size(), "the mail went to the taker");
+        assertEquals(0, inbox.size());
+
+        release.countDown();
+        taker.join();
+        assertTrue(owners.holds(1, 1), "the region holds the chunk once released");
+    }
+
     @Test
     void aChunkIsTakenOnceUntilReleased() {
         ChunkOwners owners = owners();
@@ -298,7 +337,7 @@ class ChunkOwnersTest {
         assertEquals(List.of("first", "second"), ran);
     }
 
-    /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. */
+    /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. 2026-09-14: game work waits for the next pump, a release runs nothing on its thread. */
     @Test
     void aDeadRegionHandsItsTasksBackAsTheWorkTheyAre() throws InterruptedException {
         ChunkOwners owners = owners();
@@ -310,6 +349,8 @@ class ChunkOwnersTest {
         owners.resubmit(inbox);
 
         assertTrue(chunkWork.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of(), ran, "the game work did not run on the releasing thread");
+        assertTrue(server.drain());
         assertEquals(List.of("game"), ran);
         assertEquals(List.of("1,1"), taken);
         assertFalse(inbox.post(1, 1, Work.CHUNK, () -> ran.add("too late")), "a closed inbox refuses, the caller routes again");

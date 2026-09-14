@@ -1,0 +1,17 @@
+{
+	"schemaVersion": 1,
+	"id": "leafs-gametest",
+	"version": "1",
+	"name": "Leafs Game Tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"fr.hardel.leafs.gametest.ChunkLoadEventsTest",
+			"fr.hardel.leafs.gametest.BorrowReleaseTest"
+		]
+	},
+	"depends": {
+		"leafs": "*",
+		"fabric-gametest-api-v1": "*"
+	}
+}

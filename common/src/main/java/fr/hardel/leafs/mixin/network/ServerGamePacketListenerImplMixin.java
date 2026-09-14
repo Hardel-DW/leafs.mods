@@ -4,11 +4,11 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import fr.hardel.leafs.global.CommandEngine;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
@@ -66,9 +66,10 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
     }
 
-    /** Leave message, bed release and removal, one head execution of the server thread. */
+    /** Leave message, bed release and removal on the server thread, the player's region locked first. */
     @WrapMethod(method = "onDisconnect")
-    private void leafs$disconnectAsHead(DisconnectionDetails details, Operation<Void> original) {
-        CommandEngine.runHead(player.level().getServer(), player, () -> original.call(details));
+    private void leafs$lockThePlayerOnDisconnect(DisconnectionDetails details, Operation<Void> original) {
+        RegionBorrow.atContact(player);
+        original.call(details);
     }
 }
