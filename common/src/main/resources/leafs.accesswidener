@@ -34,7 +34,6 @@ accessible field net/minecraft/world/level/entity/EntitySectionStorage sections 
 accessible method net/minecraft/world/level/entity/EntitySectionStorage getChunkSections (II)Lit/unimi/dsi/fastutil/longs/LongSortedSet;
 accessible class net/minecraft/world/level/entity/PersistentEntitySectionManager$ChunkLoadStatus
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
-accessible method net/minecraft/world/level/chunk/status/ChunkStatusTasks postLoadProtoChunk (Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/storage/ValueInput$ValueInputList;)V
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
 accessible method net/minecraft/server/level/GenerationChunkHolder isStatusDisallowed (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
 accessible method net/minecraft/server/level/GenerationChunkHolder acquireStatusBump (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z

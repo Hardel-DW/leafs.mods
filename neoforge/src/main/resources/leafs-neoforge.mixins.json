@@ -6,6 +6,7 @@
 		"BlockCaptureShim",
 		"FreshBlockEntitiesShim",
 		"LevelSnapshotCaptureShim",
+		"LoadingChunkShim",
 		"PlacementSnapshotCaptureShim",
 		"PlayerListViewShim",
 		"ServerTickEventsShim"

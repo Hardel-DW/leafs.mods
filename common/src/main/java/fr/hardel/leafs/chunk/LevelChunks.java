@@ -2,7 +2,6 @@ package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.disk.ChunkWrites;
 import fr.hardel.leafs.chunk.holder.ChunkHolders;
-import fr.hardel.leafs.chunk.holder.FullStep;
 import fr.hardel.leafs.chunk.holder.GenerationSteps;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
@@ -12,6 +11,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.view.PlayerView;
+import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.ticking.LevelRegions;
 
 import fr.hardel.leafs.ticking.RegionBorrow;
@@ -33,7 +33,7 @@ public final class LevelChunks {
     private final ChunkOwners owners;
     private final ChunkHolders holders;
     private final GenerationSteps steps;
-    private final FullStep full;
+    private final MinuteCounter chunksFull;
     private final UnownedSweep sweep;
     private final ChunkWrites writes;
 
@@ -49,7 +49,7 @@ public final class LevelChunks {
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
         this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
         this.steps = new GenerationSteps(chunkMap, pool, owners, ticking.metrics());
-        this.full = new FullStep(owners, ticking.metrics().chunksFull());
+        this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs);
         this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, steps, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
@@ -121,8 +121,12 @@ public final class LevelChunks {
         return steps;
     }
 
-    public FullStep full() {
-        return full;
+    public Executor publisher(int chunkX, int chunkZ) {
+        Executor owner = owners.executor(chunkX, chunkZ);
+        return task -> owner.execute(() -> {
+            task.run();
+            chunksFull.increment();
+        });
     }
 
     public UnownedSweep sweep() {
