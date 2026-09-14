@@ -64,7 +64,6 @@
 		"ticking.ServerTickRateManagerMixin",
 		"ticking.ServerWatchdogMixin",
 		"world.ChunkAccessMixin",
-		"world.EnderDragonFightMixin",
 		"world.EuclideanGameEventListenerRegistryMixin",
 		"world.LevelChunkMixin",
 		"world.LevelMixin",

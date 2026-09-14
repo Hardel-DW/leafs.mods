@@ -1,14 +1,11 @@
 package fr.hardel.leafs.mixin.world;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import fr.hardel.excess.ConcurrentInt2ObjectMap;
 import fr.hardel.leafs.global.SharedStateMonitor;
-import fr.hardel.leafs.world.RaidTickerAccess;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.raid.Raid;
 import net.minecraft.world.entity.raid.Raids;
@@ -20,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Raids are created from player ticks on the regions, one at a time; the server thread keeps the map, each raid ticks on the owner of its centre. */
+/** Raids are created from player ticks on the regions, one at a time; the map is shared, the raids tick with the level on the server thread. */
 @Mixin(Raids.class)
 public abstract class RaidsMixin {
 
@@ -40,10 +37,5 @@ public abstract class RaidsMixin {
     @WrapMethod(method = "createOrExtendRaid")
     private Raid leafs$oneRaidStartAtATime(ServerPlayer player, BlockPos raidPosition, Operation<Raid> original) {
         return SharedStateMonitor.call(this, () -> original.call(player, raidPosition));
-    }
-
-    @WrapOperation(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/raid/Raid;tick(Lnet/minecraft/server/level/ServerLevel;)V"))
-    private void leafs$raidTicksAsAnchored(Raid raid, ServerLevel level, Operation<Void> original) {
-        ((RaidTickerAccess) raid).leafs$ensureTicker(level);
     }
 }
