@@ -6,9 +6,9 @@
 		"BlockCaptureShim",
 		"FreshBlockEntitiesShim",
 		"LevelSnapshotCaptureShim",
+		"LoadingChunkShim",
 		"PlacementSnapshotCaptureShim",
-		"PlayerListViewShim",
-		"ServerTickEventsShim"
+		"PlayerListViewShim"
 	],
 	"injectors": {
 		"defaultRequire": 1

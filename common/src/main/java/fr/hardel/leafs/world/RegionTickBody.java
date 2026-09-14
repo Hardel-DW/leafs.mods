@@ -14,7 +14,6 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionClock;
 import fr.hardel.leafs.ticking.RegionTickData;
-import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -99,7 +98,7 @@ public final class RegionTickBody {
         if (level.emptyTime < EMPTY_LEVEL_ENTITY_SKIP_TICKS) {
             tickEntities(tickRateManager, entities);
             stages.mark(TickStages.regionEntities);
-            tickBlockEntities(region, runs, owned);
+            tickBlockEntities(runs, owned);
             stages.mark(TickStages.regionBlockEntities);
         }
 
@@ -117,10 +116,9 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionTasks);
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, the anchors no region owns, then the custom spawners. */
+    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, then the custom spawners. */
     public void tickSerial(boolean spawnEnemies) {
         LevelChunks.of(level).sweep().soon();
-        ((ServerLevelRegionAccess) level).leafs$anchors().tickUnowned(LevelRegions.of(level));
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
         }
@@ -246,16 +244,12 @@ public final class RegionTickBody {
     }
 
 
-    private void tickBlockEntities(Region<?> region, boolean runsNormally, RegionChunks chunks) {
+    private void tickBlockEntities(boolean runsNormally, RegionChunks chunks) {
         ServerChunkCache chunkSource = level.getChunkSource();
         for (LevelChunk chunk : chunks.ticking()) {
             if (chunkSource.isPositionTicking(chunk.getPos().pack())) {
                 ((ChunkTickAccess) chunk).leafs$tickers().tickAll(runsNormally);
             }
-        }
-
-        if (runsNormally) {
-            ((ServerLevelRegionAccess) level).leafs$anchors().tick(region);
         }
     }
 }

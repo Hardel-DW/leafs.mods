@@ -3,10 +3,8 @@
 	"package": "fr.hardel.leafs.fabric.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"ArrayBackedEventShim",
 		"FabricApiLookupCacheShim",
-		"FabricLoadedChunksShim",
-		"ServerTickEventsShim"
+		"FabricLoadedChunksShim"
 	],
 	"injectors": {
 		"defaultRequire": 1

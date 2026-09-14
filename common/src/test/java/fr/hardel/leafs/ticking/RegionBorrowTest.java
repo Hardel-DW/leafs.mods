@@ -50,7 +50,7 @@ class RegionBorrowTest {
         region.markNotTicking();
     }
 
-    /** A write is a contact like a read: the head takes the region of the chunk before deciding whether to defer. */
+    /** A write is a contact like a read: the server thread locks the region of the chunk before deciding whether to defer. */
     @Test
     void aBorrowingThreadTakesTheRegionOfAChunkItMeets() {
         simulated(regions, 0, 0);
@@ -91,9 +91,9 @@ class RegionBorrowTest {
         borrower.join();
     }
 
-    /** A merge between a held region and the one being taken can only run once the held one is returned; the borrower returns everything and takes the survivor. */
+    /** The server thread locks an idle region owed a merge with one it holds, like a ticking region keeps merges waiting; the fold runs at the release. */
     @Test
-    void aPendingMergeWithAHeldRegionIsFoldedByReleasingAndTakingTheSurvivor() {
+    void aHeadTakesARegionOwedAMergeAndTheMergeRunsAtItsRelease() {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
         regions.settle();
@@ -107,61 +107,22 @@ class RegionBorrowTest {
         simulated(regions, 64, 0);
         borrow.borrow(regions, 96, 0);
 
-        Region<RegionTickData> survivor = regions.regionizer().regionAt(96, 0);
-        assertSame(survivor, regions.regionizer().regionAt(0, 0), "the merge ran");
-        assertEquals(RegionState.TICKING, survivor.state());
-        assertEquals(1, borrow.size());
+        assertEquals(2, borrow.size(), "both regions are held, nothing folds meanwhile");
+        assertNotSame(regions.regionizer().regionAt(0, 0), regions.regionizer().regionAt(96, 0));
+        assertEquals(RegionState.TICKING, east.state());
         borrow.releaseAll();
+        Region<RegionTickData> survivor = regions.regionizer().regionAt(96, 0);
+        assertSame(survivor, regions.regionizer().regionAt(0, 0), "the merge ran at the release");
         assertEquals(RegionState.READY, survivor.state());
     }
 
-    /** N03: the fold returns every region of every level; what the head asked for before, in another level, is taken again. */
+    /** The whole level locked: a region owed a merge with one it holds is taken too, the fold waits for the release. */
     @Test
-    void aFoldInOneLevelRetakesWhatWasHeldInAnother() {
-        LevelRegions nether = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
-        simulated(regions, 0, 0);
-        simulated(nether, 0, 0);
-        simulated(nether, 96, 0);
-        nether.settle();
-        RegionBorrow borrow = RegionBorrow.enter();
-        borrow.borrow(regions, 0, 0);
-        borrow.borrow(nether, 0, 0);
-
-        simulated(nether, 32, 0);
-        simulated(nether, 64, 0);
-        borrow.borrow(nether, 96, 0);
-
-        assertSame(nether.regionizer().regionAt(96, 0), nether.regionizer().regionAt(0, 0), "the merge ran");
-        assertEquals(2, borrow.size(), "the nether survivor and the overworld region");
-        assertEquals(RegionState.TICKING, regions.regionizer().regionAt(0, 0).state(), "the overworld region was taken again after the fold");
-    }
-
-    @Test
-    void borrowAllOnASecondLevelRetakesTheFirstAfterAFold() {
-        LevelRegions nether = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
-        simulated(regions, 0, 0);
-        simulated(nether, 0, 0);
-        simulated(nether, 96, 0);
-        nether.settle();
-        RegionBorrow borrow = RegionBorrow.enter();
-        borrow.borrowAll(regions);
-        borrow.borrow(nether, 0, 0);
-        simulated(nether, 32, 0);
-        simulated(nether, 64, 0);
-
-        borrow.borrowAll(nether);
-
-        assertEquals(2, borrow.size());
-        assertEquals(RegionState.TICKING, regions.regionizer().regionAt(0, 0).state());
-        assertEquals(RegionState.TICKING, nether.regionizer().regionAt(0, 0).state());
-    }
-
-    /** The same fold for the whole level: a region owed to one this thread holds cannot be taken until the held one is returned. */
-    @Test
-    void borrowAllFoldsAPendingMergeWithAHeldRegion() throws InterruptedException {
+    void borrowAllHoldsARegionOwedAMergeUntilTheRelease() throws InterruptedException {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
         regions.settle();
+        AtomicInteger heldAfter = new AtomicInteger();
         CountDownLatch done = new CountDownLatch(1);
         Thread borrower = new Thread(() -> {
             RegionBorrow borrow = RegionBorrow.enter();
@@ -169,20 +130,21 @@ class RegionBorrowTest {
             simulated(regions, 32, 0);
             simulated(regions, 64, 0);
             borrow.borrowAll(regions);
+            heldAfter.set(borrow.size());
             done.countDown();
+            borrow.releaseAll();
         });
         borrower.start();
 
-        assertTrue(done.await(2, TimeUnit.SECONDS), "borrowAll must return everything, let the merge run and take the survivor");
-        Region<RegionTickData> survivor = regions.regionizer().regionAt(96, 0);
-        assertSame(survivor, regions.regionizer().regionAt(0, 0), "the merge ran");
-        assertEquals(RegionState.TICKING, survivor.state());
+        assertTrue(done.await(2, TimeUnit.SECONDS), "borrowAll takes the region owed a merge without waiting for the fold");
+        assertEquals(2, heldAfter.get(), "both sides of the merge are held");
         borrower.join();
+        assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran at the release");
     }
 
-    /** B05: a pass that returned everything for a fold and then found the folded region dead ended with nothing held, the count being back where it started. */
+    /** B05: a pass that waited for a tick in flight took the partner owed a merge meanwhile; both are held, the fold runs at the release. */
     @Test
-    void borrowAllFromNothingRetakesTheSurvivorOfAFold() throws InterruptedException {
+    void borrowAllWaitsForTheTickInFlightAndHoldsBothSidesOfTheMerge() throws InterruptedException {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
         regions.settle();
@@ -204,10 +166,10 @@ class RegionBorrowTest {
         Thread.sleep(100);
         west.markNotTicking();
 
-        assertTrue(done.await(5, TimeUnit.SECONDS), "borrowAll must fold the pending merge and hold the survivor");
+        assertTrue(done.await(5, TimeUnit.SECONDS), "borrowAll ends once the tick in flight ends");
         borrower.join();
-        assertEquals(1, heldAfter.get(), "the survivor of the fold is held");
-        assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran");
+        assertEquals(2, heldAfter.get(), "both sides of the merge were held");
+        assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran at the release");
     }
 
     @Test

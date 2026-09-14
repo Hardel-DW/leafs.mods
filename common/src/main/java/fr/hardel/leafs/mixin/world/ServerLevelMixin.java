@@ -18,7 +18,6 @@ import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.dimension.end.EnderDragonFight;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
@@ -126,11 +125,6 @@ public abstract class ServerLevelMixin {
     private void leafs$positionKeyedBlockUpdate(BlockPos pos, BlockState old, BlockState current, int updateFlags, CallbackInfo callbackInfo) {
         LevelBlockUpdates.onBlockUpdated(self(), pos, old, current);
         callbackInfo.cancel();
-    }
-
-    /** The fight is an anchor, the owner of its origin chunk ticks it; the level tick does not. */
-    @WrapOperation(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/dimension/end/EnderDragonFight;tick()V"))
-    private void leafs$dragonFightTicksAsAnchored(EnderDragonFight fight, Operation<Void> original) {
     }
 
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {

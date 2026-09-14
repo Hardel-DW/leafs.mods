@@ -1,24 +1,28 @@
 package fr.hardel.leafs.mixin.chunk;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
-import net.minecraft.server.level.GenerationChunkHolder;
-import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatusTasks;
-import net.minecraft.world.level.chunk.status.ChunkStep;
 import net.minecraft.world.level.chunk.status.WorldGenContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 
-/** The FULL step publishes into the live world: the pool builds the chunk and only the publication reaches the owner. */
+/** Vanilla's FULL body stays whole and runs on the chunk's owner instead of the main thread, so what the loaders patched into it runs there too. */
 @Mixin(ChunkStatusTasks.class)
 public abstract class ChunkStatusTasksMixin {
-    @Inject(method = "full", at = @At("HEAD"), cancellable = true)
-    private static void leafs$buildOnThePoolPublishOnTheOwner(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk, CallbackInfoReturnable<CompletableFuture<ChunkAccess>> callbackInfo) {
-        callbackInfo.setReturnValue(LevelChunks.of(context.level()).full().apply(context, chunks, chunk));
+
+    @WrapOperation(method = "full", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
+    private static CompletableFuture<ChunkAccess> leafs$publishOnTheOwner(Supplier<ChunkAccess> body, Executor mainThread, Operation<CompletableFuture<ChunkAccess>> original,
+        @Local(argsOnly = true) WorldGenContext context, @Local(argsOnly = true) ChunkAccess chunk) {
+        ChunkPos pos = chunk.getPos();
+        return original.call(body, LevelChunks.of(context.level()).publisher(pos.x(), pos.z()));
     }
 }

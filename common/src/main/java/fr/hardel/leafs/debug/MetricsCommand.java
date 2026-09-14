@@ -28,9 +28,7 @@ public final class MetricsCommand {
     private static int report(CommandSourceStack source) {
         TickingManager ticking = TickingManager.of(source.getServer());
         ServerMetrics metrics = ticking.metrics();
-        source.sendSuccess(() -> Component.empty()
-            .append(Component.literal("borrows").withStyle(ChatFormatting.AQUA))
-            .append(CommandText.stat("tick events", perMinute(metrics.tickEventBorrows().perMinute()))), false);
+        source.sendSuccess(() -> Component.literal("deferred").withStyle(ChatFormatting.AQUA), false);
 
         DeferStats defers = metrics.deferStats();
         for (DeferReason reason : DeferReason.values()) {

@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class OwnWorkTest {
-    private final GlobalScheduler diverted = new GlobalScheduler();
+    private final GlobalScheduler diverted = new GlobalScheduler(Runnable::run);
     private final OwnWork work = new OwnWork(diverted::drain);
 
     @Test
@@ -24,7 +24,7 @@ class OwnWorkTest {
         assertEquals(2, ran.get());
     }
 
-    /** 2026-09-09: a mod queued one server task per chunk, each borrowing the player's region; the head pumping vanilla's queue ran the next head inside its own wait, and the stack ended. */
+    /** 2026-09-09: a mod queued one server task per chunk, each borrowing the player's region; the server thread pumping vanilla's queue ran the next task inside its own wait, and the stack ended. */
     @Test
     void aHeadWaitingInsideItsTaskLeavesTheNextHeadToTheOuterDrain() {
         List<String> order = new ArrayList<>();

@@ -61,7 +61,7 @@ class RoutingNeighborUpdaterTest {
 
     /** Every chunk is covered by one region; the test says whether the calling thread holds it. */
     private ChunkOwners owners() {
-        return new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, task) -> { task.run(); return true; }, new GlobalScheduler(), Long.MAX_VALUE);
+        return new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, task) -> { task.run(); return true; }, new GlobalScheduler(Runnable::run), Long.MAX_VALUE);
     }
 
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
