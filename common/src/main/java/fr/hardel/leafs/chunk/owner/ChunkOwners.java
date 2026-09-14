@@ -89,7 +89,7 @@ public final class ChunkOwners implements Router {
             }
 
             if (work == Work.CHUNK) {
-                pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
+                onPool(chunkX, chunkZ, task);
                 return false;
             }
 
@@ -113,7 +113,12 @@ public final class ChunkOwners implements Router {
 
     public void later(int chunkX, int chunkZ, Work work, Runnable task) {
         RegionInbox inbox = inboxAt(chunkX, chunkZ);
-        if (live.getAsBoolean() && inbox != null && inbox.post(chunkX, chunkZ, work, task)) {
+        if (inbox != null && inbox.post(chunkX, chunkZ, work, task)) {
+            return;
+        }
+
+        if (work == Work.CHUNK) {
+            onPool(chunkX, chunkZ, task);
             return;
         }
 
@@ -123,6 +128,11 @@ public final class ChunkOwners implements Router {
     /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
     public void onPool(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius, Runnable task) {
         pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(kind, chunkX, chunkZ, radius), task));
+    }
+
+    /** The owner task of a chunk no region covers, which takes the chunk when it starts. */
+    private void onPool(int chunkX, int chunkZ, Runnable task) {
+        pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
     }
 
     public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ) {
@@ -207,7 +217,7 @@ public final class ChunkOwners implements Router {
 
     /** A borrow that ended hands its inbox back: each task finds its owner again, as the work it is. */
     void resubmit(RegionInbox inbox) {
-        inbox.close(posted -> submit(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
+        inbox.close(posted -> later(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
     }
 
     /** The pool task reads the owner again when it starts: a region or a taker that arrived while it queued gets the task instead of racing it. Otherwise it takes the chunk like a taker, for the task, so a taker meanwhile finds it held. */

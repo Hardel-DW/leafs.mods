@@ -315,3 +315,5 @@ class ChunkOwnersTest {
         assertFalse(inbox.post(1, 1, Work.CHUNK, () -> ran.add("too late")), "a closed inbox refuses, the caller routes again");
     }
 }
+        assertEquals(List.of(), ran, "the game work did not run on the releasing thread");
+        assertTrue(server.drain());
