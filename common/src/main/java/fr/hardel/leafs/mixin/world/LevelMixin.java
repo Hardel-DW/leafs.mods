@@ -50,7 +50,7 @@ public abstract class LevelMixin {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$routeUnitState(CallbackInfo callbackInfo) {
         if ((Object) this instanceof ServerLevel level) {
-            this.random = new RoutingRandomSource(level, this.random);
+            this.random = new RoutingRandomSource(level);
             this.neighborUpdater = new RoutingNeighborUpdater(level, () -> new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), () -> LevelChunks.of(level).owners());
         }
     }
