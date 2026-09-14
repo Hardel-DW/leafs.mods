@@ -124,7 +124,7 @@ class ChunkOwnersTest {
     /** A chunk taken by a thread that never releases it, for the tests of what the others see. */
     private static RegionInbox takenOnAnotherThread(ChunkOwners owners) throws InterruptedException {
         AtomicReference<RegionInbox> held = new AtomicReference<>();
-        Thread holder = new Thread(() -> held.set(owners.borrow(1, 1)));
+        Thread holder = new Thread(() -> held.set(owners.borrow(1, 1)), "taker");
         holder.start();
         holder.join();
         return held.get();
@@ -260,6 +260,20 @@ class ChunkOwnersTest {
         release.countDown();
         taker.join();
         assertTrue(owners.holds(1, 1), "the region holds the chunk once released");
+    }
+
+    @Test
+    void aTakenChunkReportsItsTakerAndItsMail() throws InterruptedException {
+        covered = false;
+        ChunkOwners owners = owners();
+        assertNull(owners.describeTaken(1, 1));
+
+        RegionInbox taken = takenOnAnotherThread(owners);
+        owners.submit(1, 1, Work.GAME, () -> ran.add("mail"));
+
+        assertEquals("taken by thread 'taker' with 1 queued", owners.describeTaken(1, 1));
+        owners.release(1, 1, taken);
+        assertNull(owners.describeTaken(1, 1));
     }
 
     @Test
