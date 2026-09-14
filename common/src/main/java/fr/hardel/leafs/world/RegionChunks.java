@@ -2,6 +2,7 @@ package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.holder.HolderTable;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.region.Region;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
@@ -28,16 +29,22 @@ public final class RegionChunks {
         minZ = Integer.MAX_VALUE;
         maxX = Integer.MIN_VALUE;
         maxZ = Integer.MIN_VALUE;
-        HolderTable table = LevelChunks.of(chunkMap.level).holders().table();
+        LevelChunks chunks = LevelChunks.of(chunkMap.level);
+        HolderTable table = chunks.holders().table();
+        ChunkOwners owners = chunks.owners();
         for (long section : region.sectionKeySnapshot()) {
-            table.forEachHolderIn(section, this::collect);
+            table.forEachHolderIn(section, holder -> collect(holder, owners));
         }
     }
 
-    /** The ticket level says whether the ticking future can hold a chunk, so most holders never touch it. */
-    private void collect(ChunkHolder holder) {
-        holders.add(holder);
+    /** A chunk another thread took before the region covered it stays that thread's for the pass. The ticket level says whether the ticking future can hold a chunk, so most holders never touch it. */
+    private void collect(ChunkHolder holder, ChunkOwners owners) {
         ChunkPos pos = holder.getPos();
+        if (owners.heldElsewhere(pos.x(), pos.z())) {
+            return;
+        }
+
+        holders.add(holder);
         minX = Math.min(minX, pos.x());
         minZ = Math.min(minZ, pos.z());
         maxX = Math.max(maxX, pos.x());

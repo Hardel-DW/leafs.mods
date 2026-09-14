@@ -8,7 +8,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class GlobalSchedulerTest {
-    private final GlobalScheduler scheduler = new GlobalScheduler();
+    private final GlobalScheduler scheduler = new GlobalScheduler(Runnable::run);
     private final List<String> executed = new ArrayList<>();
 
     @Test

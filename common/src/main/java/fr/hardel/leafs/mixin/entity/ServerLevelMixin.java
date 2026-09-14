@@ -89,7 +89,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         return data != null && data.entities().contains(entity);
     }
 
-    /** From a region of another level the add hops to this level's owner of the position; here a head takes the region at contact, and two regions serialize on the level-wide player maps. */
+    /** From a region of another level the add hops to this level's owner of the position; here the server thread locks the region at contact, and two regions serialize on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
         if (leafs$fromAnotherLevel()) {

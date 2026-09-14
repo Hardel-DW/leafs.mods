@@ -261,7 +261,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         }
     }
 
-    /** The periodic autosave is the epoch bump, each owner saves its own chunks in its slice; a flush is head work, every region of the level held, then vanilla's walk as it is. */
+    /** The periodic autosave is the epoch bump, each owner saves its own chunks in its slice; a flush runs on the server thread with every region of the level locked, then vanilla's walk as it is. */
     @WrapMethod(method = "saveAllChunks")
     private void leafs$autosave(boolean flushStorage, Operation<Void> original) {
         LevelRegions regions = leafs$regions();
@@ -276,11 +276,8 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
             return;
         }
 
-        RegionBorrow.hold(borrow -> {
-            borrow.borrowAll(regions);
-            original.call(true);
-            return null;
-        });
+        RegionBorrow.current().borrowAll(regions);
+        original.call(true);
     }
 
     /** View diffs run on the player's owner, the region ticking him; a call from anywhere else is that region's next pass. */

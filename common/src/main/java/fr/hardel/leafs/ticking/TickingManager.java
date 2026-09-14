@@ -28,7 +28,10 @@ public final class TickingManager {
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkPool chunkPool;
-    private final GlobalScheduler globalScheduler = new GlobalScheduler();
+    private final GlobalScheduler globalScheduler = new GlobalScheduler(task -> RegionBorrow.hold(_ -> {
+        task.run();
+        return null;
+    }));
     private final OwnWork serverWork = new OwnWork(this::pumpServer);
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
@@ -128,7 +131,7 @@ public final class TickingManager {
         return worked;
     }
 
-    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. A region worker runs it now, as vanilla would on its game thread; any other thread's task runs as a head, borrowing at contact like a command. */
+    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. A region worker runs it now, as vanilla would on its game thread; any other thread's task runs on the server thread, which locks what the task touches until it ends. */
     public boolean divertExecute(Runnable task) {
         if (!globalTicking || onServerThread()) {
             return false;
@@ -139,10 +142,7 @@ public final class TickingManager {
             return true;
         }
 
-        globalScheduler.run(() -> RegionBorrow.hold(borrow -> {
-            task.run();
-            return null;
-        }));
+        globalScheduler.run(task);
         return true;
     }
 

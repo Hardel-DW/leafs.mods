@@ -1,5 +1,9 @@
 package fr.hardel.leafs.mixin.ticking;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import fr.hardel.leafs.ticking.ChunkPumpAccess;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickScheduler;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
@@ -26,6 +30,17 @@ public abstract class BlockableEventLoopMixin {
         if ((Object) this instanceof MinecraftServer server && TickingManager.of(server).pumpDiverted()) {
             callbackInfo.setReturnValue(true);
         }
+    }
+
+    /** Between two ticks the server thread locks what a task touches and releases it when the task ends; inside a tick or a wait the task shares the locks already open. A region worker running a task inline locks nothing. */
+    @WrapMethod(method = "doRunTask")
+    private void leafs$lockDuringTheTask(Runnable task, Operation<Void> original) {
+        if (RegionTickScheduler.onWorker() || !((Object) this instanceof MinecraftServer || (Object) this instanceof ChunkPumpAccess)) {
+            original.call(task);
+            return;
+        }
+
+        RegionBorrow.hold(_ -> original.call(task));
     }
 
     @Inject(method = "execute(Ljava/lang/Runnable;)V", at = @At("HEAD"), cancellable = true)

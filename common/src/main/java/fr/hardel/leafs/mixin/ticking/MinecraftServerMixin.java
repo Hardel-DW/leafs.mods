@@ -6,6 +6,7 @@ import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -27,6 +28,12 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     @Override
     public TickingManager leafs$ticking() {
         return leafs$ticking;
+    }
+
+    /** The server thread locks what it touches during its tick and releases everything when the tick ends: tick events, commands, spawners and game tests alike. */
+    @WrapOperation(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;processPacketsAndTick(Z)V"))
+    private void leafs$lockDuringTheTick(MinecraftServer server, boolean sprinting, Operation<Void> original) {
+        RegionBorrow.hold(_ -> original.call(server, sprinting));
     }
 
     @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V"))
