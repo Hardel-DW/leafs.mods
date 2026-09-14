@@ -276,7 +276,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
             return;
         }
 
-        RegionBorrow.current().borrowAll(regions);
+        RegionBorrow.lockAll(regions);
         original.call(true);
     }
 

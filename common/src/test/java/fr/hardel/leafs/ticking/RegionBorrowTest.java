@@ -172,6 +172,16 @@ class RegionBorrowTest {
         assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran at the release");
     }
 
+    /** ATM11, 14 September 2026: the integrated server saves everything from initServer, before its loop opens any lock context. */
+    @Test
+    void lockingEveryRegionWithoutAContextLocksNothing() {
+        simulated(regions, 0, 0);
+
+        RegionBorrow.lockAll(regions);
+
+        assertEquals(RegionState.READY, regions.regionizer().regionAt(0, 0).state());
+    }
+
     @Test
     void borrowAllTakesEveryLiveRegion() {
 
