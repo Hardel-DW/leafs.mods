@@ -36,7 +36,6 @@ class RegionBorrowTest {
         simulated(regions, 0, 0);
         Region<RegionTickData> region = regions.regionizer().regionAt(0, 0);
         RegionBorrow borrow = RegionBorrow.enter();
-
         borrow.borrow(regions, 0, 0);
         borrow.borrow(regions, 0, 0);
 
@@ -55,7 +54,6 @@ class RegionBorrowTest {
     void aBorrowingThreadTakesTheRegionOfAChunkItMeets() {
         simulated(regions, 0, 0);
         Region<RegionTickData> region = regions.regionizer().regionAt(0, 0);
-
         RegionBorrow.atContact(regions, 0, 0);
         assertEquals(RegionState.READY, region.state(), "nothing happens without a borrow");
 
@@ -80,8 +78,8 @@ class RegionBorrowTest {
             borrow.borrow(regions, 0, 0);
             borrowed.countDown();
         });
-        borrower.start();
 
+        borrower.start();
         assertFalse(borrowed.await(100, TimeUnit.MILLISECONDS), "the region in flight is not taken before its tick ends");
         assertTrue(tookTheOther.get(), "the idle region was taken without waiting");
 
@@ -99,17 +97,17 @@ class RegionBorrowTest {
         regions.settle();
         Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
         Region<RegionTickData> east = regions.regionizer().regionAt(96, 0);
+
         assertNotSame(west, east);
         RegionBorrow borrow = RegionBorrow.enter();
         borrow.borrow(regions, 0, 0);
-
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
         borrow.borrow(regions, 96, 0);
-
         assertEquals(2, borrow.size(), "both regions are held, nothing folds meanwhile");
         assertNotSame(regions.regionizer().regionAt(0, 0), regions.regionizer().regionAt(96, 0));
         assertEquals(RegionState.TICKING, east.state());
+
         borrow.releaseAll();
         Region<RegionTickData> survivor = regions.regionizer().regionAt(96, 0);
         assertSame(survivor, regions.regionizer().regionAt(0, 0), "the merge ran at the release");
@@ -122,6 +120,7 @@ class RegionBorrowTest {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
         regions.settle();
+
         AtomicInteger heldAfter = new AtomicInteger();
         CountDownLatch done = new CountDownLatch(1);
         Thread borrower = new Thread(() -> {
@@ -134,8 +133,8 @@ class RegionBorrowTest {
             done.countDown();
             borrow.releaseAll();
         });
-        borrower.start();
 
+        borrower.start();
         assertTrue(done.await(2, TimeUnit.SECONDS), "borrowAll takes the region owed a merge without waiting for the fold");
         assertEquals(2, heldAfter.get(), "both sides of the merge are held");
         borrower.join();
@@ -155,6 +154,7 @@ class RegionBorrowTest {
         regions.settle();
         CountDownLatch done = new CountDownLatch(1);
         AtomicInteger heldAfter = new AtomicInteger();
+
         Thread borrower = new Thread(() -> {
             RegionBorrow borrow = RegionBorrow.enter();
             borrow.borrowAll(regions);
@@ -162,10 +162,10 @@ class RegionBorrowTest {
             done.countDown();
             borrow.releaseAll();
         });
+
         borrower.start();
         Thread.sleep(100);
         west.markNotTicking();
-
         assertTrue(done.await(5, TimeUnit.SECONDS), "borrowAll ends once the tick in flight ends");
         borrower.join();
         assertEquals(2, heldAfter.get(), "both sides of the merge were held");
@@ -176,22 +176,17 @@ class RegionBorrowTest {
     @Test
     void lockingEveryRegionWithoutAContextLocksNothing() {
         simulated(regions, 0, 0);
-
         RegionBorrow.lockAll(regions);
-
         assertEquals(RegionState.READY, regions.regionizer().regionAt(0, 0).state());
     }
 
     @Test
     void borrowAllTakesEveryLiveRegion() {
-
         simulated(regions, 0, 0);
         simulated(regions, 200, 200);
         simulated(regions, -200, -200);
         RegionBorrow borrow = RegionBorrow.enter();
-
         borrow.borrowAll(regions);
-
         assertEquals(3, borrow.size());
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             assertEquals(RegionState.TICKING, region.state());
