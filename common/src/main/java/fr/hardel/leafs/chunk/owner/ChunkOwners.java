@@ -183,6 +183,11 @@ public final class ChunkOwners implements Router {
         return taken != null && !taken.heldBy(Thread.currentThread());
     }
 
+    public @Nullable String describeTaken(int chunkX, int chunkZ) {
+        RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        return taken == null ? null : "taken by thread '%s' with %d queued".formatted(taken.holderName(), taken.size());
+    }
+
     /** Vanilla's executor for the holder futures, promotions and teardowns: chunk work. */
     public Executor executor(int chunkX, int chunkZ) {
         return task -> submit(chunkX, chunkZ, Work.CHUNK, task);
