@@ -1,6 +1,5 @@
 package fr.hardel.leafs.debug;
 
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.holder.WaitReport;
@@ -10,6 +9,8 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.coordinates.ColumnPosArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
@@ -17,7 +18,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-/** {@code /leafs chunk <x> <z>}: why a chunk of the caller's dimension is, or is not, where the game expects it. */
+/** {@code /leafs chunk [<pos>]}: why the chunk at a block column, the caller's by default, is or is not where the game expects it. */
 public final class ChunkCommand {
 
     private ChunkCommand() {
@@ -25,12 +26,14 @@ public final class ChunkCommand {
 
     static LiteralArgumentBuilder<CommandSourceStack> tree() {
         return Commands.literal("chunk")
-            .then(Commands.argument("x", IntegerArgumentType.integer())
-                .then(Commands.argument("z", IntegerArgumentType.integer())
-                    .executes(context -> report(context.getSource(), IntegerArgumentType.getInteger(context, "x"), IntegerArgumentType.getInteger(context, "z")))));
+            .executes(context -> report(context.getSource(), ChunkPos.containing(BlockPos.containing(context.getSource().getPosition()))))
+            .then(Commands.argument("pos", ColumnPosArgument.columnPos())
+                .executes(context -> report(context.getSource(), ColumnPosArgument.getColumnPos(context, "pos").toChunkPos())));
     }
 
-    private static int report(CommandSourceStack source, int chunkX, int chunkZ) {
+    private static int report(CommandSourceStack source, ChunkPos chunk) {
+        int chunkX = chunk.x();
+        int chunkZ = chunk.z();
         ServerLevel level = source.getLevel();
         LevelChunks chunks = LevelChunks.of(level);
         LevelRegions regions = LevelRegions.of(level);
