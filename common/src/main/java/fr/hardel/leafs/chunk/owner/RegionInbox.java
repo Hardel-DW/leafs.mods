@@ -16,18 +16,30 @@ public final class RegionInbox {
     private final long slowTaskNanos;
     private final Predicate<Posted> owns;
     private final Consumer<Posted> elsewhere;
+    private final Thread holder;
     private boolean closed;
 
-    /** The box of a chunk another thread took: every task in it is for that chunk. */
+    /** The box of a chunk the calling thread took: every task in it is for that chunk, and the chunk is that thread's until it releases. */
     public RegionInbox(long slowTaskNanos) {
-        this(slowTaskNanos, _ -> true, _ -> { });
+        this(slowTaskNanos, _ -> true, _ -> { }, Thread.currentThread());
+    }
+
+    /** A region's box, owned by whichever thread ticks the region. */
+    public RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere) {
+        this(slowTaskNanos, owns, elsewhere, null);
     }
 
     /** A task longer than the threshold is logged with its class and chunk, the one place where a publication can cost a tick. A task on a chunk the owner lost, a section reclaimed from a region, leaves through {@code elsewhere}. */
-    public RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere) {
+    private RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere, Thread holder) {
         this.slowTaskNanos = slowTaskNanos;
         this.owns = owns;
         this.elsewhere = elsewhere;
+        this.holder = holder;
+    }
+
+    /** Whether the thread holds the chunk this box belongs to. */
+    public boolean heldBy(Thread thread) {
+        return holder == thread;
     }
 
     /** False once closed: the region no longer exists, the caller resolves the owner again. */

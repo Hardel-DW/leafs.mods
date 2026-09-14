@@ -125,11 +125,15 @@ public final class Regionizer<R> {
         return regionsView;
     }
 
-    boolean tryMarkTicking(Region<R> region) {
+    boolean tryMarkTicking(Region<R> region, boolean despiteMerges) {
         long stamp = writeLock();
         try {
             RegionState state = region.state();
-            if (state == RegionState.TICKING || state == RegionState.DEAD || !region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty()) {
+            if (state == RegionState.TICKING || state == RegionState.DEAD) {
+                return false;
+            }
+
+            if (!despiteMerges && (!region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty())) {
                 return false;
             }
 

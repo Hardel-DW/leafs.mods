@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.LongAccumulator;
 
 /** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
-    private final MinuteCounter tickEventBorrows = new MinuteCounter();
     private final DeferStats deferStats = new DeferStats();
     private final StageTimings globalStages = new StageTimings(TickStages.count(TickFamily.GLOBAL));
     private final MinuteCounter packetsIn = new MinuteCounter();
@@ -22,11 +21,6 @@ public final class ServerMetrics {
     private final MinuteCounter chunkWaits = new MinuteCounter();
     private final AtomicLong chunkWaitNanos = new AtomicLong();
     private final LongAccumulator longestChunkWaitNanos = new LongAccumulator(Math::max, 0L);
-
-    /** Loader server tick events emitted with a subscriber, each one a borrow scope on the server thread. */
-    public MinuteCounter tickEventBorrows() {
-        return tickEventBorrows;
-    }
 
     public DeferStats deferStats() {
         return deferStats;

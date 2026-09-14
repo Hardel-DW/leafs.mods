@@ -39,7 +39,12 @@ public final class Region<R> {
 
     /** Only when idle with no pending merge; an awaited merge partner never ticks on its own. */
     public boolean tryMarkTicking() {
-        return regionizer.tryMarkTicking(this);
+        return regionizer.tryMarkTicking(this, false);
+    }
+
+    /** The server thread locks an idle region whatever merge awaits it: the merge waits for the release, as it waits for a tick. */
+    public boolean tryHold() {
+        return regionizer.tryMarkTicking(this, true);
     }
 
     public void markNotTicking() {

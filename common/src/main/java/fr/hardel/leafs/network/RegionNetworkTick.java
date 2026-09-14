@@ -2,7 +2,6 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.global.CommandEngine;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -70,7 +69,7 @@ public final class RegionNetworkTick {
         }
     }
 
-    /** {@code Connection.tick}'s listener half: a game listener ticks on the region that ticks its player; one no region ticks, dead or without tickets, ticks here as a head. Every other listener stays here. */
+    /** {@code Connection.tick}'s listener half: a game listener ticks on the region that ticks its player; one no region ticks, dead or without tickets, ticks here on the server thread. Every other listener stays here. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
         if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             original.run();
@@ -82,10 +81,10 @@ public final class RegionNetworkTick {
         }
 
         MinecraftServer server = game.player.level().getServer();
-        CommandEngine.runHead(server, null, () -> countIfHeld(server, PacketRouting.queueOf(game).handleAs(() -> {
+        countIfHeld(server, PacketRouting.queueOf(game).handleAs(() -> {
             PacketRouting.queueOf(game).drain(() -> !tickedByARegion(game.player));
             original.run();
-        })));
+        }));
     }
 
     /** The region's photo of its entities: the player is in the world and a live region covers his chunk. */
