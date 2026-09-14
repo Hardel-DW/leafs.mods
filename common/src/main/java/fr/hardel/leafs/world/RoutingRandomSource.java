@@ -5,19 +5,19 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.jspecify.annotations.NonNull;
 
-/** Swapped into the level's random field: resolves per call to the ticking unit's random, vanilla otherwise. */
+/** Swapped into the level's random field: resolves per call to the ticking region's random; a thread outside a region has its own, the server thread included. */
 public final class RoutingRandomSource implements RandomSource {
-    private final ServerLevel level;
-    private final RandomSource vanilla;
+    private static final ThreadLocal<RandomSource> OWN = ThreadLocal.withInitial(RandomSource::create);
 
-    public RoutingRandomSource(ServerLevel level, RandomSource vanilla) {
+    private final ServerLevel level;
+
+    public RoutingRandomSource(ServerLevel level) {
         this.level = level;
-        this.vanilla = vanilla;
     }
 
     private RandomSource resolve() {
         RegionWorldData data = WorldTickContext.activeFor(level);
-        return data == null ? vanilla : data.random();
+        return data == null ? OWN.get() : data.random();
     }
 
     @Override

@@ -10,9 +10,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RoutingRandomSourceTest {
-    private final RandomSource vanilla = fixed(1);
     private final RandomSource unitRandom = fixed(2);
-    private final RoutingRandomSource routing = new RoutingRandomSource(null, vanilla);
+    private final RoutingRandomSource routing = new RoutingRandomSource(null);
     private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache(), 0L);
 
     @AfterEach
@@ -22,11 +21,29 @@ class RoutingRandomSourceTest {
 
     @Test
     void contextForTheLevelResolvesTheRegionRandom() {
+        routing.setSeed(7);
         WorldTickContext.enter(null, null, worldData);
 
         assertEquals(2, routing.nextInt());
         WorldTickContext.exit();
-        assertEquals(1, routing.nextInt());
+        assertEquals(RandomSource.create(7).nextInt(), routing.nextInt(), "back to this thread's own random, untouched by the region");
+    }
+
+    /** ATM11, 14 September 2026: a chunk worker promoting a chunk and the server thread shared the level's random, which refuses two threads. */
+    @Test
+    void offARegionEachThreadHasItsOwnRandom() throws InterruptedException {
+        routing.setSeed(1);
+        routing.nextInt();
+        Thread other = new Thread(() -> {
+            routing.setSeed(2);
+            routing.nextInt();
+        });
+        other.start();
+        other.join();
+
+        RandomSource reference = RandomSource.create(1);
+        reference.nextInt();
+        assertEquals(reference.nextInt(), routing.nextInt(), "the other thread seeded its own random, not this thread's");
     }
 
     private static RandomSource fixed(int value) {
