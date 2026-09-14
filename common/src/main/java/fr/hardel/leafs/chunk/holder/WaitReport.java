@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /** What a thread waits for, for a stall report. */
-record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, CompletableFuture<?> delivery, long startedNanos) {
+public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, CompletableFuture<?> delivery, long startedNanos) {
     @Override
     public String toString() {
         LevelChunks chunks = LevelChunks.of(level);
@@ -26,19 +26,19 @@ record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status,
         ChunkHolder holder = chunks.holders().table().get(key);
         return String.join(", ",
             "waiting for chunk [%d, %d] at %s, delivered %b".formatted(chunkX, chunkZ, status, delivery.isDone()),
-            "loading level " + chunks.graphs().loading().level(key),
+            "loading level %d".formatted(chunks.graphs().loading().level(key)),
             holder == null ? "no holder" : holder(holder),
             chunks.owners().describeQueued(chunkX, chunkZ),
             owner(regions),
             "pool queued %d active %d".formatted(chunks.pool().queued(), chunks.pool().active()),
-            "tickets " + level.getChunkSource().ticketStorage.getTicketDebugString(key, false));
+            "tickets %s".formatted(level.getChunkSource().ticketStorage.getTicketDebugString(key, false)));
     }
 
-    static String holder(ChunkHolder holder) {
+    public static String holder(ChunkHolder holder) {
         ChunkGenerationTask task = holder.task.get();
         return String.join(", ",
             "holder %s level %d, latest %s, started %s, generation refs %d".formatted(holder.getPos(), holder.getTicketLevel(), holder.getLatestStatus(), holder.startedWork.get(), holder.generationRefCount.get()),
-            "pending " + pending(holder),
+            "pending %s".formatted(pending(holder)),
             task == null ? "no task" : task(task));
     }
 
@@ -54,10 +54,15 @@ record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status,
         task.cache.forEach(member -> {
             CompletableFuture<?> future = member.futures.get(layer.getIndex());
             if (future != null && !future.isDone()) {
-                stuck.add(member.getPos() + " latest " + member.getLatestStatus() + " started " + member.startedWork.get());
+                stuck.add("%s latest %s started %s".formatted(member.getPos(), member.getLatestStatus(), member.startedWork.get()));
             }
         });
-        return head + ", layer pending on " + stuck.size() + (stuck.isEmpty() ? "" : ", first " + stuck.getFirst());
+        
+        if (stuck.isEmpty()) {
+            return "%s, layer pending on 0".formatted(head);
+        }
+
+        return "%s, layer pending on %d, first %s".formatted(head, stuck.size(), stuck.getFirst());
     }
 
     private static String pending(ChunkHolder holder) {

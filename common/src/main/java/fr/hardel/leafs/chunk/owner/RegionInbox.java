@@ -42,6 +42,10 @@ public final class RegionInbox {
         return holder == thread;
     }
 
+    public String holderName() {
+        return holder.getName();
+    }
+
     /** False once closed: the region no longer exists, the caller resolves the owner again. */
     public synchronized boolean post(int chunkX, int chunkZ, Work work, Runnable task) {
         if (closed) {
