@@ -83,6 +83,14 @@ public final class RegionBorrow {
         }
     }
 
+    /** Every region of the level, for a save or a reload. Without a lock context the server thread runs outside its loop, before the first tick or after the halt, and owns everything. */
+    public static void lockAll(LevelRegions regions) {
+        RegionBorrow borrow = CURRENT.get();
+        if (borrow != null) {
+            borrow.borrowAll(regions);
+        }
+    }
+
     /** Locks the region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
         boolean serverThread = serverThread(regions);
