@@ -1,21 +1,23 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
+import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
+
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/** A HashSet other threads may write while one iterates: writes take the set's lock, iteration walks a snapshot. Fits a field declared HashSet. */
-public final class SynchronizedHashSet<E> extends HashSet<E> {
+/** An ObjectOpenHashSet other threads may write while one iterates: writes take the set's lock, iteration walks a snapshot. Fits a field declared ObjectOpenHashSet or Set. */
+public final class SynchronizedObjectOpenHashSet<E> extends ObjectOpenHashSet<E> {
 
-    public SynchronizedHashSet() {
+    public SynchronizedObjectOpenHashSet() {
     }
 
-    public SynchronizedHashSet(Collection<? extends E> elements) {
+    public SynchronizedObjectOpenHashSet(Collection<? extends E> elements) {
         super(elements);
     }
 
@@ -80,13 +82,18 @@ public final class SynchronizedHashSet<E> extends HashSet<E> {
     }
 
     @Override
-    public Iterator<E> iterator() {
+    public synchronized boolean trim() {
+        return super.trim();
+    }
+
+    @Override
+    public ObjectIterator<E> iterator() {
         return new SnapshotIterator<>(snapshot().iterator(), this::remove);
     }
 
     @Override
-    public Spliterator<E> spliterator() {
-        return snapshot().spliterator();
+    public ObjectSpliterator<E> spliterator() {
+        return ObjectSpliterators.asObjectSpliterator(snapshot().spliterator());
     }
 
     @Override
@@ -115,13 +122,13 @@ public final class SynchronizedHashSet<E> extends HashSet<E> {
     }
 
     @Override
-    public synchronized Object clone() {
+    public synchronized ObjectOpenHashSet<E> clone() {
         return super.clone();
     }
 
     private synchronized List<E> snapshot() {
         List<E> copy = new ArrayList<>(super.size());
-        Iterator<E> live = super.iterator();
+        ObjectIterator<E> live = super.iterator();
         while (live.hasNext()) {
             copy.add(live.next());
         }

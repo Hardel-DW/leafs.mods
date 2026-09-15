@@ -1,10 +1,12 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
+
 import java.util.Iterator;
 import java.util.function.Consumer;
 
 /** Walks a copy taken under the collection's lock; remove goes back to the live collection through the remover. */
-final class SnapshotIterator<E> implements Iterator<E> {
+final class SnapshotIterator<E> implements ObjectIterator<E> {
     private final Iterator<E> snapshot;
     private final Consumer<E> remover;
     private E last;

@@ -1,27 +1,24 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectFunction;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceSet;
+
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
- * A HashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write back, and the functions
- * of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared HashMap or Map.
+ * A Reference2ObjectOpenHashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write
+ * back, and the functions of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared
+ * Reference2ObjectOpenHashMap or Map.
  */
-public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
-
-    public SynchronizedHashMap() {
-    }
-
-    public SynchronizedHashMap(Map<? extends K, ? extends V> entries) {
-        super(entries);
-    }
+public final class SynchronizedReference2ObjectOpenHashMap<K, V> extends Reference2ObjectOpenHashMap<K, V> {
 
     @Override
     public synchronized V get(Object key) {
@@ -94,7 +91,17 @@ public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
     }
 
     @Override
+    public synchronized boolean trim() {
+        return super.trim();
+    }
+
+    @Override
     public V computeIfAbsent(K key, Function<? super K, ? extends V> mapping) {
+        return Snapshots.computeIfAbsent(this, key, mapping);
+    }
+
+    @Override
+    public V computeIfAbsent(K key, Reference2ObjectFunction<? super K, ? extends V> mapping) {
         return Snapshots.computeIfAbsent(this, key, mapping);
     }
 
@@ -114,13 +121,6 @@ public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
     }
 
     @Override
-    public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
-        for (Snapshots.Entry<K, V> entry : entries()) {
-            Snapshots.update(this, entry.getKey(), current -> current == null ? null : function.apply(entry.getKey(), current));
-        }
-    }
-
-    @Override
     public void forEach(BiConsumer<? super K, ? super V> action) {
         for (Snapshots.Entry<K, V> entry : entries()) {
             action.accept(entry.getKey(), entry.getValue());
@@ -128,18 +128,18 @@ public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
     }
 
     @Override
-    public Set<K> keySet() {
+    public ReferenceSet<K> keySet() {
         return new Snapshots.Keys<>(this, entries());
     }
 
     @Override
-    public Collection<V> values() {
+    public ObjectCollection<V> values() {
         return new Snapshots.Values<>(this, entries());
     }
 
     @Override
-    public Set<Map.Entry<K, V>> entrySet() {
-        return new Snapshots.Entries<>(this, new ArrayList<Map.Entry<K, V>>(entries()));
+    public FastEntrySet<K, V> reference2ObjectEntrySet() {
+        return new Snapshots.Reference2ObjectEntries<>(this, new ArrayList<Reference2ObjectMap.Entry<K, V>>(entries()));
     }
 
     @Override
@@ -158,13 +158,13 @@ public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
     }
 
     @Override
-    public synchronized Object clone() {
+    public synchronized Reference2ObjectOpenHashMap<K, V> clone() {
         return super.clone();
     }
 
     private synchronized List<Snapshots.Entry<K, V>> entries() {
         List<Snapshots.Entry<K, V>> copy = new ArrayList<>(super.size());
-        for (Map.Entry<K, V> entry : super.entrySet()) {
+        for (Reference2ObjectMap.Entry<K, V> entry : super.reference2ObjectEntrySet()) {
             copy.add(new Snapshots.Entry<>(this, entry));
         }
 

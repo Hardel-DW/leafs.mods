@@ -2,26 +2,19 @@ package fr.hardel.excess;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
- * A HashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write back, and the functions
- * of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared HashMap or Map.
+ * A WeakHashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write back, and the
+ * functions of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared WeakHashMap or Map.
  */
-public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
-
-    public SynchronizedHashMap() {
-    }
-
-    public SynchronizedHashMap(Map<? extends K, ? extends V> entries) {
-        super(entries);
-    }
+public final class SynchronizedWeakHashMap<K, V> extends WeakHashMap<K, V> {
 
     @Override
     public synchronized V get(Object key) {
@@ -155,11 +148,6 @@ public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
     @Override
     public synchronized String toString() {
         return super.toString();
-    }
-
-    @Override
-    public synchronized Object clone() {
-        return super.clone();
     }
 
     private synchronized List<Snapshots.Entry<K, V>> entries() {
