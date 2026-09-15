@@ -1,0 +1,19 @@
+{
+	"required": true,
+	"package": "fr.hardel.leafs.mixin.compat",
+	"plugin": "fr.hardel.leafs.compat.CompatMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"exmachina.MechanicalGraphBufferMixin",
+		"exmachina.SignalGraphBufferMixin",
+		"lootr.DataStorageMixin",
+		"lootr.SectionMixin",
+		"utilitarian.ModEventHandlerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

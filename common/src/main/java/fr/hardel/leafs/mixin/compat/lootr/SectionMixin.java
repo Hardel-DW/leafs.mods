@@ -1,0 +1,20 @@
+package fr.hardel.leafs.mixin.compat.lootr;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import fr.hardel.excess.SynchronizedObject2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.injection.At;
+
+/** LootrMinecraft/Lootr#895, second map on the same path. getStore inserts the store of a container met for the first time, from every chunk owner. */
+@Pseudo
+@Mixin(targets = "noobanidus.mods.lootr.common.data.Section")
+public abstract class SectionMixin {
+
+    @WrapOperation(method = "<init>", at = @At(value = "NEW", target = "it/unimi/dsi/fastutil/objects/Object2ObjectOpenHashMap"))
+    private static <K, V> Object2ObjectOpenHashMap<K, V> leafs$sharedStores(Operation<Object2ObjectOpenHashMap<K, V>> original) {
+        return new SynchronizedObject2ObjectOpenHashMap<>();
+    }
+}

@@ -18,6 +18,7 @@
 	},
 	"mixins": [
 		"leafs.mixins.json",
+		"compat.mixins.json",
 		"fabric.mixins.json"
 	],
 	"breaks": {
