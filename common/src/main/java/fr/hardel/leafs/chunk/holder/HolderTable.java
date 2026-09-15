@@ -12,7 +12,6 @@ import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /** The one holder table behind both vanilla fields, plus the same holders by region section. The empty superclass makes any surface not delegated here throw. */
@@ -44,11 +43,6 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     @Override
     public ChunkHolder get(long key) {
         return holders.get(key);
-    }
-
-    @Override
-    public ChunkHolder get(Object key) {
-        return key instanceof Long boxed ? holders.get(boxed.longValue()) : null;
     }
 
     @Override
@@ -97,13 +91,6 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     public void clear() {
         holders.clear();
         sections.clear();
-    }
-
-    @Override
-    public void forEach(BiConsumer<? super Long, ? super ChunkHolder> action) {
-        for (Long2ObjectMap.Entry<ChunkHolder> entry : holders.long2ObjectEntrySet()) {
-            action.accept(entry.getLongKey(), entry.getValue());
-        }
     }
 
     /** One atomic compute per key, so a birth and a death on the same section never lose each other. */
