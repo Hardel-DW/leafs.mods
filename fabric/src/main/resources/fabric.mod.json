@@ -18,7 +18,7 @@
 	},
 	"mixins": [
 		"leafs.mixins.json",
-		"leafs-fabric.mixins.json"
+		"fabric.mixins.json"
 	],
 	"breaks": {
 		"c2me": "*",
