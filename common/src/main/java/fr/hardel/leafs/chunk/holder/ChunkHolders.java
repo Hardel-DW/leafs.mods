@@ -147,11 +147,11 @@ public final class ChunkHolders implements LevelListener {
         }
 
         List<ChunkHolder> tasked = new ArrayList<>();
-        table.forEach((_, holder) -> {
+        for (ChunkHolder holder : table.values()) {
             if (holder.task.get() != null) {
                 tasked.add(holder);
             }
-        });
+        }
         String byStatus = waiting.stream().collect(Collectors.groupingBy(holder -> String.valueOf(holder.getLatestStatus()), Collectors.counting())).toString();
         String samples = waiting.stream().limit(3).map(WaitReport::holder).collect(Collectors.joining("; "));
         String tasks = tasked.stream().limit(5).map(WaitReport::holder).collect(Collectors.joining("; "));
