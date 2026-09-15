@@ -69,7 +69,7 @@ public final class ChunkWrites {
             }
 
             CompressedChunk bytes = write.bytes();
-            RegionFile file = files.getRegionFile(pos);
+            RegionFile file = files.getOrCreateRegionFile(pos);
             JvmProfiler.INSTANCE.onRegionFileWrite(files.info(), pos, bytes.version(), bytes.streamLength());
             file.write(pos, bytes.buffer());
             return null;
