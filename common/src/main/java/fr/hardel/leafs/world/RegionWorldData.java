@@ -26,19 +26,17 @@ public final class RegionWorldData {
     private final RegionEntities entities = new RegionEntities();
     private volatile MobCensus census = MobCensus.EMPTY;
     private long subTick;
-    private long lastInhabitedUpdate;
     private long savedEpoch;
 
-    public RegionWorldData(LongSupplier time, RandomSource random, CollectingNeighborUpdater neighborUpdater, PathTypeCache pathTypeCache, long inhabitedFrom) {
+    public RegionWorldData(LongSupplier time, RandomSource random, CollectingNeighborUpdater neighborUpdater, PathTypeCache pathTypeCache) {
         this.time = time;
         this.random = random;
         this.neighborUpdater = neighborUpdater;
         this.pathTypeCache = pathTypeCache;
-        this.lastInhabitedUpdate = inhabitedFrom;
     }
 
     public static RegionWorldData regional(ServerLevel level, LongSupplier time) {
-        return new RegionWorldData(time, RandomSource.create(), new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), new PathTypeCache(), level.getGameTime());
+        return new RegionWorldData(time, RandomSource.create(), new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), new PathTypeCache());
     }
 
     public long currentTick() {
@@ -102,11 +100,5 @@ public final class RegionWorldData {
     /** Chunks joined the region: the next pass walks them. */
     public void forgetEpoch() {
         savedEpoch = Long.MIN_VALUE;
-    }
-
-    public long advanceInhabitedTime(long gameTime) {
-        long delta = gameTime - lastInhabitedUpdate;
-        lastInhabitedUpdate = gameTime;
-        return delta;
     }
 }

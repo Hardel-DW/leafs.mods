@@ -129,12 +129,11 @@ public final class RegionTickBody {
         ChunkMap chunkMap = chunkSource.chunkMap;
         DistanceManager distanceManager = chunkMap.getDistanceManager();
         long gameTime = level.getGameTime();
-        long timeDiff = worldData.advanceInhabitedTime(gameTime);
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(chunks, chunkMap, view, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, worldData.entities().accessible(), (chunkKey, output) -> {
+        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, level, (chunkKey, output) -> {
             ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
             if (holder != null) {
                 holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
@@ -147,7 +146,7 @@ public final class RegionTickBody {
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
             ChunkPos chunkPos = chunk.getPos();
-            chunk.incrementInhabitedTime(timeDiff);
+            chunk.incrementInhabitedTime();
             if (distanceManager.inEntityTickingRange(chunkPos.pack())) {
                 level.tickThunder(chunk);
             }
