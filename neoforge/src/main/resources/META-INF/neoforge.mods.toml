@@ -59,7 +59,7 @@ versionRange = "*"
 config = "leafs.mixins.json"
 
 [[mixins]]
-config = "leafs-neoforge.mixins.json"
+config = "neoforge.mixins.json"
 
 ["lithium:options"]
 "mixin.ai.poi" = false
