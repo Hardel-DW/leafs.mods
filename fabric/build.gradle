@@ -12,9 +12,9 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
 	compileOnly rootProject.files("libs/${rootProject.scalablelux_fabric}")
 	localRuntime "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
-	localRuntime rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}")
+	localRuntime rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}", "libs/${rootProject.zconfig_fabric}")
 	testRuntimeOnly "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
-	testRuntimeOnly rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}")
+	testRuntimeOnly rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}", "libs/${rootProject.zconfig_fabric}")
 
 	testImplementation platform("org.junit:junit-bom:5.12.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"
