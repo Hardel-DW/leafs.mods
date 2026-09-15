@@ -1,0 +1,46 @@
+{
+	"required": true,
+	"package": "fr.hardel.leafs.mixin.compat",
+	"plugin": "fr.hardel.leafs.compat.CompatMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"appleskin.SyncHandlerMixin",
+		"appliedsticks.ServerEventsMixin",
+		"auroral.PlayerEventHandlerMixin",
+		"buildinggadgets2.ServerTickHandlerMixin",
+		"enderio.PlayerMovementHandlerMixin",
+		"exmachina.MechanicalGraphBufferMixin",
+		"exmachina.SignalGraphBufferMixin",
+		"fastbench.SlotUpdateManagerMixin",
+		"framedblocks.CullingUpdateTrackerMixin",
+		"justdirethings.EntityEventsMixin",
+		"laserio.ServerTickHandlerMixin",
+		"lootr.BlockEntityTickerMixin",
+		"lootr.DataStorageMixin",
+		"lootr.SectionMixin",
+		"mahoutsukai.FogProjectorMixin",
+		"mahoutsukai.MurkyWaterBlockMixin",
+		"mahoutsukai.StaffEmrysMixin",
+		"mahoutsukai.StrengtheningSpellEffectMixin",
+		"mahoutsukai.SummonFamiliarSpellEffectMixin",
+		"mahoutsukai.WilliamMixin",
+		"mininggadgets.ServerTickHandlerMixin",
+		"morered.GearsBlockMixin",
+		"neovitae.CommonEventHandlerMixin",
+		"placebo.PlaceboTaskQueueMixin",
+		"productivebees.SolitaryNestMixin",
+		"refinedsticks.ServerEventsMixin",
+		"reliquary.CommonEventHandlerMixin",
+		"sophisticatedbackpacks.BackpackTemplateStorageMixin",
+		"sophisticatedcore.CoreFakePlayerMixin",
+		"theurgy.LogisticsMixin",
+		"theurgy.WiresMixin",
+		"utilitarian.ModEventHandlerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
