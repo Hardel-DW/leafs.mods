@@ -151,17 +151,9 @@ public final class SynchronizedArrayList<E> extends ArrayList<E> {
         snapshot().forEach(action);
     }
 
-    /** The filter runs outside the lock, it may read the world. */
     @Override
     public boolean removeIf(Predicate<? super E> filter) {
-        List<E> matched = new ArrayList<>();
-        for (E element : snapshot()) {
-            if (filter.test(element)) {
-                matched.add(element);
-            }
-        }
-
-        return !matched.isEmpty() && removeAll(matched);
+        return Snapshots.removeIf(this, snapshot(), filter);
     }
 
     @Override

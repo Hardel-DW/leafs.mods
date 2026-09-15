@@ -3,23 +3,20 @@ package fr.hardel.excess;
 import it.unimi.dsi.fastutil.objects.Object2ObjectFunction;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
-import it.unimi.dsi.fastutil.objects.ObjectCollections;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.ObjectSets;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 /**
- * An Object2ObjectOpenHashMap other threads may write while one iterates: writes take the map's lock, the key and value views are unmodifiable
- * snapshots, the entry set is a detached copy, and the functions of compute and merge run outside the lock, published only if the entry did not move
- * meanwhile. Fits a field declared Object2ObjectOpenHashMap or Map.
+ * An Object2ObjectOpenHashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write back,
+ * and the functions of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared
+ * Object2ObjectOpenHashMap or Map.
  */
 public final class SynchronizedObject2ObjectOpenHashMap<K, V> extends Object2ObjectOpenHashMap<K, V> {
 
@@ -98,70 +95,51 @@ public final class SynchronizedObject2ObjectOpenHashMap<K, V> extends Object2Obj
         return super.trim();
     }
 
-    /** The mapping runs outside the lock; two threads racing on an absent key both build, the first published wins. */
     @Override
     public V computeIfAbsent(K key, Function<? super K, ? extends V> mapping) {
-        V current = get(key);
-        if (current != null) {
-            return current;
-        }
-
-        V created = mapping.apply(key);
-        if (created == null) {
-            return null;
-        }
-
-        synchronized (this) {
-            V existing = super.get(key);
-            if (existing != null) {
-                return existing;
-            }
-
-            super.put(key, created);
-            return created;
-        }
+        return Snapshots.computeIfAbsent(this, key, mapping);
     }
 
     @Override
     public V computeIfAbsent(K key, Object2ObjectFunction<? super K, ? extends V> mapping) {
-        return computeIfAbsent(key, (Function<? super K, ? extends V>) mapping);
+        return Snapshots.computeIfAbsent(this, key, mapping);
     }
 
     @Override
     public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remapping) {
-        return update(key, current -> current == null ? null : remapping.apply(key, current));
+        return Snapshots.update(this, key, current -> current == null ? null : remapping.apply(key, current));
     }
 
     @Override
     public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remapping) {
-        return update(key, current -> remapping.apply(key, current));
+        return Snapshots.update(this, key, current -> remapping.apply(key, current));
     }
 
     @Override
     public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
-        return update(key, current -> current == null ? value : remapping.apply(current, value));
+        return Snapshots.update(this, key, current -> current == null ? value : remapping.apply(current, value));
     }
 
     @Override
     public void forEach(BiConsumer<? super K, ? super V> action) {
-        for (Object2ObjectMap.Entry<K, V> entry : copy().object2ObjectEntrySet()) {
+        for (Snapshots.Entry<K, V> entry : entries()) {
             action.accept(entry.getKey(), entry.getValue());
         }
     }
 
     @Override
-    public synchronized ObjectSet<K> keySet() {
-        return ObjectSets.unmodifiable(new ObjectOpenHashSet<>(super.keySet()));
+    public ObjectSet<K> keySet() {
+        return new Snapshots.Keys<>(this, entries());
     }
 
     @Override
-    public synchronized ObjectCollection<V> values() {
-        return ObjectCollections.unmodifiable(new ObjectArrayList<>(super.values()));
+    public ObjectCollection<V> values() {
+        return new Snapshots.Values<>(this, entries());
     }
 
     @Override
     public FastEntrySet<K, V> object2ObjectEntrySet() {
-        return copy().object2ObjectEntrySet();
+        return new Snapshots.Object2ObjectEntries<>(this, new ArrayList<Object2ObjectMap.Entry<K, V>>(entries()));
     }
 
     @Override
@@ -184,31 +162,10 @@ public final class SynchronizedObject2ObjectOpenHashMap<K, V> extends Object2Obj
         return super.clone();
     }
 
-    /** Applies the change to the value read outside the lock, and publishes only if the entry still holds that value, else reads again. */
-    private V update(K key, UnaryOperator<V> change) {
-        while (true) {
-            V current = get(key);
-            V next = change.apply(current);
-            synchronized (this) {
-                if (super.get(key) != current) {
-                    continue;
-                }
-
-                if (next == null) {
-                    super.remove(key);
-                } else {
-                    super.put(key, next);
-                }
-
-                return next;
-            }
-        }
-    }
-
-    private synchronized Object2ObjectOpenHashMap<K, V> copy() {
-        Object2ObjectOpenHashMap<K, V> copy = new Object2ObjectOpenHashMap<>(super.size());
+    private synchronized List<Snapshots.Entry<K, V>> entries() {
+        List<Snapshots.Entry<K, V>> copy = new ArrayList<>(super.size());
         for (Object2ObjectMap.Entry<K, V> entry : super.object2ObjectEntrySet()) {
-            copy.put(entry.getKey(), entry.getValue());
+            copy.add(new Snapshots.Entry<>(this, entry));
         }
 
         return copy;

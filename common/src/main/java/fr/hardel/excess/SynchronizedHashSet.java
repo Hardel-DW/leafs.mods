@@ -12,6 +12,13 @@ import java.util.function.Predicate;
 /** A HashSet other threads may write while one iterates: writes take the set's lock, iteration walks a snapshot. Fits a field declared HashSet. */
 public final class SynchronizedHashSet<E> extends HashSet<E> {
 
+    public SynchronizedHashSet() {
+    }
+
+    public SynchronizedHashSet(Collection<? extends E> elements) {
+        super(elements);
+    }
+
     @Override
     public synchronized boolean add(E element) {
         return super.add(element);
@@ -87,17 +94,9 @@ public final class SynchronizedHashSet<E> extends HashSet<E> {
         snapshot().forEach(action);
     }
 
-    /** The filter runs outside the lock, it may read the world. */
     @Override
     public boolean removeIf(Predicate<? super E> filter) {
-        List<E> matched = new ArrayList<>();
-        for (E element : snapshot()) {
-            if (filter.test(element)) {
-                matched.add(element);
-            }
-        }
-
-        return !matched.isEmpty() && removeAll(matched);
+        return Snapshots.removeIf(this, snapshot(), filter);
     }
 
     @Override
