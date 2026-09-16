@@ -178,9 +178,9 @@ class RegionTickSchedulerTest {
         assertEquals(after, ticks.get(), "a cancelled handle must stop ticking");
     }
 
-    /** A region held by the server thread at its start retries within milliseconds once let go, not a whole period later. */
+    /** 2026-09-16: retrying a missed start within a millisecond made the server thread wait 5 ms a tick behind regions; a missed start counts and waits its period. */
     @Test
-    void aMissedStartRetriesRightAwayNotAPeriodLater(@TempDir Path crashDirectory) throws InterruptedException {
+    void aMissedStartIsCountedAndWaitsItsPeriod(@TempDir Path crashDirectory) throws InterruptedException {
         RegionTickScheduler pool = createScheduler(1, crashDirectory);
         pool.start();
         List<Long> attempts = new CopyOnWriteArrayList<>();
@@ -195,7 +195,7 @@ class RegionTickSchedulerTest {
         assertTrue(started.await(3, TimeUnit.SECONDS));
         handle.cancel();
         long retryNanos = attempts.get(2) - attempts.get(1);
-        assertTrue(retryNanos < RegionTickScheduler.TICK_PERIOD_NANOS / 2, "a missed start retried " + retryNanos / 1_000_000 + " ms later");
+        assertTrue(retryNanos >= RegionTickScheduler.TICK_PERIOD_NANOS, "a missed start retried " + retryNanos / 1_000_000 + " ms later");
         assertEquals(2, handle.stages().missedStarts());
     }
 
