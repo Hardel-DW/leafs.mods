@@ -12,7 +12,6 @@ import java.util.function.BiConsumer;
 /** Region worker pool, one tick per pass, a late region restarts from now instead of catching up. */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
-    private static final long MISSED_START_RETRY_NANOS = 1_000_000L;
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
@@ -122,15 +121,13 @@ public final class RegionTickScheduler {
         }
     }
 
+    /** A start missed behind another thread counts, and waits its period like a tick: retrying sooner made the server thread wait behind the region instead. */
     private void reschedule(TickHandle handle, boolean started) {
-        long now = System.nanoTime();
-        if (started) {
-            handle.setScheduledStartNanos(Math.max(now, handle.scheduledStartNanos() + periodNanos));
-            return;
+        if (!started) {
+            handle.stages().recordMissedStart();
         }
 
-        handle.stages().recordMissedStart();
-        handle.setScheduledStartNanos(now + MISSED_START_RETRY_NANOS);
+        handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos));
     }
 
     private boolean executeTick(TickHandle handle) {
