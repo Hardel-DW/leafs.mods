@@ -4,16 +4,19 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.ChunkPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -37,6 +40,17 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     @Override
     public PlayerPacketQueue leafs$inboundQueue() {
         return leafs$inboundQueue;
+    }
+
+    /** A region never waits for a player's chunk: arrived in raw terrain, he is not ticked until it lands, vanilla's keep-alive branch runs instead. The server thread waits like vanilla. */
+    @WrapMethod(method = "tickPlayer")
+    private boolean leafs$tickOnALandedChunk(Operation<Boolean> original) {
+        ChunkPos chunk = player.chunkPosition();
+        if (WorldTickContext.current() != null && RegionChunkAccess.fullChunkOrNull(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z()) == null) {
+            return false;
+        }
+
+        return original.call();
     }
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/FutureChain;<init>(Ljava/util/concurrent/Executor;)V"))
