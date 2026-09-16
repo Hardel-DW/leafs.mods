@@ -49,10 +49,4 @@ public final class RegionChunkAccess {
 
         return ChunkWait.chunk(chunkMap.level, chunkX, chunkZ, status);
     }
-
-    /** Vanilla's readiness of a chunk for the client, whoever owns it; the send reads a chunk like any thread does, the section writes are monitored. */
-    public static LevelChunk readyToSend(ChunkMap chunkMap, long key) {
-        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
-        return holder == null ? null : holder.getChunkToSend();
-    }
 }

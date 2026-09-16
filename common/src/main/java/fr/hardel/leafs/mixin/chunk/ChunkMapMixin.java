@@ -8,7 +8,6 @@ import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.chunk.DistanceManagerAccess;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.LevelChunksAccess;
-import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.disk.PendingWrite;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
@@ -32,7 +31,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.ChunkTrackingView;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.server.level.ServerPlayer;
@@ -273,24 +271,6 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         if (WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunk.x(), chunk.z())) {
             original.call(player);
         }
-    }
-
-    /** The view of a player is read where his diffs run: the mark of a ready chunk goes to his owner's inbox and reads the view there. */
-    @WrapOperation(method = "onChunkReadyToSend", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkTrackingView;contains(Lnet/minecraft/world/level/ChunkPos;)Z"))
-    private boolean leafs$markOnThePlayersOwner(ChunkTrackingView view, ChunkPos pos, Operation<Boolean> original, @Local ServerPlayer player, @Local(argsOnly = true) LevelChunk chunk) {
-        ChunkPos at = player.chunkPosition();
-        leafs$owners().submit(at.x(), at.z(), Work.CHUNK, () -> {
-            if (player.getChunkTrackingView().contains(pos)) {
-                player.connection.chunkSender.markChunkPendingToSend(chunk);
-            }
-        });
-        return false;
-    }
-
-    /** A chunk entering a view joins the queue on vanilla's readiness, whoever owns it. */
-    @WrapOperation(method = "markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkToSend(J)Lnet/minecraft/world/level/chunk/LevelChunk;"))
-    private LevelChunk leafs$queueOnVanillaReadiness(ChunkMap chunkMap, long pos, Operation<LevelChunk> original) {
-        return RegionChunkAccess.readyToSend(chunkMap, pos);
     }
 
     @Unique
