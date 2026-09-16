@@ -34,13 +34,6 @@ ordering = "BEFORE"
 side = "BOTH"
 
 [[dependencies.leafs]]
-modId = "zfastnoise"
-type = "optional"
-versionRange = "*"
-ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.leafs]]
 modId = "c2me"
 type = "incompatible"
 versionRange = "*"
