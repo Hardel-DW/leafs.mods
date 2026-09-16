@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -175,6 +176,27 @@ class RegionTickSchedulerTest {
         long after = ticks.get();
         Thread.sleep(150);
         assertEquals(after, ticks.get(), "a cancelled handle must stop ticking");
+    }
+
+    /** A region held by the server thread at its start retries within milliseconds once let go, not a whole period later. */
+    @Test
+    void aMissedStartRetriesRightAwayNotAPeriodLater(@TempDir Path crashDirectory) throws InterruptedException {
+        RegionTickScheduler pool = createScheduler(1, crashDirectory);
+        pool.start();
+        List<Long> attempts = new CopyOnWriteArrayList<>();
+        CountDownLatch started = new CountDownLatch(1);
+        TestTickHandle handle = new TestTickHandle(1, () -> {
+            attempts.add(System.nanoTime());
+            return attempts.size() >= 3;
+        }, started::countDown);
+
+        pool.schedule(handle);
+
+        assertTrue(started.await(3, TimeUnit.SECONDS));
+        handle.cancel();
+        long retryNanos = attempts.get(2) - attempts.get(1);
+        assertTrue(retryNanos < RegionTickScheduler.TICK_PERIOD_NANOS / 2, "a missed start retried " + retryNanos / 1_000_000 + " ms later");
+        assertEquals(2, handle.stages().missedStarts());
     }
 
     @Test
