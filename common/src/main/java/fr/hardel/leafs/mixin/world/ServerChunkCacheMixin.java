@@ -1,9 +1,7 @@
 package fr.hardel.leafs.mixin.world;
 
-import fr.hardel.leafs.world.WorldTickContext;
 import java.util.concurrent.ConcurrentHashMap;
 import org.spongepowered.asm.mixin.Mutable;
-import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.chunk.ChangedChunksAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -51,7 +49,7 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
         return chunkHoldersToBroadcast;
     }
 
-    /** The set takes writers from every owner; a region skips it for its own chunks, so it holds what the workers' sweep must broadcast. */
+    /** The set takes writers from every owner; a region removes what it broadcasts, the workers' sweep drains the rest. */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$bindPumpLevel(CallbackInfo callbackInfo) {
         ServerChunkCache self = (ServerChunkCache) (Object) this;
@@ -88,13 +86,6 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
     @Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;tick(Ljava/util/function/BooleanSupplier;)V", shift = At.Shift.AFTER), require = 0)
     private void leafs$markUnloadsStage(CallbackInfo callbackInfo) {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialUnloads);
-    }
-
-    /** A region broadcasts its own chunks from their flags; a change anywhere else lands in the set the workers' sweep drains. */
-    @WrapOperation(method = {"blockChanged", "onChunkReadyToSend"}, at = @At(value = "INVOKE", target = "Ljava/util/Set;add(Ljava/lang/Object;)Z"))
-    private boolean leafs$changedOutsideTheRegion(Set<ChunkHolder> instance, Object holder, Operation<Boolean> original) {
-        ChunkPos pos = ((ChunkHolder) holder).getPos();
-        return WorldTickContext.ownsChunk(this.level, pos.x(), pos.z()) || original.call(instance, holder);
     }
 
     /** The serial broadcast walk only survives for the universal owner; after activation the sweep owns the set. */

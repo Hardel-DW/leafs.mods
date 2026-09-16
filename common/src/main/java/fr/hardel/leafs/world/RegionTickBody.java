@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.ChangedChunksAccess;
 import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionEntityTracking;
@@ -86,7 +87,7 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionChunkTick);
         }
 
-        ChunkBroadcasts.changed(owned.holders());
+        ChunkBroadcasts.changed(((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders(), owned.holders());
         stages.mark(TickStages.regionBroadcast);
         RegionEntityTracking.tickRegion(level, owned, entities);
         stages.mark(TickStages.regionTracking);
