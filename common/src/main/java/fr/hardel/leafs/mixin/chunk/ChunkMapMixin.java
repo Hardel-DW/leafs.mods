@@ -54,9 +54,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -103,11 +103,6 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     private TicketStorage ticketStorage;
 
     @Shadow
-    private void runGenerationTask(ChunkGenerationTask task) {
-        throw new IllegalStateException("Shadowed method body");
-    }
-
-    @Shadow
     abstract void onFullChunkStatusChange(ChunkPos pos, FullChunkStatus status);
 
     @Shadow
@@ -116,7 +111,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     }
 
     @Unique
-    private final ConcurrentLinkedQueue<ChunkGenerationTask> leafs$pendingGenerationTasks = new ConcurrentLinkedQueue<>();
+    private final ThreadLocal<List<ChunkGenerationTask>> leafs$tasksCreatedHere = ThreadLocal.withInitial(ArrayList::new);
 
     @Unique
     private LevelChunks leafs$chunks;
@@ -167,20 +162,10 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         callbackInfo.cancel();
     }
 
-    /** Tasks are created from any thread and started by the holder that registered them. */
-    @WrapOperation(method = "scheduleGenerationTask", at = @At(value = "INVOKE", target = "Ljava/util/List;add(Ljava/lang/Object;)Z"))
-    private boolean leafs$queueGenerationTask(List<ChunkGenerationTask> instance, Object task, Operation<Boolean> original) {
-        return leafs$pendingGenerationTasks.add((ChunkGenerationTask) task);
-    }
-
-    @Inject(method = "runGenerationTasks", at = @At("HEAD"), cancellable = true)
-    private void leafs$startQueuedTasks(CallbackInfo callbackInfo) {
-        ChunkGenerationTask task;
-        while ((task = leafs$pendingGenerationTasks.poll()) != null) {
-            runGenerationTask(task);
-        }
-
-        callbackInfo.cancel();
+    /** Vanilla's list of created tasks, one per thread: the thread that creates a task installs it in its holder, then starts it; no other thread drains it. */
+    @WrapOperation(method = {"scheduleGenerationTask", "runGenerationTasks"}, at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;pendingGenerationTasks:Ljava/util/List;"))
+    private List<ChunkGenerationTask> leafs$tasksOfThisThread(ChunkMap self, Operation<List<ChunkGenerationTask>> original) {
+        return leafs$tasksCreatedHere.get();
     }
 
     /** Both halves of a load, parse and read, run on the pool under the chunk. */
