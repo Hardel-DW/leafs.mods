@@ -143,7 +143,7 @@ public final class UnownedSweep {
         for (ChunkHolder holder : changed) {
             long chunkKey = holder.getPos().pack();
             if (unowned(chunkKey) && changed.remove(holder)) {
-                dispatch(chunkKey, () -> ChunkBroadcasts.changed(List.of(holder)));
+                dispatch(chunkKey, () -> ChunkBroadcasts.changed(changed, List.of(holder)));
             }
         }
     }
