@@ -32,8 +32,7 @@
 		"java": ">=25",
 		"fabric-api": "*",
 		"mapple": "*",
-		"scalablelux": "*",
-		"zfastnoise": "*"
+		"scalablelux": "*"
 	},
 	"custom": {
 		"lithium:options": {
