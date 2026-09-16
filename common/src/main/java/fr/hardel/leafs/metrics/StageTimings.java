@@ -19,6 +19,7 @@ public final class StageTimings {
     private volatile int cursor;
     private volatile long busyNanos;
     private volatile long lagNanos;
+    private volatile long missedStarts;
 
     public StageTimings(int stageCount) {
         this.ring = new long[CAPACITY][stageCount];
@@ -67,6 +68,14 @@ public final class StageTimings {
 
     public long lagNanos() {
         return lagNanos;
+    }
+
+    public void recordMissedStart() {
+        missedStarts++;
+    }
+
+    public long missedStarts() {
+        return missedStarts;
     }
 
     public int stageCount() {

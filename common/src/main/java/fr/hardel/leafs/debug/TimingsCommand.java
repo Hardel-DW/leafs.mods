@@ -82,7 +82,8 @@ public final class TimingsCommand {
             .append(CommandText.sep()).append(CommandText.rate(region.stages().sample(System.nanoTime())))
             .append(CommandText.stat("chunks", region.chunkCount()))
             .append(CommandText.stat("entities", region.entityCount()))
-            .append(CommandText.stat("lag", formatMillis(averageLag(region.stages())))), false);
+            .append(CommandText.stat("lag", formatMillis(averageLag(region.stages()))))
+            .append(CommandText.stat("missed", region.stages().missedStarts())), false);
 
         return sendStages(source, TickFamily.REGION, averages);
     }

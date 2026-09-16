@@ -49,7 +49,7 @@ public abstract class TickHandle {
     /** The region clock, or game time for the level-serial unit. */
     public abstract long currentTick();
 
-    protected abstract void tick();
+    protected abstract boolean tick();
 
     protected abstract RegionCrashReport buildCrashReport();
 }

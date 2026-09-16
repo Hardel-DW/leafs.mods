@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 /** Region worker pool, one tick per pass, a late region restarts from now instead of catching up. */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
+    private static final long MISSED_START_RETRY_NANOS = 1_000_000L;
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
@@ -102,8 +103,9 @@ public final class RegionTickScheduler {
                 worker.setName("Leafs Server R#" + handle.id() + " " + handle.dimension());
             }
 
+            boolean started;
             try {
-                executeTick(handle);
+                started = executeTick(handle);
             } catch (Throwable throwable) {
                 failurePolicy.accept(handle, throwable);
                 continue;
@@ -114,17 +116,28 @@ public final class RegionTickScheduler {
             }
 
             if (!handle.isCancelled()) {
-                handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos));
+                reschedule(handle, started);
                 queue.add(next);
             }
         }
     }
 
-    private void executeTick(TickHandle handle) {
+    private void reschedule(TickHandle handle, boolean started) {
+        long now = System.nanoTime();
+        if (started) {
+            handle.setScheduledStartNanos(Math.max(now, handle.scheduledStartNanos() + periodNanos));
+            return;
+        }
+
+        handle.stages().recordMissedStart();
+        handle.setScheduledStartNanos(now + MISSED_START_RETRY_NANOS);
+    }
+
+    private boolean executeTick(TickHandle handle) {
         RegionContext.enter(handle.context());
         try {
             watchdog.beginTick(handle);
-            handle.tick();
+            return handle.tick();
         } catch (Throwable throwable) {
             try {
                 crashWriter.write(handle.buildCrashReport(), throwable);

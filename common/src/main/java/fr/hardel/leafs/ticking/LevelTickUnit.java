@@ -51,7 +51,7 @@ public final class LevelTickUnit extends TickHandle {
     }
 
     @Override
-    protected void tick() {
+    protected boolean tick() {
         Runnable work = pendingWork;
         if (work == null) {
             throw new IllegalStateException("Level tick unit ticked without prepared work");
@@ -69,6 +69,7 @@ public final class LevelTickUnit extends TickHandle {
 
         stages.mark(TickStages.serialManagement);
         stages.endTick(System.nanoTime());
+        return true;
     }
 
     /** Paused solo: vanilla drains packets while paused, so the per-player queues do too, without listener tick. */
