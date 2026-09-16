@@ -56,10 +56,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 /** Leafs owns the holder bookkeeping: the table, the generation on the pool, the publication on the owner, the unload. Vanilla's serial passes are cut. */
 @Mixin(ChunkMap.class)
@@ -211,12 +209,6 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
 
         leafs$owners().submit(pos.x(), pos.z(), Work.CHUNK, body);
         callbackInfo.cancel();
-    }
-
-    /** The send dependency is holder state the owner writes: each chunk of the area takes vanilla's step on its owner. */
-    @WrapOperation(method = "waitForLightBeforeSending", at = @At(value = "INVOKE", target = "Ljava/util/stream/Stream;forEach(Ljava/util/function/Consumer;)V"))
-    private void leafs$sendDependenciesOnTheOwner(Stream<ChunkPos> chunks, Consumer<ChunkPos> perChunk, Operation<Void> original) {
-        original.call(chunks, (Consumer<ChunkPos>) pos -> leafs$owners().submit(pos.x(), pos.z(), Work.CHUNK, () -> perChunk.accept(pos)));
     }
 
     /** The unload leaves from the loading graph to the owner; vanilla's drop loop, unload queue and eager pass have nothing left. */
