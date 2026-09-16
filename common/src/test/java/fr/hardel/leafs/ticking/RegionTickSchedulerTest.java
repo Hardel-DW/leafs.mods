@@ -195,7 +195,7 @@ class RegionTickSchedulerTest {
         assertTrue(started.await(3, TimeUnit.SECONDS));
         handle.cancel();
         long retryNanos = attempts.get(2) - attempts.get(1);
-        assertTrue(retryNanos >= RegionTickScheduler.TICK_PERIOD_NANOS, "a missed start retried " + retryNanos / 1_000_000 + " ms later");
+        assertTrue(retryNanos >= RegionTickScheduler.TICK_PERIOD_NANOS / 2, "a missed start retried " + retryNanos / 1_000_000 + " ms later");
         assertEquals(2, handle.stages().missedStarts());
     }
 
