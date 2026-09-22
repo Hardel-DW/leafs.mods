@@ -37,6 +37,11 @@ public final class Region<R> {
         return state;
     }
 
+    /** The thread ticking or holding the region, null otherwise. */
+    public Thread tickingThread() {
+        return tickingThread;
+    }
+
     /** Only when idle with no pending merge; an awaited merge partner never ticks on its own. */
     public boolean tryMarkTicking() {
         return regionizer.tryMarkTicking(this, false);
