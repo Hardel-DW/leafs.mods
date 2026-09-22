@@ -18,6 +18,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
+import java.util.List;
+
 /** {@code /leafs chunk [<pos>]}: why the chunk at a block column, the caller's by default, is or is not where the game expects it. */
 public final class ChunkCommand {
 
@@ -26,42 +28,41 @@ public final class ChunkCommand {
 
     static LiteralArgumentBuilder<CommandSourceStack> tree() {
         return Commands.literal("chunk")
-            .executes(context -> report(context.getSource(), ChunkPos.containing(BlockPos.containing(context.getSource().getPosition()))))
+            .executes(context -> send(context.getSource(), ChunkPos.containing(BlockPos.containing(context.getSource().getPosition()))))
             .then(Commands.argument("pos", ColumnPosArgument.columnPos())
-                .executes(context -> report(context.getSource(), ColumnPosArgument.getColumnPos(context, "pos").toChunkPos())));
+                .executes(context -> send(context.getSource(), ColumnPosArgument.getColumnPos(context, "pos").toChunkPos())));
     }
 
-    private static int report(CommandSourceStack source, ChunkPos chunk) {
-        int chunkX = chunk.x();
-        int chunkZ = chunk.z();
-        ServerLevel level = source.getLevel();
+    /** The lines of the report, read from the server thread: the command sends them, Leafs Debug logs them. */
+    public static List<Component> report(ServerLevel level, int chunkX, int chunkZ) {
         LevelChunks chunks = LevelChunks.of(level);
-        LevelRegions regions = LevelRegions.of(level);
         long key = ChunkPos.pack(chunkX, chunkZ);
         ChunkHolder holder = chunks.holders().table().get(key);
-
-        source.sendSuccess(() -> Component.empty()
+        Component header = Component.empty()
             .append(Component.literal("chunk [%d, %d]".formatted(chunkX, chunkZ)).withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("dimension", CommandText.shortDimension(level.dimension().identifier().toString())))
             .append(CommandText.stat("loading level", chunks.graphs().loading().level(key)))
-            .append(CommandText.stat("tickets", level.getChunkSource().ticketStorage.getTicketDebugString(key, false))), false);
+            .append(CommandText.stat("tickets", level.getChunkSource().ticketStorage.getTicketDebugString(key, false)));
 
         if (holder == null) {
-            source.sendSuccess(() -> CommandText.gray("no holder: nothing asks for this chunk"), false);
-            return 0;
+            return List.of(header, CommandText.gray("no holder: nothing asks for this chunk"));
         }
 
-        source.sendSuccess(() -> CommandText.gray(WaitReport.holder(holder)), false);
-        source.sendSuccess(() -> Component.empty()
+        Component status = Component.empty()
             .append(CommandText.gray(ChunkLevel.fullStatus(holder.getTicketLevel()).toString()))
             .append(CommandText.stat("full", holder.getChunkIfPresent(ChunkStatus.FULL) != null))
             .append(CommandText.stat("ticking", holder.getTickingChunk() != null))
             .append(CommandText.stat("light synced", holder.getSendSyncFuture().isDone()))
-            .append(CommandText.stat("sendable", holder.getChunkToSend() != null)), false);
-            
-        source.sendSuccess(() -> CommandText.gray(owner(chunks, regions, chunkX, chunkZ)), false);
-        source.sendSuccess(() -> CommandText.gray(chunks.owners().describeQueued(chunkX, chunkZ)), false);
-        return 1;
+            .append(CommandText.stat("sendable", holder.getChunkToSend() != null));
+
+        return List.of(header, CommandText.gray(WaitReport.holder(holder)), status,
+            CommandText.gray(owner(chunks, LevelRegions.of(level), chunkX, chunkZ)), CommandText.gray(chunks.owners().describeQueued(chunkX, chunkZ)));
+    }
+
+    private static int send(CommandSourceStack source, ChunkPos chunk) {
+        List<Component> lines = report(source.getLevel(), chunk.x(), chunk.z());
+        lines.forEach(line -> source.sendSuccess(() -> line, false));
+        return lines.size();
     }
 
     /** The thread that took the chunk comes first, a region born over it meanwhile waits for the release. */
