@@ -12,7 +12,6 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.ArrayList;
 
-/** NeoForge's item placement drives its capture through the level's fields; here it drives the thread's. */
 @Mixin(CommonHooks.class)
 public abstract class PlacementSnapshotCaptureShim {
 

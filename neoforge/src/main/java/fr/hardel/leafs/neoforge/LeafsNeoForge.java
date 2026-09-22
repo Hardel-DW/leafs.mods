@@ -22,14 +22,12 @@ import java.util.Map;
 
 @Mod(Leafs.MOD_ID)
 public final class LeafsNeoForge {
-
     public LeafsNeoForge(IEventBus modBus) {
         Leafs.bootstrap(new Leafs.Platform(FMLPaths.CONFIGDIR.get(), FMLPaths.GAMEDIR.get(), ModAttribution.fromOrigins(origins()), SidedThreadGroups.SERVER));
         modBus.addListener((RegisterEvent event) -> event.register(Registries.TICKET_TYPE, LeafsTicketTypes.DEMAND, () -> LeafsTicketTypes.demand));
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> event.getDispatcher().register(LeafsCommand.node()));
     }
 
-    /** Every mod by the file that carries it; NeoForge itself is the platform, never a suspect. */
     private static Map<Path, Suspect> origins() {
         Map<Path, Suspect> byOrigin = new HashMap<>();
         for (IModInfo mod : ModList.get().getMods()) {

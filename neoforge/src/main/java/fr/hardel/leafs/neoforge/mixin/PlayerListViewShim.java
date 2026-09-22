@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Collections;
 import java.util.List;
 
-/** NeoForge hands out an unmodifiable view built over the original player list; Leafs swaps that list for a concurrent one at the end of construction, so the view follows, after the swap. */
 @Mixin(value = PlayerList.class, priority = 1500)
 public abstract class PlayerListViewShim {
 
