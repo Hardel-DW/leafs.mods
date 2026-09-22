@@ -1,6 +1,6 @@
 # Leafs
 On a classic server, every cost is shared. Leafs splits the world into independent regions, and each region runs its own tick at 20 TPS. Leafs adds multithreading, and nothing else. No gameplay feature, no API.
-The RAM/CPU optimizations we made live in a separate mod, Mapple, which works with or without Leafs. Leafs depends on Mapple, ScalableLux and FastNoise.
+The RAM/CPU optimizations we made live in a separate mod, Mapple, which works with or without Leafs. Leafs depends on Mapple, ScalableLux.
 The mods C2ME, Moonrise and VMP are incompatible.
 
 ## Reading this documentation
