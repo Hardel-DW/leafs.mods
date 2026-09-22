@@ -4,14 +4,17 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.world.WorldTickContext;
+import net.minecraft.CrashReport;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.thread.BlockableEventLoop;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -47,7 +50,7 @@ public final class TickingManager {
         ThreadGroup serverThreads = Leafs.platform().serverThreads();
         this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.slowTaskNanos = config.debug().slowTaskNanos();
-        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT);
+        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",
@@ -210,6 +213,11 @@ public final class TickingManager {
         if (!server.isDedicatedServer()) {
             watchdog.disarmShutdownDeadline();
         }
+    }
+
+    private void onChunkTaskFailure(ChunkTask task, Throwable failure) {
+        Leafs.LOGGER.error("Chunk task {} failed on {} - stopping the server", task, Thread.currentThread().getName(), failure);
+        BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(failure, "Leafs chunk task " + task));
     }
 
     private void onRegionTickFailure(TickHandle handle, Throwable throwable) {

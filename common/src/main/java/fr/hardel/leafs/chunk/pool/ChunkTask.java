@@ -109,6 +109,11 @@ public abstract class ChunkTask {
     /** Null when the work is done on return. */
     protected abstract @Nullable CompletableFuture<?> run();
 
+    @Override
+    public String toString() {
+        return place == null ? "%s at priority %d".formatted(kind, priority) : "%s at [%d, %d] priority %d".formatted(kind, chunkX(place.chunkKey()), chunkZ(place.chunkKey()), priority);
+    }
+
     /** Left the queue before running: the pool drops it when it reaches it. */
     protected final void withdraw() {
         withdrawn = true;

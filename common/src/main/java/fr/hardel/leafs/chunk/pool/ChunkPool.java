@@ -11,6 +11,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 /** Every piece of chunk work runs here, most urgent first, under its reservation. Lowest OS priority so region ticks win the cores. */
 public final class ChunkPool implements Executor {
@@ -25,10 +26,12 @@ public final class ChunkPool implements Executor {
     private final AtomicInteger queued = new AtomicInteger();
     private final AtomicInteger active = new AtomicInteger();
     private final ReservationBlocks blocks = new ReservationBlocks();
+    private final BiConsumer<ChunkTask, Throwable> failures;
     private volatile boolean running = true;
 
-    public ChunkPool(ThreadGroup serverThreads, int threads, int priorities) {
+    public ChunkPool(ThreadGroup serverThreads, int threads, int priorities, BiConsumer<ChunkTask, Throwable> failures) {
         this.buckets = new PriorityBuckets(priorities);
+        this.failures = failures;
         List<Thread> started = new ArrayList<>(threads);
         for (int index = 1; index <= threads; index++) {
             Thread worker = new Worker(serverThreads, this::work, index);
@@ -168,7 +171,7 @@ public final class ChunkPool implements Executor {
             pending = task.run();
         } catch (Throwable failure) {
             finish(task);
-            Leafs.LOGGER.error("Chunk task failed on {}", Thread.currentThread().getName(), failure);
+            failures.accept(task, failure);
             return;
         }
 

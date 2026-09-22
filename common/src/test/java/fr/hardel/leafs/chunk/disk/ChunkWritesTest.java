@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Timeout(30)
 @ExtendWith(MinecraftBootstrap.class)
 class ChunkWritesTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 2, 4);
+    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 2, 4, (_, _) -> { });
     private SimpleRegionStorage storage;
 
     @AfterEach
