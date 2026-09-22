@@ -31,6 +31,18 @@ public final class RegionChunkAccess {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
+    public static boolean fullAround(ChunkMap chunkMap, int chunkX, int chunkZ) {
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (fullChunkOrNull(chunkMap, chunkX + dx, chunkZ + dz) == null) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     public static ChunkAccess presentChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         return holder == null ? null : holder.getChunkIfPresent(status);

@@ -42,11 +42,11 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return leafs$inboundQueue;
     }
 
-    /** A region never waits for a player's chunk: arrived in raw terrain, he is not ticked until it lands, vanilla's keep-alive branch runs instead. The server thread waits like vanilla. */
+    /** A region never waits for a player's chunks: arrived in raw terrain, he is not ticked until his chunk and its neighbours land, vanilla's keep-alive branch runs instead. The server thread waits like vanilla. */
     @WrapMethod(method = "tickPlayer")
-    private boolean leafs$tickOnALandedChunk(Operation<Boolean> original) {
+    private boolean leafs$tickOnLandedChunks(Operation<Boolean> original) {
         ChunkPos chunk = player.chunkPosition();
-        if (WorldTickContext.current() != null && RegionChunkAccess.fullChunkOrNull(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z()) == null) {
+        if (WorldTickContext.current() != null && !RegionChunkAccess.fullAround(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
             return false;
         }
 
