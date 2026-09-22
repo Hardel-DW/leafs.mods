@@ -38,9 +38,6 @@ loom {
 
 		client {
 			vmArg "-Xmx8G"
-			if (project.hasProperty('world')) {
-				programArgs "--quickPlaySingleplayer", project.world
-			}
 		}
 
 		server {
