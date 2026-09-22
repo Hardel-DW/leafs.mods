@@ -58,7 +58,7 @@ neoForge {
 }
 
 dependencies {
-	compileOnly rootProject.files("libs/${rootProject.scalablelux_neoforge}")
+	compileOnly "maven.modrinth:scalablelux:${rootProject.scalablelux_neoforge}"
 }
 
 tasks.named('compileJava') {
