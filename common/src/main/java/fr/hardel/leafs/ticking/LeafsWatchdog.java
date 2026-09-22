@@ -10,11 +10,8 @@ import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 
-/** Per-tick-unit watchdog, replaces vanilla's. Warn logs the stuck stack, kill (vanilla's max-tick-time, zero disables) runs once; the same killer covers a shutdown that never finishes. */
 public final class LeafsWatchdog {
-    /** Generous next to the kill threshold: a legitimate final save of a large world must never be cut short. */
     public static final Duration SHUTDOWN_DEADLINE = Duration.ofMinutes(5);
-
     private final long warnNanos;
     private final LongSupplier killNanos;
     private final LongFunction<Map<Thread, String>> stalledWaits;

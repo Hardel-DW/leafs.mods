@@ -7,13 +7,11 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 
-/** What the mod does, whichever loader starts it; the loader module hands over what only it knows. */
 public final class Leafs {
     public static final String MOD_ID = "leafs";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static Platform platform;
 
-    /** The loader's side of the world: where its files are, which mod owns a class, and the thread group it reads as the server's. Every Leafs thread running game code is born in that group. */
     public record Platform(Path configDir, Path gameDir, ModAttribution attribution, ThreadGroup serverThreads) {
     }
 

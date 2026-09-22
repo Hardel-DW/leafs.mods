@@ -349,6 +349,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
             RegionInbox target = child == null ? orphans : child.data().inbox();
             target.post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task());
         });
+        
         if (body != null && orphans.size() > 0) {
             owners().abandon(orphans);
         }
