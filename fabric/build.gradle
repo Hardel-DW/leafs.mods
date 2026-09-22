@@ -37,15 +37,15 @@ loom {
 		}
 
 		client {
-			vmArg "-Xmx3G"
+			vmArg "-Xmx8G"
 			if (project.hasProperty('world')) {
 				programArgs "--quickPlaySingleplayer", project.world
 			}
 		}
 
 		server {
-			vmArg "-Xms14G"
-			vmArg "-Xmx14G"
+			vmArg "-Xms8G"
+			vmArg "-Xmx8G"
 			vmArg "-XX:+AlwaysPreTouch"
 		}
 	}
