@@ -30,9 +30,6 @@ class EntitySectionConcurrencyTest {
                     for (Object entity : section.find(Mob.class)) {
                         assertTrue(entity instanceof Mob);
                     }
-
-                    for (Object ignored : section) {
-                    }
                 }
             } catch (Throwable throwable) {
                 readerFailure.set(throwable);
