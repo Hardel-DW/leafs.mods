@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.ArrayList;
 
-/** A block set while this thread captures lands in the thread's capture; a mod driving the level's own flag keeps the level's list, as before. */
 @Mixin(Level.class)
 public abstract class LevelSnapshotCaptureShim {
 

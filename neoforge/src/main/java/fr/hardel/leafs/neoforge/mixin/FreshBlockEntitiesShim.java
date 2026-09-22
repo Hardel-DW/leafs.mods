@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import java.util.Collection;
 import java.util.List;
 
-/** NeoForge defers a block entity's load callback to the level's next pass, in one level-wide list; on a server level the chunk's own pass runs it, on the owner, before the first tick. */
 @Mixin(LevelChunk.class)
 public abstract class FreshBlockEntitiesShim {
 
