@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoutingNeighborUpdaterTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4);
+    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4, (_, _) -> { });
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private boolean holding;
 
