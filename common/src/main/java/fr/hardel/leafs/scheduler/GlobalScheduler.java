@@ -1,6 +1,7 @@
 package fr.hardel.leafs.scheduler;
 
 import fr.hardel.leafs.Leafs;
+import net.minecraft.util.thread.BlockableEventLoop;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
@@ -38,10 +39,14 @@ public final class GlobalScheduler {
         Runnable task;
         while (budget-- > 0 && (task = tasks.poll()) != null) {
             ran = true;
+
             try {
                 runner.accept(task);
-            } catch (Throwable throwable) {
-                Leafs.LOGGER.error("Global task failed", throwable);
+            } catch (Exception exception) {
+                Leafs.LOGGER.error("Global task failed", exception);
+                if (BlockableEventLoop.isNonRecoverable(exception)) {
+                    throw exception;
+                }
             }
         }
 

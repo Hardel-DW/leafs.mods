@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class GlobalSchedulerTest {
     private final GlobalScheduler scheduler = new GlobalScheduler(Runnable::run);
@@ -15,7 +16,6 @@ class GlobalSchedulerTest {
     void drainRunsTasksInSubmissionOrder() {
         scheduler.run(() -> executed.add("first"));
         scheduler.run(() -> executed.add("second"));
-
         scheduler.drain();
         assertEquals(List.of("first", "second"), executed);
         scheduler.drain();
@@ -27,10 +27,22 @@ class GlobalSchedulerTest {
         scheduler.run(() -> {
             throw new IllegalStateException("boom");
         });
-        scheduler.run(() -> executed.add("survivor"));
 
+        scheduler.run(() -> executed.add("survivor"));
         scheduler.drain();
         assertEquals(List.of("survivor"), executed);
+    }
+
+    /** Vanilla's task loop logs an exception and lets an error through: the server crashes, like vanilla, instead of running on. */
+    @Test
+    void anErrorLeavesTheDrainLikeVanilla() {
+        scheduler.run(() -> {
+            throw new StackOverflowError("deep");
+        });
+
+        scheduler.run(() -> executed.add("after"));
+        assertThrows(StackOverflowError.class, scheduler::drain);
+        assertEquals(List.of(), executed);
     }
 
     /** 2026-09-06: the server thread pumped its queue inside a task waiting for a chunk, so the writes behind it ran first and erased a fresh nether portal. */
@@ -41,17 +53,15 @@ class GlobalSchedulerTest {
             scheduler.drain();
             executed.add("air written");
         });
-        scheduler.run(() -> executed.add("write portal"));
 
+        scheduler.run(() -> executed.add("write portal"));
         scheduler.drain();
         assertEquals(List.of("write air", "air written", "write portal"), executed);
     }
 
     @Test
     void tasksQueuedDuringADrainWaitForTheNext() {
-
         scheduler.run(() -> scheduler.run(() -> executed.add("requeued")));
-
         scheduler.drain();
         assertEquals(List.of(), executed);
         scheduler.drain();
