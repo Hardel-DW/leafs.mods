@@ -85,6 +85,7 @@ public final class Regionizer<R> {
         }
     }
 
+    // Used by the Leafs Debug mod
     public Region<R> regionAt(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         long stamp = lock.tryOptimisticRead();
@@ -104,6 +105,7 @@ public final class Regionizer<R> {
         }
     }
 
+    // Used by the Leafs Debug mod
     public int sectionShift() {
         return sectionShift;
     }
@@ -114,6 +116,7 @@ public final class Regionizer<R> {
         return section == null ? null : section.region();
     }
 
+    // Used by the Leafs Debug mod
     public Collection<Region<R>> regionsView() {
         return regionsView;
     }

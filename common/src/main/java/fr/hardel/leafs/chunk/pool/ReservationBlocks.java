@@ -18,6 +18,7 @@ public final class ReservationBlocks {
         of(blocked.kind(), holder.kind()).increment();
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter of(Kind blocked, Kind holder) {
         return counts[blocked.ordinal()][holder.ordinal()];
     }

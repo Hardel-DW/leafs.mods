@@ -59,6 +59,7 @@ public final class LevelChunks {
         timeouts.pauseWhile(holders::busy);
     }
 
+    // Used by the Leafs Debug mod
     public static LevelChunks of(ServerLevel level) {
         return ((LevelChunksAccess) level.getChunkSource().chunkMap).leafs$chunks();
     }
@@ -95,6 +96,7 @@ public final class LevelChunks {
         return pool;
     }
 
+    // Used by the Leafs Debug mod
     public TicketGraphs graphs() {
         return graphs;
     }

@@ -22,10 +22,12 @@ public final class RegionTickHandle extends TickHandle {
         this.regions = regions;
     }
 
+    // Used by the Leafs Debug mod
     public int chunkCount() {
         return chunkCensus;
     }
 
+    // Used by the Leafs Debug mod
     public int entityCount() {
         return entityCensus;
     }

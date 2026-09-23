@@ -54,6 +54,7 @@ public final class ChunkLevels {
         return sections.size();
     }
 
+    // Used by the Leafs Debug mod
     public int level(long chunkKey) {
         int chunkX = ChunkPos.getX(chunkKey);
         int chunkZ = ChunkPos.getZ(chunkKey);

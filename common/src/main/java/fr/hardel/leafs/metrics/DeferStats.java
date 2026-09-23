@@ -21,10 +21,12 @@ public final class DeferStats {
         drops[reason.ordinal()].increment();
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter deferrals(DeferReason reason) {
         return deferrals[reason.ordinal()];
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter drops(DeferReason reason) {
         return drops[reason.ordinal()];
     }
