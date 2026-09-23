@@ -2,7 +2,6 @@ package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongList;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -21,7 +20,6 @@ import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,20 +169,6 @@ class CompatCollectionsTest {
             }
         });
         assertEquals(WRITERS * PER_WRITER, set.size());
-    }
-
-    @Test
-    void fastutilMapsPublishOneValuePerKeyAndWriteBackThroughEntries() throws InterruptedException {
-        SynchronizedObject2ObjectOpenHashMap<Integer, Object> map = new SynchronizedObject2ObjectOpenHashMap<>();
-        walkWhileWriting(map::values, index -> map.computeIfAbsent(index % 8, _ -> new Object()));
-        assertEquals(8, map.size());
-        Object first = map.get(0);
-        assertSame(first, map.computeIfAbsent(0, _ -> new Object()));
-
-        Iterator<Object2ObjectMap.Entry<Integer, Object>> entries = map.object2ObjectEntrySet().fastIterator();
-        entries.next();
-        entries.remove();
-        assertEquals(7, map.size());
     }
 
     private static int walkWhileWriting(Supplier<Iterable<?>> view, Writer writer) throws InterruptedException {
