@@ -10,11 +10,9 @@
 		"LeafDecayMixin",
 		"ListFieldMixin",
 		"MapFieldMixin",
-		"PlacedBlockSetMixin",
 		"QueueFieldMixin",
 		"SetFieldMixin",
 		"StaticArrayListMixin",
-		"StaticHashMapMixin",
 		"StaticObject2ObjectMapMixin"
 	],
 	"injectors": {

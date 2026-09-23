@@ -3,12 +3,14 @@ package fr.hardel.leafs.mixin.compat;
 import com.google.common.collect.MapMaker;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import fr.hardel.excess.HashMapFacade;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -52,7 +54,25 @@ import java.util.concurrent.ConcurrentMap;
     // Commoble/exmachina, signal buffer, fed by enqueue on every VanillaGameEvent from any thread while tick swaps and walks it.
     "net.commoble.exmachina.internal.signal.SignalGraphBuffer",
     // Team-EnderIO/EnderIO, hang glider falling ticks, written by every player tick from the player's region.
-    "com.enderio.enderio.content.tools.hang_glider.PlayerMovementHandler"
+    "com.enderio.enderio.content.tools.hang_glider.PlayerMovementHandler",
+    // benbenlaw/appliedsticks, per player positions, written by every player tick from the player's region.
+    "com.benbenlaw.appliedsticks.event.ServerEvents",
+    // benbenlaw/refinedsticks, per player positions, written by every player tick from the player's region.
+    "com.benbenlaw.refinedsticks.event.ServerEvents",
+    // Direwolf20-MC/BuildingGadgets2, build queue, filled by gadgets from the player's region and emptied by the server tick.
+    "com.direwolf20.buildinggadgets2.common.events.ServerTickHandler",
+    // stepsword/mahoutsukai, staff users, written by every staff use from the player's region.
+    "stepsword.mahoutsukai.item.emrys.StaffEmrys",
+    // stepsword/mahoutsukai, staff users, written by every staff use from the player's region.
+    "stepsword.mahoutsukai.item.morgan.Morgan",
+    // stepsword/mahoutsukai, staff users, written by every staff use from the player's region.
+    "stepsword.mahoutsukai.item.spells.mystic.MysticStaff.MysticStaff",
+    // stepsword/mahoutsukai, staff users, written by every staff use from the player's region.
+    "stepsword.mahoutsukai.item.spells.mystic.SpatialDisorientation.SpatialDisorientationStaff",
+    // stepsword/mahoutsukai, familiars, written by summons and familiar ticks from their region.
+    "stepsword.mahoutsukai.effects.familiar.SummonFamiliarSpellEffect",
+    // stepsword/mahoutsukai, lecterns, written by a right click from the player's region while every player tick walks it.
+    "stepsword.mahoutsukai.item.william.William"
 })
 public abstract class MapFieldMixin {
 
@@ -99,5 +119,21 @@ public abstract class MapFieldMixin {
         ConcurrentMap<K, V> weak = new MapMaker().weakKeys().makeMap();
         weak.putAll(vanilla);
         original.call(weak);
+    }
+
+    @WrapOperation(method = "<clinit>", at = {
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lcom/benbenlaw/appliedsticks/event/ServerEvents;lastSentPositions:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lcom/benbenlaw/refinedsticks/event/ServerEvents;lastSentPositions:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lcom/direwolf20/buildinggadgets2/common/events/ServerTickHandler;buildMap:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lstepsword/mahoutsukai/item/emrys/StaffEmrys;staffs:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lstepsword/mahoutsukai/item/morgan/Morgan;staffs:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lstepsword/mahoutsukai/item/spells/mystic/MysticStaff/MysticStaff;staffs:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC,
+            target = "Lstepsword/mahoutsukai/item/spells/mystic/SpatialDisorientation/SpatialDisorientationStaff;staffs:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lstepsword/mahoutsukai/effects/familiar/SummonFamiliarSpellEffect;familiarMap:Ljava/util/HashMap;"),
+        @At(value = "FIELD", opcode = Opcodes.PUTSTATIC, target = "Lstepsword/mahoutsukai/item/william/William;awaitingLecterns:Ljava/util/HashMap;")
+    })
+    private static <K, V> void leafs$concurrentHashMap(HashMap<K, V> vanilla, Operation<Void> original) {
+        original.call(new HashMapFacade<>(vanilla));
     }
 }
