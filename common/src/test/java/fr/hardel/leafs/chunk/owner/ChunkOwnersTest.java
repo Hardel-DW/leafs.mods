@@ -109,17 +109,17 @@ class ChunkOwnersTest {
     void gameWorkOnAChunkAnotherThreadHoldsIsMailForThatThread() throws InterruptedException {
         chunkHeldByAnother = true;
         covered = false;
-        RegionInbox held = takenOnAnotherThread();
+        ChunkClaim held = takenOnAnotherThread();
 
         assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("later")));
 
         assertEquals(List.of(), ran);
-        assertEquals(1, held.size());
+        assertEquals(1, held.mail().size());
         assertTrue(taken.isEmpty());
     }
 
-    private RegionInbox takenOnAnotherThread() throws InterruptedException {
-        AtomicReference<RegionInbox> held = new AtomicReference<>();
+    private ChunkClaim takenOnAnotherThread() throws InterruptedException {
+        AtomicReference<ChunkClaim> held = new AtomicReference<>();
         Thread holder = new Thread(() -> held.set(owners.borrow(1, 1)), "taker");
         holder.start();
         holder.join();
@@ -184,15 +184,15 @@ class ChunkOwnersTest {
         covered = false;
         CountDownLatch release = TestThreads.occupy(pool);
         owners.submit(1, 1, Work.CHUNK, () -> ran.add("chunk work"));
-        RegionInbox taken = owners.borrow(1, 1);
+        ChunkClaim taken = owners.borrow(1, 1);
 
         release.countDown();
-        for (int attempt = 0; attempt < 500 && taken.size() == 0; attempt++) {
+        for (int attempt = 0; attempt < 500 && taken.mail().size() == 0; attempt++) {
             Thread.sleep(10);
         }
 
         assertEquals(List.of(), ran, "the pool task never ran beside the taker");
-        assertEquals(1, taken.size());
+        assertEquals(1, taken.mail().size());
         owners.release(1, 1, taken);
         for (int attempt = 0; attempt < 500 && ran.isEmpty(); attempt++) {
             Thread.sleep(10);
@@ -205,7 +205,7 @@ class ChunkOwnersTest {
     void aChunkATakerHoldsStaysItsOnceARegionCoversIt() throws InterruptedException {
         covered = false;
         holding = true;
-        AtomicReference<RegionInbox> taken = new AtomicReference<>();
+        AtomicReference<ChunkClaim> taken = new AtomicReference<>();
         CountDownLatch took = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         Thread taker = new Thread(() -> {
@@ -220,7 +220,7 @@ class ChunkOwnersTest {
 
         assertFalse(owners.holds(1, 1), "the region does not hold a chunk another thread took");
         assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("mail")));
-        assertEquals(1, taken.get().size(), "the mail went to the taker");
+        assertEquals(1, taken.get().mail().size(), "the mail went to the taker");
         assertEquals(0, inbox.size());
 
         release.countDown();
@@ -233,7 +233,7 @@ class ChunkOwnersTest {
         covered = false;
         assertNull(owners.describeTaken(1, 1));
 
-        RegionInbox taken = takenOnAnotherThread();
+        ChunkClaim taken = takenOnAnotherThread();
         owners.submit(1, 1, Work.GAME, () -> ran.add("mail"));
 
         assertEquals("taken by thread 'taker' with 1 queued", owners.describeTaken(1, 1));

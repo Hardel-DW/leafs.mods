@@ -15,30 +15,16 @@ public final class RegionInbox {
     private final long slowTaskNanos;
     private final Predicate<Posted> owns;
     private final Consumer<Posted> elsewhere;
-    private final Thread holder;
     private boolean closed;
 
     public RegionInbox(long slowTaskNanos) {
-        this(slowTaskNanos, _ -> true, _ -> { }, Thread.currentThread());
+        this(slowTaskNanos, _ -> true, _ -> { });
     }
 
     public RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere) {
-        this(slowTaskNanos, owns, elsewhere, null);
-    }
-
-    private RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere, Thread holder) {
         this.slowTaskNanos = slowTaskNanos;
         this.owns = owns;
         this.elsewhere = elsewhere;
-        this.holder = holder;
-    }
-
-    public boolean heldBy(Thread thread) {
-        return holder == thread;
-    }
-
-    public String holderName() {
-        return holder.getName();
     }
 
     public synchronized boolean post(int chunkX, int chunkZ, Work work, Runnable task) {
