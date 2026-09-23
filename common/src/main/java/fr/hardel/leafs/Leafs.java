@@ -16,7 +16,6 @@ public final class Leafs {
     public static void bootstrap(Path configDir, Path gameDir, ThreadGroup serverThreads) {
         Leafs.serverThreads = serverThreads;
         LeafsConfig.register(configDir, gameDir);
-
         LeafsConfig config = LeafsConfig.get();
         LOGGER.info("Leafs initialised - {} region workers, {} chunk workers, {}x{}-chunk sections", config.effectiveRegionThreads(), config.effectiveChunkThreads(), config.sectionSize(), config.sectionSize());
     }

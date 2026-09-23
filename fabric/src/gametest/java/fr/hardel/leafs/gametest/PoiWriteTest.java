@@ -14,6 +14,7 @@ public final class PoiWriteTest {
         BlockPos bell = new BlockPos(1, 1, 1);
         BlockPos absolute = helper.absolutePos(bell);
         PoiManager pois = helper.getLevel().getPoiManager();
+
         helper.startSequence()
             .thenExecute(() -> helper.setBlock(bell, Blocks.BELL))
             .thenWaitUntil(() -> helper.assertTrue(pois.existsAtPosition(PoiTypes.MEETING, absolute), "the bell registers its meeting point"))
