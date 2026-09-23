@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.region.CoordinateKey;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
@@ -18,19 +19,16 @@ public final class TicketTimeoutIndex {
     }
 
     private final TicketStorage storage;
+    private final ChunkMap chunkMap;
     private final TicketGraphs graphs;
     private final int sectionShift;
     private final ConcurrentLong2ObjectMap<ConcurrentLinkedQueue<TrackedTicket>> sections = new ConcurrentLong2ObjectMap<>();
-    private volatile LongPredicate busy = _ -> false;
 
-    public TicketTimeoutIndex(TicketStorage storage, TicketGraphs graphs, int sectionShift) {
+    public TicketTimeoutIndex(TicketStorage storage, ChunkMap chunkMap, TicketGraphs graphs, int sectionShift) {
         this.storage = storage;
+        this.chunkMap = chunkMap;
         this.graphs = graphs;
         this.sectionShift = sectionShift;
-    }
-
-    public void pauseWhile(LongPredicate busy) {
-        this.busy = busy;
     }
 
     public void track(long chunkPos, Ticket ticket) {
@@ -81,7 +79,7 @@ public final class TicketTimeoutIndex {
 
     private void countDown(Iterable<TrackedTicket> queue) {
         for (TrackedTicket tracked : queue) {
-            if (!canExpire(tracked.ticket(), tracked.chunkPos())) {
+            if (!storage.canTicketExpire(chunkMap, tracked.ticket(), tracked.chunkPos())) {
                 continue;
             }
 
@@ -90,10 +88,6 @@ public final class TicketTimeoutIndex {
                 storage.removeTicket(tracked.chunkPos(), tracked.ticket());
             }
         }
-    }
-
-    private boolean canExpire(Ticket ticket, long chunkPos) {
-        return ticket.getType().canExpireIfUnloaded() || !busy.test(chunkPos);
     }
 
     private long sectionOf(long chunkPos) {
