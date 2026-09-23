@@ -1,7 +1,5 @@
 package fr.hardel.leafs.region;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -17,12 +15,12 @@ public final class RegionizerAssertions {
     }
 
     public static <R> void assertInvariants(Regionizer<R> regionizer, boolean strict) {
-        Map<Long, RegionSection<R>> sections = regionizer.sectionsView();
-        int bufferRadius = regionizer.bufferRadiusValue();
-        int mergeRadius = regionizer.mergeRadiusValue();
+        var sections = regionizer.sections;
+        int bufferRadius = regionizer.bufferRadius;
+        int mergeRadius = regionizer.mergeRadius;
 
-        for (Map.Entry<Long, RegionSection<R>> entry : sections.entrySet()) {
-            long key = entry.getKey();
+        for (var entry : sections.long2ObjectEntrySet()) {
+            long key = entry.getLongKey();
             RegionSection<R> section = entry.getValue();
             int sectionX = CoordinateKey.x(key);
             int sectionZ = CoordinateKey.z(key);

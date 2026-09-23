@@ -14,7 +14,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
@@ -24,14 +23,14 @@ public final class Regionizer<R> {
     private static final int DEAD_SECTION_DIVISOR = 6;
 
     private final int sectionShift;
-    private final int mergeRadius;
-    private final int bufferRadius;
+    final int mergeRadius;
+    final int bufferRadius;
     private final int searchRadius;
     private final int connectivityRadius;
     private final RegionCallbacks<R> callbacks;
 
     private final StampedLock lock = new StampedLock();
-    private final ConcurrentLong2ObjectMap<RegionSection<R>> sections = new ConcurrentLong2ObjectMap<>();
+    final ConcurrentLong2ObjectMap<RegionSection<R>> sections = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLong2ObjectMap<Region<R>> regionsById = new ConcurrentLong2ObjectMap<>();
     private final Collection<Region<R>> regionsView = Collections.unmodifiableCollection(regionsById.values());
     private final AtomicLong nextRegionId = new AtomicLong(1);
@@ -570,17 +569,5 @@ public final class Regionizer<R> {
         if (value < min || value > max) {
             throw new IllegalArgumentException(name + " must be in [" + min + ", " + max + "], got " + value);
         }
-    }
-
-    Map<Long, RegionSection<R>> sectionsView() {
-        return sections;
-    }
-
-    int mergeRadiusValue() {
-        return mergeRadius;
-    }
-
-    int bufferRadiusValue() {
-        return bufferRadius;
     }
 }

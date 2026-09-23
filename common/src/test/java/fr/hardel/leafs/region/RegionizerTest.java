@@ -33,7 +33,7 @@ class RegionizerTest {
         assertEquals(RegionState.READY, region.state());
         assertEquals(9, region.sectionCount());
         assertEquals(1, region.chunkCount());
-        assertEquals(9, regionizer.sectionsView().size());
+        assertEquals(9, regionizer.sections.size());
         RegionizerAssertions.assertInvariants(regionizer, true);
     }
 
@@ -183,7 +183,7 @@ class RegionizerTest {
 
         assertEquals(RegionState.DEAD, region.state());
         assertTrue(regionizer.regionsView().isEmpty());
-        assertTrue(regionizer.sectionsView().isEmpty());
+        assertTrue(regionizer.sections.isEmpty());
         assertNull(regionizer.regionAt(0, 0));
     }
 
