@@ -10,8 +10,7 @@
 		"ListFieldMixin",
 		"MapFieldMixin",
 		"QueueFieldMixin",
-		"SetFieldMixin",
-		"StaticArrayListMixin"
+		"SetFieldMixin"
 	],
 	"injectors": {
 		"defaultRequire": 0
