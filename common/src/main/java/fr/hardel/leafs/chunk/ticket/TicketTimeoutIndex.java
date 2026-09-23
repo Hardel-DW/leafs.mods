@@ -1,7 +1,6 @@
 package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
-import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.world.level.ChunkPos;
@@ -91,6 +90,6 @@ public final class TicketTimeoutIndex {
     }
 
     private long sectionOf(long chunkPos) {
-        return CoordinateKey.pack(ChunkPos.getX(chunkPos) >> sectionShift, ChunkPos.getZ(chunkPos) >> sectionShift);
+        return ChunkPos.pack(ChunkPos.getX(chunkPos) >> sectionShift, ChunkPos.getZ(chunkPos) >> sectionShift);
     }
 }

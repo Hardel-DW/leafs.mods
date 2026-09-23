@@ -36,7 +36,7 @@ final class Section {
     }
 
     static long keyOf(int chunkX, int chunkZ) {
-        return ((chunkX >> SHIFT) & 0xFFFFFFFFL) | (((long) (chunkZ >> SHIFT) & 0xFFFFFFFFL) << 32);
+        return ChunkPos.pack(chunkX >> SHIFT, chunkZ >> SHIFT);
     }
 
     boolean post(int index, int level) {
@@ -74,8 +74,8 @@ final class Section {
     }
 
     void forEachAtMost(int level, LongConsumer consumer) {
-        int originX = (int) key << SHIFT;
-        int originZ = (int) (key >> 32) << SHIFT;
+        int originX = ChunkPos.getX(key) << SHIFT;
+        int originZ = ChunkPos.getZ(key) << SHIFT;
         for (int index = 0; index < levels.length; index++) {
             if (level(index) <= level) {
                 consumer.accept(ChunkPos.pack(originX + (index & MASK), originZ + (index >> SHIFT)));

@@ -2,7 +2,6 @@ package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
-import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
@@ -16,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class TicketTimeoutIndexTest {
     private static final long CHUNK = ChunkPos.pack(3, 3);
-    private static final long SECTION = CoordinateKey.pack(1, 1);
+    private static final long SECTION = ChunkPos.pack(1, 1);
 
     @Test
     void aTicketExpiresOnceItsTimeoutIsCountedDown() {

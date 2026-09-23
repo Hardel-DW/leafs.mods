@@ -5,7 +5,6 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
-import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
@@ -266,7 +265,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         for (long key : chunks) {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(CoordinateKey.x(key), CoordinateKey.z(key)));
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
             if (holder != null && holder.getLatestChunk() instanceof LevelChunk chunk) {
                 ChunkScheduledTicks.rebase(chunk, tickOffset);
             }
@@ -284,7 +283,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         int shift = regionizer.sectionShift();
         RegionInbox orphans = new RegionInbox(slowTaskNanos);
         parent.data().inbox().close(posted -> {
-            Region<RegionTickData> child = sectionToChild.get(CoordinateKey.pack(posted.chunkX() >> shift, posted.chunkZ() >> shift));
+            Region<RegionTickData> child = sectionToChild.get(ChunkPos.pack(posted.chunkX() >> shift, posted.chunkZ() >> shift));
             RegionInbox target = child == null ? orphans : child.data().inbox();
             target.post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task());
         });

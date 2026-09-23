@@ -117,7 +117,7 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     }
 
     private long sectionOf(long key) {
-        return CoordinateKey.pack(ChunkPos.getX(key) >> sectionShift, ChunkPos.getZ(key) >> sectionShift);
+        return ChunkPos.pack(ChunkPos.getX(key) >> sectionShift, ChunkPos.getZ(key) >> sectionShift);
     }
 
     private int slotOf(long key) {
