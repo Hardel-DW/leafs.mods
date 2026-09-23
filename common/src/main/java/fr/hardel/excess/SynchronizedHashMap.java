@@ -12,13 +12,6 @@ import java.util.function.Function;
 
 public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
 
-    public SynchronizedHashMap() {
-    }
-
-    public SynchronizedHashMap(Map<? extends K, ? extends V> entries) {
-        super(entries);
-    }
-
     @Override
     public synchronized V get(Object key) {
         return super.get(key);
