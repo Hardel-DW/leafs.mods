@@ -7,7 +7,6 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
@@ -73,7 +72,7 @@ public final class UnownedSweep {
     private void purgeTimeouts() {
         Regionizer<RegionTickData> regionizer = regions.regionizer();
         int shift = regionizer.sectionShift();
-        timeouts.purgeUnowned(section -> regionizer.regionAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) != null);
+        timeouts.purgeUnowned(section -> regionizer.regionAt(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift) != null);
     }
 
     private void unloadHiddenEntities() {

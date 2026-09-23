@@ -139,13 +139,13 @@ public final class ChunkLevels {
     }
 
     private static long[] area(long centerKey) {
-        int sectionX = (int) centerKey;
-        int sectionZ = (int) (centerKey >> 32);
+        int sectionX = ChunkPos.getX(centerKey);
+        int sectionZ = ChunkPos.getZ(centerKey);
         long[] area = new long[9];
         int count = 0;
         for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
-                area[count++] = Section.keyOf((sectionX + dx) << Section.SHIFT, (sectionZ + dz) << Section.SHIFT);
+                area[count++] = ChunkPos.pack(sectionX + dx, sectionZ + dz);
             }
         }
 
@@ -184,8 +184,8 @@ public final class ChunkLevels {
         }
 
         private boolean run(LevelListener listener) {
-            int originX = (int) center.key << Section.SHIFT;
-            int originZ = (int) (center.key >> 32) << Section.SHIFT;
+            int originX = ChunkPos.getX(center.key) << Section.SHIFT;
+            int originZ = ChunkPos.getZ(center.key) << Section.SHIFT;
             for (ObjectIterator<Short2ByteMap.Entry> iterator = batch.short2ByteEntrySet().iterator(); iterator.hasNext(); ) {
                 Short2ByteMap.Entry entry = iterator.next();
                 int index = entry.getShortKey() & 0xFFFF;

@@ -2,7 +2,6 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.RegionizerAssertions;
@@ -223,11 +222,11 @@ class LevelRegionsTest {
     private void feedCreate(Random random, LongOpenHashSet present, LongArrayList presentList) {
         long key;
         do {
-            key = CoordinateKey.pack(randomCoordinate(random), randomCoordinate(random));
+            key = ChunkPos.pack(randomCoordinate(random), randomCoordinate(random));
         } while (!present.add(key));
 
         presentList.add(key);
-        simulated(regions, CoordinateKey.x(key), CoordinateKey.z(key));
+        simulated(regions, ChunkPos.getX(key), ChunkPos.getZ(key));
     }
 
     private void feedDestroy(Random random, LongOpenHashSet present, LongArrayList presentList) {
@@ -236,7 +235,7 @@ class LevelRegionsTest {
         presentList.set(index, presentList.getLong(presentList.size() - 1));
         presentList.removeLong(presentList.size() - 1);
         present.remove(key);
-        unsimulated(regions, CoordinateKey.x(key), CoordinateKey.z(key));
+        unsimulated(regions, ChunkPos.getX(key), ChunkPos.getZ(key));
     }
 
     private static int randomCoordinate(Random random) {
