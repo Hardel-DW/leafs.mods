@@ -21,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongPredicate;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -139,7 +140,8 @@ class SynchronizedCollectionsTest {
     void arrayDequeSurvivesWritesDuringIterationAndIteratorRemoves() throws InterruptedException {
         ArrayDeque<Integer> deque = new SynchronizedArrayDeque<>();
         walkWhileWriting(() -> deque, deque::add);
-        assertEquals(WRITERS * PER_WRITER, deque.size());
+        List<Integer> written = IntStream.range(0, WRITERS * PER_WRITER).boxed().toList();
+        assertEquals(written, deque.stream().sorted().toList());
 
         Iterator<Integer> iterator = deque.iterator();
         while (iterator.hasNext()) {
@@ -148,8 +150,7 @@ class SynchronizedCollectionsTest {
             }
         }
 
-        assertEquals(WRITERS * PER_WRITER / 2, deque.size());
-        assertEquals(1, deque.peekFirst());
+        assertEquals(written.stream().filter(value -> value % 2 != 0).toList(), deque.stream().sorted().toList());
     }
 
     @Test
