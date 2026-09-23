@@ -71,14 +71,6 @@ public abstract class ServerChunkCacheMixin {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
     }
 
-    @WrapMethod(method = "runDistanceManagerUpdates")
-    private boolean leafs$settleTheAddedTickets(Operation<Boolean> original) {
-        boolean changed = original.call();
-        LevelChunks chunks = LevelChunks.of(this.level);
-        chunks.graphs().settleWritten();
-        return changed;
-    }
-
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         ChunkPos pos = holder.getPos();
