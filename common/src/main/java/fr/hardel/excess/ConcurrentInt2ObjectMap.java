@@ -3,11 +3,9 @@ package fr.hardel.excess;
 import it.unimi.dsi.fastutil.ints.AbstractInt2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
@@ -21,6 +19,7 @@ import java.util.function.IntFunction;
 
 public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     private final ConcurrentHashMap<Integer, V> map = new ConcurrentHashMap<>();
+    private final ConcurrentValues<V> values = new ConcurrentValues<>(map);
 
     @Override
     public V get(int key) {
@@ -113,32 +112,7 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
 
     @Override
     public @NonNull ObjectCollection<V> values() {
-        return new AbstractObjectCollection<>() {
-            @Override
-            public @NonNull ObjectIterator<V> iterator() {
-                return ObjectIterators.asObjectIterator(map.values().iterator());
-            }
-
-            @Override
-            public @NonNull ObjectSpliterator<V> spliterator() {
-                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
-            }
-
-            @Override
-            public int size() {
-                return map.size();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-                return map.containsValue(value);
-            }
-
-            @Override
-            public void clear() {
-                map.clear();
-            }
-        };
+        return values;
     }
 
     @Override

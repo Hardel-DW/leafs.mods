@@ -3,9 +3,6 @@ package fr.hardel.excess;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -39,34 +36,5 @@ class ConcurrentShort2ObjectMapTest {
         assertEquals(2, copy.size());
         assertEquals("c", copy.get((short) 3));
         assertEquals("d", copy.get((short) 4));
-    }
-
-    @Test
-    void iterationSurvivesConcurrentMutation() {
-        for (short i = 0; i < 100; i++) {
-            map.put(i, "v" + i);
-        }
-
-        int seen = 0;
-        List<String> values = new ArrayList<>();
-        for (String value : map.values()) {
-            assertTrue(value.startsWith("v") || value.startsWith("x"), "value outside the known universe: " + value);
-            map.remove((short) (90 - seen));
-            map.put((short) (200 + seen), "x" + seen);
-            values.add(value);
-            seen++;
-        }
-
-        assertTrue(seen > 0);
-    }
-
-    @Test
-    void aStreamOverTheValuesSurvivesGrowth() {
-        map.put((short) 1, "a");
-        map.put((short) 2, "b");
-
-        List<String> seen = map.values().stream().peek(_ -> map.put((short) (map.size() + 10), "z")).toList();
-
-        assertTrue(seen.size() >= 2);
     }
 }

@@ -4,11 +4,9 @@ import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
@@ -22,6 +20,7 @@ import java.util.function.LongFunction;
 
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
     private final ConcurrentHashMap<Long, V> map = new ConcurrentHashMap<>();
+    private final ConcurrentValues<V> values = new ConcurrentValues<>(map);
 
     @Override
     public V get(long key) {
@@ -100,32 +99,7 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
 
     @Override
     public @NonNull ObjectCollection<V> values() {
-        return new AbstractObjectCollection<>() {
-            @Override
-            public @NonNull ObjectIterator<V> iterator() {
-                return ObjectIterators.asObjectIterator(map.values().iterator());
-            }
-
-            @Override
-            public @NonNull ObjectSpliterator<V> spliterator() {
-                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
-            }
-
-            @Override
-            public int size() {
-                return map.size();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-                return map.containsValue(value);
-            }
-
-            @Override
-            public void clear() {
-                map.clear();
-            }
-        };
+        return values;
     }
 
     @Override
