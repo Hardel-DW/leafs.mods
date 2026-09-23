@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 public final class GenerationSteps {
-    private static final long[] NO_RESERVATION = {};
     private static final int STATUSES = ChunkStatus.getStatusList().size();
     private static final RuntimeException CANCELLED = new RuntimeException("Step cancelled in the queue", null, false, false) {
     };
@@ -44,7 +43,7 @@ public final class GenerationSteps {
 
     public void run(ChunkGenerationTask task) {
         ChunkPos pos = task.getCenter().getPos();
-        pool.submit(ChunkTask.of(Kind.STEP, owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> drive(task)));
+        pool.submit(ChunkTask.of(Kind.STEP, owners.place(pos.x(), pos.z(), pos.x(), pos.z()), ChunkTask.NO_RESERVATION, () -> drive(task)));
     }
 
     private void drive(ChunkGenerationTask task) {

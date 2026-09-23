@@ -3,6 +3,7 @@ package fr.hardel.leafs.debug;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import fr.hardel.leafs.chunk.owner.Work;
+import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
@@ -28,12 +29,9 @@ public final class CrashCommand {
         LevelRegions regions = LevelRegions.of(level);
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             if (region.id() == regionId && region.data().handle() != null && !region.data().handle().isCancelled()) {
-                int[] chunk = new int[2];
-                region.forEachChunk((chunkX, chunkZ) -> {
-                    chunk[0] = chunkX;
-                    chunk[1] = chunkZ;
-                });
-                region.data().inbox().post(chunk[0], chunk[1], Work.GAME, () -> {
+                long section = region.sectionKeySnapshot()[0];
+                int shift = regions.regionizer().sectionShift();
+                region.data().inbox().post(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift, Work.GAME, () -> {
                     throw new IllegalStateException("Crash requested by /leafs crash on region #" + regionId);
                 });
                 source.sendSuccess(() -> Component.literal("Region #" + regionId + " will throw on its next tick").withStyle(ChatFormatting.RED), true);

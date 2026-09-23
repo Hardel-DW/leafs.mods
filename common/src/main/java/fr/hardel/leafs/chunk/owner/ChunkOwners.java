@@ -15,8 +15,6 @@ import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
 public final class ChunkOwners implements Router {
-    private static final long[] NO_RESERVATION = {};
-
     @FunctionalInterface
     public interface Inboxes {
         @Nullable RegionInbox at(int chunkX, int chunkZ);
@@ -176,7 +174,7 @@ public final class ChunkOwners implements Router {
 
     public long[] area(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius) {
         if (radius < 0) {
-            return NO_RESERVATION;
+            return ChunkTask.NO_RESERVATION;
         }
 
         int space = space(kind);
@@ -226,18 +224,17 @@ public final class ChunkOwners implements Router {
             }
 
             RegionInbox claim = borrow(chunkX, chunkZ);
-            if (claim != null) {
-                owning(chunkX, chunkZ, claim, task);
-                return;
+            if (claim == null) {
+                continue;
             }
-        }
-    }
 
-    private void owning(int chunkX, int chunkZ, RegionInbox claim, Runnable task) {
-        try {
-            task.run();
-        } finally {
-            release(chunkX, chunkZ, claim);
+            try {
+                task.run();
+            } finally {
+                release(chunkX, chunkZ, claim);
+            }
+
+            return;
         }
     }
 

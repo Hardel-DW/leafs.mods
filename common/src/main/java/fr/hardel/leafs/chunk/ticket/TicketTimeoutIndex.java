@@ -52,53 +52,44 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    public int purgeSections(long[] sectionKeys) {
-        int expired = 0;
+    public void purgeSections(long[] sectionKeys) {
         for (long key : sectionKeys) {
-            expired += purgeSection(key);
+            purgeSection(key);
         }
-
-        return expired;
     }
 
-    public int purgeUnowned(LongPredicate sectionOwned) {
-        int expired = 0;
+    public void purgeUnowned(LongPredicate sectionOwned) {
         for (long key : sections.keySet()) {
             if (!sectionOwned.test(key)) {
-                expired += purgeSection(key);
+                purgeSection(key);
             }
         }
-
-        return expired;
     }
 
-    private int purgeSection(long sectionKey) {
+    private void purgeSection(long sectionKey) {
         ConcurrentLinkedQueue<TrackedTicket> queue = sections.get(sectionKey);
         if (queue == null) {
-            return 0;
+            return;
         }
 
-        return graphs.batch(() -> {
+        graphs.batch(() -> {
             synchronized (storage) {
-                return countDown(queue);
+                countDown(queue);
             }
         });
     }
 
-    private int countDown(Iterable<TrackedTicket> queue) {
-        int expired = 0;
+    private void countDown(Iterable<TrackedTicket> queue) {
         for (TrackedTicket tracked : queue) {
             if (!canExpire(tracked.ticket(), tracked.chunkPos())) {
                 continue;
             }
 
             tracked.ticket().decreaseTicksLeft();
-            if (tracked.ticket().isTimedOut() && storage.removeTicket(tracked.chunkPos(), tracked.ticket())) {
-                expired++;
+            if (tracked.ticket().isTimedOut()) {
+                storage.removeTicket(tracked.chunkPos(), tracked.ticket());
             }
         }
-
-        return expired;
     }
 
     private boolean canExpire(Ticket ticket, long chunkPos) {

@@ -341,7 +341,7 @@ public final class Regionizer<R> {
         for (LongIterator iterator = from.sectionKeys.iterator(); iterator.hasNext(); ) {
             long key = iterator.nextLong();
             RegionSection<R> section = sections.get(key);
-            section.forEachPosition((chunkX, chunkZ) -> movedChunks.add(CoordinateKey.pack(chunkX, chunkZ)));
+            section.forEachChunkKey(movedChunks::add);
             section.setRegion(into);
             into.sectionKeys.add(key);
         }
@@ -539,15 +539,6 @@ public final class Regionizer<R> {
         }
 
         owner.deadSectionKeys.add(section.key());
-    }
-
-    void forEachChunkOf(Region<R> region, Region.ChunkConsumer consumer) {
-        for (long key : sectionKeysOf(region)) {
-            RegionSection<R> section = sections.get(key);
-            if (section != null) {
-                section.forEachPosition(consumer);
-            }
-        }
     }
 
     private int sumChunkCounts(Region<R> region) {

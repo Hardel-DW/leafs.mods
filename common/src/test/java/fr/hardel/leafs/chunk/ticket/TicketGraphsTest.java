@@ -84,10 +84,10 @@ class TicketGraphsTest {
         graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
 
         graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, true);
-        graphs.settleWritten(loading);
+        graphs.settleWritten();
 
         assertEquals(List.of(Thread.currentThread().getName()), threads, "the holder exists before the call returns, on this thread");
-        graphs.settleWritten(loading);
+        graphs.settleWritten();
         assertEquals(1, threads.size(), "settled once");
     }
 

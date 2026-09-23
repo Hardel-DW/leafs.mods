@@ -7,6 +7,7 @@ import java.lang.invoke.VarHandle;
 import java.util.concurrent.CompletableFuture;
 
 public abstract class ChunkTask {
+    public static final long[] NO_RESERVATION = {};
     static final int UNQUEUED = -1;
     private static final VarHandle BUCKET;
 

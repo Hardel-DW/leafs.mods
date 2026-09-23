@@ -43,13 +43,9 @@ public final class RegionChunkAccess {
         return true;
     }
 
-    public static ChunkAccess presentChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status) {
-        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
-        return holder == null ? null : holder.getChunkIfPresent(status);
-    }
-
     public static ChunkAccess contractedChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {
-        ChunkAccess chunk = presentChunk(chunkMap, chunkX, chunkZ, status);
+        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+        ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);
         if (chunk != null || !required) {
             return chunk;
         }

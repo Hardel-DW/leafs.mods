@@ -56,10 +56,6 @@ public final class RegionTickHandle extends TickHandle {
         RegionTickData data = region.data();
         RegionWorldData worldData = data.worldData();
         RegionTickBody body = regions.body();
-        if (worldData == null || body == null) {
-            return;
-        }
-
         WorldTickContext.enter(body.level(), region, worldData);
         try {
             if (TickingManager.of(body.level().getServer()).paused()) {
