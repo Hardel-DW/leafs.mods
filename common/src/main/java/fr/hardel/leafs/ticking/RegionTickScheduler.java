@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
 
 public final class RegionTickScheduler {
+    private static final long IDLE_POLL_NANOS = 50_000_000L;
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final Queue<ScheduledTick> missed = new ConcurrentLinkedQueue<>();
     private final List<Thread> workers = new ArrayList<>();
@@ -41,17 +42,13 @@ public final class RegionTickScheduler {
         }
     }
 
-    public void shutdown() {
+    public void shutdown(boolean crashed, OwnWork wait) {
         running = false;
-        workers.forEach(Thread::interrupt);
-        for (Thread worker : workers) {
-            try {
-                worker.join();
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return;
-            }
+        if (crashed) {
+            workers.forEach(Thread::interrupt);
         }
+
+        wait.until(() -> workers.stream().noneMatch(Thread::isAlive));
     }
 
     public void schedule(TickHandle handle) {
@@ -84,13 +81,13 @@ public final class RegionTickScheduler {
         while (running) {
             ScheduledTick next;
             try {
-                next = queue.take();
+                next = queue.poll(IDLE_POLL_NANOS, TimeUnit.NANOSECONDS);
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 return;
             }
 
-            if (next.handle.isCancelled()) {
+            if (next == null || next.handle.isCancelled()) {
                 continue;
             }
 
@@ -105,7 +102,10 @@ public final class RegionTickScheduler {
             try {
                 started = executeTick(handle);
             } catch (Throwable throwable) {
-                failurePolicy.accept(handle, throwable);
+                if (running) {
+                    failurePolicy.accept(handle, throwable);
+                }
+
                 continue;
             } finally {
                 if (regionThreadNames) {
