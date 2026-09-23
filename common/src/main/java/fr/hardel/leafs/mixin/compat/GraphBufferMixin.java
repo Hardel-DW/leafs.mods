@@ -1,4 +1,4 @@
-package fr.hardel.leafs.mixin.compat.exmachina;
+package fr.hardel.leafs.mixin.compat;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -11,18 +11,22 @@ import org.spongepowered.asm.mixin.injection.At;
 import java.util.HashMap;
 import java.util.HashSet;
 
-/** Commoble/exmachina, synchronized buffers. Same shape as the mechanical buffer, fed by VanillaGameEvent from any thread. */
 @Pseudo
-@Mixin(targets = "net.commoble.exmachina.internal.signal.SignalGraphBuffer")
-public abstract class SignalGraphBufferMixin {
+@Mixin(targets = {
+    // Commoble/exmachina, mechanical buffer, fed by enqueue on every NeighborNotifyEvent from any thread while tick swaps and walks it.
+    "net.commoble.exmachina.internal.mechanical.MechanicalGraphBuffer",
+    // Commoble/exmachina, signal buffer, fed by enqueue on every VanillaGameEvent from any thread while tick swaps and walks it.
+    "net.commoble.exmachina.internal.signal.SignalGraphBuffer"
+})
+public abstract class GraphBufferMixin {
 
     @WrapOperation(method = {"<init>", "tick"}, at = @At(value = "NEW", target = "java/util/HashMap"))
-    private static <K, V> HashMap<K, V> leafs$sharedPositions(Operation<HashMap<K, V>> original) {
+    private static <K, V> HashMap<K, V> leafs$synchronizedPositions(Operation<HashMap<K, V>> original) {
         return new SynchronizedHashMap<>();
     }
 
     @WrapOperation(method = "lambda$enqueue$0", at = @At(value = "NEW", target = "java/util/HashSet"))
-    private static <E> HashSet<E> leafs$sharedLevelPositions(Operation<HashSet<E>> original) {
+    private static <E> HashSet<E> leafs$synchronizedLevelPositions(Operation<HashSet<E>> original) {
         return new SynchronizedHashSet<>();
     }
 }
