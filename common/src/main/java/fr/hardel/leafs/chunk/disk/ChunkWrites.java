@@ -28,6 +28,7 @@ public final class ChunkWrites {
     public PendingWrite photograph(ChunkPos pos, Supplier<CompoundTag> photo) {
         PendingWrite write = new PendingWrite(photo);
         pending.put(pos.pack(), write);
+
         CompletableFuture.supplyAsync(() -> {
             CompoundTag tag = photo.get();
             write.compressed(CompressedChunk.of(tag));
@@ -39,7 +40,7 @@ public final class ChunkWrites {
                 write.completeExceptionally(failure);
             }
         });
-        
+
         write.thenCompose(_ -> store(pos, write)).whenComplete((_, failure) -> {
             pending.remove(pos.pack(), write);
             if (failure == null) {

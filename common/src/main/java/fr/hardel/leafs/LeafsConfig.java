@@ -154,7 +154,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     public static void register(Path configDir, Path gameDir) {
         file = configDir.resolve(Leafs.MOD_ID + ".json");
         if (Files.notExists(file)) {
-            // Only on the first start, without leafs.json: the admin may set it back.
             new ServerProperties(gameDir.resolve("server.properties")).set("sync-chunk-writes", "false");
         }
 
