@@ -6,7 +6,6 @@ import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
-import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.util.StaticCache2D;
 import net.minecraft.world.level.ChunkPos;
@@ -34,16 +33,10 @@ public final class GenerationSteps {
         this.owners = owners;
     }
 
-    public void run(ChunkGenerationTask task) {
-        ChunkPos pos = task.getCenter().getPos();
-        pool.submit(ChunkTask.of(Kind.STEP, owners.place(pos.x(), pos.z(), pos.x(), pos.z()), ChunkTask.NO_RESERVATION, () -> drive(task)));
-    }
-
-    private void drive(ChunkGenerationTask task) {
-        CompletableFuture<?> waiting = task.runUntilWait();
-        if (waiting != null) {
-            waiting.thenRun(() -> pool.execute(() -> drive(task)));
-        }
+    public void run(Runnable task, long chunkKey) {
+        int chunkX = ChunkPos.getX(chunkKey);
+        int chunkZ = ChunkPos.getZ(chunkKey);
+        pool.submit(ChunkTask.of(Kind.STEP, owners.place(chunkX, chunkZ, chunkX, chunkZ), ChunkTask.NO_RESERVATION, task));
     }
 
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
