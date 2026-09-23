@@ -125,11 +125,6 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     }
 
     @Override
-    public Long2ObjectLinkedOpenHashMap<ChunkHolder> clone() {
-        return this;
-    }
-
-    @Override
     public @NonNull ObjectCollection<ChunkHolder> values() {
         return holders.values();
     }

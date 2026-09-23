@@ -15,8 +15,7 @@ public final class LeafsWatchdog {
     private final Consumer<Stall> killer;
     private final ConcurrentHashMap<TickHandle, RunningTick> running = new ConcurrentHashMap<>();
     private final Map<Thread, Long> reportedWaits = new HashMap<>();
-    private volatile boolean active;
-    private Thread thread;
+    private final Thread thread = new Thread(this::watch, "Leafs Watchdog");
 
     public record Stall(String summary, Thread thread) {
     }
@@ -30,17 +29,12 @@ public final class LeafsWatchdog {
     }
 
     public void start() {
-        active = true;
-        thread = new Thread(this::watch, "Leafs Watchdog");
         thread.setDaemon(true);
         thread.start();
     }
 
     public void stop() {
-        active = false;
-        if (thread != null) {
-            thread.interrupt();
-        }
+        thread.interrupt();
     }
 
     void beginTick(TickHandle handle) {
@@ -53,11 +47,10 @@ public final class LeafsWatchdog {
 
     private void watch() {
         long checkMillis = Math.clamp(warnNanos / 4_000_000L, 10L, 1_000L);
-        while (active) {
+        while (true) {
             try {
                 Thread.sleep(checkMillis);
             } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
                 return;
             }
 

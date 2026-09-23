@@ -264,8 +264,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        for (long key : chunks) {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
+        for (int index = 0; index < chunks.size(); index++) {
+            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunks.getLong(index));
             if (holder != null && holder.getLatestChunk() instanceof LevelChunk chunk) {
                 ChunkScheduledTicks.rebase(chunk, tickOffset);
             }
