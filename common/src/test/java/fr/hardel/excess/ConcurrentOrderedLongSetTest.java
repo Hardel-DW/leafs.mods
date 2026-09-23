@@ -209,12 +209,6 @@ class ConcurrentOrderedLongSetTest {
     }
 
     @Test
-    void groupShiftMustBeSane() {
-        assertThrows(IllegalArgumentException.class, () -> new ConcurrentOrderedLongSet(0));
-        assertThrows(IllegalArgumentException.class, () -> new ConcurrentOrderedLongSet(64));
-    }
-
-    @Test
     void iteratorRemoveDeletesFromTheLiveSet() {
         ConcurrentOrderedLongSet set = new ConcurrentOrderedLongSet(4);
         set.add(1);

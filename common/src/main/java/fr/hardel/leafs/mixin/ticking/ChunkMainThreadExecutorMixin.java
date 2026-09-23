@@ -26,13 +26,8 @@ public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
             return true;
         }
 
-        ServerLevel level = leafs$level;
-        if (level == null) {
-            return false;
-        }
-
-        if (TickingManager.of(level.getServer()).halted()) {
-            return LevelRegions.of(level).drainInboxes() > 0;
+        if (TickingManager.of(leafs$level.getServer()).halted()) {
+            return LevelRegions.of(leafs$level).drainInboxes() > 0;
         }
 
         RegionBorrow borrow = RegionBorrow.current();

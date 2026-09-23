@@ -14,7 +14,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.IntSupplier;
@@ -34,53 +33,45 @@ public final class Regionizer<R> {
     private final ConcurrentLong2ObjectMap<Region<R>> regionsById = new ConcurrentLong2ObjectMap<>();
     private final Collection<Region<R>> regionsView = Collections.unmodifiableCollection(regionsById.values());
     private final AtomicLong nextRegionId = new AtomicLong(1);
-    private volatile Thread writeLockOwner;
 
     public Regionizer(int sectionShift, int mergeRadius, int bufferRadius, RegionCallbacks<R> callbacks) {
-        requireRange("sectionShift", sectionShift, 1, 8);
-        requireRange("mergeRadius", mergeRadius, 1, 8);
-        requireRange("bufferRadius", bufferRadius, 1, 8);
         this.sectionShift = sectionShift;
         this.mergeRadius = mergeRadius;
         this.bufferRadius = bufferRadius;
         this.searchRadius = mergeRadius + bufferRadius;
         this.connectivityRadius = Math.max(mergeRadius, bufferRadius);
-        this.callbacks = Objects.requireNonNull(callbacks, "callbacks");
+        this.callbacks = callbacks;
     }
 
     public void addChunk(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         RegionSection<R> section = sections.get(key);
         if (section != null && !section.isEmpty()) {
-            section.addChunk(chunkX, chunkZ);
+            section.addChunk();
             return;
         }
 
-        long stamp = writeLock();
+        long stamp = lock.writeLock();
         try {
-            addChunkToEmptySection(chunkX, chunkZ, key);
+            addChunkToEmptySection(key);
         } finally {
-            unlockWrite(stamp);
+            lock.unlockWrite(stamp);
         }
     }
 
     public void removeChunk(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         RegionSection<R> section = sections.get(key);
-        if (section == null) {
-            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] has no section to remove from");
-        }
-
         if (section.chunkCount() > 1) {
-            section.removeChunk(chunkX, chunkZ);
+            section.removeChunk();
             return;
         }
 
-        long stamp = writeLock();
+        long stamp = lock.writeLock();
         try {
-            removeLastChunkOfSection(chunkX, chunkZ, section);
+            removeLastChunkOfSection(section);
         } finally {
-            unlockWrite(stamp);
+            lock.unlockWrite(stamp);
         }
     }
 
@@ -121,7 +112,7 @@ public final class Regionizer<R> {
     }
 
     boolean tryMarkTicking(Region<R> region, boolean despiteMerges) {
-        long stamp = writeLock();
+        long stamp = lock.writeLock();
         try {
             RegionState state = region.state();
             if (state == RegionState.TICKING || state == RegionState.DEAD) {
@@ -136,16 +127,16 @@ public final class Regionizer<R> {
 
             return true;
         } finally {
-            unlockWrite(stamp);
+            lock.unlockWrite(stamp);
         }
     }
 
     void markNotTicking(Region<R> region) {
-        long stamp = writeLock();
+        long stamp = lock.writeLock();
         try {
             releaseFromTicking(region);
         } finally {
-            unlockWrite(stamp);
+            lock.unlockWrite(stamp);
         }
     }
 
@@ -162,10 +153,6 @@ public final class Regionizer<R> {
     }
 
     long[] sectionKeysOf(Region<R> region) {
-        if (writeLockOwner == Thread.currentThread()) {
-            return region.sectionKeys.toLongArray();
-        }
-
         long stamp = lock.readLock();
         try {
             return region.sectionKeys.toLongArray();
@@ -175,10 +162,6 @@ public final class Regionizer<R> {
     }
 
     private int readCount(IntSupplier count) {
-        if (writeLockOwner == Thread.currentThread()) {
-            return count.getAsInt();
-        }
-
         long stamp = lock.readLock();
         try {
             return count.getAsInt();
@@ -187,7 +170,7 @@ public final class Regionizer<R> {
         }
     }
 
-    private void addChunkToEmptySection(int chunkX, int chunkZ, long key) {
+    private void addChunkToEmptySection(long key) {
         RegionSection<R> section = sections.get(key);
         List<RegionSection<R>> created = new ArrayList<>();
         if (section == null) {
@@ -195,7 +178,7 @@ public final class Regionizer<R> {
             created.add(section);
         }
 
-        section.addChunk(chunkX, chunkZ);
+        section.addChunk();
         reviveIfDead(section);
 
         int sectionX = CoordinateKey.x(key);
@@ -234,12 +217,8 @@ public final class Regionizer<R> {
         resolvePendingMerges(target);
     }
 
-    private void removeLastChunkOfSection(int chunkX, int chunkZ, RegionSection<R> section) {
-        section.removeChunk(chunkX, chunkZ);
-        if (!section.isEmpty()) {
-            throw new IllegalStateException("Section " + CoordinateKey.describe(section.key()) + " was mutated concurrently during removal");
-        }
-
+    private void removeLastChunkOfSection(RegionSection<R> section) {
+        section.removeChunk();
         int sectionX = CoordinateKey.x(section.key());
         int sectionZ = CoordinateKey.z(section.key());
         for (int dx = -bufferRadius; dx <= bufferRadius; dx++) {
@@ -249,10 +228,6 @@ public final class Regionizer<R> {
                 }
 
                 RegionSection<R> neighbour = sections.get(CoordinateKey.pack(sectionX + dx, sectionZ + dz));
-                if (neighbour == null) {
-                    throw new IllegalStateException("Buffer section missing around non-empty section " + CoordinateKey.describe(section.key()));
-                }
-
                 neighbour.lostNonEmptyNeighbour();
                 markDeadIfIsolated(neighbour);
             }
@@ -261,10 +236,6 @@ public final class Regionizer<R> {
     }
 
     private void releaseFromTicking(Region<R> region) {
-        if (region.state() != RegionState.TICKING) {
-            throw new IllegalStateException(region + " released without being marked ticking");
-        }
-
         region.setState(RegionState.READY);
 
         if (resolvePendingMerges(region) != region) {
@@ -327,10 +298,6 @@ public final class Regionizer<R> {
     }
 
     private void killAndMergeInto(Region<R> from, Region<R> into) {
-        if (from == into || from.state() == RegionState.TICKING || into.state() == RegionState.TICKING) {
-            throw new IllegalStateException("Illegal merge of " + from + " into " + into);
-        }
-
         boolean fromWasSchedulable = from.state() == RegionState.READY;
         from.setState(RegionState.DEAD);
         from.mergeIntoLater.remove(into);
@@ -411,12 +378,7 @@ public final class Regionizer<R> {
     private void removeDeadSections(Region<R> region) {
         for (LongIterator iterator = region.deadSectionKeys.iterator(); iterator.hasNext(); ) {
             long key = iterator.nextLong();
-            RegionSection<R> removed = sections.remove(key);
-            if (removed == null || !removed.isEmpty() || removed.nonEmptyNeighbours() > 0) {
-                throw new IllegalStateException("Section " + CoordinateKey.describe(key) + " was marked dead but is still alive");
-            }
-
-            removed.clearRegion();
+            sections.remove(key).clearRegion();
             region.sectionKeys.remove(key);
         }
         region.deadSectionKeys.clear();
@@ -532,12 +494,7 @@ public final class Regionizer<R> {
             return;
         }
 
-        Region<R> owner = section.region();
-        if (owner == null) {
-            throw new IllegalStateException("Section " + CoordinateKey.describe(section.key()) + " has no owning region");
-        }
-
-        owner.deadSectionKeys.add(section.key());
+        section.region().deadSectionKeys.add(section.key());
     }
 
     private int sumChunkCounts(Region<R> region) {
@@ -547,27 +504,5 @@ public final class Regionizer<R> {
         }
 
         return total;
-    }
-
-    private long writeLock() {
-        if (writeLockOwner == Thread.currentThread()) {
-            throw new IllegalStateException("Regionizer lock re-entered - callbacks must not call back into the regionizer");
-        }
-
-        long stamp = lock.writeLock();
-        writeLockOwner = Thread.currentThread();
-
-        return stamp;
-    }
-
-    private void unlockWrite(long stamp) {
-        writeLockOwner = null;
-        lock.unlockWrite(stamp);
-    }
-
-    private static void requireRange(String name, int value, int min, int max) {
-        if (value < min || value > max) {
-            throw new IllegalArgumentException(name + " must be in [" + min + ", " + max + "], got " + value);
-        }
     }
 }

@@ -162,10 +162,6 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     public static LeafsConfig get() {
-        if (instance == null) {
-            throw new IllegalStateException("Leafs config accessed before mod initialisation");
-        }
-
         return instance;
     }
 
