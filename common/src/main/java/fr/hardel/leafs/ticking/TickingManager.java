@@ -2,7 +2,6 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
@@ -199,15 +198,9 @@ public final class TickingManager {
 
     public void shutdown() {
         chunkPool.shutdown();
-        for (ServerLevel level : server.getAllLevels()) {
-            LevelChunks.of(level).holders().logWaitingTeardowns(level.dimension().identifier().toString());
-            Leafs.LOGGER.info("{} graph sections left in {}", LevelChunks.of(level).graphs().sectionCount(), level.dimension().identifier());
-        }
-
         globalTicking = false;
         globalScheduler.drain();
         watchdog.stop();
-        drainRegions();
         if (!server.isDedicatedServer()) {
             watchdog.disarmShutdownDeadline();
         }
@@ -222,28 +215,6 @@ public final class TickingManager {
         Leafs.LOGGER.error("Tick unit #{} in {} threw - stopping the server", handle.id(), handle.dimension(), throwable);
         handle.cancel();
         server.halt(false);
-    }
-
-    private void drainRegions() {
-        int regions = 0;
-        int sections = 0;
-        for (ServerLevel level : server.getAllLevels()) {
-            LevelRegions levelRegions = LevelRegions.of(level);
-            try {
-                levelRegions.settle();
-            } catch (RuntimeException exception) {
-                Leafs.LOGGER.error("Leafs region drain failed on {}", level.dimension().identifier(), exception);
-            }
-
-            regions += levelRegions.regionizer().regionsView().size();
-            sections += levelRegions.sections();
-        }
-
-        if (regions == 0 && sections == 0) {
-            Leafs.LOGGER.info("Leafs regions drained: 0 regions, 0 sections");
-        } else {
-            Leafs.LOGGER.error("Leafs regions NOT drained: {} regions and {} sections outlived the simulation that feeds them", regions, sections);
-        }
     }
 }
 

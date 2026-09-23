@@ -3,8 +3,6 @@ package fr.hardel.leafs.chunk.holder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import net.minecraft.server.level.ChunkHolder;
 
-import java.util.List;
-
 public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
     @Override
     public synchronized ChunkHolder put(long key, ChunkHolder value) {
@@ -44,9 +42,5 @@ public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHold
     @Override
     public synchronized int size() {
         return super.size();
-    }
-
-    public synchronized List<ChunkHolder> snapshot() {
-        return List.copyOf(values());
     }
 }

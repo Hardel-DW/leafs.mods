@@ -1,6 +1,5 @@
 package fr.hardel.leafs.chunk.holder;
 
-import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
@@ -23,7 +22,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public final class ChunkHolders implements LevelListener {
     private final ChunkMap chunkMap;
@@ -131,25 +129,6 @@ public final class ChunkHolders implements LevelListener {
 
     public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
         return loading.settled(chunkX, chunkZ, this, body);
-    }
-
-    public void logWaitingTeardowns(String dimension) {
-        List<ChunkHolder> waiting = unloading.snapshot();
-        if (waiting.isEmpty()) {
-            return;
-        }
-
-        List<ChunkHolder> tasked = new ArrayList<>();
-        for (ChunkHolder holder : table.values()) {
-            if (holder.task.get() != null) {
-                tasked.add(holder);
-            }
-        }
-        String byStatus = waiting.stream().collect(Collectors.groupingBy(holder -> String.valueOf(holder.getLatestStatus()), Collectors.counting())).toString();
-        String samples = waiting.stream().limit(3).map(WaitReport::holder).collect(Collectors.joining("; "));
-        String tasks = tasked.stream().limit(5).map(WaitReport::holder).collect(Collectors.joining("; "));
-        Leafs.LOGGER.warn("{} holders of {} still wait for their teardown, by latest status {}: {}", waiting.size(), dimension, byStatus, samples);
-        Leafs.LOGGER.warn("{} holders of {} still carry a generation task: {}", tasked.size(), dimension, tasks);
     }
 
     public boolean busy(long chunkKey) {
