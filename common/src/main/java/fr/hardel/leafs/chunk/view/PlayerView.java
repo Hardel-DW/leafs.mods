@@ -2,9 +2,11 @@ package fr.hardel.leafs.chunk.view;
 
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
@@ -46,7 +48,12 @@ public final class PlayerView {
     }
 
     public int urgency(int chunkX, int chunkZ) {
-        return Math.min(players.level(ChunkPos.pack(chunkX, chunkZ)), tickets.viewDistance());
+        long chunkKey = ChunkPos.pack(chunkX, chunkZ);
+        if (!ChunkLevel.isLoaded(graphs.loading().level(chunkKey))) {
+            return ChunkPool.SECOND;
+        }
+
+        return Math.min(players.level(chunkKey), tickets.viewDistance());
     }
 
     public TriState nearby(long chunkKey) {
