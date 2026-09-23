@@ -69,6 +69,7 @@ public final class RegionTickBody {
                 RegionNetworkTick.drainOnRegion(player, level);
             }
         });
+
         stages.mark(TickStages.regionPackets);
         if (runs && !level.isDebug()) {
             long currentTick = clock.currentTick();
@@ -101,6 +102,7 @@ public final class RegionTickBody {
                 RegionNetworkTick.tickPlayerOnRegion(player, level.getServer());
             }
         });
+
         stages.mark(TickStages.regionPlayers);
         long slice = level.tickRateManager().nanosecondsPerTick() / 10;
         saves.autosave(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
@@ -129,6 +131,7 @@ public final class RegionTickBody {
         List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
             ? List.of()
             : mobCaps.spawnable(worldData, state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
+
         stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
