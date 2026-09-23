@@ -63,7 +63,7 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
 
     @Override
     public V computeIfAbsent(int key, Int2ObjectFunction<? extends V> mapping) {
-        return orDefault(map.computeIfAbsent(key, mapping::get));
+        return orDefault(map.computeIfAbsent(key, boxed -> mapping.get((int) boxed)));
     }
 
     @Override
