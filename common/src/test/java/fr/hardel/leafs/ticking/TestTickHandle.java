@@ -12,7 +12,7 @@ final class TestTickHandle extends TickHandle {
     }
 
     TestTickHandle(long id, BooleanSupplier gate, Runnable body) {
-        super(new RegionContext.Region(id, "test:world"), 1);
+        super(id, "test:world", 1);
         this.gate = gate;
         this.body = body;
     }

@@ -6,6 +6,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
+import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.CrashReport;
@@ -182,9 +183,7 @@ public final class TickingManager {
     }
 
     public void tickPausedNetwork() {
-        for (LevelTickUnit unit : levelUnits.values()) {
-            unit.tickPausedNetwork();
-        }
+        levelUnits.keySet().forEach(RegionNetworkTick::drainPaused);
     }
 
     private void drainRegionTasks() {

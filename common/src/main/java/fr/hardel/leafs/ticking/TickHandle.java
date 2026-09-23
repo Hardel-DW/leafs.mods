@@ -4,24 +4,26 @@ import fr.hardel.leafs.metrics.StageTimings;
 import net.minecraft.CrashReportCategory;
 
 public abstract class TickHandle {
-    private final RegionContext context;
+    private final long id;
+    private final String dimension;
     private final StageTimings stages;
     private volatile boolean cancelled;
     private volatile long scheduledStartNanos;
 
-    protected TickHandle(RegionContext context, int stageCount) {
-        this.context = context;
+    protected TickHandle(long id, String dimension, int stageCount) {
+        this.id = id;
+        this.dimension = dimension;
         this.stages = new StageTimings(stageCount);
     }
 
     // Used by the Leafs Debug mod
     public long id() {
-        return context.id();
+        return id;
     }
 
     // Used by the Leafs Debug mod
     public String dimension() {
-        return context.dimension();
+        return dimension;
     }
 
     // Used by the Leafs Debug mod
@@ -36,10 +38,6 @@ public abstract class TickHandle {
     // Used by the Leafs Debug mod
     public boolean isCancelled() {
         return cancelled;
-    }
-
-    RegionContext context() {
-        return context;
     }
 
     long scheduledStartNanos() {
