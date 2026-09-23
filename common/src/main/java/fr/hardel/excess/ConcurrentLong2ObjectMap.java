@@ -16,6 +16,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
@@ -24,52 +25,111 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
 
     @Override
     public V get(long key) {
-        V value = map.get(HashCommon.mix(key));
-        return value == null ? defaultReturnValue() : value;
+        return orDefault(map.get(HashCommon.mix(key)));
     }
 
     @Override
     public V put(long key, V value) {
-        V previous = map.put(HashCommon.mix(key), value);
-        return previous == null ? defaultReturnValue() : previous;
-    }
-
-    public V putIfAbsent(long key, V value) {
-        return map.putIfAbsent(HashCommon.mix(key), value);
+        return orDefault(map.put(HashCommon.mix(key), value));
     }
 
     @Override
     public V remove(long key) {
-        V previous = map.remove(HashCommon.mix(key));
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.remove(HashCommon.mix(key)));
     }
 
+    @Override
+    public V putIfAbsent(long key, V value) {
+        return orDefault(map.putIfAbsent(HashCommon.mix(key), value));
+    }
+
+    @Override
     public boolean remove(long key, Object value) {
         return map.remove(HashCommon.mix(key), value);
     }
 
     @Override
-    public V computeIfAbsent(long key, LongFunction<? extends V> mappingFunction) {
-        return map.computeIfAbsent(HashCommon.mix(key), _ -> mappingFunction.apply(key));
+    public boolean replace(long key, V oldValue, V newValue) {
+        return map.replace(HashCommon.mix(key), oldValue, newValue);
     }
 
     @Override
-    public V computeIfAbsent(long key, Long2ObjectFunction<? extends V> mappingFunction) {
-        V existing = get(key);
-        if (existing != null) {
-            return existing;
-        }
-
-        if (!mappingFunction.containsKey(key)) {
-            return defaultReturnValue();
-        }
-
-        return map.computeIfAbsent(HashCommon.mix(key), _ -> mappingFunction.get(key));
+    public V replace(long key, V value) {
+        return orDefault(map.replace(HashCommon.mix(key), value));
     }
 
     @Override
-    public V compute(long key, BiFunction<? super Long, ? super V, ? extends V> remappingFunction) {
-        return map.compute(HashCommon.mix(key), (_, value) -> remappingFunction.apply(key, value));
+    public V computeIfAbsent(long key, LongFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(HashCommon.mix(key), _ -> mapping.apply(key)));
+    }
+
+    @Override
+    public V computeIfAbsent(long key, Long2ObjectFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(HashCommon.mix(key), _ -> mapping.get(key)));
+    }
+
+    @Override
+    public V computeIfPresent(long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
+        return orDefault(map.computeIfPresent(HashCommon.mix(key), (_, value) -> remapping.apply(key, value)));
+    }
+
+    @Override
+    public V compute(long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
+        return orDefault(map.compute(HashCommon.mix(key), (_, value) -> remapping.apply(key, value)));
+    }
+
+    @Override
+    public V merge(long key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return orDefault(map.merge(HashCommon.mix(key), value, remapping));
+    }
+
+    @Override
+    public V putIfAbsent(Long key, V value) {
+        return map.putIfAbsent(HashCommon.mix(key), value);
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        return map.remove(HashCommon.mix((Long) key), value);
+    }
+
+    @Override
+    public boolean replace(Long key, V oldValue, V newValue) {
+        return map.replace(HashCommon.mix(key), oldValue, newValue);
+    }
+
+    @Override
+    public V replace(Long key, V value) {
+        return map.replace(HashCommon.mix(key), value);
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super Long, ? super V, ? extends V> function) {
+        map.replaceAll((mixed, value) -> function.apply(HashCommon.invMix(mixed), value));
+    }
+
+    @Override
+    public V computeIfAbsent(Long key, Function<? super Long, ? extends V> mapping) {
+        return map.computeIfAbsent(HashCommon.mix(key), _ -> mapping.apply(key));
+    }
+
+    @Override
+    public V computeIfPresent(Long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
+        return map.computeIfPresent(HashCommon.mix(key), (_, value) -> remapping.apply(key, value));
+    }
+
+    @Override
+    public V compute(Long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
+        return map.compute(HashCommon.mix(key), (_, value) -> remapping.apply(key, value));
+    }
+
+    @Override
+    public V merge(Long key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return map.merge(HashCommon.mix(key), value, remapping);
+    }
+
+    private V orDefault(V value) {
+        return value == null ? defaultReturnValue() : value;
     }
 
     @Override
