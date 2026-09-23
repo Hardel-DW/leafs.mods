@@ -24,7 +24,7 @@ public final class TicketGraphs {
     private final ConcurrentLongSet written = new ConcurrentLongSet();
     private final AtomicBoolean handed = new AtomicBoolean();
     private volatile ChunkPool pool;
-    private volatile LevelListener loadingListener;
+    private volatile Supplier<LevelListener> loadingListener;
     private volatile LevelListener simulationListener;
     private volatile LevelListener playersListener;
 
@@ -45,7 +45,7 @@ public final class TicketGraphs {
         return players;
     }
 
-    public void listen(LevelListener loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
+    public void listen(Supplier<LevelListener> loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
         this.loadingListener = loading;
         this.simulationListener = simulation;
         this.playersListener = players;
@@ -65,7 +65,7 @@ public final class TicketGraphs {
         for (LongIterator keys = written.iterator(); keys.hasNext(); ) {
             long key = keys.nextLong();
             keys.remove();
-            loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener, () -> null);
+            loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener.get(), () -> null);
         }
     }
 
@@ -114,13 +114,13 @@ public final class TicketGraphs {
 
         boolean changed = drainOwnSimulation();
         if (ChunkPool.isWorker()) {
-            return loading.drain(loadingListener) | changed;
+            return loading.drain(loadingListener.get()) | changed;
         }
 
         if (handed.compareAndSet(false, true)) {
             pool.execute(() -> {
                 handed.set(false);
-                loading.drain(loadingListener);
+                loading.drain(loadingListener.get());
             });
         }
 

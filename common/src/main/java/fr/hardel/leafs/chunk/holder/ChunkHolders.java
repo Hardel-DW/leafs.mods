@@ -23,7 +23,7 @@ import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
-public final class ChunkHolders implements LevelListener {
+public final class ChunkHolders {
     private final ChunkMap chunkMap;
     private final ChunkLevels loading;
     private final HolderTable table;
@@ -34,7 +34,6 @@ public final class ChunkHolders implements LevelListener {
     private final Demands demands;
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
-    private final ThreadLocal<List<ChunkHolder>> batch = ThreadLocal.withInitial(ArrayList::new);
 
     public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
         this.chunkMap = chunkMap;
@@ -57,52 +56,8 @@ public final class ChunkHolders implements LevelListener {
         return demands;
     }
 
-    @Override
-    public void changed(long chunkKey, int oldLevel, int newLevel) {
-        ChunkHolder holder = table.get(chunkKey);
-        if (holder == null) {
-            if (!ChunkLevel.isLoaded(newLevel)) {
-                return;
-            }
-
-            holder = unloading.remove(chunkKey);
-            if (holder == null) {
-                holder = new ChunkHolder(ChunkPos.unpack(chunkKey), newLevel, chunkMap.level, chunkMap.lightEngine, ChunkHolders::queueLevelFollows, chunkMap);
-                loads.increment();
-            }
-
-            table.put(chunkKey, holder);
-        }
-
-        holder.setTicketLevel(newLevel);
-        if (!ChunkLevel.isLoaded(newLevel)) {
-            table.remove(chunkKey);
-            unloading.put(chunkKey, holder);
-        }
-
-        batch.get().add(holder);
-    }
-
-    @Override
-    public void published() {
-        List<ChunkHolder> changed = batch.get();
-        for (ChunkHolder holder : changed) {
-            holder.updateHighestAllowedStatus(chunkMap);
-            steps.cancelDisallowed(holder);
-        }
-
-        for (ChunkHolder holder : changed) {
-            ChunkPos pos = holder.getPos();
-            holder.updateFutures(chunkMap, owners.executor(pos.x(), pos.z()));
-        }
-
-        for (ChunkHolder holder : changed) {
-            if (!ChunkLevel.isLoaded(holder.getTicketLevel())) {
-                unload(holder);
-            }
-        }
-
-        changed.clear();
+    public LevelListener publication() {
+        return new Publication();
     }
 
     public record Demand(CompletableFuture<ChunkResult<ChunkAccess>> delivery, Runnable release) {
@@ -128,7 +83,7 @@ public final class ChunkHolders implements LevelListener {
     }
 
     public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
-        return loading.settled(chunkX, chunkZ, this, body);
+        return loading.settled(chunkX, chunkZ, publication(), body);
     }
 
     private static void queueLevelFollows(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel) {
@@ -139,5 +94,56 @@ public final class ChunkHolders implements LevelListener {
         ChunkPos pos = holder.getPos();
         unloads.increment();
         owners.submit(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
+    }
+
+    private final class Publication implements LevelListener {
+        private final List<ChunkHolder> holders = new ArrayList<>();
+
+        @Override
+        public void changed(long chunkKey, int oldLevel, int newLevel) {
+            ChunkHolder holder = table.get(chunkKey);
+            if (holder == null) {
+                if (!ChunkLevel.isLoaded(newLevel)) {
+                    return;
+                }
+
+                holder = unloading.remove(chunkKey);
+                if (holder == null) {
+                    holder = new ChunkHolder(ChunkPos.unpack(chunkKey), newLevel, chunkMap.level, chunkMap.lightEngine, ChunkHolders::queueLevelFollows, chunkMap);
+                    loads.increment();
+                }
+
+                table.put(chunkKey, holder);
+            }
+
+            holder.setTicketLevel(newLevel);
+            if (!ChunkLevel.isLoaded(newLevel)) {
+                table.remove(chunkKey);
+                unloading.put(chunkKey, holder);
+            }
+
+            holders.add(holder);
+        }
+
+        @Override
+        public void published() {
+            for (ChunkHolder holder : holders) {
+                holder.updateHighestAllowedStatus(chunkMap);
+                steps.cancelDisallowed(holder);
+            }
+
+            for (ChunkHolder holder : holders) {
+                ChunkPos pos = holder.getPos();
+                holder.updateFutures(chunkMap, owners.executor(pos.x(), pos.z()));
+            }
+
+            for (ChunkHolder holder : holders) {
+                if (!ChunkLevel.isLoaded(holder.getTicketLevel())) {
+                    unload(holder);
+                }
+            }
+
+            holders.clear();
+        }
     }
 }

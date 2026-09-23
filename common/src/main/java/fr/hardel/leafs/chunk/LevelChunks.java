@@ -55,7 +55,7 @@ public final class LevelChunks {
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
-        graphs.listen(holders, regions, view.tickets().and(owners.follow()), pool);
+        graphs.listen(holders::publication, regions, view.tickets().and(owners.follow()), pool);
     }
 
     // Used by the Leafs Debug mod

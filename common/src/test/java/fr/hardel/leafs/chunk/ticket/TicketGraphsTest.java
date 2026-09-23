@@ -46,7 +46,7 @@ class TicketGraphsTest {
     @Test
     void aWriterOffThePoolHandsTheLoadingDrainOver() throws InterruptedException {
         List<String> simulation = new CopyOnWriteArrayList<>();
-        graphs.listen(loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
+        graphs.listen(() -> loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
 
         graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, false);
         graphs.simulationFeed().update(ChunkPos.pack(0, 0), 44, false);
@@ -62,7 +62,7 @@ class TicketGraphsTest {
     @Test
     void aBystanderLeavesTheSimulationMoveToItsWriter() throws InterruptedException {
         List<String> simulation = new CopyOnWriteArrayList<>();
-        graphs.listen(loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
+        graphs.listen(() -> loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
         graphs.simulationFeed().update(ChunkPos.pack(0, 0), 40, false);
         CountDownLatch drained = new CountDownLatch(1);
 
@@ -81,7 +81,7 @@ class TicketGraphsTest {
     /** B30: Lithium reads the holder right after runDistanceManagerUpdates without passing through vanilla's caller, so the primitive itself settles what was added. */
     @Test
     void aTicketAddedOffThePoolSettlesOnTheCallerAtRunDistanceManagerUpdates() {
-        graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
+        graphs.listen(() -> loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
 
         graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, true);
         graphs.settleWritten();
@@ -93,7 +93,7 @@ class TicketGraphsTest {
 
     @Test
     void aWorkerDrainsInLine() throws InterruptedException {
-        graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
+        graphs.listen(() -> loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
         boolean[] changed = new boolean[1];
         CountDownLatch done = new CountDownLatch(1);
 
