@@ -2,12 +2,10 @@ package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
-import fr.hardel.leafs.chunk.level.LevelListener;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
-import fr.hardel.leafs.chunk.pool.Urgency;
 import fr.hardel.leafs.global.GlobalScheduler;
-import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;
 
@@ -31,10 +29,9 @@ public final class ChunkOwners implements Router {
     }
 
     private final ChunkPool pool;
-    private final int level;
+    private final ChunkPlacement placement;
     private final Inboxes inboxes;
     private final Ownership ownership;
-    private final Urgency urgency;
     private final BooleanSupplier live;
     private final Executor serial;
     private final Taker taker;
@@ -42,12 +39,11 @@ public final class ChunkOwners implements Router {
     private final long slowTaskNanos;
     private final ConcurrentLong2ObjectMap<ChunkClaim> borrowed = new ConcurrentLong2ObjectMap<>();
 
-    public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server, long slowTaskNanos) {
+    public ChunkOwners(ChunkPool pool, ChunkPlacement placement, Inboxes inboxes, Ownership ownership, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server, long slowTaskNanos) {
         this.pool = pool;
-        this.level = level;
+        this.placement = placement;
         this.inboxes = inboxes;
         this.ownership = ownership;
-        this.urgency = urgency;
         this.live = live;
         this.serial = serial;
         this.taker = taker;
@@ -117,81 +113,25 @@ public final class ChunkOwners implements Router {
     }
 
     private void onPool(int chunkX, int chunkZ, Runnable task) {
-        pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
-    }
-
-    public void onPool(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius, Runnable task) {
-        pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(kind, chunkX, chunkZ, radius), task));
-    }
-
-    public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ) {
-        return new ChunkTask.Place(ChunkTask.key(level, chunkX, chunkZ), ChunkTask.key(level, centerX, centerZ), urgency);
-    }
-
-    public LevelListener follow() {
-        return (chunkKey, _, _) -> pool.changed(ChunkTask.key(level, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
-    }
-
-    public void expedite(int chunkX, int chunkZ) {
-        int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
-        for (int dz = -radius; dz <= radius; dz++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                pool.expedite(ChunkTask.key(level, chunkX + dx, chunkZ + dz));
-            }
-        }
-    }
-
-    public String describeQueued(int chunkX, int chunkZ) {
-        int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
-        int around = 0;
-        for (int dz = -radius; dz <= radius; dz++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                around += pool.queuedAt(ChunkTask.key(level, chunkX + dx, chunkZ + dz));
-            }
-        }
-
-        return around + " tasks queued within " + radius + ", " + pool.queuedAt(ChunkTask.key(level, chunkX, chunkZ)) + " on the chunk itself";
+        pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, placement.area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
     }
 
     public boolean holds(int chunkX, int chunkZ) {
-        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        ChunkClaim taken = claimAt(chunkX, chunkZ);
         return taken != null ? taken.mine() : ownership.holds(chunkX, chunkZ);
     }
 
     public boolean heldElsewhere(int chunkX, int chunkZ) {
-        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        ChunkClaim taken = claimAt(chunkX, chunkZ);
         return taken != null && !taken.mine();
     }
 
-    public @Nullable String describeTaken(int chunkX, int chunkZ) {
-        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
-        return taken == null ? null : "taken by thread '%s' with %d queued".formatted(taken.holder().getName(), taken.mail().size());
+    public @Nullable ChunkClaim claimAt(int chunkX, int chunkZ) {
+        return borrowed.get(ChunkPos.pack(chunkX, chunkZ));
     }
 
     public Executor executor(int chunkX, int chunkZ) {
         return task -> submit(chunkX, chunkZ, Work.CHUNK, task);
-    }
-
-    public long[] area(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius) {
-        if (radius < 0) {
-            return ChunkTask.NO_RESERVATION;
-        }
-
-        int space = space(kind);
-        int side = 2 * radius + 1;
-        long[] keys = new long[side * side];
-        int count = 0;
-        for (int dz = -radius; dz <= radius; dz++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                keys[count++] = ChunkTask.key(space, chunkX + dx, chunkZ + dz);
-            }
-        }
-
-        return keys;
-    }
-
-    private int space(ChunkTask.Kind kind) {
-        return kind == ChunkTask.Kind.LIGHT ? level * 2 + 1 : level * 2;
     }
 
     public @Nullable ChunkClaim borrow(int chunkX, int chunkZ) {
@@ -239,7 +179,7 @@ public final class ChunkOwners implements Router {
     }
 
     private @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
-        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        ChunkClaim taken = claimAt(chunkX, chunkZ);
         return taken != null ? taken.mail() : inboxes.at(chunkX, chunkZ);
     }
 }

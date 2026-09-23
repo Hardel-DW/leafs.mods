@@ -55,7 +55,7 @@ public final class ChunkCommand {
             .append(CommandText.stat("sendable", holder.getChunkToSend() != null));
 
         return List.of(header, CommandText.gray(WaitReport.holder(holder)), status,
-            CommandText.gray(owner(chunks, LevelRegions.of(level), chunkX, chunkZ)), CommandText.gray(chunks.owners().describeQueued(chunkX, chunkZ)));
+            CommandText.gray(owner(chunks, LevelRegions.of(level), chunkX, chunkZ)), CommandText.gray(WaitReport.queued(chunks.placement(), chunkX, chunkZ)));
     }
 
     private static int send(CommandSourceStack source, ChunkPos chunk) {
@@ -65,7 +65,7 @@ public final class ChunkCommand {
     }
 
     private static String owner(LevelChunks chunks, LevelRegions regions, int chunkX, int chunkZ) {
-        String taken = chunks.owners().describeTaken(chunkX, chunkZ);
+        String taken = WaitReport.taken(chunks.owners(), chunkX, chunkZ);
         if (taken != null) {
             return taken;
         }

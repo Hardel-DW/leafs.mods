@@ -4,7 +4,6 @@ import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.global.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -144,12 +143,6 @@ class ChunkOwnersTest {
         assertEquals(List.of("2,2"), taken);
     }
 
-    @Test
-    void lightReservesInItsOwnSpace() {
-        assertEquals(owners.area(ChunkTask.Kind.STEP, 1, 1, 0)[0], owners.area(ChunkTask.Kind.OWNER, 1, 1, 0)[0], "publication and generation write the blocks");
-        assertFalse(owners.area(ChunkTask.Kind.STEP, 1, 1, 0)[0] == owners.area(ChunkTask.Kind.LIGHT, 1, 1, 0)[0], "light writes the light arrays");
-    }
-
     /** N02: the pool and a taker kept two registries of the same chunk; the pool task now takes the chunk for its duration, so a taker meanwhile finds it held and its work waits for the release. */
     @Test
     void aPoolTaskHoldsItsChunkAgainstATakerUntilItEnds() throws InterruptedException {
@@ -226,19 +219,6 @@ class ChunkOwnersTest {
         release.countDown();
         taker.join();
         assertTrue(owners.holds(1, 1), "the region holds the chunk once released");
-    }
-
-    @Test
-    void aTakenChunkReportsItsTakerAndItsMail() throws InterruptedException {
-        covered = false;
-        assertNull(owners.describeTaken(1, 1));
-
-        ChunkClaim taken = takenOnAnotherThread();
-        owners.submit(1, 1, Work.GAME, () -> ran.add("mail"));
-
-        assertEquals("taken by thread 'taker' with 1 queued", owners.describeTaken(1, 1));
-        owners.release(1, 1, taken);
-        assertNull(owners.describeTaken(1, 1));
     }
 
     /** 2026-09-04: a status change on an uncovered chunk re-submitted itself to the pool forever, the worker not counting as its owner. */

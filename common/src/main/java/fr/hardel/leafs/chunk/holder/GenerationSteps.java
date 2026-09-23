@@ -2,7 +2,7 @@ package fr.hardel.leafs.chunk.holder;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
@@ -25,24 +25,24 @@ public final class GenerationSteps {
     };
 
     private final ChunkPool pool;
-    private final ChunkOwners owners;
+    private final ChunkPlacement placement;
     private final ConcurrentLong2ObjectMap<StepTask[]> queued = new ConcurrentLong2ObjectMap<>();
 
-    public GenerationSteps(ChunkPool pool, ChunkOwners owners) {
+    public GenerationSteps(ChunkPool pool, ChunkPlacement placement) {
         this.pool = pool;
-        this.owners = owners;
+        this.placement = placement;
     }
 
     public void run(Runnable task, long chunkKey) {
         int chunkX = ChunkPos.getX(chunkKey);
         int chunkZ = ChunkPos.getZ(chunkKey);
-        pool.submit(ChunkTask.of(Kind.STEP, owners.place(chunkX, chunkZ, chunkX, chunkZ), ChunkTask.NO_RESERVATION, task));
+        pool.submit(ChunkTask.of(Kind.STEP, placement.place(chunkX, chunkZ, chunkX, chunkZ), ChunkTask.NO_RESERVATION, task));
     }
 
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
         ChunkPos pos = chunk.getPos();
-        ChunkTask.Place place = owners.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
-        StepTask task = new StepTask(place, owners.area(Kind.STEP, pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
+        ChunkTask.Place place = placement.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
+        StepTask task = new StepTask(place, placement.area(Kind.STEP, pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
         queued.compute(pos.pack(), (_, slots) -> {
             StepTask[] target = slots == null ? new StepTask[STATUSES] : slots;
             target[step.targetStatus().getIndex()] = task;
@@ -66,7 +66,7 @@ public final class GenerationSteps {
     }
 
     public Executor loading(ChunkPos pos) {
-        return task -> owners.onPool(Kind.STEP, pos.x(), pos.z(), 0, task);
+        return task -> placement.onPool(Kind.STEP, pos.x(), pos.z(), 0, task);
     }
 
     private void forget(StepTask task) {

@@ -7,6 +7,7 @@ import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.UnownedSweep;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class LevelChunks {
     private static final AtomicInteger IDS = new AtomicInteger();
     private final ChunkPool pool;
+    private final ChunkPlacement placement;
     private final TicketGraphs graphs;
     private final TicketTimeoutIndex timeouts;
     private final PlayerView view;
@@ -47,15 +49,16 @@ public final class LevelChunks {
         this.timeouts = new TicketTimeoutIndex(tickets, chunkMap, graphs, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
-        this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
-        this.steps = new GenerationSteps(pool, owners);
+        this.placement = new ChunkPlacement(pool, IDS.getAndIncrement(), this::urgency);
+        this.owners = new ChunkOwners(pool, placement, regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
+        this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs);
-        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, steps, ticking.metrics());
+        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, placement, tickets, steps, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
-        graphs.listen(holders::publication, regions, view.tickets().and(owners.follow()), pool);
+        graphs.listen(holders::publication, regions, view.tickets().and(placement.follow()), pool);
     }
 
     // Used by the Leafs Debug mod
@@ -106,6 +109,10 @@ public final class LevelChunks {
 
     public PlayerView view() {
         return view;
+    }
+
+    public ChunkPlacement placement() {
+        return placement;
     }
 
     public ChunkOwners owners() {
