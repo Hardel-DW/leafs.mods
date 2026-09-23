@@ -74,10 +74,12 @@ public final class StageTimings {
         return missedStarts;
     }
 
+    // Used by the Leafs Debug mod
     public int stageCount() {
         return ring[0].length;
     }
 
+    // Used by the Leafs Debug mod
     public int completedTicks() {
         return cursor;
     }
@@ -116,6 +118,7 @@ public final class StageTimings {
         return averages;
     }
 
+    // Used by the Leafs Debug mod
     public Snapshot sample(long nowNanos) {
         long cutoff = nowNanos - WINDOW_NANOS;
         long[] window = new long[CAPACITY];
@@ -146,6 +149,7 @@ public final class StageTimings {
         return sorted[rank] / NANOS_PER_MILLI;
     }
 
+    // Used by the Leafs Debug mod
     public record Snapshot(double tps, double msptAverage, double mspt50, double mspt95, double mspt99, double msptMax) {
         static final Snapshot IDLE = new Snapshot(0, 0, 0, 0, 0, 0);
     }

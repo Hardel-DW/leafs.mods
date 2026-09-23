@@ -35,6 +35,7 @@ public final class MinuteCounter {
         return total.get();
     }
 
+    // Used by the Leafs Debug mod
     public long perMinute() {
         long now = secondSource.getAsLong();
         long sum = 0;

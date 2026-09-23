@@ -26,6 +26,7 @@ public final class LevelTickUnit extends TickHandle {
         this.scheduler = scheduler;
     }
 
+    // Used by the Leafs Debug mod
     public LevelRegions regions() {
         return regions;
     }
@@ -79,10 +80,12 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
+    // Used by the Leafs Debug mod
     public int chunkCount() {
         return lastChunkCount;
     }
 
+    // Used by the Leafs Debug mod
     public int entityCount() {
         int entities = 0;
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {

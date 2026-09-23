@@ -13,14 +13,17 @@ public abstract class TickHandle {
         this.stages = new StageTimings(stageCount);
     }
 
+    // Used by the Leafs Debug mod
     public long id() {
         return context.id();
     }
 
+    // Used by the Leafs Debug mod
     public String dimension() {
         return context.dimension();
     }
 
+    // Used by the Leafs Debug mod
     public StageTimings stages() {
         return stages;
     }
@@ -29,6 +32,7 @@ public abstract class TickHandle {
         cancelled = true;
     }
 
+    // Used by the Leafs Debug mod
     public boolean isCancelled() {
         return cancelled;
     }

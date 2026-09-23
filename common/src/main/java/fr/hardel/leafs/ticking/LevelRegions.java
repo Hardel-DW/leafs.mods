@@ -57,10 +57,12 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return slowTaskNanos;
     }
 
+    // Used by the Leafs Debug mod
     public static LevelRegions of(ServerLevel level) {
         return ((ServerLevelRegionAccess) level).leafs$regions();
     }
 
+    // Used by the Leafs Debug mod
     public Regionizer<RegionTickData> regionizer() {
         return regionizer;
     }

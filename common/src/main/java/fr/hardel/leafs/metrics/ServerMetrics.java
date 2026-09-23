@@ -26,22 +26,27 @@ public final class ServerMetrics {
         return deferStats;
     }
 
+    // Used by the Leafs Debug mod
     public StageTimings globalStages() {
         return globalStages;
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter packetsIn() {
         return packetsIn;
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter packetsOut() {
         return packetsOut;
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter chunkLoads() {
         return chunkLoads;
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter chunkUnloads() {
         return chunkUnloads;
     }
@@ -54,6 +59,7 @@ public final class ServerMetrics {
         return stepsRan.get(status.getIndex());
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter chunksFull() {
         return chunksFull;
     }
@@ -64,6 +70,7 @@ public final class ServerMetrics {
         longestChunkWaitNanos.accumulate(nanos);
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter chunkWaits() {
         return chunkWaits;
     }
@@ -72,10 +79,12 @@ public final class ServerMetrics {
         return chunkWaitNanos.get();
     }
 
+    // Used by the Leafs Debug mod
     public long longestChunkWaitNanos() {
         return longestChunkWaitNanos.get();
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter sharedPlayers() {
         return sharedPlayers;
     }

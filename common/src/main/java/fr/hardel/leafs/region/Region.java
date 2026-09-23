@@ -24,14 +24,17 @@ public final class Region<R> {
         this.data = callbacks.createData(this);
     }
 
+    // Used by the Leafs Debug mod
     public long id() {
         return id;
     }
 
+    // Used by the Leafs Debug mod
     public R data() {
         return data;
     }
 
+    // Used by the Leafs Debug mod
     public RegionState state() {
         return state;
     }
@@ -57,6 +60,7 @@ public final class Region<R> {
         return regionizer.sectionCountOf(this);
     }
 
+    // Used by the Leafs Debug mod
     public int chunkCount() {
         return regionizer.chunkCountOf(this);
     }
@@ -77,6 +81,7 @@ public final class Region<R> {
         regionizer.forEachChunkOf(this, consumer);
     }
 
+    // Used by the Leafs Debug mod
     public long[] sectionKeySnapshot() {
         return regionizer.sectionKeysOf(this);
     }

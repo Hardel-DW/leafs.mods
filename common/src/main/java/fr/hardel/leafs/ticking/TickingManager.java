@@ -62,10 +62,12 @@ public final class TickingManager {
         return server instanceof DedicatedServer dedicated && dedicated.getMaxTickLength() > 0 ? Duration.ofMillis(dedicated.getMaxTickLength()).toNanos() : 0L;
     }
 
+    // Used by the Leafs Debug mod
     public static TickingManager of(MinecraftServer server) {
         return ((LeafsServerAccess) server).leafs$ticking();
     }
 
+    // Used by the Leafs Debug mod
     public ServerMetrics metrics() {
         return metrics;
     }
@@ -107,6 +109,7 @@ public final class TickingManager {
         scheduler.wakeMissed();
     }
 
+    // Used by the Leafs Debug mod
     public ChunkPool chunkPool() {
         return chunkPool;
     }

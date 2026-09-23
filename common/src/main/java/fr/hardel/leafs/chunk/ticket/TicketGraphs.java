@@ -32,6 +32,7 @@ public final class TicketGraphs {
         return loading;
     }
 
+    // Used by the Leafs Debug mod
     public ChunkLevels simulation() {
         return simulation;
     }
