@@ -28,7 +28,7 @@ class FacadeCoverageTest {
     @ParameterizedTest
     @ValueSource(classes = {
         HashMapFacade.class, HashSetFacade.class, SynchronizedArrayList.class,
-        SynchronizedLongOpenHashSet.class, SynchronizedObject2ObjectOpenHashMap.class
+        SynchronizedLongOpenHashSet.class
     })
     void aClassFacadeRedefinesEveryMethodOfItsClasses(Class<?> facade) {
         assertEquals(List.of(), inherited(facade, method -> !method.getDeclaringClass().isInterface() || isCompound(method) || SEQUENCED.contains(method.getName())));

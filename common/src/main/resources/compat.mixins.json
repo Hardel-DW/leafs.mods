@@ -4,7 +4,6 @@
 	"plugin": "fr.hardel.leafs.CompatMixinPlugin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"ConstructorObject2ObjectMapMixin",
 		"CullingUpdateTrackerMixin",
 		"GraphBufferMixin",
 		"LeafDecayMixin",
@@ -12,8 +11,7 @@
 		"MapFieldMixin",
 		"QueueFieldMixin",
 		"SetFieldMixin",
-		"StaticArrayListMixin",
-		"StaticObject2ObjectMapMixin"
+		"StaticArrayListMixin"
 	],
 	"injectors": {
 		"defaultRequire": 0
