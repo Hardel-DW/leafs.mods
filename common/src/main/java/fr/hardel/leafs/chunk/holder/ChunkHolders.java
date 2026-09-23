@@ -5,6 +5,7 @@ import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.Work;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import net.minecraft.server.level.ChunkHolder;
@@ -29,18 +30,20 @@ public final class ChunkHolders {
     private final HolderTable table;
     private final PendingUnloads unloading;
     private final ChunkOwners owners;
+    private final ChunkPlacement placement;
     private final TicketStorage tickets;
     private final GenerationSteps steps;
     private final Demands demands;
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
 
-    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
+    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, ChunkPlacement placement, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
         this.chunkMap = chunkMap;
         this.loading = loading;
         this.table = table;
         this.unloading = unloading;
         this.owners = owners;
+        this.placement = placement;
         this.tickets = tickets;
         this.demands = new Demands(tickets, LeafsTicketTypes.demand);
         this.steps = steps;
@@ -68,7 +71,7 @@ public final class ChunkHolders {
         int level = ChunkLevel.byStatus(status);
         demands.demand(key, level);
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
-        owners.expedite(chunkX, chunkZ);
+        placement.expedite(chunkX, chunkZ);
         return new Demand(delivery, () -> demands.release(key, level));
     }
 
