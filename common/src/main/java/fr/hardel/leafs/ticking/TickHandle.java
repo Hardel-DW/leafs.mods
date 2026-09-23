@@ -1,6 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.metrics.StageTimings;
+import net.minecraft.CrashReportCategory;
 
 public abstract class TickHandle {
     private final RegionContext context;
@@ -49,9 +50,11 @@ public abstract class TickHandle {
         this.scheduledStartNanos = scheduledStartNanos;
     }
 
+    public void fillCrashReportCategory(CrashReportCategory category) {
+        category.setDetail("Id", id()).setDetail("Dimension", dimension()).setDetail("Tick", currentTick());
+    }
+
     public abstract long currentTick();
 
     protected abstract boolean tick();
-
-    protected abstract RegionCrashReport buildCrashReport();
 }

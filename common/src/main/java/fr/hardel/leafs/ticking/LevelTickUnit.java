@@ -96,9 +96,4 @@ public final class LevelTickUnit extends TickHandle {
 
         return entities;
     }
-
-    @Override
-    protected RegionCrashReport buildCrashReport() {
-        return new RegionCrashReport(id(), dimension(), currentTick(), chunkCount(), entityCount());
-    }
 }

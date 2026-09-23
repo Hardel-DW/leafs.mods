@@ -77,9 +77,4 @@ public final class RegionTickHandle extends TickHandle {
             WorldTickContext.exit();
         }
     }
-
-    @Override
-    protected RegionCrashReport buildCrashReport() {
-        return new RegionCrashReport(id(), dimension(), currentTick(), region.chunkCount(), entityCensus);
-    }
 }

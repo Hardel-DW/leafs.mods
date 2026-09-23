@@ -9,13 +9,13 @@ import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.CrashReport;
+import net.minecraft.ReportedException;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.thread.BlockableEventLoop;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
@@ -45,10 +45,9 @@ public final class TickingManager {
         this.server = server;
         long warnNanos = config.debug().watchdogWarnNanos();
         this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
-        RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), Leafs.platform().attribution());
-        ThreadGroup serverThreads = Leafs.platform().serverThreads();
+        ThreadGroup serverThreads = Leafs.serverThreads();
         this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), () -> server.tickRateManager().nanosecondsPerTick(),
-            config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
+            config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
         this.slowTaskNanos = config.debug().slowTaskNanos();
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
         watchdog.start();
@@ -211,10 +210,11 @@ public final class TickingManager {
         BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(failure, "Leafs chunk task " + task));
     }
 
-    private void onRegionTickFailure(TickHandle handle, Throwable throwable) {
-        Leafs.LOGGER.error("Tick unit #{} in {} threw - stopping the server", handle.id(), handle.dimension(), throwable);
+    private void onRegionTickFailure(TickHandle handle, Throwable failure) {
         handle.cancel();
-        server.halt(false);
+        CrashReport report = failure instanceof ReportedException reported ? reported.getReport() : CrashReport.forThrowable(failure, "Ticking Leafs region");
+        handle.fillCrashReportCategory(report.addCategory("Leafs region").setDetail("Thread", Thread.currentThread().getName()));
+        BlockableEventLoop.relayDelayCrash(report);
     }
 }
 
