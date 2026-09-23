@@ -37,6 +37,6 @@ class ThreadWaitsTest {
         assertEquals(Map.of(), ThreadWaits.stalled(now, 1_000_000_000L), "younger than the threshold");
         Map<Thread, String> stalled = ThreadWaits.stalled(now + 2_000_000_000L, 1_000_000_000L);
         assertEquals(1, stalled.size());
-        assertEquals("Wait stalled for 2s on thread '" + Thread.currentThread().getName() + "': region #7 TICKING", stalled.get(Thread.currentThread()));
+        assertEquals("Wait stalled for 2s on thread '%s': region #7 TICKING".formatted(Thread.currentThread().getName()), stalled.get(Thread.currentThread()));
     }
 }

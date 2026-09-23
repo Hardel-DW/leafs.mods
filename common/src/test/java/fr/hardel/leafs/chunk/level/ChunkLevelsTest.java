@@ -178,7 +178,7 @@ class ChunkLevelsTest {
                     expected = Math.min(expected, (int) source[2] + distance);
                 }
 
-                assertEquals(expected, level(chunkX, chunkZ), "chunk " + chunkX + "," + chunkZ);
+                assertEquals(expected, level(chunkX, chunkZ), "chunk %s,%s".formatted(chunkX, chunkZ));
             }
         }
     }

@@ -33,7 +33,7 @@ public final class RamCommand {
 
         for (GarbageCollectorMXBean collector : ManagementFactory.getGarbageCollectorMXBeans()) {
             source.sendSuccess(() -> Component.empty()
-                .append(CommandText.gray("  " + collector.getName()))
+                .append(CommandText.gray("  %s".formatted(collector.getName())))
                 .append(CommandText.stat("collections", collector.getCollectionCount()))
                 .append(CommandText.stat("time", String.format(Locale.ROOT, "%.1fs", collector.getCollectionTime() / 1000.0))), false);
         }
@@ -41,7 +41,7 @@ public final class RamCommand {
         for (ServerLevel level : source.getServer().getAllLevels()) {
             LevelChunks chunks = LevelChunks.of(level);
             source.sendSuccess(() -> Component.empty()
-                .append(CommandText.gray("  " + level.dimension().identifier()))
+                .append(CommandText.gray("  %s".formatted(level.dimension().identifier())))
                 .append(CommandText.stat("holders", chunks.holders().table().size()))
                 .append(CommandText.stat("graph sections", chunks.graphs().sectionCount())), false);
         }

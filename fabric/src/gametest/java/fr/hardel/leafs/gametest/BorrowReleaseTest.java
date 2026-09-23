@@ -46,8 +46,8 @@ public final class BorrowReleaseTest {
         }
 
         helper.succeedWhen(() -> {
-            helper.assertFalse(waitedForItself.get(), "reading " + b + " from the mail of " + a + " would wait for the reading thread itself");
-            helper.assertTrue(sawStone.get(), "the mail of " + a + " read the stone placed in " + b);
+            helper.assertFalse(waitedForItself.get(), "reading %s from the mail of %s would wait for the reading thread itself".formatted(b, a));
+            helper.assertTrue(sawStone.get(), "the mail of %s read the stone placed in %s".formatted(a, b));
         });
     }
 }

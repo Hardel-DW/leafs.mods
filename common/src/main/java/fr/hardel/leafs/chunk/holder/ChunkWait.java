@@ -39,7 +39,7 @@ public final class ChunkWait {
                 continue;
             }
 
-            return owner.substring(owner.lastIndexOf('.') + 1) + "." + frame.getMethodName();
+            return "%s.%s".formatted(owner.substring(owner.lastIndexOf('.') + 1), frame.getMethodName());
         }
 
         return "unknown";

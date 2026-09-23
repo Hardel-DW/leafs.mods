@@ -38,7 +38,7 @@ class ChunkOwnersTest {
             return false;
         }
 
-        taken.add(chunkX + "," + chunkZ);
+        taken.add("%s,%s".formatted(chunkX, chunkZ));
         task.run();
         return true;
     }

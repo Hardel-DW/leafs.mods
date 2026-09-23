@@ -124,7 +124,7 @@ final class Snapshots {
 
         @Override
         public String toString() {
-            return key + "=" + value;
+            return "%s=%s".formatted(key, value);
         }
     }
 

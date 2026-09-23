@@ -129,7 +129,7 @@ public final class RegionTickScheduler {
     /** The name contains "Server", the rename per tick included: some mods recognise the server thread by its name. */
     private static final class Worker extends Thread {
         private Worker(ThreadGroup group, Runnable loop, int index) {
-            super(group, loop, "Leafs Server Region Worker #" + index);
+            super(group, loop, "Leafs Server Region Worker #%s".formatted(index));
         }
     }
 

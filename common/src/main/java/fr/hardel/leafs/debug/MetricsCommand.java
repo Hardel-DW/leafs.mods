@@ -38,7 +38,7 @@ public final class MetricsCommand {
             }
 
             MutableComponent line = Component.empty()
-                .append(CommandText.gray("  " + reason.name().toLowerCase(Locale.ROOT).replace('_', ' ')))
+                .append(CommandText.gray("  %s".formatted(reason.name().toLowerCase(Locale.ROOT).replace('_', ' '))))
                 .append(CommandText.stat("deferred", perMinute(deferred)));
             if (dropped > 0) {
                 line.append(CommandText.stat("dropped", perMinute(dropped)));
@@ -59,8 +59,8 @@ public final class MetricsCommand {
             for (ChunkTask.Kind holder : ChunkTask.Kind.values()) {
                 long count = blocks.of(blocked, holder).perMinute();
                 if (count > 0) {
-                    String pair = blocked.name().toLowerCase(Locale.ROOT) + " behind " + holder.name().toLowerCase(Locale.ROOT);
-                    source.sendSuccess(() -> Component.empty().append(CommandText.gray("  pool tasks parked, " + pair)).append(CommandText.stat("", perMinute(count))), false);
+                    String parked = "  pool tasks parked, %s behind %s".formatted(blocked.name().toLowerCase(Locale.ROOT), holder.name().toLowerCase(Locale.ROOT));
+                    source.sendSuccess(() -> Component.empty().append(CommandText.gray(parked)).append(CommandText.stat("", perMinute(count))), false);
                 }
             }
         }
@@ -73,7 +73,7 @@ public final class MetricsCommand {
     }
 
     private static String perMinute(long count) {
-        return count + "/min";
+        return "%s/min".formatted(count);
     }
 
 }

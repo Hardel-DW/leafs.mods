@@ -11,39 +11,39 @@ class RecordingCallbacks implements RegionCallbacks<Object> {
 
     @Override
     public Object createData(Region<Object> region) {
-        events.add("data #" + region.id());
+        events.add("data #%s".formatted(region.id()));
 
         return new Object();
     }
 
     @Override
     public void onRegionCreate(Region<Object> region) {
-        events.add("create #" + region.id());
+        events.add("create #%s".formatted(region.id()));
     }
 
     @Override
     public void onRegionDestroy(Region<Object> region) {
-        events.add("destroy #" + region.id());
+        events.add("destroy #%s".formatted(region.id()));
     }
 
     @Override
     public void onRegionActive(Region<Object> region) {
-        events.add("active #" + region.id());
+        events.add("active #%s".formatted(region.id()));
     }
 
     @Override
     public void onRegionInactive(Region<Object> region) {
-        events.add("inactive #" + region.id());
+        events.add("inactive #%s".formatted(region.id()));
     }
 
     @Override
     public void merge(Region<Object> from, Region<Object> into, LongList movedChunks) {
-        events.add("merge #" + from.id() + "->#" + into.id());
+        events.add("merge #%s->#%s".formatted(from.id(), into.id()));
     }
 
     @Override
     public void split(Region<Object> parent, Long2ObjectMap<Region<Object>> sectionToChild, List<Region<Object>> children) {
         List<Long> childIds = children.stream().map(Region::id).sorted().toList();
-        events.add("split #" + parent.id() + "->" + childIds);
+        events.add("split #%s->%s".formatted(parent.id(), childIds));
     }
 }

@@ -45,17 +45,17 @@ class WaypointRowTest {
 
         @Override
         public void connect() {
-            journal.add(name + " connect");
+            journal.add("%s connect".formatted(name));
         }
 
         @Override
         public void disconnect() {
-            journal.add(name + " disconnect");
+            journal.add("%s disconnect".formatted(name));
         }
 
         @Override
         public void update() {
-            journal.add(name + " update");
+            journal.add("%s update".formatted(name));
         }
 
         @Override

@@ -112,7 +112,7 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     @Override
     public LongSortedSet subSet(long fromElement, long toElement) {
         if (fromElement > toElement) {
-            throw new IllegalArgumentException("Start element (" + fromElement + ") is larger than end element (" + toElement + ")");
+            throw new IllegalArgumentException("Start element (%s) is larger than end element (%s)".formatted(fromElement, toElement));
         }
 
         return snapshot(true, fromElement, true, toElement);
@@ -278,7 +278,7 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
         @Override
         public LongSortedSet subSet(long fromElement, long toElement) {
             if (fromElement > toElement) {
-                throw new IllegalArgumentException("Start element (" + fromElement + ") is larger than end element (" + toElement + ")");
+                throw new IllegalArgumentException("Start element (%s) is larger than end element (%s)".formatted(fromElement, toElement));
             }
 
             return new Snapshot(owner, elements, bound(fromElement), bound(toElement));

@@ -74,14 +74,14 @@ class ConcurrentInt2ObjectMapTest {
     @Test
     void valuesViewIteratesEverythingWithoutOrderGuarantee() {
         for (int i = 0; i < 50; i++) {
-            map.put(i, "v" + i);
+            map.put(i, "v%s".formatted(i));
         }
 
         List<String> values = new ArrayList<>();
         map.values().iterator().forEachRemaining(values::add);
         assertEquals(50, values.size());
         for (int i = 0; i < 50; i++) {
-            assertTrue(values.contains("v" + i));
+            assertTrue(values.contains("v%s".formatted(i)));
         }
     }
 

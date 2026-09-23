@@ -78,8 +78,8 @@ public final class ChunkHolders {
     private ChunkHolder demanded(long key, ChunkStatus status) {
         ChunkHolder holder = table.get(key);
         if (holder == null) {
-            throw new IllegalStateException("Chunk " + ChunkPos.unpack(key) + " demanded at " + status + " has no holder: loading level " + loading.level(key) + ", awaiting teardown " + unloading.containsKey(key)
-                + ", draining " + ChunkLevels.draining() + ", tickets " + tickets.getTicketDebugString(key, false));
+            throw new IllegalStateException("Chunk %s demanded at %s has no holder: loading level %s, awaiting teardown %s, draining %s, tickets %s".formatted(
+                ChunkPos.unpack(key), status, loading.level(key), unloading.containsKey(key), ChunkLevels.draining(), tickets.getTicketDebugString(key, false)));
         }
 
         return holder;
