@@ -17,6 +17,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.Locale;
@@ -55,7 +56,7 @@ public final class TimingsCommand {
 
         long[] averages = unit.stages().averageNanos(AVERAGE_WINDOW_TICKS);
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal("serial " + CommandText.shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal("serial " + Identifier.parse(unit.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(unit.stages().sample(System.nanoTime()))), false);
 
         return sendStages(source, TickFamily.SERIAL, averages);
@@ -77,7 +78,7 @@ public final class TimingsCommand {
         long[] averages = handle.stages().averageNanos(AVERAGE_WINDOW_TICKS);
         RegionTickHandle region = handle;
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal("R#" + region.id() + " " + CommandText.shortDimension(region.dimension())).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal("R#" + region.id() + " " + Identifier.parse(region.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(region.stages().sample(System.nanoTime())))
             .append(CommandText.stat("chunks", region.chunkCount()))
             .append(CommandText.stat("entities", region.entityCount()))

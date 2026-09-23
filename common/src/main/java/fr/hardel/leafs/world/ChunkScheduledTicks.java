@@ -95,11 +95,6 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     }
 
     @Override
-    public void copyArea(@NonNull BoundingBox area, @NonNull Vec3i offset) {
-        copyAreaFrom(this, area, offset);
-    }
-
-    @Override
     public void copyAreaFrom(@NonNull LevelTicks<T> source, @NonNull BoundingBox area, @NonNull Vec3i offset) {
         if (!(source instanceof ChunkScheduledTicks<T> chunked)) {
             super.copyAreaFrom(source, area, offset);

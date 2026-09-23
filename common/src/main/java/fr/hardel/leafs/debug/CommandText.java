@@ -3,19 +3,12 @@ package fr.hardel.leafs.debug;
 import fr.hardel.leafs.metrics.StageTimings;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 
 import java.util.Locale;
 
 final class CommandText {
 
     private CommandText() {
-    }
-
-    static String shortDimension(String dimension) {
-        Identifier location = Identifier.parse(dimension);
-
-        return location.getNamespace().equals(Identifier.DEFAULT_NAMESPACE) ? location.getPath() : location.toString();
     }
 
     static Component rate(StageTimings.Snapshot snapshot) {

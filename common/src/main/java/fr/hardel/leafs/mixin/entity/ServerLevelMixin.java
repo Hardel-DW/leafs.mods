@@ -105,7 +105,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return original.call(entity);
         }
 
-        if (entity.isRemoved() || ((EntityManagerAccess) ((ServerLevel) (Object) this).entityManager).leafs$knows(entity.getUUID())) {
+        if (entity.isRemoved() || ((ServerLevel) (Object) this).entityManager.isLoaded(entity.getUUID())) {
             return false;
         }
 

@@ -39,7 +39,7 @@ public final class ChunkCommand {
         ChunkHolder holder = chunks.holders().table().get(key);
         Component header = Component.empty()
             .append(Component.literal("chunk [%d, %d]".formatted(chunkX, chunkZ)).withStyle(ChatFormatting.AQUA))
-            .append(CommandText.stat("dimension", CommandText.shortDimension(level.dimension().identifier().toString())))
+            .append(CommandText.stat("dimension", level.dimension().identifier().toShortString()))
             .append(CommandText.stat("loading level", chunks.graphs().loading().level(key)))
             .append(CommandText.stat("tickets", level.getChunkSource().ticketStorage.getTicketDebugString(key, false)));
 
