@@ -22,7 +22,7 @@ class FacadeCoverageTest {
         ConcurrentLongSet.class, ConcurrentOrderedLongSet.class
     })
     void aConcurrentFacadeRedefinesEveryPrimitiveCompoundWrite(Class<?> facade) {
-        assertEquals(List.of(), inherited(facade, method -> method.getDeclaringClass() != Map.class && isCompoundOrSequenced(method)));
+        assertEquals(List.of(), inherited(facade, method -> method.getDeclaringClass() != Map.class && isCompound(method)));
     }
 
     @ParameterizedTest
@@ -32,7 +32,7 @@ class FacadeCoverageTest {
         SynchronizedReference2ObjectOpenHashMap.class, SynchronizedWeakHashMap.class
     })
     void aSynchronizedCollectionRedefinesEveryMethodOfItsClasses(Class<?> facade) {
-        assertEquals(List.of(), inherited(facade, method -> !method.getDeclaringClass().isInterface() || isCompoundOrSequenced(method)));
+        assertEquals(List.of(), inherited(facade, method -> !method.getDeclaringClass().isInterface() || isCompound(method) || SEQUENCED.contains(method.getName())));
     }
 
     private static List<String> inherited(Class<?> facade, Predicate<Method> mustRedefine) {
@@ -44,9 +44,9 @@ class FacadeCoverageTest {
             .toList();
     }
 
-    private static boolean isCompoundOrSequenced(Method method) {
+    private static boolean isCompound(Method method) {
         String name = method.getName();
         return name.startsWith("compute") || name.startsWith("merge") || name.startsWith("replace") || name.equals("putIfAbsent")
-            || name.equals("remove") && method.getParameterCount() == 2 || SEQUENCED.contains(name);
+            || name.equals("remove") && method.getParameterCount() == 2;
     }
 }
