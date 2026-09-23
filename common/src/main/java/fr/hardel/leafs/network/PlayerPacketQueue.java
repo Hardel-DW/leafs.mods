@@ -34,6 +34,7 @@ public final class PlayerPacketQueue {
         return DRAINING.get() == this;
     }
 
+    // Used by the Leafs Debug mod
     public int pending() {
         return packets.size();
     }

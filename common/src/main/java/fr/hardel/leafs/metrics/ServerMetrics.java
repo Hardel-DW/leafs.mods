@@ -21,6 +21,7 @@ public final class ServerMetrics {
     private final AtomicLong chunkWaitNanos = new AtomicLong();
     private final LongAccumulator longestChunkWaitNanos = new LongAccumulator(Math::max, 0L);
 
+    // Used by the Leafs Debug mod
     public DeferStats deferStats() {
         return deferStats;
     }
