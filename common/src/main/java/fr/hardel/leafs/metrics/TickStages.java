@@ -11,6 +11,7 @@ import java.util.Map;
 
 /** Declaration order is execution order and timing slot. */
 public final class TickStages {
+
     // Used by the Leafs Debug mod
     public enum TickFamily {
         GLOBAL,
@@ -20,7 +21,6 @@ public final class TickStages {
 
     // Used by the Leafs Debug mod
     public record TickStage(TickFamily family, int index, Identifier id) {}
-
     private static final Map<TickFamily, List<TickStage>> byFamily = new EnumMap<>(TickFamily.class);
     public static final TickStage globalLevels = create(TickFamily.GLOBAL, "levels");
     public static final TickStage globalDrain = create(TickFamily.GLOBAL, "drain");

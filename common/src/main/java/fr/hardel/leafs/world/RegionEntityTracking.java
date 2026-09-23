@@ -64,6 +64,7 @@ public final class RegionEntityTracking {
                 tracked.serverEntity.sendChanges();
             }
         });
+
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
                 chunkMap.updateChunkTracking(player);
