@@ -77,7 +77,7 @@ public final class RegionsCommand {
         }
 
         if (slowest != null) {
-            line.append(CommandText.stat("slowest", CommandText.white("R#" + slowest.id()))).append(CommandText.sep()).append(CommandText.tps(slowestTps));
+            line.append(CommandText.stat("slowest", CommandText.white("R#%s".formatted(slowest.id())))).append(CommandText.sep()).append(CommandText.tps(slowestTps));
         }
 
         return line;
@@ -103,7 +103,7 @@ public final class RegionsCommand {
         for (Region<RegionTickData> region : live) {
             RegionTickHandle handle = region.data().handle();
             MutableComponent line = Component.empty()
-                .append(CommandText.sep()).append(CommandText.white("R#" + region.id()))
+                .append(CommandText.sep()).append(CommandText.white("R#%s".formatted(region.id())))
                 .append(CommandText.sep()).append(state(region.state()));
             if (handle != null && !handle.isCancelled()) {
                 line.append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now)))
@@ -138,7 +138,7 @@ public final class RegionsCommand {
 
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("You ").withStyle(ChatFormatting.GOLD))
-            .append(CommandText.white("R#" + handle.id()))
+            .append(CommandText.white("R#%s".formatted(handle.id())))
             .append(CommandText.gray(" in ")).append(Component.literal(Identifier.parse(handle.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now))), false);
     }

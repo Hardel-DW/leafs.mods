@@ -210,7 +210,7 @@ public final class TickingManager {
     private void onChunkTaskFailure(ChunkTask task, Throwable failure) {
         Leafs.LOGGER.error("Chunk task {} failed on {} - stopping the server", task, Thread.currentThread().getName(), failure);
         crashed = true;
-        BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(failure, "Leafs chunk task " + task));
+        BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(failure, "Leafs chunk task %s".formatted(task)));
     }
 
     private void onRegionTickFailure(TickHandle handle, Throwable failure) {

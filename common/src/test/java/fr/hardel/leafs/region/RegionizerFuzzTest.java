@@ -55,7 +55,7 @@ class RegionizerFuzzTest {
             int chunkX = CoordinateKey.x(chunkKey);
             int chunkZ = CoordinateKey.z(chunkKey);
             Region<Object> owner = regionizer.regionAt(chunkX, chunkZ);
-            assertNotNull(owner, "chunk [" + chunkX + ", " + chunkZ + "] lost its region");
+            assertNotNull(owner, "chunk [%s, %s] lost its region".formatted(chunkX, chunkZ));
             assertSame(owner, regionizer.regionAtUnsynchronised(chunkX, chunkZ));
         }
     }

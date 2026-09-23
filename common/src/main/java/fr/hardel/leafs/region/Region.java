@@ -86,6 +86,6 @@ public final class Region<R> {
     @Override
     public String toString() {
         Thread ticker = tickingThread;
-        return "Region[#" + id + " " + state + " sections=" + sectionKeys.size() + (ticker == null ? "" : " on thread '" + ticker.getName() + "'") + "]";
+        return "Region[#%s %s sections=%s%s]".formatted(id, state, sectionKeys.size(), ticker == null ? "" : " on thread '%s'".formatted(ticker.getName()));
     }
 }

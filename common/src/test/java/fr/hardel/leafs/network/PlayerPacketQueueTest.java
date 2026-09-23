@@ -182,10 +182,10 @@ class PlayerPacketQueueTest {
         int perThread = 250;
         CountDownLatch done = new CountDownLatch(threads);
         for (int thread = 0; thread < threads; thread++) {
-            String prefix = "t" + thread + ":";
+            String prefix = "t%s:".formatted(thread);
             Thread submitter = new Thread(() -> {
                 for (int sequence = 0; sequence < perThread; sequence++) {
-                    queue.add(listener, new FakePacket(prefix + sequence, handled::add));
+                    queue.add(listener, new FakePacket("%s%s".formatted(prefix, sequence), handled::add));
                 }
                 done.countDown();
             });
@@ -197,10 +197,10 @@ class PlayerPacketQueueTest {
 
         assertEquals(threads * perThread, handled.size());
         for (int thread = 0; thread < threads; thread++) {
-            String prefix = "t" + thread + ":";
+            String prefix = "t%s:".formatted(thread);
             List<String> sequence = handled.stream().filter(name -> name.startsWith(prefix)).toList();
             for (int index = 0; index < perThread; index++) {
-                assertEquals(prefix + index, sequence.get(index), "per-player submissions must stay ordered");
+                assertEquals("%s%s".formatted(prefix, index), sequence.get(index), "per-player submissions must stay ordered");
             }
         }
     }

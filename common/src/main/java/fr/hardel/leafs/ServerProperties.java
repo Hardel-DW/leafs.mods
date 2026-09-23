@@ -16,7 +16,7 @@ public record ServerProperties(Path file) {
             lines.add(key + "=" + value);
             Files.write(file, lines);
         } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to update " + file, exception);
+            throw new UncheckedIOException("Unable to update %s".formatted(file), exception);
         }
     }
 }

@@ -56,7 +56,7 @@ public final class TimingsCommand {
 
         long[] averages = unit.stages().averageNanos(AVERAGE_WINDOW_TICKS);
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal("serial " + Identifier.parse(unit.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal("serial %s".formatted(Identifier.parse(unit.dimension()).toShortString())).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(unit.stages().sample(System.nanoTime()))), false);
 
         return sendStages(source, TickFamily.SERIAL, averages);
@@ -71,14 +71,14 @@ public final class TimingsCommand {
         }
 
         if (handle == null || handle.isCancelled()) {
-            source.sendFailure(Component.literal("No live region #" + regionId + " in this dimension, /leafs regions lists them"));
+            source.sendFailure(Component.literal("No live region #%s in this dimension, /leafs regions lists them".formatted(regionId)));
             return 0;
         }
 
         long[] averages = handle.stages().averageNanos(AVERAGE_WINDOW_TICKS);
         RegionTickHandle region = handle;
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal("R#" + region.id() + " " + Identifier.parse(region.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal("R#%s %s".formatted(region.id(), Identifier.parse(region.dimension()).toShortString())).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(region.stages().sample(System.nanoTime())))
             .append(CommandText.stat("chunks", region.chunkCount()))
             .append(CommandText.stat("entities", region.entityCount()))
@@ -92,7 +92,7 @@ public final class TimingsCommand {
         for (TickStage stage : TickStages.of(family)) {
             long nanos = averages[stage.index()];
             source.sendSuccess(() -> Component.empty()
-                .append(CommandText.gray("  " + stage.id() + " "))
+                .append(CommandText.gray("  %s ".formatted(stage.id())))
                 .append(CommandText.white(formatMillis(nanos))), false);
         }
 

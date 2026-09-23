@@ -32,14 +32,14 @@ public final class CrashCommand {
                 long section = region.sectionKeySnapshot()[0];
                 int shift = regions.regionizer().sectionShift();
                 region.data().inbox().post(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift, Work.GAME, () -> {
-                    throw new IllegalStateException("Crash requested by /leafs crash on region #" + regionId);
+                    throw new IllegalStateException("Crash requested by /leafs crash on region #%s".formatted(regionId));
                 });
-                source.sendSuccess(() -> Component.literal("Region #" + regionId + " will throw on its next tick").withStyle(ChatFormatting.RED), true);
+                source.sendSuccess(() -> Component.literal("Region #%s will throw on its next tick".formatted(regionId)).withStyle(ChatFormatting.RED), true);
                 return 1;
             }
         }
 
-        source.sendFailure(Component.literal("No live region #" + regionId + " in this dimension, /leafs regions lists them"));
+        source.sendFailure(Component.literal("No live region #%s in this dimension, /leafs regions lists them".formatted(regionId)));
         return 0;
     }
 }

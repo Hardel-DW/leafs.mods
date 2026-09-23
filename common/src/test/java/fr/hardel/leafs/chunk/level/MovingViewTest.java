@@ -41,7 +41,7 @@ class MovingViewTest {
         }
 
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-        assertTrue(millis < 2_000, "the sliding views took " + millis + " ms");
+        assertTrue(millis < 2_000, "the sliding views took %s ms".formatted(millis));
         assertEquals(31, graph.level(ChunkPos.pack(STEPS, 0)));
         assertEquals(31 + VIEW + 1, graph.level(ChunkPos.pack(STEPS + 2 * VIEW + 1, 0)));
         assertEquals(graph.none(), graph.level(ChunkPos.pack(-VIEW - 14, 0)));

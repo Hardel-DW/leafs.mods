@@ -99,7 +99,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     private static Codec<Integer> threads(Setting setting) {
         return atMost(setting.key(), 1024, "negative uses all cores")
             .validate(value -> value == 0
-                ? DataResult.error(() -> setting.key() + " 0 is invalid: negative uses all cores")
+                ? DataResult.error(() -> "%s 0 is invalid: negative uses all cores".formatted(setting.key()))
                 : DataResult.success(value));
     }
 
@@ -110,7 +110,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
 
     private static Codec<Integer> atMost(String key, int max, String negative) {
         return Codec.INT.validate(value -> value > max
-            ? DataResult.error(() -> key + " must be at most " + max + ", " + negative)
+            ? DataResult.error(() -> "%s must be at most %s, %s".formatted(key, max, negative))
             : DataResult.success(value));
     }
 
@@ -208,16 +208,16 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     private static LeafsConfig parse(Path file, JsonElement json) {
-        return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config " + file + " is invalid: " + error));
+        return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config %s is invalid: %s".formatted(file, error)));
     }
 
     private static JsonElement read(Path file) {
         try {
             return JsonParser.parseString(Files.readString(file));
         } catch (JsonParseException exception) {
-            throw new IllegalArgumentException("Config " + file + " is not valid JSON", exception);
+            throw new IllegalArgumentException("Config %s is not valid JSON".formatted(file), exception);
         } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to read " + file, exception);
+            throw new UncheckedIOException("Unable to read %s".formatted(file), exception);
         }
     }
 
@@ -226,7 +226,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
             Files.createDirectories(file.getParent());
             Files.writeString(file, GSON.toJson(encode(config)) + System.lineSeparator());
         } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to write " + file, exception);
+            throw new UncheckedIOException("Unable to write %s".formatted(file), exception);
         }
 
         return config;

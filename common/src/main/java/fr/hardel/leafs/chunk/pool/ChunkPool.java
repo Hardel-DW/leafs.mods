@@ -185,7 +185,7 @@ public final class ChunkPool implements Executor {
 
     private static final class Worker extends Thread {
         private Worker(ThreadGroup group, Runnable work, int index) {
-            super(group, work, "Leafs Chunk Worker #" + index);
+            super(group, work, "Leafs Chunk Worker #%s".formatted(index));
         }
     }
 }

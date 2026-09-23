@@ -125,7 +125,7 @@ public abstract class ChunkTask {
 
     final void enqueuedAt(int bucket) {
         if (!BUCKET.compareAndSet(this, UNQUEUED, bucket)) {
-            throw new IllegalStateException("Task already queued at bucket " + this.bucket);
+            throw new IllegalStateException("Task already queued at bucket %s".formatted(this.bucket));
         }
     }
 

@@ -29,7 +29,7 @@ class PalettedContainerConcurrencyTest {
             states.add(state);
         }
 
-        throw new IllegalStateException("Registry holds fewer than " + count + " block states");
+        throw new IllegalStateException("Registry holds fewer than %s block states".formatted(count));
     }
 
     /** 2026-08-19: vanilla's ThreadingDetector crashes the second entrant; a region writing while IO packs must serialize instead. */

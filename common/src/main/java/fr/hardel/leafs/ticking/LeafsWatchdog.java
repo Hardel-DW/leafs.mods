@@ -94,7 +94,8 @@ public final class LeafsWatchdog {
     }
 
     private String headerLine(TickHandle handle, RunningTick tick, long now) {
-        return "Region tick stalled for " + (now - tick.startNanos) / 1_000_000_000L + "s: region #" + handle.id() + " in " + handle.dimension() + ", tick " + handle.currentTick() + ", thread '" + tick.thread.getName() + "'";
+        return "Region tick stalled for %ss: region #%s in %s, tick %s, thread '%s'".formatted(
+            (now - tick.startNanos) / 1_000_000_000L, handle.id(), handle.dimension(), handle.currentTick(), tick.thread.getName());
     }
 
     private String describeStall(TickHandle handle, RunningTick tick, long now) {

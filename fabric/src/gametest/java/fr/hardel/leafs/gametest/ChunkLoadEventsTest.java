@@ -25,8 +25,8 @@ public final class ChunkLoadEventsTest {
         helper.getLevel().getChunk(far.x(), far.z());
 
         helper.succeedWhen(() -> {
-            helper.assertTrue(loaded.contains(far), "CHUNK_LOAD fired for " + far);
-            helper.assertTrue(generated.contains(far), "CHUNK_GENERATE fired for " + far);
+            helper.assertTrue(loaded.contains(far), "CHUNK_LOAD fired for %s".formatted(far));
+            helper.assertTrue(generated.contains(far), "CHUNK_GENERATE fired for %s".formatted(far));
         });
     }
 }

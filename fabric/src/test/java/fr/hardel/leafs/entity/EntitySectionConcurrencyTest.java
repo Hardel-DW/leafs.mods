@@ -39,7 +39,7 @@ class EntitySectionConcurrencyTest {
         for (int i = 0; i < WRITES; i++) {
             Mob mob = new Mob(i);
             section.add(mob);
-            section.add("not a mob " + i);
+            section.add("not a mob %s".formatted(i));
             section.remove(mob);
         }
 

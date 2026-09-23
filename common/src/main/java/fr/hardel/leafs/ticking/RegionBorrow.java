@@ -148,7 +148,7 @@ public final class RegionBorrow {
             return;
         }
 
-        ThreadWaits.Wait outer = ThreadWaits.open(() -> "waiting for " + region + " in " + regions.level().dimension().identifier());
+        ThreadWaits.Wait outer = ThreadWaits.open(() -> "waiting for %s in %s".formatted(region, regions.level().dimension().identifier()));
         try {
             TickingManager.of(regions.level().getServer()).await(() -> held.contains(region) || region.state() != RegionState.TICKING);
         } finally {

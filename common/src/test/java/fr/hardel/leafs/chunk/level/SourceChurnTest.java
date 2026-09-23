@@ -40,10 +40,10 @@ class SourceChurnTest {
 
         graph.drain((key, old, now) -> {});
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-        assertTrue(millis < 10_000, "the churn took " + millis + " ms");
+        assertTrue(millis < 10_000, "the churn took %s ms".formatted(millis));
         for (int chunkX = -50; chunkX < SPAN + 50; chunkX++) {
             for (int chunkZ = -50; chunkZ < SPAN + 50; chunkZ++) {
-                assertEquals(expected(sources, chunkX, chunkZ), graph.level(ChunkPos.pack(chunkX, chunkZ)), "chunk " + chunkX + "," + chunkZ);
+                assertEquals(expected(sources, chunkX, chunkZ), graph.level(ChunkPos.pack(chunkX, chunkZ)), "chunk %s,%s".formatted(chunkX, chunkZ));
             }
         }
     }
@@ -84,7 +84,7 @@ class SourceChurnTest {
         for (int chunkX = -50; chunkX < SPAN + 50; chunkX++) {
             for (int chunkZ = -50; chunkZ < SPAN + 50; chunkZ++) {
                 int level = graph.level(ChunkPos.pack(chunkX, chunkZ));
-                assertTrue(level >= 20 || level == NONE, "chunk " + chunkX + "," + chunkZ + " at " + level);
+                assertTrue(level >= 20 || level == NONE, "chunk %s,%s at %s".formatted(chunkX, chunkZ, level));
             }
         }
     }
