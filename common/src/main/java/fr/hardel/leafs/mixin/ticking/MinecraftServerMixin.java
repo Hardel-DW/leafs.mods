@@ -31,6 +31,7 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @WrapOperation(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;processPacketsAndTick(Z)V"))
     private void leafs$lockDuringTheTick(MinecraftServer server, boolean sprinting, Operation<Void> original) {
+        leafs$ticking.throwRegionCrash();
         int tickCount = server.getTickCount();
         RegionBorrow.hold(_ -> original.call(server, sprinting));
         leafs$ticking.endServerTick(server.getTickCount() != tickCount);

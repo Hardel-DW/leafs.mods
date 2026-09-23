@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 public final class TickingManager {
@@ -36,6 +37,7 @@ public final class TickingManager {
     private final OwnWork serverWork = new OwnWork(this::pumpServer);
     private final Map<ServerLevel, LevelTickUnit> levelUnits = new ConcurrentHashMap<>();
     private final AtomicLong nextUnitId = new AtomicLong(1);
+    private final AtomicReference<CrashReport> regionCrash = new AtomicReference<>();
     private volatile boolean globalTicking;
     private final long slowTaskNanos;
     private volatile boolean halted;
@@ -101,6 +103,13 @@ public final class TickingManager {
 
     public boolean paused() {
         return paused;
+    }
+
+    public void throwRegionCrash() {
+        CrashReport crash = regionCrash.get();
+        if (crash != null) {
+            throw new ReportedException(crash);
+        }
     }
 
     public void endServerTick(boolean ticked) {
@@ -213,7 +222,9 @@ public final class TickingManager {
         crashed = true;
         CrashReport report = failure instanceof ReportedException reported ? reported.getReport() : CrashReport.forThrowable(failure, "Ticking Leafs region");
         handle.fillCrashReportCategory(report.addCategory("Leafs region").setDetail("Thread", Thread.currentThread().getName()));
-        BlockableEventLoop.relayDelayCrash(report);
+        if (!regionCrash.compareAndSet(null, report)) {
+            regionCrash.get().getException().addSuppressed(report.getException());
+        }
     }
 }
 
