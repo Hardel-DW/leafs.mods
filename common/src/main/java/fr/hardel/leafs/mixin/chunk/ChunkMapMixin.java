@@ -108,7 +108,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     }
 
     @Unique
-    /** The thread that creates a generation task installs it in its holder, then starts it; no other thread drains the list. */
+    // The thread that creates a generation task installs it in its holder, then starts it; no other thread drains the list.
     private final ThreadLocal<List<ChunkGenerationTask>> leafs$tasksCreatedHere = ThreadLocal.withInitial(ArrayList::new);
 
     @Unique
