@@ -172,14 +172,14 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         return Files.notExists(file) ? write(file, defaults()) : parse(file, read(file));
     }
 
-    public static LeafsConfig rewrite(Setting setting, int value) {
-        return rewrite(file, setting, value);
+    public static void rewrite(Setting setting, int value) {
+        rewrite(file, setting, value);
     }
 
-    static LeafsConfig rewrite(Path file, Setting setting, int value) {
+    static void rewrite(Path file, Setting setting, int value) {
         JsonObject json = read(file).getAsJsonObject();
         json.addProperty(setting.key(), value);
-        return write(file, parse(file, json));
+        write(file, parse(file, json));
     }
 
     public int effectiveRegionThreads() {
