@@ -20,17 +20,15 @@ public final class RegionTickScheduler {
     private final LongSupplier periodNanos;
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
-    private final RegionCrashWriter crashWriter;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.serverThreads = serverThreads;
         this.threadCount = threadCount;
         this.periodNanos = periodNanos;
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
-        this.crashWriter = crashWriter;
         this.failurePolicy = failurePolicy;
     }
 
@@ -135,14 +133,6 @@ public final class RegionTickScheduler {
         try {
             watchdog.beginTick(handle);
             return handle.tick();
-        } catch (Throwable throwable) {
-            try {
-                crashWriter.write(handle.buildCrashReport(), throwable);
-            } catch (Throwable reportFailure) {
-                throwable.addSuppressed(reportFailure);
-            }
-
-            throw throwable;
         } finally {
             watchdog.endTick(handle);
             RegionContext.exit();

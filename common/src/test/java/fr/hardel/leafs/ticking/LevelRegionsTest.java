@@ -2,7 +2,6 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
@@ -13,7 +12,6 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.FullChunkStatus;
@@ -23,7 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Random;
 
@@ -214,7 +211,7 @@ class LevelRegionsTest {
         LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> {
         }, _ -> {
         });
-        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> 50_000_000L, false, watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports"), new ModAttribution(_ -> Optional.empty())), (_, _) -> {
+        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> 50_000_000L, false, watchdog, (_, _) -> {
         });
         regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache()), null);
     }
