@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionTickSchedulerTest {
@@ -27,7 +28,7 @@ class RegionTickSchedulerTest {
     @AfterEach
     void stopScheduler() {
         if (scheduler != null) {
-            scheduler.shutdown();
+            scheduler.shutdown(false, new OwnWork(() -> false));
         }
     }
 
@@ -99,8 +100,46 @@ class RegionTickSchedulerTest {
         }));
 
         assertTrue(started.await(5, TimeUnit.SECONDS));
-        scheduler.shutdown();
+        scheduler.shutdown(false, new OwnWork(() -> false));
         assertFalse(ticking.get());
+    }
+
+    @Test
+    void aNormalShutdownLetsATickFinishTheWaitTheServerServes() throws InterruptedException {
+        ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
+        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
+        stopping.start();
+        CountDownLatch waiting = new CountDownLatch(1);
+        AtomicBoolean delivered = new AtomicBoolean();
+        AtomicBoolean finished = new AtomicBoolean();
+        stopping.schedule(new TestTickHandle(1, () -> {
+            waiting.countDown();
+            new OwnWork(() -> false).until(delivered::get);
+            finished.set(true);
+        }));
+
+        assertTrue(waiting.await(5, TimeUnit.SECONDS));
+        stopping.shutdown(false, new OwnWork(() -> !delivered.getAndSet(true)));
+
+        assertTrue(finished.get(), "the shutdown must return after the tick ends, before the saves");
+        assertTrue(failures.isEmpty());
+    }
+
+    /** 2026-09-23: a Leafs wait ignored the interrupt, so a worker waiting on a failed chunk blocked the server stop forever. */
+    @Test
+    void aCrashShutdownEndsATickStuckInAWait() throws InterruptedException {
+        ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
+        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
+        stopping.start();
+        CountDownLatch waiting = new CountDownLatch(1);
+        stopping.schedule(new TestTickHandle(1, () -> {
+            waiting.countDown();
+            new OwnWork(() -> false).until(() -> false);
+        }));
+
+        assertTrue(waiting.await(5, TimeUnit.SECONDS));
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> stopping.shutdown(true, new OwnWork(() -> false)), "a crash stop must interrupt the wait");
+        assertTrue(failures.isEmpty(), "a tick cut short by the shutdown is not a crash");
     }
 
     @Test
