@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -120,18 +121,63 @@ public final class SynchronizedArrayList<E> extends ArrayList<E> {
     }
 
     @Override
+    public synchronized E getFirst() {
+        return super.getFirst();
+    }
+
+    @Override
+    public synchronized E getLast() {
+        return super.getLast();
+    }
+
+    @Override
+    public synchronized void addFirst(E element) {
+        super.addFirst(element);
+    }
+
+    @Override
+    public synchronized void addLast(E element) {
+        super.addLast(element);
+    }
+
+    @Override
+    public synchronized E removeFirst() {
+        return super.removeFirst();
+    }
+
+    @Override
+    public synchronized E removeLast() {
+        return super.removeLast();
+    }
+
+    @Override
+    public synchronized List<E> reversed() {
+        return super.reversed();
+    }
+
+    @Override
+    public synchronized void ensureCapacity(int capacity) {
+        super.ensureCapacity(capacity);
+    }
+
+    @Override
+    public synchronized void trimToSize() {
+        super.trimToSize();
+    }
+
+    @Override
     public Iterator<E> iterator() {
         return new SnapshotIterator<>(snapshot().iterator(), element -> remove((Object) element));
     }
 
     @Override
     public ListIterator<E> listIterator() {
-        return Collections.unmodifiableList(snapshot()).listIterator();
+        return listIterator(0);
     }
 
     @Override
     public ListIterator<E> listIterator(int index) {
-        return Collections.unmodifiableList(snapshot()).listIterator(index);
+        return new SnapshotListIterator(index);
     }
 
     @Override
@@ -176,5 +222,88 @@ public final class SynchronizedArrayList<E> extends ArrayList<E> {
 
     private synchronized List<E> snapshot() {
         return new ArrayList<>(super.subList(0, super.size()));
+    }
+
+    private final class SnapshotListIterator implements ListIterator<E> {
+        private final ListIterator<E> cursor;
+        private int expectedModCount;
+        private int lastIndex = -1;
+
+        private SnapshotListIterator(int index) {
+            synchronized (SynchronizedArrayList.this) {
+                cursor = snapshot().listIterator(index);
+                expectedModCount = modCount;
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return cursor.hasNext();
+        }
+
+        @Override
+        public E next() {
+            lastIndex = cursor.nextIndex();
+            return cursor.next();
+        }
+
+        @Override
+        public boolean hasPrevious() {
+            return cursor.hasPrevious();
+        }
+
+        @Override
+        public E previous() {
+            lastIndex = cursor.previousIndex();
+            return cursor.previous();
+        }
+
+        @Override
+        public int nextIndex() {
+            return cursor.nextIndex();
+        }
+
+        @Override
+        public int previousIndex() {
+            return cursor.previousIndex();
+        }
+
+        @Override
+        public void remove() {
+            write(() -> {
+                cursor.remove();
+                SynchronizedArrayList.this.remove(lastIndex);
+                lastIndex = -1;
+            });
+        }
+
+        @Override
+        public void set(E element) {
+            write(() -> {
+                cursor.set(element);
+                SynchronizedArrayList.this.set(lastIndex, element);
+            });
+        }
+
+        @Override
+        public void add(E element) {
+            write(() -> {
+                int index = cursor.nextIndex();
+                cursor.add(element);
+                SynchronizedArrayList.this.add(index, element);
+                lastIndex = -1;
+            });
+        }
+
+        private void write(Runnable change) {
+            synchronized (SynchronizedArrayList.this) {
+                if (modCount != expectedModCount) {
+                    throw new ConcurrentModificationException();
+                }
+
+                change.run();
+                expectedModCount = modCount;
+            }
+        }
     }
 }

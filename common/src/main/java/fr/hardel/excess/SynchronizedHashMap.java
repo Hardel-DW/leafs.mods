@@ -104,9 +104,7 @@ public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
 
     @Override
     public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
-        for (Snapshots.Entry<K, V> entry : entries()) {
-            Snapshots.update(this, entry.getKey(), current -> current == null ? null : function.apply(entry.getKey(), current));
-        }
+        Snapshots.replaceAll(this, entries(), function);
     }
 
     @Override

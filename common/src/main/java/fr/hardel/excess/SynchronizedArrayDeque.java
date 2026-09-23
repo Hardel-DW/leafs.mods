@@ -3,6 +3,7 @@ package fr.hardel.excess;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Spliterator;
@@ -159,6 +160,16 @@ public final class SynchronizedArrayDeque<E> extends ArrayDeque<E> {
     @Override
     public synchronized boolean retainAll(Collection<?> elements) {
         return super.retainAll(elements);
+    }
+
+    @Override
+    public synchronized boolean containsAll(Collection<?> elements) {
+        return super.containsAll(elements);
+    }
+
+    @Override
+    public synchronized Deque<E> reversed() {
+        return super.reversed();
     }
 
     @Override

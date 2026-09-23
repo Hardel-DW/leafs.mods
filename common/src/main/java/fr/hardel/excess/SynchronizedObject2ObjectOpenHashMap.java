@@ -91,6 +91,26 @@ public final class SynchronizedObject2ObjectOpenHashMap<K, V> extends Object2Obj
     }
 
     @Override
+    public synchronized boolean trim(int capacity) {
+        return super.trim(capacity);
+    }
+
+    @Override
+    public synchronized void ensureCapacity(int capacity) {
+        super.ensureCapacity(capacity);
+    }
+
+    @Override
+    public synchronized V defaultReturnValue() {
+        return super.defaultReturnValue();
+    }
+
+    @Override
+    public synchronized void defaultReturnValue(V value) {
+        super.defaultReturnValue(value);
+    }
+
+    @Override
     public V computeIfAbsent(K key, Function<? super K, ? extends V> mapping) {
         return Snapshots.computeIfAbsent(this, key, mapping);
     }
@@ -113,6 +133,11 @@ public final class SynchronizedObject2ObjectOpenHashMap<K, V> extends Object2Obj
     @Override
     public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
         return Snapshots.update(this, key, current -> current == null ? value : remapping.apply(current, value));
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
+        Snapshots.replaceAll(this, entries(), function);
     }
 
     @Override

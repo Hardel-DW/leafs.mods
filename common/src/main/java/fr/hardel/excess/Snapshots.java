@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -73,6 +74,12 @@ final class Snapshots {
 
                 return next;
             }
+        }
+    }
+
+    static <K, V> void replaceAll(Map<K, V> live, List<Entry<K, V>> entries, BiFunction<? super K, ? super V, ? extends V> function) {
+        for (Entry<K, V> entry : entries) {
+            update(live, entry.getKey(), current -> current == null ? null : function.apply(entry.getKey(), current));
         }
     }
 

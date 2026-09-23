@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.SortedSet;
 
 public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     private static final long[] EMPTY = new long[0];
@@ -135,6 +136,51 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     @Override
     public long lastLong() {
         return snapshot(false, 0L, false, 0L).lastLong();
+    }
+
+    @Override
+    public Long getFirst() {
+        return firstLong();
+    }
+
+    @Override
+    public Long getLast() {
+        return lastLong();
+    }
+
+    @Override
+    public Long removeFirst() {
+        while (true) {
+            long first = firstLong();
+            if (remove(first)) {
+                return first;
+            }
+        }
+    }
+
+    @Override
+    public Long removeLast() {
+        while (true) {
+            long last = lastLong();
+            if (remove(last)) {
+                return last;
+            }
+        }
+    }
+
+    @Override
+    public void addFirst(Long value) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void addLast(Long value) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SortedSet<Long> reversed() {
+        return super.reversed();
     }
 
     @Override

@@ -74,8 +74,28 @@ public final class SynchronizedObjectOpenHashSet<E> extends ObjectOpenHashSet<E>
     }
 
     @Override
+    public synchronized E addOrGet(E element) {
+        return super.addOrGet(element);
+    }
+
+    @Override
+    public synchronized E get(Object element) {
+        return super.get(element);
+    }
+
+    @Override
+    public synchronized void ensureCapacity(int capacity) {
+        super.ensureCapacity(capacity);
+    }
+
+    @Override
     public synchronized boolean trim() {
         return super.trim();
+    }
+
+    @Override
+    public synchronized boolean trim(int capacity) {
+        return super.trim(capacity);
     }
 
     @Override
