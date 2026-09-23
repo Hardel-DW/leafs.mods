@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Tracking split by owner: a region checks its entities against the players within view of its chunks, plus the ones already seeing an entity so a departure unpairs. */
 public final class RegionEntityTracking {
     private RegionEntityTracking() {
     }
@@ -73,7 +72,6 @@ public final class RegionEntityTracking {
         });
     }
 
-    /** The players seeing the entity from beyond the region's reach; copied first, an update may unpair them from the set. */
     private static void farWatchers(ChunkMap.TrackedEntity tracked, RegionChunks chunks, int reach, List<ServerPlayer> watchers) {
         watchers.clear();
         for (ServerPlayerConnection connection : tracked.seenBy) {

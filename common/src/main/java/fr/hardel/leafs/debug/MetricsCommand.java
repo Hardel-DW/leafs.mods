@@ -15,7 +15,6 @@ import net.minecraft.network.chat.MutableComponent;
 
 import java.util.Locale;
 
-/** {@code /leafs metrics}: last minute of counters. */
 public final class MetricsCommand {
 
     private MetricsCommand() {

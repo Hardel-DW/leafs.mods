@@ -10,7 +10,6 @@ import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Save half of the two clocks: scheduled ticks pack delay-relative to the owning region's clock, not game time. */
 @Mixin(SerializableChunkData.class)
 public abstract class SerializableChunkDataMixin {
 

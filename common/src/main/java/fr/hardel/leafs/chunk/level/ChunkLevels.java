@@ -16,12 +16,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
-
-/**
- * A level per chunk, one step weaker per chunk of distance, like vanilla's ChunkTracker. Any thread posts sources, any thread drains.
- * A drain locks the 3 by 3 sections around the changed one; a source never reaches farther than 64 chunks, so no wavefront leaves the area.
- * A section exists while a chunk of it has a level, like vanilla's tracker entries, and is retired by the drain that emptied it.
- */
 public final class ChunkLevels {
     private static final int STRIPES = 256;
     private static final ThreadLocal<ChunkLevels> DRAINING = new ThreadLocal<>();
@@ -31,7 +25,6 @@ public final class ChunkLevels {
     private final ConcurrentLinkedQueue<Section> dirty = new ConcurrentLinkedQueue<>();
     private final ReentrantLock[] stripes = new ReentrantLock[STRIPES];
 
-    /** Levels 0 to levelCount - 2 are real, levelCount - 1 means none. */
     public ChunkLevels(int levelCount) {
         this.none = levelCount - 1;
         Arrays.setAll(stripes, _ -> new ReentrantLock());
@@ -127,7 +120,6 @@ public final class ChunkLevels {
         }
     }
 
-    /** The drain, then the sections the drain emptied leave; a retired section refuses the sources posted after, whose writer asks again. */
     private boolean propagate(@Nullable Section center, LevelListener listener) {
         if (center == null) {
             return false;
@@ -145,7 +137,6 @@ public final class ChunkLevels {
         return changed;
     }
 
-    /** The keys of the 3 by 3 around a section, the centre fifth. */
     private static long[] area(long centerKey) {
         int sectionX = (int) centerKey;
         int sectionZ = (int) (centerKey >> 32);
@@ -160,7 +151,6 @@ public final class ChunkLevels {
         return area;
     }
 
-    /** One global order over striped locks, so two drains never wait on each other crosswise; a stripe shared by two keys is taken once. */
     private void lock(long[] area) {
         for (int stripe : stripesOf(area)) {
             stripes[stripe].lock();
@@ -178,7 +168,6 @@ public final class ChunkLevels {
         return Arrays.stream(area).mapToInt(key -> (int) ((key * 0x9E3779B97F4A7C15L) >>> 56)).distinct().sorted().toArray();
     }
 
-    /** One drain's min fixed point on an overlay: only settled values reach the shared arrays, never a transient. */
     private final class Propagation {
         private final Section center;
         private final Short2ByteMap batch;
@@ -217,7 +206,6 @@ public final class ChunkLevels {
             }
         }
 
-        /** What may descend from a weakened level drops to none and stays none until the raise; the sources and neighbours still standing become seeds. */
         private void lower() {
             while (!removals.isEmpty()) {
                 long key = removals.dequeueLong();
@@ -250,7 +238,6 @@ public final class ChunkLevels {
             }
         }
 
-        /** Seeds push outward, strongest first, until nothing improves. */
         private void raise() {
             for (int level = 0; level < none; level++) {
                 LongArrayList atLevel = seeds[level];
@@ -267,7 +254,6 @@ public final class ChunkLevels {
                         continue;
                     }
 
-                    // A seed that fell in the lowering only lands again on its own source; a standing one pushes as it is.
                     if (current > level) {
                         if (source(chunkX, chunkZ) != level) {
                             continue;
@@ -294,7 +280,6 @@ public final class ChunkLevels {
             removals.enqueue(key);
         }
 
-        /** A candidate level for the raise; the chunk keeps what it has until then. */
         private void seed(int chunkX, int chunkZ, int level) {
             long key = ChunkPos.pack(chunkX, chunkZ);
             olds.putIfAbsent(key, (byte) level(chunkX, chunkZ));
@@ -306,7 +291,6 @@ public final class ChunkLevels {
             atLevel.add(key);
         }
 
-        /** The raise found a better level: it lands at once, so the same chunk is pushed once per level. */
         private void push(int chunkX, int chunkZ, int level) {
             seed(chunkX, chunkZ, level);
             overlay.put(ChunkPos.pack(chunkX, chunkZ), (byte) level);
@@ -327,7 +311,6 @@ public final class ChunkLevels {
             return section == null ? none : section.source(Section.index(chunkX, chunkZ));
         }
 
-        /** A level landing outside every section makes one. */
         private Section sectionOf(int chunkX, int chunkZ) {
             return sections.computeIfAbsent(Section.keyOf(chunkX, chunkZ), key -> new Section(key, none));
         }

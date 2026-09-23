@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** Block states read from any thread while the owner writes; writers and serializers must not crash each other. */
 @ExtendWith(MinecraftBootstrap.class)
 class PalettedContainerConcurrencyTest {
 

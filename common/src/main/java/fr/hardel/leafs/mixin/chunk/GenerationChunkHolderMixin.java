@@ -19,7 +19,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** A generation task starts right after the holder registered it, never before, from whichever thread scheduled it. */
 @Mixin(GenerationChunkHolder.class)
 public abstract class GenerationChunkHolderMixin {
     @Inject(method = "rescheduleChunkTask", at = @At("TAIL"))
@@ -27,7 +26,6 @@ public abstract class GenerationChunkHolderMixin {
         scheduler.runGenerationTasks();
     }
 
-    /** The step lands on its holder through Leafs, which knows one more outcome than vanilla: a step cancelled in the queue. */
     @WrapMethod(method = "applyStep")
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$stepOutcome(ChunkStep step, GeneratingChunkMap chunkMap, StaticCache2D<GenerationChunkHolder> cache, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         return LevelChunks.of(((ChunkMap) chunkMap).level).steps().applyOnHolder((GenerationChunkHolder) (Object) this, step, cache);

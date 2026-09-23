@@ -22,7 +22,6 @@ class RegionWorldDataTest {
         return new RegionWorldData(clock::get, RandomSource.create(), null, new PathTypeCache());
     }
 
-    /** A delay lands on the region clock, never on game time, and the sub-tick counter orders same-tick schedules. */
     @Test
     void aTickIsCreatedOnTheRegionClockInSchedulingOrder() {
         RegionWorldData data = worldData(new AtomicLong(40));

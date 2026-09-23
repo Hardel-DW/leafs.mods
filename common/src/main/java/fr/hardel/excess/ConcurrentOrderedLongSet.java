@@ -10,7 +10,6 @@ import org.jspecify.annotations.NonNull;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-/** Striped by {@code key >> groupShift}, copy-on-write sorted arrays per bucket: a single-group range reads one lock-free snapshot. */
 public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     private static final long[] EMPTY = new long[0];
     private static final int BUCKET_COUNT = 128;
@@ -151,7 +150,6 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
         return buckets[(int) HashCommon.mix(value >> groupShift) & (BUCKET_COUNT - 1)];
     }
 
-    /** One bucket's live array when the range cannot span two groups, a merged copy of every bucket's slice otherwise. */
     private Snapshot snapshot(boolean hasFrom, long from, boolean hasTo, long to) {
         if (hasFrom && hasTo && from >= to) {
             return new Snapshot(this, EMPTY, 0, 0);
@@ -196,7 +194,6 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
         volatile long[] elements = EMPTY;
     }
 
-    /** An immutable window over a captured array: the sub-views vanilla asks for are read-only scans. */
     private static final class Snapshot extends AbstractLongSortedSet {
         private final ConcurrentOrderedLongSet owner;
         private final long[] elements;
@@ -334,7 +331,6 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
             return lastReturned;
         }
 
-        /** Removes from the live set, not the snapshot: the concurrent-iteration contract callers already have. */
         @Override
         public void remove() {
             if (!hasLastReturned) {

@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/** An ObjectOpenHashSet other threads may write while one iterates: writes take the set's lock, iteration walks a snapshot. Fits a field declared ObjectOpenHashSet or Set. */
 public final class SynchronizedObjectOpenHashSet<E> extends ObjectOpenHashSet<E> {
 
     public SynchronizedObjectOpenHashSet() {

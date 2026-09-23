@@ -8,7 +8,6 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.TicketStorage;
 
-/** Vanilla's player ticket tracker: a chunk within the view distance of any player carries one PLAYER_LOADING ticket. Fed by the players graph. */
 public final class ViewTickets implements LevelListener {
     private static final int LEVEL = ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING);
 
@@ -26,7 +25,6 @@ public final class ViewTickets implements LevelListener {
         return viewDistance;
     }
 
-    /** Every chunk that crosses the new limit gains or loses its ticket. */
     public void viewDistance(int distance) {
         int previous = viewDistance;
         viewDistance = distance;

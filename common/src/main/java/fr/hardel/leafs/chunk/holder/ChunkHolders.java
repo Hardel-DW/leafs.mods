@@ -25,7 +25,6 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-/** Leafs' bookkeeping of vanilla's holders, fed by the loading graph: birth on a loaded level, level changes, unload on the owner. */
 public final class ChunkHolders implements LevelListener {
     private final ChunkMap chunkMap;
     private final ChunkLevels loading;
@@ -61,7 +60,6 @@ public final class ChunkHolders implements LevelListener {
     }
 
     @Override
-    /** Vanilla's updateChunkScheduling: a loaded level revives the holder waiting for its teardown or makes a new one, an unloaded level sends it to the teardown. */
     public void changed(long chunkKey, int oldLevel, int newLevel) {
         ChunkHolder holder = table.get(chunkKey);
         if (holder == null) {
@@ -88,7 +86,6 @@ public final class ChunkHolders implements LevelListener {
     }
 
     @Override
-    /** Vanilla's two passes over the changed holders, the queued steps a lowered level disallows leave the pool between them, then the unloads leave for their owner. */
     public void published() {
         List<ChunkHolder> changed = batch.get();
         for (ChunkHolder holder : changed) {
@@ -110,11 +107,9 @@ public final class ChunkHolders implements LevelListener {
         changed.clear();
     }
 
-    /** A chunk a thread waits for: its delivery, and the release of the ticket that keeps it, due when the waiter's tick or head ends. */
     public record Demand(CompletableFuture<ChunkResult<ChunkAccess>> delivery, Runnable release) {
     }
 
-    /** The chunk heads the pool until it lands; the request follows once its own ticket has settled. Like vanilla's one-tick ticket, the chunk stays until the waiter's tick or head ends. */
     public Demand require(int chunkX, int chunkZ, ChunkStatus status) {
         long key = ChunkPos.pack(chunkX, chunkZ);
         int level = ChunkLevel.byStatus(status);
@@ -124,7 +119,6 @@ public final class ChunkHolders implements LevelListener {
         return new Demand(delivery, () -> demands.release(key, level));
     }
 
-    /** Under the graph locks, the demand's level is settled, so the holder is there; the message says what the graph and the tickets think when it is not. */
     private ChunkHolder demanded(long key, ChunkStatus status) {
         ChunkHolder holder = table.get(key);
         if (holder == null) {
@@ -139,7 +133,6 @@ public final class ChunkHolders implements LevelListener {
         return loading.settled(chunkX, chunkZ, this, body);
     }
 
-    /** Once the pool is done: the holders that left the table and never reached their teardown, by the status they stopped at, and the tasks still alive that hold them. */
     public void logWaitingTeardowns(String dimension) {
         List<ChunkHolder> waiting = unloading.snapshot();
         if (waiting.isEmpty()) {
@@ -159,7 +152,6 @@ public final class ChunkHolders implements LevelListener {
         Leafs.LOGGER.warn("{} holders of {} still carry a generation task: {}", tasked.size(), dimension, tasks);
     }
 
-    /** Generation or a promotion in flight: vanilla's ticket countdown pauses on it. */
     public boolean busy(long chunkKey) {
         ChunkHolder holder = table.get(chunkKey);
         return holder != null && !holder.isReadyForSaving();
@@ -168,7 +160,6 @@ public final class ChunkHolders implements LevelListener {
     private static void queueLevelFollows(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel) {
         setQueueLevel.accept(newLevel);
     }
-
 
     private void unload(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();

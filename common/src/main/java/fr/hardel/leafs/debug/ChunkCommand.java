@@ -20,7 +20,6 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.List;
 
-/** {@code /leafs chunk [<pos>]}: why the chunk at a block column, the caller's by default, is or is not where the game expects it. */
 public final class ChunkCommand {
 
     private ChunkCommand() {
@@ -33,7 +32,6 @@ public final class ChunkCommand {
                 .executes(context -> send(context.getSource(), ColumnPosArgument.getColumnPos(context, "pos").toChunkPos())));
     }
 
-    /** The lines of the report, read from the server thread: the command sends them, Leafs Debug logs them. */
     public static List<Component> report(ServerLevel level, int chunkX, int chunkZ) {
         LevelChunks chunks = LevelChunks.of(level);
         long key = ChunkPos.pack(chunkX, chunkZ);
@@ -65,7 +63,6 @@ public final class ChunkCommand {
         return lines.size();
     }
 
-    /** The thread that took the chunk comes first, a region born over it meanwhile waits for the release. */
     private static String owner(LevelChunks chunks, LevelRegions regions, int chunkX, int chunkZ) {
         String taken = chunks.owners().describeTaken(chunkX, chunkZ);
         if (taken != null) {

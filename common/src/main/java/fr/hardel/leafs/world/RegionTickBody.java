@@ -37,7 +37,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Every chunk-anchored phase of the level tick, over one region's chunks, in vanilla order. Level-wide work stays on the server thread. */
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
@@ -56,7 +55,6 @@ public final class RegionTickBody {
         return level;
     }
 
-    /** The save takes a tenth of the period at most, the inbox what is left of it and a tenth at least: a heavy tick still publishes, a light one publishes everything. */
     public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tickDeadlineNanos) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
@@ -117,7 +115,6 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionTasks);
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, then the custom spawners. */
     public void tickSerial(boolean spawnEnemies) {
         LevelChunks.of(level).sweep().soon();
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
@@ -162,7 +159,6 @@ public final class RegionTickBody {
         }
     }
 
-    /** One pass over the ticking chunks: the spawnable census, the spawning list and the random-tick list. */
     private int countAndCollect(RegionChunks chunks, ChunkMap chunkMap, PlayerView view, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
         DistanceManager distanceManager = chunkMap.getDistanceManager();
         int spawnable = 0;
@@ -210,7 +206,6 @@ public final class RegionTickBody {
                 return;
             }
 
-            // An entity moved far during its tick lands in the next region's photo while that tick still runs: the same rule as the player's queue, it is skipped.
             EntityTickAccess claim = (EntityTickAccess) entity;
             if (!claim.leafs$beginTick()) {
                 return;
@@ -242,7 +237,6 @@ public final class RegionTickBody {
 
         level.guardEntityTick(level::tickNonPassenger, entity);
     }
-
 
     private void tickBlockEntities(boolean runsNormally, RegionChunks chunks) {
         ServerChunkCache chunkSource = level.getChunkSource();

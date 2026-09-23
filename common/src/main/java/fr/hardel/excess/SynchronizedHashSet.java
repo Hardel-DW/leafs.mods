@@ -9,7 +9,6 @@ import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/** A HashSet other threads may write while one iterates: writes take the set's lock, iteration walks a snapshot. Fits a field declared HashSet. */
 public final class SynchronizedHashSet<E> extends HashSet<E> {
 
     public SynchronizedHashSet() {

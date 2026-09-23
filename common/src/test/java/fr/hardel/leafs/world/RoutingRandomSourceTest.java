@@ -6,7 +6,6 @@ import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RoutingRandomSourceTest {

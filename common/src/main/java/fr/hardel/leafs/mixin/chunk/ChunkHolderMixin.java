@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.Unique;
 
 import java.util.concurrent.CompletableFuture;
 
-/** The send and save barriers are written by any owner and read by any thread: vanilla's read-then-write composition runs under one monitor, its reads too. */
 @Mixin(ChunkHolder.class)
 public abstract class ChunkHolderMixin implements SavedEpochAccess {
 

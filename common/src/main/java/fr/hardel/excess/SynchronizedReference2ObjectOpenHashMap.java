@@ -13,11 +13,6 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-/**
- * A Reference2ObjectOpenHashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write
- * back, and the functions of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared
- * Reference2ObjectOpenHashMap or Map.
- */
 public final class SynchronizedReference2ObjectOpenHashMap<K, V> extends Reference2ObjectOpenHashMap<K, V> {
 
     @Override

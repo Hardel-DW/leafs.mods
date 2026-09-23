@@ -9,7 +9,6 @@ import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import net.minecraft.server.level.ServerLevel;
 
-/** The server-thread remainder of the level tick. Activation schedules the regions before any of them ticks. */
 public final class LevelTickUnit extends TickHandle {
     private static final int CENSUS_INTERVAL_TICKS = 100;
 
@@ -31,7 +30,6 @@ public final class LevelTickUnit extends TickHandle {
         return regions;
     }
 
-    /** Server thread only, before the first tick of this level; no region is scheduled yet. */
     void ensureActivated() {
         if (activated) {
             return;
@@ -72,7 +70,6 @@ public final class LevelTickUnit extends TickHandle {
         return true;
     }
 
-    /** Paused solo: vanilla drains packets while paused, so the per-player queues do too, without listener tick. */
     void tickPausedNetwork() {
         RegionContext.enter(context());
         try {
@@ -82,12 +79,10 @@ public final class LevelTickUnit extends TickHandle {
         }
     }
 
-    /** Last on-owner census; readable from any thread, at most {@value #CENSUS_INTERVAL_TICKS} ticks old. */
     public int chunkCount() {
         return lastChunkCount;
     }
 
-    /** Sum of the region censuses, O(regions), any thread. */
     public int entityCount() {
         int entities = 0;
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {

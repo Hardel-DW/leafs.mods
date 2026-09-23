@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -9,7 +8,6 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
-/** Region worker pool, one tick per pass, a late region restarts from now instead of catching up. */
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
@@ -71,7 +69,7 @@ public final class RegionTickScheduler {
         executeTick(handle);
     }
 
-    // Vanilla and mods see it as the server thread
+    /** Vanilla and mods see a worker as the server thread. */
     public static boolean onWorker() {
         return Thread.currentThread() instanceof Worker;
     }
@@ -80,7 +78,6 @@ public final class RegionTickScheduler {
         return Collections.unmodifiableList(workers);
     }
 
-    // There's a mod who wants “server” in the thread title IDK why, but ok
     private void workerLoop() {
         while (running) {
             ScheduledTick next;
@@ -121,7 +118,7 @@ public final class RegionTickScheduler {
         }
     }
 
-    /** A start missed behind another thread counts, and waits its period like a tick: retrying sooner made the server thread wait behind the region instead. */
+    /** A missed start waits its period like a tick: retrying sooner made the server thread wait behind the region. */
     private void reschedule(TickHandle handle, boolean started) {
         if (!started) {
             handle.stages().recordMissedStart();
@@ -149,6 +146,7 @@ public final class RegionTickScheduler {
         }
     }
 
+    /** The name contains "Server", the rename per tick included: some mods recognise the server thread by its name. */
     private static final class Worker extends Thread {
         private Worker(ThreadGroup group, Runnable loop, int index) {
             super(group, loop, "Leafs Server Region Worker #" + index);

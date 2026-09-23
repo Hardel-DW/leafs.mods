@@ -7,14 +7,12 @@ import fr.hardel.leafs.world.RegionWorldData;
 
 import java.util.function.Supplier;
 
-/** The per-region composite: its inbox, its clock and tick payload once the level equips it, a handle once the level activated. */
 public final class RegionTickData {
     private final RegionInbox inbox;
     private volatile RegionTickHandle handle;
     private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
 
-    /** The inbox runs what the region owns, ring included; a task on a section the region lost goes back through the owners. */
     RegionTickData(Region<RegionTickData> region, long slowTaskNanos, Supplier<ChunkOwners> owners) {
         this.inbox = new RegionInbox(slowTaskNanos, posted -> region.owns(posted.chunkX(), posted.chunkZ()),
             posted -> owners.get().submit(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));

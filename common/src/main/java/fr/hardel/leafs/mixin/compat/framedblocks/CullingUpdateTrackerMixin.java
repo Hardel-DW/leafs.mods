@@ -25,7 +25,6 @@ public abstract class CullingUpdateTrackerMixin {
         return new SynchronizedReference2ObjectOpenHashMap<>();
     }
 
-    /** The map of a dimension and the set of a chunk are built by these two lambdas; the interfaces they return let Leafs hand over its own concurrent ones. */
     @WrapMethod(method = "lambda$enqueueCullingUpdate$0")
     private static Long2ObjectMap<LongSet> leafs$sharedDimensionPositions(ResourceKey<Level> dimension, Operation<Long2ObjectMap<LongSet>> original) {
         return new ConcurrentLong2ObjectMap<>();

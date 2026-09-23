@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The shape of every compat patch: some threads add while one walks and removes, nothing throws and nothing is lost. */
 class SynchronizedCollectionsTest {
     private static final int WRITERS = 4;
     private static final int PER_WRITER = 2_000;
@@ -173,7 +172,6 @@ class SynchronizedCollectionsTest {
         assertTrue(byIdentity.isEmpty());
     }
 
-    /** Runs the writers and, meanwhile, walks a fresh view until they finish; returns how many elements the walks saw. */
     private static int walkWhileWriting(Supplier<Iterable<?>> view, Writer writer) throws InterruptedException {
         AtomicInteger seen = new AtomicInteger();
         runWriters(writer, () -> {

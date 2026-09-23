@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 
-/** Server-scoped orchestrator of the region tick machinery, one per server, reached by {@link #of}. */
 public final class TickingManager {
     private final MinecraftServer server;
     private final ServerMetrics metrics = new ServerMetrics();
@@ -57,7 +56,6 @@ public final class TickingManager {
             config.effectiveRegionThreads(), config.effectiveChunkThreads());
     }
 
-    /** Vanilla's {@code max-tick-time}, read late: the dedicated settings bind after this manager is built. Only a dedicated server kills, -1 disables. */
     private static long killAfterNanos(MinecraftServer server) {
         return server instanceof DedicatedServer dedicated && dedicated.getMaxTickLength() > 0 ? Duration.ofMillis(dedicated.getMaxTickLength()).toNanos() : 0L;
     }
@@ -74,12 +72,10 @@ public final class TickingManager {
         return scheduler;
     }
 
-    /** The unit of a level that ticked at least once; null before, so callers sampling metrics stay no-ops. */
     public LevelTickUnit unitOf(ServerLevel level) {
         return levelUnits.get(level);
     }
 
-    /** Serial stage boundary reached inside the vanilla remainder; ignored while no serial tick is in flight. */
     public void markSerial(ServerLevel level, TickStage stage) {
         LevelTickUnit unit = levelUnits.get(level);
         if (unit != null) {
@@ -91,12 +87,10 @@ public final class TickingManager {
         return globalScheduler;
     }
 
-    /** Above this, a chunk wait or an inbox task is logged with what it was. */
     public long slowTaskNanos() {
         return slowTaskNanos;
     }
 
-    /** True once {@code stopServer} began: the shutdown drains remaining work in line. */
     public boolean halted() {
         return halted;
     }
@@ -109,12 +103,10 @@ public final class TickingManager {
         return Thread.currentThread() == server.getRunningThread();
     }
 
-    /** The server thread pumping while it waits (managedBlock) also runs the diverted tasks, or a wait on one of them never ends. */
     public boolean pumpDiverted() {
         return globalTicking && onServerThread() && globalScheduler.drain();
     }
 
-    /** A wait on Leafs, region or chunk: the server thread runs the tasks the regions handed it and the chunk work of every level, a region the chunk work of its inbox. */
     public void await(BooleanSupplier done) {
         if (onServerThread()) {
             serverWork.until(done);
@@ -134,7 +126,6 @@ public final class TickingManager {
         return worked;
     }
 
-    /** Diverted as long as a Leafs thread lives: past {@code stopped} vanilla runs the task inline on the caller, and its reentrant counter is not thread-safe. A region worker runs it now, as vanilla would on its game thread; any other thread's task runs on the server thread, which locks what the task touches until it ends. */
     public boolean divertExecute(Runnable task) {
         if (!globalTicking || onServerThread()) {
             return false;
@@ -161,7 +152,6 @@ public final class TickingManager {
         scheduler.runAttached(unit);
     }
 
-    /** A level closing takes its unit and its region handles with it; a mod that unloads a dimension leaves nothing scheduled behind. */
     public void forgetLevel(ServerLevel level) {
         LevelTickUnit unit = levelUnits.remove(level);
         if (unit != null) {
@@ -177,7 +167,6 @@ public final class TickingManager {
         }
     }
 
-    /** Every region's inbox runs inline, looped because a task can post a follow-up on another level (cross-dimension teleport). */
     private void drainRegionTasks() {
         int drained;
         do {
@@ -188,7 +177,6 @@ public final class TickingManager {
         } while (drained > 0);
     }
 
-    /** Head of {@code stopServer}: the deadline arms first so a wedged stop still dies, then the pool stops and the region lanes drain before the saves. */
     public void haltTicking() {
         watchdog.armShutdownDeadline(LeafsWatchdog.SHUTDOWN_DEADLINE);
         scheduler.shutdown();
@@ -197,7 +185,6 @@ public final class TickingManager {
         globalScheduler.drain();
     }
 
-    /** The player saves of {@code removeAll} ran before this point; the flush makes them durable before the JVM exits. The pools are gone, so diversion ends here. */
     public void shutdown() {
         chunkPool.shutdown();
         for (ServerLevel level : server.getAllLevels()) {
@@ -209,7 +196,6 @@ public final class TickingManager {
         globalScheduler.drain();
         watchdog.stop();
         drainRegions();
-        // A dedicated JVM must now die, so the deadline stays armed until the process exits; in solo the JVM lives on.
         if (!server.isDedicatedServer()) {
             watchdog.disarmShutdownDeadline();
         }
@@ -226,7 +212,6 @@ public final class TickingManager {
         server.halt(false);
     }
 
-    /** Walks every level, not only the ticked units. Never throws, the worlds are already saved. */
     private void drainRegions() {
         int regions = 0;
         int sections = 0;

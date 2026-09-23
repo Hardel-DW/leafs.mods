@@ -8,7 +8,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Locks the exact callback orders documented on {@link RegionCallbacks}. */
 class RegionizerCallbackOrderTest {
     private RecordingCallbacks callbacks;
     private Regionizer<Object> regionizer;

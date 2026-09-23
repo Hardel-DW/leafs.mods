@@ -4,7 +4,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.function.LongSupplier;
 
-/** Sliding one-minute counter plus lifetime total, any thread. Sixty buckets recycle in place; a bucket reset can lose one count, harmless for a debug metric. */
 public final class MinuteCounter {
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
     private final AtomicLongArray counts = new AtomicLongArray(60);
@@ -32,7 +31,6 @@ public final class MinuteCounter {
         total.incrementAndGet();
     }
 
-    /** Cumulative, for a sampler that differences two reads. */
     public long total() {
         return total.get();
     }

@@ -36,7 +36,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Position-keyed tick diversion: scheduled ticks and block events go to their chunk, on the owning region's clock. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 
@@ -50,7 +49,6 @@ public abstract class ServerLevelMixin {
     @Final
     private LevelTicks<Fluid> fluidTicks;
 
-    /** Posting order across chunks, so a region replays vanilla's FIFO. */
     @Unique
     private final AtomicLong leafs$blockEventSequence = new AtomicLong();
 
@@ -69,7 +67,6 @@ public abstract class ServerLevelMixin {
         this.fluidTicks = leafs$fluidTicks;
     }
 
-    /** Vanilla's create and insert as one write on the chunk's owner, which stamps clock and order where the tick lands. */
     public void scheduleTick(BlockPos pos, Block type, int delay, TickPriority priority) {
         leafs$blockTicks.schedule(pos, type, delay, priority);
     }
@@ -86,7 +83,6 @@ public abstract class ServerLevelMixin {
         leafs$fluidTicks.schedule(pos, type, delay, TickPriority.NORMAL);
     }
 
-    /** A loaded chunk keeps its own events; an unloaded position keeps vanilla's level set, drained serially. */
     @Inject(method = "blockEvent", at = @At("HEAD"), cancellable = true)
     private void leafs$blockEventOnTheChunk(BlockPos pos, Block block, int b0, int b1, CallbackInfo callbackInfo) {
         if (ChunkBlockEvents.post(self(), new BlockEventData(pos.immutable(), block, b0, b1), leafs$blockEventSequence.getAndIncrement())) {
@@ -99,7 +95,6 @@ public abstract class ServerLevelMixin {
         ChunkBlockEvents.clearArea(self(), area);
     }
 
-    /** Region bodies are the level tick for their chunks: block-event consumers (pistons) must see it that way. */
     @Inject(method = "isHandlingTick", at = @At("HEAD"), cancellable = true)
     private void leafs$handlingTickInRegionContext(CallbackInfoReturnable<Boolean> callbackInfo) {
         if (WorldTickContext.activeFor(self()) != null) {
@@ -115,7 +110,6 @@ public abstract class ServerLevelMixin {
         }
     }
 
-    /** Scheduled ticks unpack against the owning region's clock at chunk load (two clocks). */
     @WrapOperation(method = "startTickingChunk", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;getGameTime()J"))
     private long leafs$unpackAtOwnerClock(ServerLevel instance, Operation<Long> original, @Local(argsOnly = true) LevelChunk chunk) {
         return LevelRegions.of(instance).timeAt(chunk.getPos().x(), chunk.getPos().z(), original.call(instance));

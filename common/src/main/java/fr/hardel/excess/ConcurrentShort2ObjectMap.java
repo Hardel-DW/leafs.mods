@@ -16,7 +16,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** ConcurrentHashMap-backed Short2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<V> {
     private final ConcurrentHashMap<Short, V> map = new ConcurrentHashMap<>();
 
@@ -71,7 +70,6 @@ public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<
                 return ObjectIterators.asObjectIterator(map.values().iterator());
             }
 
-            /** A stream must not trust a size the map outgrows while it runs. */
             @Override
             public @NonNull ObjectSpliterator<V> spliterator() {
                 return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);

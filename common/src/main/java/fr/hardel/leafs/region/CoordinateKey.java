@@ -1,6 +1,5 @@
 package fr.hardel.leafs.region;
 
-/** Packs a section coordinate pair into one long map key: x in the low 32 bits, z in the high 32. */
 public final class CoordinateKey {
 
     private CoordinateKey() {
@@ -18,7 +17,6 @@ public final class CoordinateKey {
         return (int) (key >>> 32);
     }
 
-    /** Slot of a chunk inside its section, row by row: what a section-local array is indexed with. */
     public static int index(int chunkX, int chunkZ, int sectionShift) {
         int mask = (1 << sectionShift) - 1;
         return ((chunkZ & mask) << sectionShift) | (chunkX & mask);

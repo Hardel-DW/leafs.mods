@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** Stage catalogue of the three tick families. Declaration order is execution order and slot; the only stage list, published to the registry at mod init. */
+/** Declaration order is execution order and timing slot. */
 public final class TickStages {
     public enum TickFamily {
         GLOBAL,
@@ -19,7 +19,6 @@ public final class TickStages {
         REGION
     }
 
-    /** One named stage of a tick unit's body; the index is its slot in the family's timing rows, the id its registry name. */
     public record TickStage(TickFamily family, int index, Identifier id) {}
 
     private static final Map<TickFamily, List<TickStage>> byFamily = new EnumMap<>(TickFamily.class);
@@ -62,7 +61,6 @@ public final class TickStages {
     private TickStages() {
     }
 
-    /** Stages of one family, in execution order; index {@code i} of the list owns slot {@code i} of the timing rows. */
     public static List<TickStage> of(TickFamily family) {
         return byFamily.get(family);
     }

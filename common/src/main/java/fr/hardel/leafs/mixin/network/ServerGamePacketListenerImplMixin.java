@@ -27,7 +27,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.Executor;
 
-/** Carries the player's inbound queue; handler continuations route back to it, respawn replays on the respawn spot's owner. */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class ServerGamePacketListenerImplMixin implements GameListenerNetworkAccess {
 
@@ -42,7 +41,6 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return leafs$inboundQueue;
     }
 
-    /** A region never waits for a player's chunks: arrived in raw terrain, he is not ticked until his chunk and its neighbours land, vanilla's keep-alive branch runs instead. The server thread waits like vanilla. */
     @WrapMethod(method = "tickPlayer")
     private boolean leafs$tickOnLandedChunks(Operation<Boolean> original) {
         ChunkPos chunk = player.chunkPosition();
@@ -63,7 +61,6 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this);
     }
 
-    /** Chat state is player-scoped and runs on the owner; commands reach arbitrary chunks (/locate sync-loads) and keep the global phase. */
     @WrapOperation(method = "tryHandleChat", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;execute(Ljava/lang/Runnable;)V"))
     private void leafs$chatHandlerOnTheOwner(MinecraftServer server, Runnable chatHandler, Operation<Void> original, @Local(argsOnly = true) boolean isCommand) {
         if (isCommand) {
@@ -80,7 +77,6 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
     }
 
-    /** Leave message, bed release and removal on the server thread, the player's region locked first. */
     @WrapMethod(method = "onDisconnect")
     private void leafs$lockThePlayerOnDisconnect(DisconnectionDetails details, Operation<Void> original) {
         RegionBorrow.atContact(player);

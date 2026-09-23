@@ -3,10 +3,7 @@ package fr.hardel.leafs.ticking;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
-/**
- * What a thread runs while it waits on Leafs, and nothing else: its own pump, and the inboxes of what it borrowed. Vanilla's server queue never runs here,
- * a head pumping it would run the next head, whose wait nests inside the first, until the stack ends.
- */
+/** Vanilla's server queue never runs in a Leafs wait: a head pumping it runs the next head, whose wait nests inside the first. */
 public final class OwnWork {
     private static final long PARK_NANOS = 50_000L;
     private final BooleanSupplier pump;

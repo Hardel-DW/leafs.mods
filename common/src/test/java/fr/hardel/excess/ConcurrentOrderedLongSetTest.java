@@ -21,7 +21,6 @@ class ConcurrentOrderedLongSetTest {
 
     private final ConcurrentOrderedLongSet set = new ConcurrentOrderedLongSet(SECTION_X_SHIFT);
 
-    /** SectionPos.asLong: x in the top 22 bits, z in the middle 22, y in the low 20. */
     private static long sectionKey(int x, int y, int z) {
         return (x & 0x3FFFFFL) << 42 | (y & 0xFFFFFL) | (z & 0x3FFFFFL) << 20;
     }
@@ -215,7 +214,6 @@ class ConcurrentOrderedLongSetTest {
         assertThrows(IllegalArgumentException.class, () -> new ConcurrentOrderedLongSet(64));
     }
 
-    /** Vanilla's eager-save scan removes through the iterator (ChunkMap.saveChunksEagerly), so the snapshot iterator removes from the live set. */
     @Test
     void iteratorRemoveDeletesFromTheLiveSet() {
         ConcurrentOrderedLongSet set = new ConcurrentOrderedLongSet(4);

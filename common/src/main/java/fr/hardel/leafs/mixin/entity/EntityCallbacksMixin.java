@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.Set;
 
-/** The level-wide tick list and mob set stay empty, a region reads its entities from the sections of its chunks. */
 @Mixin(targets = "net.minecraft.server.level.ServerLevel$EntityCallbacks")
 public abstract class EntityCallbacksMixin {
 

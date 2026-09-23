@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-/** The POI write runs on the owner of the block, like the block change that caused it. */
 public final class PoiWriteReroute {
 
     private PoiWriteReroute() {

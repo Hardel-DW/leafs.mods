@@ -13,7 +13,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.List;
 
-/** Vanilla's sendBlockUpdated against the state of the chunk's owner: the region ticking on this thread, or the region the writer borrowed. */
 public final class LevelBlockUpdates {
 
     private LevelBlockUpdates() {

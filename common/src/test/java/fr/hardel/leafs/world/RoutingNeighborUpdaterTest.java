@@ -59,7 +59,6 @@ class RoutingNeighborUpdaterTest {
         pool.shutdown();
     }
 
-    /** Every chunk is covered by one region; the test says whether the calling thread holds it. */
     private ChunkOwners owners() {
         return new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, task) -> { task.run(); return true; }, new GlobalScheduler(Runnable::run), Long.MAX_VALUE);
     }
@@ -114,7 +113,6 @@ class RoutingNeighborUpdaterTest {
         assertTrue(fallback.calls.isEmpty());
     }
 
-    /** A redstone line crossing a seam: the update on the other side waits in the owner's mail and runs there, a tick later. */
     @Test
     void aForeignChunkUpdateIsMailedToItsOwner() {
         RecordingUpdater fallback = new RecordingUpdater();

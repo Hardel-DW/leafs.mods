@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Vanilla's purge and a refresh never overlap on the server thread: here a section counts down under the storage monitor, so a refresh waits for it. */
 @ExtendWith(MinecraftBootstrap.class)
 class TicketTimeoutIndexTest {
     private static final long CHUNK = ChunkPos.pack(3, 3);

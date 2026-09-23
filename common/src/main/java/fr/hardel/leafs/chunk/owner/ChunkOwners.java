@@ -14,26 +14,19 @@ import org.jspecify.annotations.Nullable;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
-/**
- * Who writes into the live world at a position: the thread that already owns it, the region covering it at its next tick, or without a region the pool for
- * chunk work and the calling thread for game work, which takes the chunk for the task and reads back what it writes, like vanilla. See {@link Work}.
- */
 public final class ChunkOwners implements Router {
     private static final long[] NO_RESERVATION = {};
 
-    /** The region's inbox at a chunk, null where no region covers it. */
     @FunctionalInterface
     public interface Inboxes {
         @Nullable RegionInbox at(int chunkX, int chunkZ);
     }
 
-    /** Whether the current thread may write at a chunk now: its region ticking, a borrow holding it, or a universal owner. */
     @FunctionalInterface
     public interface Ownership {
         boolean holds(int chunkX, int chunkZ);
     }
 
-    /** The calling thread takes a chunk no region covers for the task and runs it; false when another thread holds the chunk, the task is then mail for that thread. */
     @FunctionalInterface
     public interface Taker {
         boolean take(int chunkX, int chunkZ, Runnable task);
@@ -51,7 +44,6 @@ public final class ChunkOwners implements Router {
     private final long slowTaskNanos;
     private final ConcurrentLong2ObjectMap<RegionInbox> borrowed = new ConcurrentLong2ObjectMap<>();
 
-    /** Before the regions run and once they stopped, the server thread owns everything and its pump runs what other threads post. */
     public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server, long slowTaskNanos) {
         this.pool = pool;
         this.level = level;
@@ -65,7 +57,6 @@ public final class ChunkOwners implements Router {
         this.slowTaskNanos = slowTaskNanos;
     }
 
-    /** True when the task ran in line, which is what lets a caller read back what it wrote. Under a graph drain the owner posts to itself instead. */
     public boolean submit(int chunkX, int chunkZ, Work work, Runnable task) {
         if (holds(chunkX, chunkZ) && !ChunkLevels.draining()) {
             task.run();
@@ -92,13 +83,11 @@ public final class ChunkOwners implements Router {
                 return false;
             }
 
-            // The pool never runs game work, it could wait for a chunk under its own reservation: the server thread routes it again.
             if (ChunkPool.isWorker()) {
                 server.run(() -> submit(chunkX, chunkZ, work, task));
                 return false;
             }
 
-            // A chunk another thread holds is found in its inbox on the next turn of the loop.
             if (taker.take(chunkX, chunkZ, task)) {
                 return true;
             }
@@ -110,7 +99,6 @@ public final class ChunkOwners implements Router {
         submit(chunkX, chunkZ, Work.GAME, task);
     }
 
-    /** Never in line: the owner's inbox, else the pool for chunk work, else the server thread's next pump, where game work finds its owner again. */
     public void later(int chunkX, int chunkZ, Work work, Runnable task) {
         if (!live.getAsBoolean()) {
             server.run(() -> submit(chunkX, chunkZ, work, task));
@@ -130,12 +118,10 @@ public final class ChunkOwners implements Router {
         server.run(() -> submit(chunkX, chunkZ, work, task));
     }
 
-    /** The owner task of a chunk no region covers, which takes the chunk when it starts. */
     private void onPool(int chunkX, int chunkZ, Runnable task) {
         pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
     }
 
-    /** Pool work under the reservation of the area around a chunk, placed at the chunk. */
     public void onPool(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius, Runnable task) {
         pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(kind, chunkX, chunkZ, radius), task));
     }
@@ -144,12 +130,10 @@ public final class ChunkOwners implements Router {
         return new ChunkTask.Place(ChunkTask.key(level, chunkX, chunkZ), ChunkTask.key(level, centerX, centerZ), urgency);
     }
 
-    /** Fed by the players graph: a chunk whose distance to the players changed re-prioritises what the pool queued on it. */
     public LevelListener follow() {
         return (chunkKey, _, _) -> pool.changed(ChunkTask.key(level, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
     }
 
-    /** Everything queued within vanilla's radius of a required chunk heads the pool, disk reads and light included. */
     public void expedite(int chunkX, int chunkZ) {
         int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
         for (int dz = -radius; dz <= radius; dz++) {
@@ -171,13 +155,11 @@ public final class ChunkOwners implements Router {
         return around + " tasks queued within " + radius + ", " + pool.queuedAt(ChunkTask.key(level, chunkX, chunkZ)) + " on the chunk itself";
     }
 
-    /** A chunk a thread took is that thread's until it releases, whatever region covers it meanwhile; otherwise the region or the borrow decides. */
     public boolean holds(int chunkX, int chunkZ) {
         RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
         return taken != null ? taken.heldBy(Thread.currentThread()) : ownership.holds(chunkX, chunkZ);
     }
 
-    /** Whether another thread took the chunk: a region skips it for the pass, its mail waits in the taker's box. */
     public boolean heldElsewhere(int chunkX, int chunkZ) {
         RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
         return taken != null && !taken.heldBy(Thread.currentThread());
@@ -188,7 +170,6 @@ public final class ChunkOwners implements Router {
         return taken == null ? null : "taken by thread '%s' with %d queued".formatted(taken.holderName(), taken.size());
     }
 
-    /** Vanilla's executor for the holder futures, promotions and teardowns: chunk work. */
     public Executor executor(int chunkX, int chunkZ) {
         return task -> submit(chunkX, chunkZ, Work.CHUNK, task);
     }
@@ -215,7 +196,6 @@ public final class ChunkOwners implements Router {
         return kind == ChunkTask.Kind.LIGHT ? level * 2 + 1 : level * 2;
     }
 
-    /** A thread takes a chunk no region covers: what lands there waits in the inbox for the taker until it releases, a region born over it meanwhile included. Null when another thread holds it. */
     public @Nullable RegionInbox borrow(int chunkX, int chunkZ) {
         RegionInbox inbox = new RegionInbox(slowTaskNanos);
         return borrowed.putIfAbsent(ChunkPos.pack(chunkX, chunkZ), inbox) == null ? inbox : null;
@@ -226,17 +206,14 @@ public final class ChunkOwners implements Router {
         resubmit(inbox);
     }
 
-    /** A dead region's inbox, handed back off the regionizer's lock. */
     public void abandon(RegionInbox inbox) {
         pool.execute(() -> resubmit(inbox));
     }
 
-    /** A borrow that ended hands its inbox back without running anything here: each task finds its owner again, as the work it is. */
     void resubmit(RegionInbox inbox) {
         inbox.close(posted -> later(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
     }
 
-    /** The pool task reads the owner again when it starts: a region or a taker that arrived while it queued gets the task instead of racing it. Otherwise it takes the chunk like a taker, for the task, so a taker meanwhile finds it held. */
     private void onPoolStart(int chunkX, int chunkZ, Runnable task) {
         while (true) {
             RegionInbox inbox = inboxAt(chunkX, chunkZ);
@@ -256,7 +233,6 @@ public final class ChunkOwners implements Router {
         }
     }
 
-    /** What lands on the chunk meanwhile waits in the claim and finds its owner again at release. */
     private void owning(int chunkX, int chunkZ, RegionInbox claim, Runnable task) {
         try {
             task.run();
@@ -265,7 +241,6 @@ public final class ChunkOwners implements Router {
         }
     }
 
-    /** The taker's box first: a region born over a taken chunk waits for the release like everyone else. */
     private @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
         RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
         return taken != null ? taken : inboxes.at(chunkX, chunkZ);

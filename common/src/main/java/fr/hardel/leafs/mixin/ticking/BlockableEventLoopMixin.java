@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Hook only, the logic lives in ticking/: a region worker is a game thread, off-thread server executes land in the global phase, and the server thread's own pump runs them too. */
 @Mixin(BlockableEventLoop.class)
 public abstract class BlockableEventLoopMixin {
 
@@ -32,7 +31,6 @@ public abstract class BlockableEventLoopMixin {
         }
     }
 
-    /** Between two ticks the server thread locks what a task touches and releases it when the task ends; inside a tick or a wait the task shares the locks already open. A region worker running a task inline locks nothing. */
     @WrapMethod(method = "doRunTask")
     private void leafs$lockDuringTheTask(Runnable task, Operation<Void> original) {
         if (RegionTickScheduler.onWorker() || !((Object) this instanceof MinecraftServer || (Object) this instanceof ChunkPumpAccess)) {

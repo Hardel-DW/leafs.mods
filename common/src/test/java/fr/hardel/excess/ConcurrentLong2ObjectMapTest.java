@@ -15,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The keys are spread before the backing map and folded back on every read path, so a packed coordinate comes out as it went in. */
 class ConcurrentLong2ObjectMapTest {
     private static final long[] KEYS = {0L, 1L, -1L, Long.MIN_VALUE, Long.MAX_VALUE, (7L << 32) | 3L, (-12L << 32) | (45L & 0xFFFFFFFFL)};
 
@@ -155,7 +154,6 @@ class ConcurrentLong2ObjectMapTest {
         assertEquals(new LongOpenHashSet(KEYS), seen);
     }
 
-    /** A fixed-size stream over a growing map throws once it sees more than it was told. */
     @Test
     void aStreamOverTheValuesSurvivesGrowth() {
         map.put(1, "a");

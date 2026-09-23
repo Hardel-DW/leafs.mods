@@ -11,7 +11,6 @@ import net.minecraft.world.entity.PortalProcessor;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.portal.TeleportTransition;
 
-/** Vanilla's teleport runs whole on the origin's owner; the add and remove primitives it calls carry the arrival to the target's owner. */
 public final class EntityTeleports {
     private final ServerLevel level;
 
@@ -34,7 +33,6 @@ public final class EntityTeleports {
         return true;
     }
 
-    /** Vanilla's handlePortal tail on the origin's owner: the search waits for its chunks, the exit frame it writes travels to the exit's owner like any block. */
     public void deferPortal(Entity entity, PortalProcessor process) {
         ChunkPos chunk = entity.chunkPosition();
         DeferredWork.owner(level, DeferReason.PORTAL, chunk.x(), chunk.z(), () -> searchAndEnterPortal(entity, process))

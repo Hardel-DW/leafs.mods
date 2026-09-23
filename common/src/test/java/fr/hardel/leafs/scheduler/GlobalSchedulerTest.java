@@ -33,7 +33,6 @@ class GlobalSchedulerTest {
         assertEquals(List.of("survivor"), executed);
     }
 
-    /** Vanilla's task loop logs an exception and lets an error through: the server crashes, like vanilla, instead of running on. */
     @Test
     void anErrorLeavesTheDrainLikeVanilla() {
         scheduler.run(() -> {

@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,11 +22,9 @@ public final class LeafsWatchdog {
     private volatile boolean active;
     private Thread thread;
 
-    /** A tick unit or a shutdown past the kill threshold; the thread is the stuck one, for the dump. */
     public record Stall(String summary, Thread thread) {
     }
 
-    /** The stalled waits are the chunk waits older than the warn threshold at a given time, on any thread. */
     public LeafsWatchdog(long warnNanos, LongSupplier killNanos, LongFunction<Map<Thread, String>> stalledWaits, Consumer<String> reporter, Consumer<Stall> killer) {
         this.warnNanos = warnNanos;
         this.killNanos = killNanos;
@@ -50,7 +47,6 @@ public final class LeafsWatchdog {
         }
     }
 
-    /** Armed at stopServer: a JVM alive past the deadline gets the stuck-tick dump and kill. No-op when kill is disabled. */
     public void armShutdownDeadline(Duration deadline) {
         if (killNanos.getAsLong() == 0) {
             return;
@@ -64,7 +60,6 @@ public final class LeafsWatchdog {
         }
     }
 
-    /** In solo the JVM legitimately outlives the server, so a completed shutdown stands the deadline down. */
     public void disarmShutdownDeadline() {
         Thread deadlineThread = shutdownDeadline.get();
         if (deadlineThread != null) {
@@ -106,7 +101,6 @@ public final class LeafsWatchdog {
         }
     }
 
-    /** A wait past the threshold on a thread that is not inside a tick unit: at once, then once per warn interval. */
     private void reportStalledWaits(long now) {
         Map<Thread, String> stalled = stalledWaits.apply(now);
         reportedWaits.keySet().retainAll(stalled.keySet());
@@ -122,7 +116,6 @@ public final class LeafsWatchdog {
             }
         });
     }
-
 
     private void awaitShutdown(Duration deadline, Thread stopping) {
         try {

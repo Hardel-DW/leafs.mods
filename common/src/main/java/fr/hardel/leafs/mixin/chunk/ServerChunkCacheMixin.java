@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
 
-/** The read contract: every thread reads what is published, a required absent chunk is waited for, a borrower takes the chunk's region. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin {
     @Shadow
@@ -42,7 +41,6 @@ public abstract class ServerChunkCacheMixin {
     @Final
     private Thread mainThread;
 
-    /** Off the main thread the table answers, with the contract's peek rule: presence serves every thread. */
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
         if (Thread.currentThread() != this.mainThread) {
@@ -50,7 +48,6 @@ public abstract class ServerChunkCacheMixin {
         }
     }
 
-    /** The contract for every thread once regions run, vanilla for the universal owner. */
     @WrapMethod(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;")
     private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
         LevelRegions regions = LevelRegions.of(this.level);
@@ -62,7 +59,6 @@ public abstract class ServerChunkCacheMixin {
         return chunk;
     }
 
-    /** Vanilla answers from the ticket level; the read path answers from presence. Both must agree on every thread. */
     @Inject(method = "hasChunk(II)Z", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentHasChunkPath(int x, int z, CallbackInfoReturnable<Boolean> callbackInfo) {
         if (LevelRegions.of(this.level).live()) {
@@ -70,13 +66,11 @@ public abstract class ServerChunkCacheMixin {
         }
     }
 
-    /** A light change marks its section on the chunk's owner, like a block change; the owner broadcasts at its next pass. */
     @WrapOperation(method = "onLightUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache$MainThreadExecutor;execute(Ljava/lang/Runnable;)V"))
     private void leafs$lightChangeOnTheOwner(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original, @Local(argsOnly = true) SectionPos pos) {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
     }
 
-    /** Vanilla reads a holder right after this call, from any caller: the chunks whose tickets were added since settle on this thread. */
     @WrapMethod(method = "runDistanceManagerUpdates")
     private boolean leafs$settleTheAddedTickets(Operation<Boolean> original) {
         boolean changed = original.call();
@@ -85,7 +79,6 @@ public abstract class ServerChunkCacheMixin {
         return changed;
     }
 
-    /** A request writes holder state: under the graph's locks, once the chunk's tickets settled. */
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         ChunkPos pos = holder.getPos();

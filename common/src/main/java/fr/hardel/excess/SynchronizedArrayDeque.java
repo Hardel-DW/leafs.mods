@@ -9,7 +9,6 @@ import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/** An ArrayDeque other threads may write while one iterates: writes take the deque's lock, iteration walks a snapshot. Fits a field declared ArrayDeque, Deque or Queue. */
 public final class SynchronizedArrayDeque<E> extends ArrayDeque<E> {
 
     @Override
@@ -172,7 +171,6 @@ public final class SynchronizedArrayDeque<E> extends ArrayDeque<E> {
         return super.toArray(array);
     }
 
-    /** Remove through the iterator takes out the first equal element of the live deque. */
     @Override
     public Iterator<E> iterator() {
         return new SnapshotIterator<>(snapshot().iterator(), this::remove);

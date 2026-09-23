@@ -6,7 +6,6 @@ import java.util.ArrayDeque;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/** What an owner runs at its next pass, chunk work and game work each in posting order; what it no longer owns leaves through the owners instead. Closed once the owner is gone, its remainder goes back the same way. */
 public final class RegionInbox {
     public record Posted(int chunkX, int chunkZ, Work work, Runnable task) {
     }
@@ -19,17 +18,14 @@ public final class RegionInbox {
     private final Thread holder;
     private boolean closed;
 
-    /** The box of a chunk the calling thread took: every task in it is for that chunk, and the chunk is that thread's until it releases. */
     public RegionInbox(long slowTaskNanos) {
         this(slowTaskNanos, _ -> true, _ -> { }, Thread.currentThread());
     }
 
-    /** A region's box, owned by whichever thread ticks the region. */
     public RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere) {
         this(slowTaskNanos, owns, elsewhere, null);
     }
 
-    /** A task longer than the threshold is logged with its class and chunk, the one place where a publication can cost a tick. A task on a chunk the owner lost, a section reclaimed from a region, leaves through {@code elsewhere}. */
     private RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere, Thread holder) {
         this.slowTaskNanos = slowTaskNanos;
         this.owns = owns;
@@ -37,7 +33,6 @@ public final class RegionInbox {
         this.holder = holder;
     }
 
-    /** Whether the thread holds the chunk this box belongs to. */
     public boolean heldBy(Thread thread) {
         return holder == thread;
     }
@@ -46,7 +41,6 @@ public final class RegionInbox {
         return holder.getName();
     }
 
-    /** False once closed: the region no longer exists, the caller resolves the owner again. */
     public synchronized boolean post(int chunkX, int chunkZ, Work work, Runnable task) {
         if (closed) {
             return false;
@@ -56,22 +50,18 @@ public final class RegionInbox {
         return true;
     }
 
-    /** Vanilla's main-thread queue semantics for the pass: everything posted before the call, chunk work first. */
     public int drain() {
         return drain(Long.MAX_VALUE);
     }
 
-    /** The same pass, stopped once the deadline is past; what is left waits in order for the next pass. */
     public int drain(long deadlineNanos) {
         return drain(chunkWork, deadlineNanos) + drain(gameWork, deadlineNanos);
     }
 
-    /** What a wait may run: chunk work never waits, so a task waiting for a chunk reaches the publication behind it. Game work waits its turn, one task at a time, in order. */
     public int drainChunkWork() {
         return drain(chunkWork, Long.MAX_VALUE);
     }
 
-    /** As many tasks as were posted before the call, taken one at a time: a re-post waits for the next pass. */
     private int drain(ArrayDeque<Posted> queue, long deadlineNanos) {
         int planned;
         synchronized (this) {
@@ -107,7 +97,6 @@ public final class RegionInbox {
         return ran;
     }
 
-    /** The end of the region: every posted task leaves through the consumer, nothing lands here again. */
     public void close(Consumer<Posted> leftover) {
         Posted[] batch;
         synchronized (this) {

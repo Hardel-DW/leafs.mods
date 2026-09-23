@@ -10,7 +10,6 @@ import net.minecraft.world.level.BaseCommandBlock;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-/** Hook only, one funnel for the block and the minecart: the whole run, success count included, goes through global/CommandEngine. */
 @Mixin(BaseCommandBlock.class)
 public abstract class BaseCommandBlockMixin {
 

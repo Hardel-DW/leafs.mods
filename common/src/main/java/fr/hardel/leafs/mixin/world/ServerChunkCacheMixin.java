@@ -28,7 +28,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
 
-/** Per-chunk tick work moved to region bodies; broadcast marks route to the owning unit. */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
 
@@ -49,7 +48,6 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
         return chunkHoldersToBroadcast;
     }
 
-    /** The set takes writers from every owner; a region removes what it broadcasts, the workers' sweep drains the rest. */
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$bindPumpLevel(CallbackInfo callbackInfo) {
         ServerChunkCache self = (ServerChunkCache) (Object) this;
@@ -57,7 +55,6 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
         this.chunkHoldersToBroadcast = ConcurrentHashMap.newKeySet();
     }
 
-    /** Once regions tick, each purges its own sections and the workers' sweep the rest; the halted case matters, vanilla keeps purging during its stop loop. */
     @WrapOperation(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/TicketStorage;purgeStaleTickets(Lnet/minecraft/server/level/ChunkMap;)V"))
     private void leafs$purgeAsUniversalOwner(TicketStorage storage, ChunkMap chunkMap, Operation<Void> original) {
         if (!LevelRegions.of(this.level).live()) {
@@ -88,7 +85,6 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
         TickingManager.of(this.level.getServer()).markSerial(this.level, TickStages.serialUnloads);
     }
 
-    /** The serial broadcast walk only survives for the universal owner; after activation the sweep owns the set. */
     @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;broadcastChangedChunks(Lnet/minecraft/util/profiling/ProfilerFiller;)V"))
     private void leafs$broadcastAsUniversalOwner(ServerChunkCache instance, ProfilerFiller profiler, Operation<Void> original) {
         if (!LevelRegions.of(this.level).live()) {
@@ -96,7 +92,6 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
         }
     }
 
-    /** The move runs where it is called; the visibility pass it used to carry runs on every region's tracking tick. */
     @Inject(method = "move", at = @At("HEAD"))
     private void leafs$markPlayerMoved(ServerPlayer player, CallbackInfo callbackInfo) {
         ((PlayerMoveAccess) player).leafs$markMoved();

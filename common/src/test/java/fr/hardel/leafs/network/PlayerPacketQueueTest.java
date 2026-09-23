@@ -49,7 +49,6 @@ class PlayerPacketQueueTest {
         assertEquals(List.of(), handled);
     }
 
-    /** {@code ServerGamePacketListenerImpl} keeps accepting the reconfiguration ack after it stops accepting the rest. */
     @Test
     void skippablePacketsBypassTheAcceptingCheck() {
         FakeListener listener = new FakeListener(false);
@@ -75,7 +74,6 @@ class PlayerPacketQueueTest {
         assertEquals(List.of("first", "late"), handled);
     }
 
-    /** Vanilla's global drain has no per-packet recovery either: {@code onPacketError} rethrows and the tick dies. */
     @Test
     void handlerFailureEscapesTheDrainAndLeavesTheRestQueued() {
         FakeListener listener = new FakeListener(true);
@@ -94,7 +92,6 @@ class PlayerPacketQueueTest {
         assertEquals(List.of("survivor"), handled);
     }
 
-    /** Death crash regression: the queue owns every packet it drains, whatever a handler does to the player. */
     @Test
     void ownershipHoldsForEveryPacketOfADrainAcrossAPlayerSwap() {
         FakeListener listener = new FakeListener(true);
@@ -112,7 +109,6 @@ class PlayerPacketQueueTest {
         assertFalse(queue.handledByCurrentThread(), "the scope is thread-local to the drain");
     }
 
-    /** A handler that moves the player mid-drain ends the drain; the rest waits for the new owner. */
     @Test
     void aDrainStopsWhenOwnershipMovesMidDrain() {
         FakeListener listener = new FakeListener(true);
@@ -129,7 +125,6 @@ class PlayerPacketQueueTest {
         assertEquals(List.of("teleport", "stays_queued"), handled);
     }
 
-    /** Why the gate must never re-queue mid-drain: the stackless rethrow becomes a reported crash. */
     @Test
     void aRethrowInsideTheDrainEscalatesToACrash() {
         FakeListener listener = new FakeListener(true);
@@ -198,7 +193,6 @@ class PlayerPacketQueueTest {
         assertFalse(overlapped.get(), "no packet may be handled while the player's pass runs");
     }
 
-
     private static void awaitQuietly(CountDownLatch latch) {
         try {
             latch.await();
@@ -237,7 +231,6 @@ class PlayerPacketQueueTest {
         }
     }
 
-    /** Mirrors {@code ServerCommonPacketListenerImpl}: it records the failure AND rethrows it. */
     private static final class FakeListener implements PacketListener {
         final List<Exception> errors = new ArrayList<>();
         private final boolean accepting;

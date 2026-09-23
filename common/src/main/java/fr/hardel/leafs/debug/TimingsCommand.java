@@ -21,7 +21,6 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.Locale;
 
-/** {@code /leafs timings}: per-stage cost of one tick unit, averaged over the last five seconds. */
 public final class TimingsCommand {
     private static final int AVERAGE_WINDOW_TICKS = 100;
 
@@ -99,7 +98,6 @@ public final class TimingsCommand {
         return TickStages.count(family);
     }
 
-    /** Lag has no ring, so this is the average since the region was born, not over the last five seconds like the stages. */
     private static long averageLag(StageTimings stages) {
         int ticks = stages.completedTicks();
         return ticks == 0 ? 0 : stages.lagNanos() / ticks;

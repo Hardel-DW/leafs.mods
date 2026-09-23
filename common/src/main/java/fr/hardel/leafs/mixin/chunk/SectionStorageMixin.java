@@ -20,7 +20,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Optional;
 
-/** Concurrent storage facade, and the storage's lock: its writes, its reads from disk, its saves and the graphs of its subclass take it. */
 @Mixin(SectionStorage.class)
 public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess {
 
@@ -53,7 +52,6 @@ public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess 
         leafs$lock.runLocked(original::call);
     }
 
-    /** A chunk save packs the sections the writes touch: same lock. */
     @WrapMethod(method = "flush")
     private void leafs$chunkFlushUnderTheLock(ChunkPos chunkPos, Operation<Void> original) {
         leafs$lock.runLocked(() -> original.call(chunkPos));

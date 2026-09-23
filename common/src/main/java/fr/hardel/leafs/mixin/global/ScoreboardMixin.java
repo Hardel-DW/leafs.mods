@@ -20,7 +20,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import java.util.Collection;
 import java.util.function.Consumer;
 
-/** Serializes scoreboard structural mutations and iterating readers. Per-key getters stay lock-free. */
 @Mixin(Scoreboard.class)
 public abstract class ScoreboardMixin {
 

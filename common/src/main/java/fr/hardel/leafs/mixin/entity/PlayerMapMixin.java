@@ -12,7 +12,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Written by joins, leaves and moves on region threads, read by every region's spawn pass. */
 @Mixin(PlayerMap.class)
 public abstract class PlayerMapMixin {
 

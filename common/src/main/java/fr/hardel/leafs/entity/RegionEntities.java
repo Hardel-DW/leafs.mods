@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** The region's entities this tick, from the sections of its chunks: the ticking ones, and every accessible one for the spawn census. */
 public final class RegionEntities {
     private final List<Entity> entities = new ArrayList<>();
     private final List<Entity> accessible = new ArrayList<>();
@@ -22,7 +21,6 @@ public final class RegionEntities {
     private ServerLevel level;
     private long lastTrackingNanos;
 
-    /** One walk of the sections: vanilla's tick list membership is a ticking section or an entity that always ticks, vanilla's census is every accessible section. */
     public void refresh(ServerLevel level, List<ChunkHolder> holders) {
         this.level = level;
         entities.clear();
@@ -56,7 +54,6 @@ public final class RegionEntities {
         });
     }
 
-    /** An entity that left for another level since the photo is that level's region's, and skipped here. */
     public void forEach(Consumer<Entity> action) {
         for (Entity entity : entities) {
             if (entity.level() == level) {
@@ -73,7 +70,6 @@ public final class RegionEntities {
         });
     }
 
-    /** Vanilla's {@code getAllEntities()} restricted to the region: the spawn census. */
     public List<Entity> accessible() {
         return accessible;
     }
@@ -86,7 +82,6 @@ public final class RegionEntities {
         return entities.size();
     }
 
-    /** Start of the last tracking pass; a player who moved since is re-checked against the entities he may see. */
     public long lastTrackingNanos() {
         return lastTrackingNanos;
     }

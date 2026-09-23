@@ -5,7 +5,6 @@ import fr.hardel.leafs.metrics.ModAttribution;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-/** Region-scoped crash text: a region crash must be understandable without digging in a global log. */
 public record RegionCrashReport(long regionId, String dimension, long regionTick, int chunkCount, int entityCount) {
 
     public String format(ModAttribution attribution, Throwable cause) {

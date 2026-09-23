@@ -17,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Raids are created from player ticks on the regions, one at a time; the map is shared, the raids tick with the level on the server thread. */
 @Mixin(Raids.class)
 public abstract class RaidsMixin {
 
@@ -33,7 +32,6 @@ public abstract class RaidsMixin {
         this.raidMap = concurrent;
     }
 
-    /** Two regions starting a raid together would mint the same id. */
     @WrapMethod(method = "createOrExtendRaid")
     private Raid leafs$oneRaidStartAtATime(ServerPlayer player, BlockPos raidPosition, Operation<Raid> original) {
         return SharedStateMonitor.call(this, () -> original.call(player, raidPosition));

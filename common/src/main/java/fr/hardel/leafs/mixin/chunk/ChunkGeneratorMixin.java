@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 import java.util.concurrent.Executor;
 
-/** Vanilla sends the biome fill and the terrain build to Worker-Main; they run on the calling chunk worker. */
 @Mixin({ChunkGenerator.class, NoiseBasedChunkGenerator.class})
 public abstract class ChunkGeneratorMixin {
     @ModifyArg(method = {"createBiomes", "buildTerrain"}, at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"), index = 1)

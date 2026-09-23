@@ -10,10 +10,6 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-/**
- * A WeakHashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write back, and the
- * functions of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared WeakHashMap or Map.
- */
 public final class SynchronizedWeakHashMap<K, V> extends WeakHashMap<K, V> {
 
     @Override

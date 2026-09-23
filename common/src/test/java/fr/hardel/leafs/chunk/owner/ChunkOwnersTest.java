@@ -28,7 +28,6 @@ class ChunkOwnersTest {
     private boolean covered = true;
     private boolean chunkHeldByAnother;
 
-    /** The fake taker runs the task on the caller like the real one, or refuses when another thread holds the chunk. */
     private ChunkOwners owners() {
         return new ChunkOwners(pool, 0, (x, z) -> covered ? inbox : null, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, this::take, server, Long.MAX_VALUE);
     }
@@ -106,7 +105,6 @@ class ChunkOwnersTest {
         assertEquals(0, pool.queued() + pool.active(), "the pool never runs game work");
     }
 
-    /** The taker refuses, the chunk is found in the holder's inbox on the next turn. */
     @Test
     void gameWorkOnAChunkAnotherThreadHoldsIsMailForThatThread() throws InterruptedException {
         chunkHeldByAnother = true;
@@ -121,7 +119,6 @@ class ChunkOwnersTest {
         assertTrue(taken.isEmpty());
     }
 
-    /** A chunk taken by a thread that never releases it, for the tests of what the others see. */
     private static RegionInbox takenOnAnotherThread(ChunkOwners owners) throws InterruptedException {
         AtomicReference<RegionInbox> held = new AtomicReference<>();
         Thread holder = new Thread(() -> held.set(owners.borrow(1, 1)), "taker");
@@ -149,7 +146,6 @@ class ChunkOwnersTest {
         assertEquals(List.of("2,2"), taken);
     }
 
-    /** Roadmap, two reservation spaces: a light task and a generation step on the same chunk do not wait for each other. */
     @Test
     void lightReservesInItsOwnSpace() {
         ChunkOwners owners = owners();
@@ -233,7 +229,6 @@ class ChunkOwnersTest {
         }
     }
 
-    /** A region born over a chunk a thread took: the chunk stays that thread's until it releases, the mail goes to it, the region does not hold it. */
     @Test
     void aChunkATakerHoldsStaysItsOnceARegionCoversIt() throws InterruptedException {
         covered = false;

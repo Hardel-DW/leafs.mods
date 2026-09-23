@@ -6,7 +6,6 @@ import net.minecraft.util.thread.BlockableEventLoop;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
-/** Global-phase tasks, submittable from any thread, where off-thread {@code MinecraftServer.execute} lands. Drained by the server thread only, each task through the runner. */
 public final class GlobalScheduler {
     private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
     private final Consumer<Runnable> runner;

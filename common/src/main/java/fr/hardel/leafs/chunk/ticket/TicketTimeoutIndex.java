@@ -9,7 +9,6 @@ import net.minecraft.world.level.TicketStorage;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.LongPredicate;
 
-/** Only the tickets that can expire, sharded by region section: each region counts down its own, the workers' sweep the rest. The storage says when a ticket leaves. */
 public final class TicketTimeoutIndex {
 
     private record TrackedTicket(long chunkPos, Ticket ticket) {
@@ -30,12 +29,10 @@ public final class TicketTimeoutIndex {
         this.sectionShift = sectionShift;
     }
 
-    /** A chunk still generating or promoting pauses the countdown of the types that must survive its save. */
     public void pauseWhile(LongPredicate busy) {
         this.busy = busy;
     }
 
-    /** Under the storage monitor, for every timeout ticket the table actually stored. */
     public void track(long chunkPos, Ticket ticket) {
         sections.compute(sectionOf(chunkPos), (_, queue) -> {
             ConcurrentLinkedQueue<TrackedTicket> target = queue == null ? new ConcurrentLinkedQueue<>() : queue;
@@ -44,7 +41,6 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    /** Under the storage monitor, for every ticket the table removed; vanilla matches removals by type and level, so does this. */
     public void untrack(long chunkPos, Ticket ticket) {
         sections.compute(sectionOf(chunkPos), (_, queue) -> {
             if (queue == null) {
@@ -56,7 +52,6 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    /** The owner's per-tick countdown over its own sections; returns how many tickets expired. */
     public int purgeSections(long[] sectionKeys) {
         int expired = 0;
         for (long key : sectionKeys) {
@@ -66,7 +61,6 @@ public final class TicketTimeoutIndex {
         return expired;
     }
 
-    /** The workers' countdown over the sections no region owns. */
     public int purgeUnowned(LongPredicate sectionOwned) {
         int expired = 0;
         for (long key : sections.keySet()) {
@@ -91,7 +85,6 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    /** An expired ticket leaves through the storage, whose removal untracks it here. */
     private int countDown(Iterable<TrackedTicket> queue) {
         int expired = 0;
         for (TrackedTicket tracked : queue) {

@@ -13,7 +13,6 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-/** Seeded random churn with the invariant check applied throughout; shift 2 so the topology changes often. */
 class RegionizerFuzzTest {
     private static final int OPERATIONS = 4000;
     private static final int CHECK_INTERVAL = 50;

@@ -32,7 +32,6 @@ class GameEventRegistryTest {
         EuclideanGameEventListenerRegistry registry = new EuclideanGameEventListenerRegistry(null, 0, _ -> { });
         var field = EuclideanGameEventListenerRegistry.class.getDeclaredField("listeners");
         field.setAccessible(true);
-        // Seed the transformed list without constructing a world solely for registration debug packets.
         GameEventListeners listeners = assertInstanceOf(GameEventListeners.class, field.get(registry));
         GameEventListener first = new Listener(1);
         GameEventListener second = new Listener(2);

@@ -13,7 +13,6 @@ import net.minecraft.world.level.block.Blocks;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The server thread releasing its chunks at the end of its tick: the mail left on one of them ends up reading its neighbour, on a thread that can lock it. */
 public final class BorrowReleaseTest {
 
     /** ATM11, 13 September 2026: the mail of a released chunk replayed on the releasing thread, read its neighbour chunk, still registered to that thread but no longer counted as held, and the server thread waited for itself. */

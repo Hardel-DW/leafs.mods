@@ -7,7 +7,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.function.Consumer;
 
-/** Chunks held by running tasks. A blocked task parks behind the holder and is requeued when it frees, nobody waits. */
 final class Reservations {
     private final ConcurrentLong2ObjectMap<Waiters> held = new ConcurrentLong2ObjectMap<>();
     private final Consumer<ChunkTask> requeue;
@@ -25,7 +24,6 @@ final class Reservations {
         this.requeue = requeue;
     }
 
-    /** Null once the task holds every chunk it reserves; otherwise the running task it parked behind. */
     @Nullable ChunkTask acquire(ChunkTask task) {
         long[] keys = task.reserved();
         retry:

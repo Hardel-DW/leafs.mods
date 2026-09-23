@@ -29,7 +29,6 @@ class ConcurrentShort2ObjectMapTest {
         assertTrue(map.isEmpty());
     }
 
-    /** Vanilla's refresh copies the section's records into an open hash map through the entry set. */
     @Test
     void aFastutilCopyReadsTheEntrySet() {
         map.put((short) 3, "c");
@@ -61,7 +60,6 @@ class ConcurrentShort2ObjectMapTest {
         assertTrue(seen > 0);
     }
 
-    /** A fixed-size stream over a growing map throws once it sees more than it was told. */
     @Test
     void aStreamOverTheValuesSurvivesGrowth() {
         map.put((short) 1, "a");

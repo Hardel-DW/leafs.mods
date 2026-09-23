@@ -26,8 +26,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-
-/** Vanilla's generation on the pool: each step reserves the radius it writes, placed at the chunk it writes and the centre it serves, and leaves the queue when its status is no longer allowed. */
 public final class GenerationSteps {
     private static final long[] NO_RESERVATION = {};
     private static final int STATUSES = ChunkStatus.getStatusList().size();
@@ -47,13 +45,11 @@ public final class GenerationSteps {
         this.metrics = metrics;
     }
 
-    /** A new task starts at the urgency of its centre. */
     public void run(ChunkGenerationTask task) {
         ChunkPos pos = task.getCenter().getPos();
         pool.submit(ChunkTask.of(Kind.STEP, owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> drive(task)));
     }
 
-    /** A layer done, the task schedules the next one or releases its claims on 289 holders: a continuation, so it heads the pool like every continuation. */
     private void drive(ChunkGenerationTask task) {
         CompletableFuture<?> waiting = task.runUntilWait();
         if (waiting != null) {
@@ -61,7 +57,6 @@ public final class GenerationSteps {
         }
     }
 
-    /** Vanilla's application of a step on its holder, with one more outcome: a step cancelled in the queue leaves the holder as if the status had been refused, its start mark erased. */
     public CompletableFuture<ChunkResult<ChunkAccess>> applyOnHolder(GenerationChunkHolder holder, ChunkStep step, StaticCache2D<GenerationChunkHolder> cache) {
         ChunkStatus status = step.targetStatus();
         if (holder.isStatusDisallowed(status)) {
@@ -89,7 +84,6 @@ public final class GenerationSteps {
         });
     }
 
-    /** The body is the wrapped call of {@code ChunkStep.apply}, so what another mod wraps around it runs on the pool too. */
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
         ChunkPos pos = chunk.getPos();
         ChunkTask.Place place = owners.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
@@ -103,7 +97,6 @@ public final class GenerationSteps {
         return task.result;
     }
 
-    /** The level dropped: every step still queued for a status the holder no longer allows leaves the pool. */
     public void cancelDisallowed(GenerationChunkHolder holder) {
         StepTask[] slots = queued.get(holder.getPos().pack());
         if (slots == null) {
@@ -142,7 +135,6 @@ public final class GenerationSteps {
         });
     }
 
-    /** One step of one chunk in the pool: taken once, by its run or by its cancellation. */
     private final class StepTask extends ChunkTask {
         private final ChunkStep step;
         private final ChunkAccess chunk;
@@ -191,7 +183,6 @@ public final class GenerationSteps {
             }
         }
 
-        /** Vanilla keeps a failed step for the server thread's next loop, which may be the one waiting: logged here. */
         private void fail(Throwable failure) {
             Leafs.LOGGER.error("Step {} of chunk {} failed", step.targetStatus(), chunk.getPos(), failure);
             result.completeExceptionally(failure);
