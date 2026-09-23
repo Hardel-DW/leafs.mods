@@ -25,21 +25,21 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class SynchronizedCollectionsTest {
+class CompatCollectionsTest {
     private static final int WRITERS = 4;
     private static final int PER_WRITER = 2_000;
 
     @Test
-    void hashSetSurvivesWritesDuringIteration() throws InterruptedException {
-        Set<Integer> set = new SynchronizedHashSet<>();
+    void hashSetFacadeSurvivesWritesDuringIteration() throws InterruptedException {
+        Set<Integer> set = new HashSetFacade<>(Set.of());
         int walked = walkWhileWriting(() -> set, set::add);
         assertEquals(WRITERS * PER_WRITER, set.size());
         assertTrue(walked > 0);
     }
 
     @Test
-    void hashSetIteratorRemoveReachesTheLiveSet() {
-        Set<Integer> set = new SynchronizedHashSet<>();
+    void hashSetFacadeIteratorRemoveReachesTheLiveSet() {
+        Set<Integer> set = new HashSetFacade<>(Set.of());
         set.addAll(List.of(1, 2, 3));
         Iterator<Integer> iterator = set.iterator();
         iterator.next();
@@ -124,8 +124,8 @@ class SynchronizedCollectionsTest {
     }
 
     @Test
-    void hashMapPublishesOneValuePerKeyUnderRacingComputeIfAbsent() throws InterruptedException {
-        HashMap<Integer, Object> map = new SynchronizedHashMap<>();
+    void hashMapFacadePublishesOneValuePerKeyUnderRacingComputeIfAbsent() throws InterruptedException {
+        HashMap<Integer, Object> map = new HashMapFacade<>(Map.of());
         List<Object> seen = new SynchronizedArrayList<>();
         walkWhileWriting(map::keySet, index -> seen.add(map.computeIfAbsent(index % 8, _ -> new Object())));
         assertEquals(8, map.size());
@@ -135,15 +135,15 @@ class SynchronizedCollectionsTest {
     }
 
     @Test
-    void hashMapMergePublishesEveryIncrement() throws InterruptedException {
-        HashMap<Integer, Integer> map = new SynchronizedHashMap<>();
+    void hashMapFacadeMergePublishesEveryIncrement() throws InterruptedException {
+        HashMap<Integer, Integer> map = new HashMapFacade<>(Map.of());
         walkWhileWriting(map::entrySet, index -> map.merge(index % 3, 1, Integer::sum));
         assertEquals(WRITERS * PER_WRITER, map.values().stream().mapToInt(Integer::intValue).sum());
     }
 
     @Test
-    void hashMapViewsWriteBackToTheLiveMap() {
-        HashMap<String, Integer> map = new SynchronizedHashMap<>();
+    void hashMapFacadeViewsWriteBackToTheLiveMap() {
+        HashMap<String, Integer> map = new HashMapFacade<>(Map.of());
         map.putAll(Map.of("a", 1, "b", 2, "c", 3));
 
         Iterator<Map.Entry<String, Integer>> entries = map.entrySet().iterator();
