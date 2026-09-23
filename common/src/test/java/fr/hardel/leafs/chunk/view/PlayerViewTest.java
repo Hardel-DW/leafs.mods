@@ -8,6 +8,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MinecraftBootstrap.class)
 class PlayerViewTest {
@@ -30,6 +32,18 @@ class PlayerViewTest {
     @AfterEach
     void stop() {
         pool.shutdown();
+    }
+
+    /** 2026-09-24: the chunk under a player shared the first bucket with the awaited chunks. */
+    @Test
+    void theChunkOfAPlayerStaysBehindTheAwaitedChunks() {
+        view.viewDistance(10);
+        graphs.loading().setSource(0, 0, ChunkLevel.byStatus(ChunkStatus.FULL));
+        graphs.loading().drain((_, _, _) -> { });
+        view.enter(ChunkPos.pack(0, 0));
+        graphs.players().drain((_, _, _) -> { });
+
+        assertTrue(view.urgency(0, 0) > ChunkPool.FIRST);
     }
 
     /** 2026-09-24: a far chunk waited behind the pregen steps to unload, and stayed in memory meanwhile. */

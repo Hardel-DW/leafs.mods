@@ -102,7 +102,7 @@ public final class ChunkPool implements Executor {
 
     @Override
     public void execute(@NonNull Runnable task) {
-        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, FIRST, ChunkTask.NO_RESERVATION, task));
+        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, SECOND, ChunkTask.NO_RESERVATION, task));
     }
 
     public void shutdown() {
