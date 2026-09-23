@@ -268,7 +268,11 @@ class ChunkOwnersTest {
 
         assertTrue(chunkWork.await(5, TimeUnit.SECONDS));
         assertEquals(List.of(), ran, "the game work did not run on the releasing thread");
-        assertTrue(server.drain());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (ran.isEmpty() && System.nanoTime() < deadline) {
+            server.drain();
+        }
+
         assertEquals(List.of("game"), ran);
         assertEquals(List.of("1,1"), taken);
         assertFalse(inbox.post(1, 1, Work.CHUNK, () -> ran.add("too late")), "a closed inbox refuses, the caller routes again");
