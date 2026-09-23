@@ -1,4 +1,4 @@
-package fr.hardel.leafs.mixin.compat.placebo;
+package fr.hardel.leafs.mixin.compat;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -9,13 +9,15 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.ArrayDeque;
 
-/** Shadows-of-Fire/Placebo, task queue. Any mod submits from any thread; the server tick walks the queue and removes the completed tasks. */
 @Pseudo
-@Mixin(targets = "dev.shadowsoffire.placebo.util.PlaceboTaskQueue$Impl")
-public abstract class PlaceboTaskQueueMixin {
+@Mixin(targets = {
+    // Shadows-of-Fire/Placebo, task queue, fed by any mod from any thread and emptied by the server tick.
+    "dev.shadowsoffire.placebo.util.PlaceboTaskQueue$Impl"
+})
+public abstract class StaticArrayDequeMixin {
 
     @WrapOperation(method = "<clinit>", at = @At(value = "NEW", target = "java/util/ArrayDeque"))
-    private static <E> ArrayDeque<E> leafs$sharedTasks(Operation<ArrayDeque<E>> original) {
+    private static <E> ArrayDeque<E> leafs$synchronized(Operation<ArrayDeque<E>> original) {
         return new SynchronizedArrayDeque<>();
     }
 }

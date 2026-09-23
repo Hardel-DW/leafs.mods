@@ -1,4 +1,4 @@
-package fr.hardel.leafs.mixin.compat.fastbench;
+package fr.hardel.leafs.mixin.compat;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -9,13 +9,15 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.IdentityHashMap;
 
-/** Shadows-of-Fire/FastWorkbench, slot updates. Crafting queues an update from the player's region; the server tick runs and clears them. */
 @Pseudo
-@Mixin(targets = "dev.shadowsoffire.fastbench.util.SlotUpdateManager")
-public abstract class SlotUpdateManagerMixin {
+@Mixin(targets = {
+    // Shadows-of-Fire/FastWorkbench, slot updates, queued by crafting from the player's region and run and cleared by the server tick.
+    "dev.shadowsoffire.fastbench.util.SlotUpdateManager"
+})
+public abstract class StaticIdentityHashMapMixin {
 
     @WrapOperation(method = "<clinit>", at = @At(value = "NEW", target = "java/util/IdentityHashMap"))
-    private static <K, V> IdentityHashMap<K, V> leafs$sharedUpdates(Operation<IdentityHashMap<K, V>> original) {
+    private static <K, V> IdentityHashMap<K, V> leafs$synchronized(Operation<IdentityHashMap<K, V>> original) {
         return new SynchronizedIdentityHashMap<>();
     }
 }

@@ -1,6 +1,5 @@
-package fr.hardel.leafs.compat;
+package fr.hardel.leafs;
 
-import fr.hardel.leafs.Leafs;
 import org.objectweb.asm.tree.ClassNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
