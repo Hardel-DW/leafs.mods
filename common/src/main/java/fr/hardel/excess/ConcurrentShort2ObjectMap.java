@@ -7,12 +7,16 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
 import it.unimi.dsi.fastutil.shorts.AbstractShort2ObjectMap;
+import it.unimi.dsi.fastutil.shorts.Short2ObjectFunction;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.IntFunction;
 
 public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<V> {
     private final ConcurrentHashMap<Short, V> map = new ConcurrentHashMap<>();
@@ -20,20 +24,111 @@ public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<
 
     @Override
     public V get(short key) {
-        V value = map.get(key);
-        return value == null ? defaultReturnValue() : value;
+        return orDefault(map.get(key));
     }
 
     @Override
     public V put(short key, V value) {
-        V previous = map.put(key, value);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.put(key, value));
     }
 
     @Override
     public V remove(short key) {
-        V previous = map.remove(key);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.remove(key));
+    }
+
+    @Override
+    public V putIfAbsent(short key, V value) {
+        return orDefault(map.putIfAbsent(key, value));
+    }
+
+    @Override
+    public boolean remove(short key, Object value) {
+        return map.remove(key, value);
+    }
+
+    @Override
+    public boolean replace(short key, V oldValue, V newValue) {
+        return map.replace(key, oldValue, newValue);
+    }
+
+    @Override
+    public V replace(short key, V value) {
+        return orDefault(map.replace(key, value));
+    }
+
+    @Override
+    public V computeIfAbsent(short key, IntFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(key, mapping::apply));
+    }
+
+    @Override
+    public V computeIfAbsent(short key, Short2ObjectFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(key, mapping::get));
+    }
+
+    @Override
+    public V computeIfPresent(short key, BiFunction<? super Short, ? super V, ? extends V> remapping) {
+        return orDefault(map.computeIfPresent(key, remapping));
+    }
+
+    @Override
+    public V compute(short key, BiFunction<? super Short, ? super V, ? extends V> remapping) {
+        return orDefault(map.compute(key, remapping));
+    }
+
+    @Override
+    public V merge(short key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return orDefault(map.merge(key, value, remapping));
+    }
+
+    @Override
+    public V putIfAbsent(Short key, V value) {
+        return map.putIfAbsent(key, value);
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        return map.remove(key, value);
+    }
+
+    @Override
+    public boolean replace(Short key, V oldValue, V newValue) {
+        return map.replace(key, oldValue, newValue);
+    }
+
+    @Override
+    public V replace(Short key, V value) {
+        return map.replace(key, value);
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super Short, ? super V, ? extends V> function) {
+        map.replaceAll(function);
+    }
+
+    @Override
+    public V computeIfAbsent(Short key, Function<? super Short, ? extends V> mapping) {
+        return map.computeIfAbsent(key, mapping);
+    }
+
+    @Override
+    public V computeIfPresent(Short key, BiFunction<? super Short, ? super V, ? extends V> remapping) {
+        return map.computeIfPresent(key, remapping);
+    }
+
+    @Override
+    public V compute(Short key, BiFunction<? super Short, ? super V, ? extends V> remapping) {
+        return map.compute(key, remapping);
+    }
+
+    @Override
+    public V merge(Short key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return map.merge(key, value, remapping);
+    }
+
+    private V orDefault(V value) {
+        return value == null ? defaultReturnValue() : value;
     }
 
     @Override

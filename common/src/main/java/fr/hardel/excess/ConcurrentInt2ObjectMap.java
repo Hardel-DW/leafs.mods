@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 
 public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
@@ -79,6 +80,51 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     @Override
     public V merge(int key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
         return orDefault(map.merge(key, value, remapping));
+    }
+
+    @Override
+    public V putIfAbsent(Integer key, V value) {
+        return map.putIfAbsent(key, value);
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        return map.remove(key, value);
+    }
+
+    @Override
+    public boolean replace(Integer key, V oldValue, V newValue) {
+        return map.replace(key, oldValue, newValue);
+    }
+
+    @Override
+    public V replace(Integer key, V value) {
+        return map.replace(key, value);
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super Integer, ? super V, ? extends V> function) {
+        map.replaceAll(function);
+    }
+
+    @Override
+    public V computeIfAbsent(Integer key, Function<? super Integer, ? extends V> mapping) {
+        return map.computeIfAbsent(key, mapping);
+    }
+
+    @Override
+    public V computeIfPresent(Integer key, BiFunction<? super Integer, ? super V, ? extends V> remapping) {
+        return map.computeIfPresent(key, remapping);
+    }
+
+    @Override
+    public V compute(Integer key, BiFunction<? super Integer, ? super V, ? extends V> remapping) {
+        return map.compute(key, remapping);
+    }
+
+    @Override
+    public V merge(Integer key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return map.merge(key, value, remapping);
     }
 
     private V orDefault(V value) {

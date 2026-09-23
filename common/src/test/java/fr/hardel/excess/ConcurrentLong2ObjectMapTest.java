@@ -55,10 +55,14 @@ class ConcurrentLong2ObjectMapTest {
     }
 
     @Test
-    void computeSeesTheUnmixedKey() {
+    void everyRemappingSeesTheUnmixedKey() {
         ConcurrentLong2ObjectMap<Long> keys = new ConcurrentLong2ObjectMap<>();
         long key = (5L << 32) | 9L;
         keys.compute(key, (seen, _) -> seen);
+        assertEquals(key, keys.get(key));
+        keys.computeIfPresent(key, (seen, value) -> seen + value);
+        assertEquals(2 * key, keys.get(key));
+        keys.replaceAll((seen, _) -> seen);
         assertEquals(key, keys.get(key));
         keys.compute(key, (_, _) -> null);
         assertNull(keys.get(key));
