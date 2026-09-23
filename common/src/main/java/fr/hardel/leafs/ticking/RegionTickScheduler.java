@@ -74,6 +74,7 @@ public final class RegionTickScheduler {
         return Thread.currentThread() instanceof Worker;
     }
 
+    // Used by the Leafs Debug mod
     public List<Thread> workerThreads() {
         return Collections.unmodifiableList(workers);
     }

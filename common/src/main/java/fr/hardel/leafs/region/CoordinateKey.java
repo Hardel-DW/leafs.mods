@@ -9,10 +9,12 @@ public final class CoordinateKey {
         return ((long) sectionZ << 32) | (sectionX & 0xFFFFFFFFL);
     }
 
+    // Used by the Leafs Debug mod
     public static int x(long key) {
         return (int) key;
     }
 
+    // Used by the Leafs Debug mod
     public static int z(long key) {
         return (int) (key >>> 32);
     }

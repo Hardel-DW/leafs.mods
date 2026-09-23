@@ -32,6 +32,7 @@ public final class ChunkCommand {
                 .executes(context -> send(context.getSource(), ColumnPosArgument.getColumnPos(context, "pos").toChunkPos())));
     }
 
+    // Used by the Leafs Debug mod
     public static List<Component> report(ServerLevel level, int chunkX, int chunkZ) {
         LevelChunks chunks = LevelChunks.of(level);
         long key = ChunkPos.pack(chunkX, chunkZ);

@@ -55,6 +55,7 @@ public final class ChunkPool implements Executor {
         return workers.size();
     }
 
+    // Used by the Leafs Debug mod
     public List<Thread> workerThreads() {
         return workers;
     }
@@ -63,6 +64,7 @@ public final class ChunkPool implements Executor {
         return queued.get();
     }
 
+    // Used by the Leafs Debug mod
     public ReservationBlocks blocks() {
         return blocks;
     }

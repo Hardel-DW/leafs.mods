@@ -82,6 +82,7 @@ public final class StageTimings {
         return cursor;
     }
 
+    // Used by the Leafs Debug mod
     public long[][] rowsSince(int fromTick) {
         int end = cursor;
         int start = Math.max(fromTick, end - (CAPACITY - 1));
