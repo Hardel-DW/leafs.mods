@@ -13,10 +13,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -176,25 +176,35 @@ class RegionTickSchedulerTest {
         assertEquals(after, ticks.get(), "a cancelled handle must stop ticking");
     }
 
-    /** 2026-09-16: retrying a missed start within a millisecond made the server thread wait 5 ms a tick behind regions; a missed start counts and waits its period. */
+    /** 2026-09-23: a start missed behind the server thread retried one period later, in phase with the next server tick, so the region never ticked again. */
     @Test
-    void aMissedStartIsCountedAndWaitsItsPeriod(@TempDir Path crashDirectory) throws InterruptedException {
+    void aMissedStartWaitsTheServerTickEndThenRuns(@TempDir Path crashDirectory) throws InterruptedException {
         RegionTickScheduler pool = createScheduler(1, crashDirectory);
         pool.start();
-        List<Long> attempts = new CopyOnWriteArrayList<>();
-        CountDownLatch started = new CountDownLatch(1);
+        AtomicBoolean held = new AtomicBoolean(true);
+        AtomicInteger attempts = new AtomicInteger();
+        CountDownLatch firstAttempt = new CountDownLatch(1);
+        CountDownLatch ticked = new CountDownLatch(1);
         TestTickHandle handle = new TestTickHandle(1, () -> {
-            attempts.add(System.nanoTime());
-            return attempts.size() >= 3;
-        }, started::countDown);
+            attempts.incrementAndGet();
+            firstAttempt.countDown();
+            return !held.get();
+        }, ticked::countDown);
 
         pool.schedule(handle);
 
-        assertTrue(started.await(3, TimeUnit.SECONDS));
+        assertTrue(firstAttempt.await(3, TimeUnit.SECONDS));
+        Thread.sleep(300);
+        assertEquals(1, attempts.get(), "a held region retried before the server tick ended");
+        held.set(false);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!ticked.await(50, TimeUnit.MILLISECONDS) && System.nanoTime() < deadline) {
+            pool.wakeMissed();
+        }
+
         handle.cancel();
-        long retryNanos = attempts.get(2) - attempts.get(1);
-        assertTrue(retryNanos >= RegionTickScheduler.TICK_PERIOD_NANOS / 2, "a missed start retried " + retryNanos / 1_000_000 + " ms later");
-        assertEquals(2, handle.stages().missedStarts());
+        assertEquals(0, ticked.getCount(), "the missed start never ran after the server tick ended");
+        assertEquals(1, handle.stages().missedStarts());
     }
 
     @Test

@@ -3,6 +3,8 @@ package fr.hardel.leafs.ticking;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
@@ -11,6 +13,7 @@ import java.util.function.BiConsumer;
 public final class RegionTickScheduler {
     public static final long TICK_PERIOD_NANOS = 50_000_000L;
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
+    private final Queue<ScheduledTick> missed = new ConcurrentLinkedQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
     private final int threadCount;
@@ -65,6 +68,13 @@ public final class RegionTickScheduler {
         return periodNanos;
     }
 
+    public void wakeMissed() {
+        for (ScheduledTick tick = missed.poll(); tick != null; tick = missed.poll()) {
+            tick.handle.setScheduledStartNanos(System.nanoTime());
+            queue.add(tick);
+        }
+    }
+
     public void runAttached(TickHandle handle) {
         executeTick(handle);
     }
@@ -112,20 +122,19 @@ public final class RegionTickScheduler {
                 }
             }
 
-            if (!handle.isCancelled()) {
-                reschedule(handle, started);
-                queue.add(next);
+            if (handle.isCancelled()) {
+                continue;
             }
-        }
-    }
 
-    /** A missed start waits its period like a tick: retrying sooner made the server thread wait behind the region. */
-    private void reschedule(TickHandle handle, boolean started) {
-        if (!started) {
-            handle.stages().recordMissedStart();
-        }
+            if (!started) {
+                handle.stages().recordMissedStart();
+                missed.add(next);
+                continue;
+            }
 
-        handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos));
+            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos));
+            queue.add(next);
+        }
     }
 
     private boolean executeTick(TickHandle handle) {
