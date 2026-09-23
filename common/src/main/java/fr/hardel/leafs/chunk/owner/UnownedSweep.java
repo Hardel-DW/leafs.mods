@@ -1,7 +1,5 @@
 package fr.hardel.leafs.chunk.owner;
 
-import fr.hardel.leafs.chunk.ChangedChunksAccess;
-import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
@@ -10,6 +8,8 @@ import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
+import fr.hardel.leafs.world.ChangedChunksAccess;
+import fr.hardel.leafs.world.ChunkBroadcasts;
 import fr.hardel.leafs.world.ChunkSaves;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.server.level.ChunkHolder;
@@ -22,6 +22,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class UnownedSweep {
+    private static final int CHUNKS_PER_TICK = 20;
+
     private final ServerLevel level;
     private final LevelRegions regions;
     private final ChunkOwners owners;
@@ -79,7 +81,7 @@ public final class UnownedSweep {
         RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
         int attempts = 0;
         for (long chunkKey : persistence.pendingUnloads().toLongArray()) {
-            if (attempts == ChunkSaves.CHUNKS_PER_TICK) {
+            if (attempts == CHUNKS_PER_TICK) {
                 return;
             }
 
@@ -94,7 +96,7 @@ public final class UnownedSweep {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         int attempts = 0;
         for (long chunkKey : chunkMap.chunksToEagerlySave.toLongArray()) {
-            if (attempts == ChunkSaves.CHUNKS_PER_TICK) {
+            if (attempts == CHUNKS_PER_TICK) {
                 return;
             }
 
@@ -121,7 +123,7 @@ public final class UnownedSweep {
             }
         }
 
-        int budget = Math.min(ChunkSaves.CHUNKS_PER_TICK, epochBacklog.size());
+        int budget = Math.min(CHUNKS_PER_TICK, epochBacklog.size());
         for (int index = 0; index < budget; index++) {
             long chunkKey = epochBacklog.popLong();
             ChunkHolder holder = table.get(chunkKey);

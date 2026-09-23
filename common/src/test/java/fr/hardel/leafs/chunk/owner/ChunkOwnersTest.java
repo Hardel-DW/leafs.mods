@@ -5,7 +5,7 @@ import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
-import fr.hardel.leafs.scheduler.GlobalScheduler;
+import fr.hardel.leafs.global.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

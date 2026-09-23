@@ -1,9 +1,6 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.chunk.ChangedChunksAccess;
-import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.entity.EntityTickAccess;
@@ -40,12 +37,12 @@ public final class RegionTickBody {
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
 
     private final ServerLevel level;
-    private final RegionAutosave autosave;
+    private final ChunkSaves saves;
     private final MobCaps mobCaps;
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
-        this.autosave = new RegionAutosave(level);
+        this.saves = new ChunkSaves(level);
         this.mobCaps = new MobCaps(level);
     }
 
@@ -106,7 +103,7 @@ public final class RegionTickBody {
         });
         stages.mark(TickStages.regionPlayers);
         long slice = level.tickRateManager().nanosecondsPerTick() / 10;
-        autosave.tick(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
+        saves.autosave(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
         stages.mark(TickStages.regionAutosave);
         RegionInbox inbox = region.data().inbox();
         inbox.drain(Math.max(tickDeadlineNanos, System.nanoTime() + slice));

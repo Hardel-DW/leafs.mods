@@ -1,8 +1,8 @@
 package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;

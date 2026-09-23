@@ -2,7 +2,7 @@ package fr.hardel.leafs.mixin.world;
 
 import java.util.concurrent.ConcurrentHashMap;
 import org.spongepowered.asm.mixin.Mutable;
-import fr.hardel.leafs.chunk.ChangedChunksAccess;
+import fr.hardel.leafs.world.ChangedChunksAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.entity.PlayerMoveAccess;

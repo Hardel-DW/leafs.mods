@@ -1,6 +1,5 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.chunk.SavedEpochAccess;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import net.minecraft.server.level.ChunkHolder;
@@ -15,21 +14,39 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.List;
 
 public final class ChunkSaves {
-    public static final int CHUNKS_PER_TICK = 20;
-
     private final ServerLevel level;
 
     public ChunkSaves(ServerLevel level) {
         this.level = level;
     }
 
-    public void saveEagerly(List<ChunkHolder> holders, long deadlineNanos) {
+    public void autosave(RegionWorldData worldData, long epoch, long deadlineNanos) {
+        List<ChunkHolder> holders = worldData.chunks().holders();
         LongSet dirty = level.getChunkSource().chunkMap.chunksToEagerlySave;
         for (ChunkHolder holder : holders) {
             if (dirty.contains(holder.getPos().pack()) && saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {
+                break;
+            }
+        }
+
+        worldData.entities().forEach(entity -> {
+            if (entity instanceof ServerPlayer player && ((SavedEpochAccess) player).leafs$savedEpoch() < epoch) {
+                level.getServer().getPlayerList().save(player);
+                ((SavedEpochAccess) player).leafs$markSaved(epoch);
+            }
+        });
+
+        if (worldData.savedEpoch() == epoch) {
+            return;
+        }
+
+        for (ChunkHolder holder : holders) {
+            if (saveBehindEpoch(holder, epoch) && System.nanoTime() >= deadlineNanos) {
                 return;
             }
         }
+
+        worldData.markEpochSaved(epoch);
     }
 
     public boolean saveEagerly(ChunkHolder holder) {
@@ -60,13 +77,5 @@ public final class ChunkSaves {
         persistence.saveChunkOnOwner(holder.getPos().pack());
         access.leafs$markSaved(epoch);
         return true;
-    }
-
-    public void saveBehindEpoch(ServerPlayer player, long epoch) {
-        SavedEpochAccess access = (SavedEpochAccess) player;
-        if (access.leafs$savedEpoch() < epoch) {
-            level.getServer().getPlayerList().save(player);
-            access.leafs$markSaved(epoch);
-        }
     }
 }

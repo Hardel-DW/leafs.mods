@@ -1,10 +1,9 @@
-package fr.hardel.leafs.scheduler;
+package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.ChunkFixtures;
-import fr.hardel.leafs.chunk.owner.ChunkOwners;
-import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.global.GlobalScheduler;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import org.junit.jupiter.api.AfterEach;

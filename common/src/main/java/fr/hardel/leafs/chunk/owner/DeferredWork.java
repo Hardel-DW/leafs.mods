@@ -1,8 +1,6 @@
-package fr.hardel.leafs.scheduler;
+package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.owner.ChunkOwners;
-import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import fr.hardel.leafs.ticking.TickingManager;
