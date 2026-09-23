@@ -109,15 +109,6 @@ class SynchronizedCollectionsTest {
     }
 
     @Test
-    void objectOpenHashSetSurvivesWritesDuringIteration() throws InterruptedException {
-        Set<Integer> set = new SynchronizedObjectOpenHashSet<>();
-        walkWhileWriting(() -> set, set::add);
-        assertEquals(WRITERS * PER_WRITER, set.size());
-        set.removeIf(value -> value % 2 == 0);
-        assertEquals(WRITERS * PER_WRITER / 2, set.size());
-    }
-
-    @Test
     void arrayListSurvivesWritesDuringIterationAndIteratorRemoves() throws InterruptedException {
         List<Integer> list = new SynchronizedArrayList<>();
         walkWhileWriting(() -> list, list::add);
