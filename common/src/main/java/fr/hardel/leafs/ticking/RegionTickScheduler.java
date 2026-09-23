@@ -129,13 +129,11 @@ public final class RegionTickScheduler {
     }
 
     private boolean executeTick(TickHandle handle) {
-        RegionContext.enter(handle.context());
+        watchdog.beginTick(handle);
         try {
-            watchdog.beginTick(handle);
             return handle.tick();
         } finally {
             watchdog.endTick(handle);
-            RegionContext.exit();
         }
     }
 

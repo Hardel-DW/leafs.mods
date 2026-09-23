@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.network.PacketRouting;
 import java.util.Map;
 import net.minecraft.CrashReportCategory;
 import org.junit.jupiter.api.AfterEach;
@@ -16,7 +17,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -63,14 +63,15 @@ class RegionTickSchedulerTest {
         assertTrue(worker.get().getName().startsWith("Leafs Server Region Worker"));
     }
 
+    /** 2026-08-04 lost GUI packets: only a region tick on a worker batches sends, everyone else keeps vanilla's flush. */
     @Test
-    void onlyARegionWorkerIsRecognisedAsOne() throws InterruptedException {
+    void onlyARegionWorkerSuspendsTheFlush() throws InterruptedException {
         RegionTickScheduler scheduler = createScheduler(1);
         scheduler.start();
         CountDownLatch ticked = new CountDownLatch(1);
-        AtomicBoolean onWorker = new AtomicBoolean();
+        AtomicBoolean flushOnWorker = new AtomicBoolean(true);
         TestTickHandle handle = new TestTickHandle(1, () -> {
-            onWorker.set(RegionTickScheduler.onWorker());
+            flushOnWorker.set(PacketRouting.scopedFlush(true));
             ticked.countDown();
         });
 
@@ -78,8 +79,9 @@ class RegionTickSchedulerTest {
 
         assertTrue(ticked.await(5, TimeUnit.SECONDS));
         handle.cancel();
-        assertTrue(onWorker.get());
-        assertFalse(RegionTickScheduler.onWorker());
+        assertFalse(flushOnWorker.get());
+        assertTrue(PacketRouting.scopedFlush(true));
+        assertFalse(PacketRouting.scopedFlush(false));
     }
 
     @Test
@@ -140,19 +142,6 @@ class RegionTickSchedulerTest {
         assertTrue(waiting.await(5, TimeUnit.SECONDS));
         assertTimeoutPreemptively(Duration.ofSeconds(5), () -> stopping.shutdown(true, new OwnWork(() -> false)), "a crash stop must interrupt the wait");
         assertTrue(failures.isEmpty(), "a tick cut short by the shutdown is not a crash");
-    }
-
-    @Test
-    void attachedTickRunsWithTheRegionContext() {
-        RegionTickScheduler attached = createScheduler(1);
-        AtomicReference<RegionContext> observed = new AtomicReference<>();
-        TestTickHandle handle = new TestTickHandle(7, () -> observed.set(RegionContext.current()));
-
-        attached.runAttached(handle);
-
-        assertEquals("region #7 in test:world", observed.get().describe());
-        assertNull(RegionContext.current());
-        assertEquals(1, handle.currentTick());
     }
 
     @Test

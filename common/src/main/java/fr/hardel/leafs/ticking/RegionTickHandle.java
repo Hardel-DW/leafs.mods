@@ -17,7 +17,7 @@ public final class RegionTickHandle extends TickHandle {
     private volatile int entityCensus;
 
     RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions) {
-        super(new RegionContext.Region(region.id(), dimension), TickStages.count(TickFamily.REGION));
+        super(region.id(), dimension, TickStages.count(TickFamily.REGION));
         this.region = region;
         this.regions = regions;
     }

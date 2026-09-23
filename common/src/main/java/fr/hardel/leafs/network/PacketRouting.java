@@ -1,6 +1,6 @@
 package fr.hardel.leafs.network;
 
-import fr.hardel.leafs.ticking.RegionContext;
+import fr.hardel.leafs.ticking.RegionTickScheduler;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
@@ -29,7 +29,7 @@ public final class PacketRouting {
     }
 
     public static boolean scopedFlush(boolean vanillaFlush) {
-        return vanillaFlush && !(RegionContext.current() instanceof RegionContext.Region);
+        return vanillaFlush && !RegionTickScheduler.onWorker();
     }
 
     public static void runTeardown(MinecraftServer server, Runnable teardown, Runnable vanillaBlocking) {

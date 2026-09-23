@@ -3,7 +3,6 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
-import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -20,7 +19,7 @@ public final class LevelTickUnit extends TickHandle {
     private volatile int lastChunkCount;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
-        super(new RegionContext.LevelSerial(id, level.dimension().identifier().toString()), TickStages.count(TickFamily.SERIAL));
+        super(id, level.dimension().identifier().toString(), TickStages.count(TickFamily.SERIAL));
         this.level = level;
         this.regions = LevelRegions.of(level);
         this.scheduler = scheduler;
@@ -68,15 +67,6 @@ public final class LevelTickUnit extends TickHandle {
         stages.mark(TickStages.serialManagement);
         stages.endTick(System.nanoTime());
         return true;
-    }
-
-    void tickPausedNetwork() {
-        RegionContext.enter(context());
-        try {
-            RegionNetworkTick.drainPaused(level);
-        } finally {
-            RegionContext.exit();
-        }
     }
 
     // Used by the Leafs Debug mod
