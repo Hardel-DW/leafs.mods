@@ -13,60 +13,22 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public final class ChunkWait {
-    private static final ThreadLocal<Scope> SCOPE = new ThreadLocal<>();
-
-    private static final class Scope {
-        private final List<Runnable> releases = new ArrayList<>();
-        private int depth;
-    }
-
     private ChunkWait() {
     }
 
-    public static void enterScope() {
-        Scope scope = SCOPE.get();
-        if (scope == null) {
-            scope = new Scope();
-            SCOPE.set(scope);
-        }
-
-        scope.depth++;
-    }
-
-    public static void exitScope() {
-        Scope scope = SCOPE.get();
-        if (scope == null || --scope.depth > 0) {
-            return;
-        }
-
-        SCOPE.remove();
-        scope.releases.forEach(Runnable::run);
-    }
-
-    static void keep(Runnable release) {
-        Scope scope = SCOPE.get();
-        if (scope == null) {
-            release.run();
-            return;
-        }
-
-        scope.releases.add(release);
-    }
-
     public static ChunkAccess chunk(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
-        if (WorldTickContext.current() != null) {
-            return await(level, chunkX, chunkZ, status);
+        WorldTickContext tick = WorldTickContext.current();
+        if (tick != null) {
+            return await(level, chunkX, chunkZ, status, tick::keep);
         }
 
         return RegionBorrow.hold(borrow -> {
             borrow.borrow(LevelRegions.of(level), chunkX, chunkZ);
-            return await(level, chunkX, chunkZ, status);
+            return await(level, chunkX, chunkZ, status, borrow::keep);
         });
     }
 
@@ -83,7 +45,7 @@ public final class ChunkWait {
         return "unknown";
     }
 
-    private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status) {
+    private static ChunkAccess await(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, Consumer<Runnable> keep) {
         ChunkHolders.Demand demand = LevelChunks.of(level).holders().require(chunkX, chunkZ, status);
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = demand.delivery();
         WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
@@ -93,7 +55,7 @@ public final class ChunkWait {
         try {
             ticking.await(delivery::isDone);
         } finally {
-            keep(demand.release());
+            keep.accept(demand.release());
             long waited = System.nanoTime() - report.startedNanos();
             ticking.metrics().chunkWaited(waited);
             if (waited >= ticking.slowTaskNanos()) {

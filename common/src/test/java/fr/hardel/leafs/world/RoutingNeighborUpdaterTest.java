@@ -101,11 +101,11 @@ class RoutingNeighborUpdaterTest {
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, () -> owners);
-        WorldTickContext.enter(null, null, dataWith(regional));
+        WorldTickContext context = WorldTickContext.enter(null, null, dataWith(regional));
         try {
             callAll(router);
         } finally {
-            WorldTickContext.exit();
+            context.exit();
         }
 
         assertEquals(List.of("shape", "simple", "full", "multi"), regional.calls);

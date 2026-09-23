@@ -56,7 +56,7 @@ public final class RegionTickHandle extends TickHandle {
         RegionTickData data = region.data();
         RegionWorldData worldData = data.worldData();
         RegionTickBody body = regions.body();
-        WorldTickContext.enter(body.level(), region, worldData);
+        WorldTickContext context = WorldTickContext.enter(body.level(), region, worldData);
         try {
             if (TickingManager.of(body.level().getServer()).paused()) {
                 data.inbox().drain();
@@ -74,7 +74,7 @@ public final class RegionTickHandle extends TickHandle {
             entityCensus = worldData.entities().size();
             stages.endTick(System.nanoTime());
         } finally {
-            WorldTickContext.exit();
+            context.exit();
         }
     }
 }
