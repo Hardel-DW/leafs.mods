@@ -10,7 +10,7 @@ configurations {
 	mods
 	compileOnly.extendsFrom(mods)
 	localRuntime.extendsFrom(mods)
-	testRuntimeOnly.extendsFrom(mods)
+	testImplementation.extendsFrom(mods)
 }
 
 dependencies {
