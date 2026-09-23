@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionTickSchedulerTest {
+    private static final long TICK_PERIOD_NANOS = 50_000_000L;
+
     private RegionTickScheduler scheduler;
 
     @AfterEach
@@ -38,13 +40,13 @@ class RegionTickSchedulerTest {
     }
 
     private RegionTickScheduler createScheduler(int threads, Path crashDirectory) {
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), threads, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), threads, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> { });
         return scheduler;
     }
 
     @Test
     void regionThreadNamesScopeTheWorkerDuringItsTick(@TempDir Path crashDirectory) throws InterruptedException {
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, true, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, true, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> { });
         scheduler.start();
         CountDownLatch ticked = new CountDownLatch(1);
         AtomicReference<String> nameDuringTick = new AtomicReference<>();
@@ -211,7 +213,7 @@ class RegionTickSchedulerTest {
     void poolTickFailureInvokesThePolicyAndStopsRescheduling(@TempDir Path crashDirectory) throws InterruptedException {
         CountDownLatch failed = new CountDownLatch(1);
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> {
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), new RegionCrashWriter(crashDirectory, new ModAttribution(_ -> Optional.empty())), (handle, throwable) -> {
             failures.add(throwable);
             failed.countDown();
         });

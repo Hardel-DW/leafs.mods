@@ -9,24 +9,25 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.LongSupplier;
 
 public final class RegionTickScheduler {
-    public static final long TICK_PERIOD_NANOS = 50_000_000L;
     private final DelayQueue<ScheduledTick> queue = new DelayQueue<>();
     private final Queue<ScheduledTick> missed = new ConcurrentLinkedQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
     private final int threadCount;
+    private final LongSupplier periodNanos;
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
     private final RegionCrashWriter crashWriter;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
-    private volatile long periodNanos = TICK_PERIOD_NANOS;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, boolean regionThreadNames, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, RegionCrashWriter crashWriter, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.serverThreads = serverThreads;
         this.threadCount = threadCount;
+        this.periodNanos = periodNanos;
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
         this.crashWriter = crashWriter;
@@ -56,16 +57,8 @@ public final class RegionTickScheduler {
     }
 
     public void schedule(TickHandle handle) {
-        handle.setScheduledStartNanos(System.nanoTime() + periodNanos);
+        handle.setScheduledStartNanos(System.nanoTime() + periodNanos.getAsLong());
         queue.add(new ScheduledTick(handle));
-    }
-
-    public void setPeriodNanos(long periodNanos) {
-        this.periodNanos = Math.max(1, periodNanos);
-    }
-
-    public long periodNanos() {
-        return periodNanos;
     }
 
     public void wakeMissed() {
@@ -132,7 +125,7 @@ public final class RegionTickScheduler {
                 continue;
             }
 
-            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos));
+            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos.getAsLong()));
             queue.add(next);
         }
     }
