@@ -1,8 +1,8 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.ChunkClaim;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
-import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -25,7 +25,7 @@ public final class RegionBorrow {
     private static final long WAIT_NANOS = 50_000L;
 
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
-    private final Map<LevelRegions, Long2ObjectOpenHashMap<RegionInbox>> heldChunks = new LinkedHashMap<>();
+    private final Map<LevelRegions, Long2ObjectOpenHashMap<ChunkClaim>> heldChunks = new LinkedHashMap<>();
     private final List<Runnable> releases = new ArrayList<>();
 
     private RegionBorrow() {
@@ -157,7 +157,7 @@ public final class RegionBorrow {
     }
 
     public boolean holds(LevelRegions regions, int chunkX, int chunkZ) {
-        Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.get(regions);
+        Long2ObjectOpenHashMap<ChunkClaim> chunks = heldChunks.get(regions);
         if (chunks != null && chunks.containsKey(ChunkPos.pack(chunkX, chunkZ))) {
             return true;
         }
@@ -172,12 +172,12 @@ public final class RegionBorrow {
         }
 
         long key = ChunkPos.pack(chunkX, chunkZ);
-        Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.computeIfAbsent(regions, _ -> new Long2ObjectOpenHashMap<>());
+        Long2ObjectOpenHashMap<ChunkClaim> chunks = heldChunks.computeIfAbsent(regions, _ -> new Long2ObjectOpenHashMap<>());
         if (chunks.containsKey(key)) {
             return true;
         }
 
-        RegionInbox taken = LevelChunks.of(regions.level()).owners().borrow(chunkX, chunkZ);
+        ChunkClaim taken = LevelChunks.of(regions.level()).owners().borrow(chunkX, chunkZ);
         if (taken == null) {
             return false;
         }
@@ -194,7 +194,7 @@ public final class RegionBorrow {
         held.clear();
         heldChunks.forEach((regions, chunks) -> {
             ChunkOwners owners = LevelChunks.of(regions.level()).owners();
-            for (Long2ObjectMap.Entry<RegionInbox> entry : chunks.long2ObjectEntrySet()) {
+            for (Long2ObjectMap.Entry<ChunkClaim> entry : chunks.long2ObjectEntrySet()) {
                 owners.release(ChunkPos.getX(entry.getLongKey()), ChunkPos.getZ(entry.getLongKey()), entry.getValue());
             }
         });
@@ -208,9 +208,9 @@ public final class RegionBorrow {
             drained += region.data().inbox().drainChunkWork();
         }
 
-        for (Long2ObjectOpenHashMap<RegionInbox> chunks : List.copyOf(heldChunks.values())) {
-            for (RegionInbox inbox : List.copyOf(chunks.values())) {
-                drained += inbox.drainChunkWork();
+        for (Long2ObjectOpenHashMap<ChunkClaim> chunks : List.copyOf(heldChunks.values())) {
+            for (ChunkClaim claim : List.copyOf(chunks.values())) {
+                drained += claim.mail().drainChunkWork();
             }
         }
 

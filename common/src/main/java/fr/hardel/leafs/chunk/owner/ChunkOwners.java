@@ -40,7 +40,7 @@ public final class ChunkOwners implements Router {
     private final Taker taker;
     private final GlobalScheduler server;
     private final long slowTaskNanos;
-    private final ConcurrentLong2ObjectMap<RegionInbox> borrowed = new ConcurrentLong2ObjectMap<>();
+    private final ConcurrentLong2ObjectMap<ChunkClaim> borrowed = new ConcurrentLong2ObjectMap<>();
 
     public ChunkOwners(ChunkPool pool, int level, Inboxes inboxes, Ownership ownership, Urgency urgency, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server, long slowTaskNanos) {
         this.pool = pool;
@@ -154,18 +154,18 @@ public final class ChunkOwners implements Router {
     }
 
     public boolean holds(int chunkX, int chunkZ) {
-        RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
-        return taken != null ? taken.heldBy(Thread.currentThread()) : ownership.holds(chunkX, chunkZ);
+        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        return taken != null ? taken.mine() : ownership.holds(chunkX, chunkZ);
     }
 
     public boolean heldElsewhere(int chunkX, int chunkZ) {
-        RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
-        return taken != null && !taken.heldBy(Thread.currentThread());
+        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        return taken != null && !taken.mine();
     }
 
     public @Nullable String describeTaken(int chunkX, int chunkZ) {
-        RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
-        return taken == null ? null : "taken by thread '%s' with %d queued".formatted(taken.holderName(), taken.size());
+        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        return taken == null ? null : "taken by thread '%s' with %d queued".formatted(taken.holder().getName(), taken.mail().size());
     }
 
     public Executor executor(int chunkX, int chunkZ) {
@@ -194,14 +194,14 @@ public final class ChunkOwners implements Router {
         return kind == ChunkTask.Kind.LIGHT ? level * 2 + 1 : level * 2;
     }
 
-    public @Nullable RegionInbox borrow(int chunkX, int chunkZ) {
-        RegionInbox inbox = new RegionInbox(slowTaskNanos);
-        return borrowed.putIfAbsent(ChunkPos.pack(chunkX, chunkZ), inbox) == null ? inbox : null;
+    public @Nullable ChunkClaim borrow(int chunkX, int chunkZ) {
+        ChunkClaim claim = new ChunkClaim(Thread.currentThread(), new RegionInbox(slowTaskNanos));
+        return borrowed.putIfAbsent(ChunkPos.pack(chunkX, chunkZ), claim) == null ? claim : null;
     }
 
-    public void release(int chunkX, int chunkZ, RegionInbox inbox) {
-        borrowed.remove(ChunkPos.pack(chunkX, chunkZ), inbox);
-        resubmit(inbox);
+    public void release(int chunkX, int chunkZ, ChunkClaim claim) {
+        borrowed.remove(ChunkPos.pack(chunkX, chunkZ), claim);
+        resubmit(claim.mail());
     }
 
     public void abandon(RegionInbox inbox) {
@@ -223,7 +223,7 @@ public final class ChunkOwners implements Router {
                 continue;
             }
 
-            RegionInbox claim = borrow(chunkX, chunkZ);
+            ChunkClaim claim = borrow(chunkX, chunkZ);
             if (claim == null) {
                 continue;
             }
@@ -239,7 +239,7 @@ public final class ChunkOwners implements Router {
     }
 
     private @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
-        RegionInbox taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
-        return taken != null ? taken : inboxes.at(chunkX, chunkZ);
+        ChunkClaim taken = borrowed.get(ChunkPos.pack(chunkX, chunkZ));
+        return taken != null ? taken.mail() : inboxes.at(chunkX, chunkZ);
     }
 }
