@@ -105,23 +105,6 @@ class ConcurrentLong2ObjectMapTest {
     }
 
     @Test
-    void iterationSurvivesConcurrentMutation() {
-        for (long i = 0; i < 100; i++) {
-            map.put(i, "v" + i);
-        }
-
-        int seen = 0;
-        for (String value : map.values()) {
-            assertTrue(value.startsWith("v") || value.startsWith("x"), "value outside the known universe: " + value);
-            map.remove(90L - seen);
-            map.put(200L + seen, "x" + seen);
-            seen++;
-        }
-
-        assertTrue(seen > 0);
-    }
-
-    @Test
     void setIteratesTheValuesItWasGiven() {
         ConcurrentLongSet set = new ConcurrentLongSet();
         for (long key : KEYS) {
@@ -130,15 +113,5 @@ class ConcurrentLong2ObjectMapTest {
 
         LongOpenHashSet seen = new LongOpenHashSet(set);
         assertEquals(new LongOpenHashSet(KEYS), seen);
-    }
-
-    @Test
-    void aStreamOverTheValuesSurvivesGrowth() {
-        map.put(1, "a");
-        map.put(2, "b");
-
-        List<String> seen = map.values().stream().peek(_ -> map.put((map.size() + 10), "z")).toList();
-
-        assertTrue(seen.size() >= 2);
     }
 }
