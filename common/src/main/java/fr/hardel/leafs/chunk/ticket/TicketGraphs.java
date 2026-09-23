@@ -1,10 +1,8 @@
 package fr.hardel.leafs.chunk.ticket;
 
-import fr.hardel.excess.ConcurrentLongSet;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.ChunkPos;
@@ -21,7 +19,6 @@ public final class TicketGraphs {
     private final ChunkLevels players = new ChunkLevels(ChunkMap.MAX_VIEW_DISTANCE + 2);
     private final ThreadLocal<Boolean> batching = ThreadLocal.withInitial(() -> false);
     private final ThreadLocal<Boolean> wroteSimulation = ThreadLocal.withInitial(() -> false);
-    private final ConcurrentLongSet written = new ConcurrentLongSet();
     private final AtomicBoolean handed = new AtomicBoolean();
     private volatile ChunkPool pool;
     private volatile Supplier<LevelListener> loadingListener;
@@ -53,18 +50,11 @@ public final class TicketGraphs {
     }
 
     public TicketStorage.ChunkUpdated loadingFeed() {
-        return (key, level, added) -> {
-            loading.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
-            if (added && !ChunkLevels.draining() && !ChunkPool.isWorker()) {
-                written.add(key);
-            }
-        };
+        return (key, level, _) -> loading.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
     }
 
-    public void settleWritten() {
-        for (LongIterator keys = written.iterator(); keys.hasNext(); ) {
-            long key = keys.nextLong();
-            keys.remove();
+    public void settle(long key) {
+        if (loadingListener != null && !ChunkLevels.draining()) {
             loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener.get(), () -> null);
         }
     }

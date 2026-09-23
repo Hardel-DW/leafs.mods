@@ -46,16 +46,21 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
 
     @WrapMethod(method = "addTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
-        return leafs$graphs.batch(() -> {
+        boolean added = leafs$graphs.batch(() -> {
             synchronized (this) {
-                boolean added = original.call(key, ticket);
-                if (added && ticket.getType().hasTimeout()) {
+                boolean stored = original.call(key, ticket);
+                if (stored && ticket.getType().hasTimeout()) {
                     leafs$timeouts.track(key, ticket);
                 }
 
-                return added;
+                return stored;
             }
         });
+        if (added) {
+            leafs$graphs.settle(key);
+        }
+
+        return added;
     }
 
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")
