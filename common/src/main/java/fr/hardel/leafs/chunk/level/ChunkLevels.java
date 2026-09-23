@@ -93,13 +93,13 @@ public final class ChunkLevels {
     }
 
     public <T> T settled(int chunkX, int chunkZ, LevelListener listener, Supplier<T> body) {
-        long[] area = area(Section.keyOf(chunkX, chunkZ));
-        lock(area);
+        long key = Section.keyOf(chunkX, chunkZ);
+        int[] taken = lock(key);
         try {
             if (DRAINING.get() == null) {
                 DRAINING.set(this);
                 try {
-                    propagate(sections.get(area[4]), listener);
+                    propagate(sections.get(key), listener);
                 } finally {
                     DRAINING.remove();
                 }
@@ -107,17 +107,16 @@ public final class ChunkLevels {
 
             return body.get();
         } finally {
-            unlock(area);
+            unlock(taken);
         }
     }
 
     private boolean drainSection(Section center, LevelListener listener) {
-        long[] area = area(center.key);
-        lock(area);
+        int[] taken = lock(center.key);
         try {
             return propagate(center, listener);
         } finally {
-            unlock(area);
+            unlock(taken);
         }
     }
 
@@ -128,45 +127,44 @@ public final class ChunkLevels {
 
         Short2ByteMap batch = center.takePending();
         boolean changed = !batch.isEmpty() && new Propagation(center, batch).run(listener);
-        for (long key : area(center.key)) {
-            Section section = sections.get(key);
-            if (section != null && section.retire()) {
-                sections.remove(key, section);
+        int sectionX = ChunkPos.getX(center.key);
+        int sectionZ = ChunkPos.getZ(center.key);
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                long key = ChunkPos.pack(sectionX + dx, sectionZ + dz);
+                Section section = sections.get(key);
+                if (section != null && section.retire()) {
+                    sections.remove(key, section);
+                }
             }
         }
 
         return changed;
     }
 
-    private static long[] area(long centerKey) {
+    private int[] lock(long centerKey) {
         int sectionX = ChunkPos.getX(centerKey);
         int sectionZ = ChunkPos.getZ(centerKey);
-        long[] area = new long[9];
+        int[] taken = new int[9];
         int count = 0;
         for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
-                area[count++] = ChunkPos.pack(sectionX + dx, sectionZ + dz);
+                taken[count++] = (int) ((ChunkPos.pack(sectionX + dx, sectionZ + dz) * 0x9E3779B97F4A7C15L) >>> 56);
             }
         }
 
-        return area;
-    }
-
-    private void lock(long[] area) {
-        for (int stripe : stripesOf(area)) {
+        Arrays.sort(taken);
+        for (int stripe : taken) {
             stripes[stripe].lock();
         }
+
+        return taken;
     }
 
-    private void unlock(long[] area) {
-        int[] taken = stripesOf(area);
+    private void unlock(int[] taken) {
         for (int index = taken.length - 1; index >= 0; index--) {
             stripes[taken[index]].unlock();
         }
-    }
-
-    private static int[] stripesOf(long[] area) {
-        return Arrays.stream(area).mapToInt(key -> (int) ((key * 0x9E3779B97F4A7C15L) >>> 56)).distinct().sorted().toArray();
     }
 
     private final class Propagation {
