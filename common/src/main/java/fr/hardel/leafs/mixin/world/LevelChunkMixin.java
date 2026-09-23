@@ -5,8 +5,6 @@ import fr.hardel.leafs.world.ChunkBlockEvents;
 import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.ChunkTickers;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.gameevent.GameEventListenerRegistry;
 import org.spongepowered.asm.mixin.Final;
@@ -45,11 +43,6 @@ public abstract class LevelChunkMixin implements ChunkTickAccess {
 
     @Unique
     private final ChunkBlockEvents leafs$blockEvents = new ChunkBlockEvents();
-
-    @Override
-    public BlockEntity leafs$existingBlockEntity(BlockPos pos) {
-        return ((LevelChunk) (Object) this).getBlockEntities().get(pos);
-    }
 
     @Override
     public ChunkTickers leafs$tickers() {

@@ -16,7 +16,6 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionClock;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerChunkCache;
@@ -28,7 +27,6 @@ import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.BlockEventData;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.LocalMobCapCalculator;
 import net.minecraft.world.level.NaturalSpawner;
@@ -125,33 +123,19 @@ public final class RegionTickBody {
     private void tickChunks(RegionChunks chunks, RegionWorldData worldData, PlayerView view, StageTimings stages) {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
-        DistanceManager distanceManager = chunkMap.getDistanceManager();
         long gameTime = level.getGameTime();
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(chunks, chunkMap, view, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, level, (chunkKey, output) -> {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
-            if (holder != null) {
-                holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
-            }
-        }, new LocalMobCapCalculator(chunkMap));
+        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, level, chunkSource::getFullChunk, new LocalMobCapCalculator(chunkMap));
         List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
             ? List.of()
             : mobCaps.spawnable(worldData, state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
         stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
-            ChunkPos chunkPos = chunk.getPos();
-            chunk.incrementInhabitedTime();
-            if (distanceManager.inEntityTickingRange(chunkPos.pack())) {
-                level.tickThunder(chunk);
-            }
-
-            if (!categories.isEmpty() && level.canSpawnEntitiesInChunk(chunkPos)) {
-                NaturalSpawner.spawnForChunk(level, chunk, state, categories);
-            }
+            chunkSource.tickSpawningChunk(chunk, categories, state);
         }
 
         for (LevelChunk chunk : randomTickingChunks) {

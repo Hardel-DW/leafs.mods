@@ -2,6 +2,8 @@ accessWidener v2 official
 
 accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
 accessible field net/minecraft/server/level/ServerChunkCache ticketStorage Lnet/minecraft/world/level/TicketStorage;
+accessible method net/minecraft/server/level/ServerChunkCache tickSpawningChunk (Lnet/minecraft/world/level/chunk/LevelChunk;Ljava/util/List;Lnet/minecraft/world/level/NaturalSpawner$SpawnState;)V
+accessible method net/minecraft/server/level/ServerChunkCache getFullChunk (JLjava/util/function/Consumer;)V
 accessible method net/minecraft/world/level/TicketStorage canTicketExpire (Lnet/minecraft/server/level/ChunkMap;Lnet/minecraft/server/level/Ticket;J)Z
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
 accessible method net/minecraft/world/entity/ai/village/poi/PoiRecord acquireTicket ()Z

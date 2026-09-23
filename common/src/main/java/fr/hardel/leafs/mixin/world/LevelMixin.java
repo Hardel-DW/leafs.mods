@@ -81,7 +81,7 @@ public abstract class LevelMixin {
 
         LevelChunk chunk = level.getChunkAt(pos);
         boolean owner = LevelChunks.of(level).owners().holds(chunk.getPos().x(), chunk.getPos().z());
-        callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : ((ChunkTickAccess) chunk).leafs$existingBlockEntity(pos));
+        callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : chunk.getBlockEntities().get(pos));
     }
 
     @Inject(method = "addBlockEntityTicker", at = @At("HEAD"), cancellable = true)

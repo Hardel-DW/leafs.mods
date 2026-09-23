@@ -15,6 +15,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -56,7 +57,7 @@ public final class RegionsCommand {
     private static Component overviewLine(LevelTickUnit unit, long now) {
         List<Region<RegionTickData>> live = liveRegions(unit.regions());
         MutableComponent line = Component.empty()
-            .append(Component.literal(CommandText.shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal(Identifier.parse(unit.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("regions", live.size()))
             .append(CommandText.stat("chunks", unit.chunkCount()))
             .append(CommandText.stat("entities", unit.entityCount()))
@@ -87,7 +88,7 @@ public final class RegionsCommand {
         List<Region<RegionTickData>> live = liveRegions(regions);
         long now = System.nanoTime();
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal(CommandText.shortDimension(level.dimension().identifier().toString())).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal(level.dimension().identifier().toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("regions", live.size()))
             .append(CommandText.stat("sections", regions.sections())).append(CommandText.gray(" (%d dead)".formatted(regions.deadSections())))
             .append(CommandText.stat("created", regions.created()))
@@ -138,7 +139,7 @@ public final class RegionsCommand {
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("You ").withStyle(ChatFormatting.GOLD))
             .append(CommandText.white("R#" + handle.id()))
-            .append(CommandText.gray(" in ")).append(Component.literal(CommandText.shortDimension(handle.dimension())).withStyle(ChatFormatting.AQUA))
+            .append(CommandText.gray(" in ")).append(Component.literal(Identifier.parse(handle.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now))), false);
     }
 
