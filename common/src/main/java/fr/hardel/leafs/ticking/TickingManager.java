@@ -189,7 +189,6 @@ public final class TickingManager {
     }
 
     public void haltTicking() {
-        watchdog.armShutdownDeadline(LeafsWatchdog.SHUTDOWN_DEADLINE);
         scheduler.shutdown(crashed, serverWork);
         halted = true;
         drainRegionTasks();
@@ -201,9 +200,6 @@ public final class TickingManager {
         globalTicking = false;
         globalScheduler.drain();
         watchdog.stop();
-        if (!server.isDedicatedServer()) {
-            watchdog.disarmShutdownDeadline();
-        }
     }
 
     private void onChunkTaskFailure(ChunkTask task, Throwable failure) {
