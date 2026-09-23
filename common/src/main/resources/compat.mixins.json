@@ -5,12 +5,12 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"ConstructorObject2ObjectMapMixin",
-		"ConstructorObjectSetMixin",
 		"CullingUpdateTrackerMixin",
 		"GraphBufferMixin",
 		"LeafDecayMixin",
 		"MapFieldMixin",
 		"PlacedBlockSetMixin",
+		"SetFieldMixin",
 		"StaticArrayDequeMixin",
 		"StaticArrayListMixin",
 		"StaticHashMapMixin",

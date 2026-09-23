@@ -1,13 +1,15 @@
 package fr.hardel.leafs.mixin.compat;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import fr.hardel.excess.SynchronizedHashSet;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
-import org.spongepowered.asm.mixin.injection.At;
 
-import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Pseudo
 @Mixin(targets = {
@@ -18,8 +20,8 @@ import java.util.HashSet;
 })
 public abstract class GraphBufferMixin {
 
-    @WrapOperation(method = "lambda$enqueue$0", at = @At(value = "NEW", target = "java/util/HashSet"))
-    private static <E> HashSet<E> leafs$synchronizedLevelPositions(Operation<HashSet<E>> original) {
-        return new SynchronizedHashSet<>();
+    @WrapMethod(method = "lambda$enqueue$0")
+    private static Set<BlockPos> leafs$concurrentLevelPositions(ResourceKey<Level> level, Operation<Set<BlockPos>> original) {
+        return ConcurrentHashMap.newKeySet();
     }
 }
