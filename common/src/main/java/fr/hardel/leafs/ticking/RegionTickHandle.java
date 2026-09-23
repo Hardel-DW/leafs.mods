@@ -71,7 +71,7 @@ public final class RegionTickHandle extends TickHandle {
             stages.beginTick(startNanos);
             ((ServerLevelEntityAccess) body.level()).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
             stages.mark(TickStages.regionUnloads);
-            body.tick(region, data.clock(), worldData, stages, regions, startNanos + regions.tickPeriodNanos());
+            body.tick(region, data.clock(), worldData, stages, regions, startNanos + body.level().tickRateManager().nanosecondsPerTick());
             chunkCensus = region.chunkCount();
             entityCensus = worldData.entities().size();
             stages.endTick(System.nanoTime());

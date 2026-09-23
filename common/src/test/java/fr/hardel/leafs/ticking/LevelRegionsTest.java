@@ -244,7 +244,7 @@ class LevelRegionsTest {
         LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> {
         }, _ -> {
         });
-        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, false, watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports"), new ModAttribution(_ -> Optional.empty())), (_, _) -> {
+        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> 50_000_000L, false, watchdog, new RegionCrashWriter(Path.of("build", "test-crash-reports"), new ModAttribution(_ -> Optional.empty())), (_, _) -> {
         });
         regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache()), null);
     }

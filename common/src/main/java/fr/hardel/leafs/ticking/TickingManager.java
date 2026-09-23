@@ -47,7 +47,8 @@ public final class TickingManager {
         this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
         RegionCrashWriter crashWriter = new RegionCrashWriter(Path.of("crash-reports"), Leafs.platform().attribution());
         ThreadGroup serverThreads = Leafs.platform().serverThreads();
-        this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
+        this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), () -> server.tickRateManager().nanosecondsPerTick(),
+            config.debug().perRegionLogs(), watchdog, crashWriter, this::onRegionTickFailure);
         this.slowTaskNanos = config.debug().slowTaskNanos();
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
         watchdog.start();

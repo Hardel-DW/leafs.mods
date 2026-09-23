@@ -92,10 +92,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return body;
     }
 
-    public long tickPeriodNanos() {
-        return scheduler.periodNanos();
-    }
-
     public boolean live() {
         RegionTickBody body = this.body;
         return body != null && !TickingManager.of(body.level().getServer()).halted();
