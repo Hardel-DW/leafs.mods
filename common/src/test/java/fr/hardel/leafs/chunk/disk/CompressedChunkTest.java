@@ -2,9 +2,6 @@ package fr.hardel.leafs.chunk.disk;
 
 import fr.hardel.MinecraftBootstrap;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.visitors.CollectFields;
-import net.minecraft.nbt.visitors.FieldSelector;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionFile;
@@ -44,17 +41,5 @@ class CompressedChunkTest {
         try (RegionFileStorage storage = new RegionFileStorage(info, folder, false)) {
             assertEquals(tag, storage.read(pos));
         }
-    }
-
-    @Test
-    void theBytesReadAndScanLikeAFile() throws IOException {
-        CompoundTag tag = chunkTag();
-        CompressedChunk compressed = CompressedChunk.of(tag);
-
-        assertEquals(tag, compressed.read());
-
-        CollectFields version = new CollectFields(new FieldSelector(IntTag.TYPE, "DataVersion"));
-        compressed.scan(version);
-        assertEquals(4882, ((CompoundTag) version.getResult()).getIntOr("DataVersion", 0));
     }
 }

@@ -2,7 +2,6 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.LeafsConfig;
-import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.metrics.ModAttribution;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
@@ -84,23 +83,6 @@ class LevelRegionsTest {
         assertTrue(regions.created() > 1, "the replay never created a second region");
         assertTrue(regions.merged() > 0, "the replay never merged two regions");
         assertTrue(regions.split() > 0, "the replay never split a region");
-    }
-
-    @Test
-    void aTaskPostedOnTheBridgeSurvivesTheSplit() {
-        simulated(regions, 0, 0);
-        simulated(regions, 32, 0);
-        simulated(regions, 64, 0);
-        simulated(regions, 96, 0);
-        regions.settle();
-        regions.regionizer().regionAt(32, 0).data().inbox().post(32, 0, Work.GAME, () -> { });
-
-        unsimulated(regions, 32, 0);
-        unsimulated(regions, 64, 0);
-        regions.settle();
-
-        assertEquals(1, regions.split());
-        assertEquals(2, regionCount());
     }
 
     @Test

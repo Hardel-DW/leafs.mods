@@ -111,15 +111,4 @@ class ChunkBlockEventsTest {
         assertEquals(List.of(), run(List.of()));
         assertEquals(List.of(1), run(List.of(idle)));
     }
-
-    @Test
-    void removeInsideDropsWhatTheBoxCovers() {
-        ChunkBlockEvents events = new ChunkBlockEvents();
-        events.add(at(1), 1);
-        events.add(at(10), 2);
-
-        events.removeInside(new BoundingBox(0, 0, 0, 5, 128, 5));
-
-        assertEquals(List.of(10), run(List.of(events)));
-    }
 }

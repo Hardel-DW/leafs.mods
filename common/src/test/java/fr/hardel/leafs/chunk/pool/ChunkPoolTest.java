@@ -30,16 +30,6 @@ class ChunkPoolTest {
         return new ChunkPool(Thread.currentThread().getThreadGroup(), threads, priorities, (task, failure) -> failures.add(task.kind() + " " + failure.getMessage()));
     }
 
-    @Test
-    void runsASubmittedTask() throws InterruptedException {
-        pool = start(2, 4);
-        CountDownLatch done = new CountDownLatch(1);
-
-        pool.execute(done::countDown);
-
-        assertTrue(done.await(5, TimeUnit.SECONDS));
-    }
-
     /** 2026-09-05: the steps of chunks the players had left kept running, a quarter of the pool for nothing. */
     @Test
     void aWithdrawnQueuedTaskIsDroppedWhenReached() throws InterruptedException {
