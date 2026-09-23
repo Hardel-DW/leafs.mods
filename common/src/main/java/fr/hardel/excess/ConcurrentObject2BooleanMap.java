@@ -13,7 +13,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 public final class ConcurrentObject2BooleanMap<K> extends AbstractObject2BooleanMap<K> {
@@ -85,48 +84,8 @@ public final class ConcurrentObject2BooleanMap<K> extends AbstractObject2Boolean
     }
 
     @Override
-    public Boolean putIfAbsent(K key, Boolean value) {
-        return map.putIfAbsent(key, value);
-    }
-
-    @Override
-    public boolean remove(Object key, Object value) {
-        return map.remove(key, value);
-    }
-
-    @Override
-    public boolean replace(K key, Boolean oldValue, Boolean newValue) {
-        return map.replace(key, oldValue, newValue);
-    }
-
-    @Override
-    public Boolean replace(K key, Boolean value) {
-        return map.replace(key, value);
-    }
-
-    @Override
     public void replaceAll(BiFunction<? super K, ? super Boolean, ? extends Boolean> function) {
         map.replaceAll(function);
-    }
-
-    @Override
-    public Boolean computeIfAbsent(K key, Function<? super K, ? extends Boolean> mapping) {
-        return map.computeIfAbsent(key, mapping);
-    }
-
-    @Override
-    public Boolean computeIfPresent(K key, BiFunction<? super K, ? super Boolean, ? extends Boolean> remapping) {
-        return map.computeIfPresent(key, remapping);
-    }
-
-    @Override
-    public Boolean compute(K key, BiFunction<? super K, ? super Boolean, ? extends Boolean> remapping) {
-        return map.compute(key, remapping);
-    }
-
-    @Override
-    public Boolean merge(K key, Boolean value, BiFunction<? super Boolean, ? super Boolean, ? extends Boolean> remapping) {
-        return map.merge(key, value, remapping);
     }
 
     private boolean orDefault(Boolean value) {
