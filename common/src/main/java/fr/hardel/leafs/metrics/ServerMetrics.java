@@ -1,10 +1,7 @@
 package fr.hardel.leafs.metrics;
 
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.LongAccumulator;
 
 public final class ServerMetrics {
@@ -15,10 +12,8 @@ public final class ServerMetrics {
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
     private final MinuteCounter chunksFull = new MinuteCounter();
-    private final AtomicLongArray stepsRan = new AtomicLongArray(ChunkStatus.getStatusList().size());
     private final MinuteCounter sharedPlayers = new MinuteCounter();
     private final MinuteCounter chunkWaits = new MinuteCounter();
-    private final AtomicLong chunkWaitNanos = new AtomicLong();
     private final LongAccumulator longestChunkWaitNanos = new LongAccumulator(Math::max, 0L);
 
     // Used by the Leafs Debug mod
@@ -51,14 +46,6 @@ public final class ServerMetrics {
         return chunkUnloads;
     }
 
-    public void stepRan(ChunkStatus status) {
-        stepsRan.incrementAndGet(status.getIndex());
-    }
-
-    public long stepsRan(ChunkStatus status) {
-        return stepsRan.get(status.getIndex());
-    }
-
     // Used by the Leafs Debug mod
     public MinuteCounter chunksFull() {
         return chunksFull;
@@ -66,17 +53,12 @@ public final class ServerMetrics {
 
     public void chunkWaited(long nanos) {
         chunkWaits.increment();
-        chunkWaitNanos.addAndGet(nanos);
         longestChunkWaitNanos.accumulate(nanos);
     }
 
     // Used by the Leafs Debug mod
     public MinuteCounter chunkWaits() {
         return chunkWaits;
-    }
-
-    public long chunkWaitNanos() {
-        return chunkWaitNanos.get();
     }
 
     // Used by the Leafs Debug mod

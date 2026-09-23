@@ -1,6 +1,5 @@
 package fr.hardel.leafs.metrics;
 
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.function.LongSupplier;
 
@@ -8,7 +7,6 @@ public final class MinuteCounter {
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
     private final AtomicLongArray counts = new AtomicLongArray(60);
     private final AtomicLongArray seconds = new AtomicLongArray(60);
-    private final AtomicLong total = new AtomicLong();
     private final LongSupplier secondSource;
 
     public MinuteCounter() {
@@ -28,11 +26,6 @@ public final class MinuteCounter {
         }
 
         counts.incrementAndGet(slot);
-        total.incrementAndGet();
-    }
-
-    public long total() {
-        return total.get();
     }
 
     // Used by the Leafs Debug mod

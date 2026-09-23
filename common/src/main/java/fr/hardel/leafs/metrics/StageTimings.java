@@ -16,7 +16,6 @@ public final class StageTimings {
     private long beginNanos;
     private long lastMarkNanos;
     private volatile int cursor;
-    private volatile long busyNanos;
     private volatile long lagNanos;
     private volatile long missedStarts;
 
@@ -46,20 +45,14 @@ public final class StageTimings {
 
     public void endTick(long nowNanos) {
         int index = cursor % CAPACITY;
-        long duration = nowNanos - beginNanos;
         endNanos[index] = nowNanos;
-        durationNanos[index] = duration;
-        busyNanos += duration;
+        durationNanos[index] = nowNanos - beginNanos;
         row = null;
         cursor++;
     }
 
     public void recordLag(long nanos) {
         lagNanos += nanos;
-    }
-
-    public long busyNanos() {
-        return busyNanos;
     }
 
     public long lagNanos() {
