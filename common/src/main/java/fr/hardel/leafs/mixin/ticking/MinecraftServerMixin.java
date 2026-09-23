@@ -31,8 +31,9 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @WrapOperation(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;processPacketsAndTick(Z)V"))
     private void leafs$lockDuringTheTick(MinecraftServer server, boolean sprinting, Operation<Void> original) {
+        int tickCount = server.getTickCount();
         RegionBorrow.hold(_ -> original.call(server, sprinting));
-        leafs$ticking.scheduler().wakeMissed();
+        leafs$ticking.endServerTick(server.getTickCount() != tickCount);
     }
 
     @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V"))
@@ -64,7 +65,7 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @Inject(method = "processPacketsAndTick", at = @At("HEAD"))
     private void leafs$drainPlayerQueuesWhilePaused(boolean sprinting, CallbackInfo callbackInfo) {
-        if (((MinecraftServer) (Object) this).isPaused()) {
+        if (leafs$ticking.paused()) {
             leafs$ticking.tickPausedNetwork();
         }
     }

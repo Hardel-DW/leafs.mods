@@ -60,7 +60,7 @@ public final class RegionTickHandle extends TickHandle {
 
         WorldTickContext.enter(body.level(), region, worldData);
         try {
-            if (body.level().getServer().isPaused()) {
+            if (TickingManager.of(body.level().getServer()).paused()) {
                 data.inbox().drain();
                 return;
             }
