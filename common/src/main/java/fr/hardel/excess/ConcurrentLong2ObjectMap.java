@@ -16,7 +16,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.LongFunction;
 
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
@@ -84,48 +83,8 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
     }
 
     @Override
-    public V putIfAbsent(Long key, V value) {
-        return map.putIfAbsent(HashCommon.mix(key), value);
-    }
-
-    @Override
-    public boolean remove(Object key, Object value) {
-        return map.remove(HashCommon.mix((Long) key), value);
-    }
-
-    @Override
-    public boolean replace(Long key, V oldValue, V newValue) {
-        return map.replace(HashCommon.mix(key), oldValue, newValue);
-    }
-
-    @Override
-    public V replace(Long key, V value) {
-        return map.replace(HashCommon.mix(key), value);
-    }
-
-    @Override
     public void replaceAll(BiFunction<? super Long, ? super V, ? extends V> function) {
         map.replaceAll((mixed, value) -> function.apply(HashCommon.invMix(mixed), value));
-    }
-
-    @Override
-    public V computeIfAbsent(Long key, Function<? super Long, ? extends V> mapping) {
-        return map.computeIfAbsent(HashCommon.mix(key), _ -> mapping.apply(key));
-    }
-
-    @Override
-    public V computeIfPresent(Long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
-        return map.computeIfPresent(HashCommon.mix(key), (_, value) -> remapping.apply(key, value));
-    }
-
-    @Override
-    public V compute(Long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
-        return map.compute(HashCommon.mix(key), (_, value) -> remapping.apply(key, value));
-    }
-
-    @Override
-    public V merge(Long key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
-        return map.merge(HashCommon.mix(key), value, remapping);
     }
 
     private V orDefault(V value) {
