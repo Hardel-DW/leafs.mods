@@ -40,6 +40,7 @@ public final class TickingManager {
     private volatile boolean globalTicking;
     private final long slowTaskNanos;
     private volatile boolean halted;
+    private volatile boolean paused;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
@@ -69,6 +70,7 @@ public final class TickingManager {
         return metrics;
     }
 
+    // Used by the Leafs Debug mod
     public RegionTickScheduler scheduler() {
         return scheduler;
     }
@@ -94,6 +96,15 @@ public final class TickingManager {
 
     public boolean halted() {
         return halted;
+    }
+
+    public boolean paused() {
+        return paused;
+    }
+
+    public void endServerTick(boolean ticked) {
+        paused = !ticked;
+        scheduler.wakeMissed();
     }
 
     public ChunkPool chunkPool() {
