@@ -1,10 +1,15 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongCollection;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongIterators;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSpliterator;
+import it.unimi.dsi.fastutil.longs.LongSpliterators;
 
 import java.util.Collection;
+import java.util.function.LongConsumer;
 
 public final class SynchronizedLongOpenHashSet extends LongOpenHashSet {
 
@@ -64,6 +69,21 @@ public final class SynchronizedLongOpenHashSet extends LongOpenHashSet {
     }
 
     @Override
+    public synchronized boolean removeAll(Collection<?> values) {
+        return super.removeAll(values);
+    }
+
+    @Override
+    public synchronized boolean retainAll(Collection<?> values) {
+        return super.retainAll(values);
+    }
+
+    @Override
+    public synchronized boolean containsAll(Collection<?> values) {
+        return super.containsAll(values);
+    }
+
+    @Override
     public long[] toLongArray() {
         return snapshot();
     }
@@ -74,13 +94,45 @@ public final class SynchronizedLongOpenHashSet extends LongOpenHashSet {
     }
 
     @Override
+    public synchronized Object[] toArray() {
+        return super.toArray();
+    }
+
+    @Override
+    public synchronized <T> T[] toArray(T[] array) {
+        return super.toArray(array);
+    }
+
+    @Override
     public LongIterator iterator() {
-        return new ArrayLongIterator(snapshot());
+        return LongIterators.asLongIterator(new SnapshotIterator<>(LongArrayList.wrap(snapshot()).iterator(), value -> remove(value.longValue())));
+    }
+
+    @Override
+    public LongSpliterator spliterator() {
+        return LongSpliterators.wrap(snapshot());
+    }
+
+    @Override
+    public void forEach(LongConsumer action) {
+        for (long value : snapshot()) {
+            action.accept(value);
+        }
+    }
+
+    @Override
+    public synchronized void ensureCapacity(int capacity) {
+        super.ensureCapacity(capacity);
     }
 
     @Override
     public synchronized boolean trim() {
         return super.trim();
+    }
+
+    @Override
+    public synchronized boolean trim(int capacity) {
+        return super.trim(capacity);
     }
 
     @Override
@@ -111,24 +163,5 @@ public final class SynchronizedLongOpenHashSet extends LongOpenHashSet {
         }
 
         return values;
-    }
-
-    private static final class ArrayLongIterator implements LongIterator {
-        private final long[] values;
-        private int next;
-
-        private ArrayLongIterator(long[] values) {
-            this.values = values;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return next < values.length;
-        }
-
-        @Override
-        public long nextLong() {
-            return values[next++];
-        }
     }
 }

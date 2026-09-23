@@ -1,25 +1,31 @@
 package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SynchronizedCollectionsTest {
@@ -42,6 +48,65 @@ class SynchronizedCollectionsTest {
         iterator.next();
         iterator.remove();
         assertEquals(2, set.size());
+    }
+
+    @Test
+    void arrayListListIteratorWritesReachTheLiveList() {
+        List<Integer> list = new SynchronizedArrayList<>();
+        list.addAll(List.of(1, 2, 3));
+
+        ListIterator<Integer> iterator = list.listIterator();
+        iterator.next();
+        iterator.set(10);
+        iterator.next();
+        iterator.remove();
+        iterator.add(20);
+        assertEquals(List.of(10, 20, 3), list);
+
+        Iterator<Integer> backwards = list.reversed().iterator();
+        backwards.next();
+        backwards.remove();
+        assertEquals(List.of(10, 20), list);
+    }
+
+    @Test
+    void arrayListListIteratorWritesAtThePositionOfADuplicate() {
+        List<Integer> list = new SynchronizedArrayList<>();
+        list.addAll(List.of(7, 7, 7));
+
+        ListIterator<Integer> iterator = list.listIterator(1);
+        iterator.next();
+        iterator.set(8);
+        assertEquals(List.of(7, 8, 7), list);
+    }
+
+    @Test
+    void arrayListListIteratorFailsFastAfterAnotherWrite() {
+        List<Integer> list = new SynchronizedArrayList<>();
+        list.addAll(List.of(1, 2, 3));
+
+        ListIterator<Integer> iterator = list.listIterator();
+        iterator.next();
+        list.add(4);
+        assertThrows(ConcurrentModificationException.class, iterator::remove);
+        assertEquals(List.of(1, 2, 3, 4), list);
+    }
+
+    @Test
+    void longOpenHashSetBulkRemovalsAndIteratorRemoveReachTheLiveSet() {
+        SynchronizedLongOpenHashSet set = new SynchronizedLongOpenHashSet();
+        set.addAll(LongList.of(1, 2, 3, 4));
+
+        assertTrue(set.removeIf((LongPredicate) value -> value > 3));
+        assertTrue(set.retainAll(LongList.of(1, 2)));
+        LongIterator iterator = set.iterator();
+        long removed = iterator.nextLong();
+        iterator.remove();
+
+        assertEquals(1, set.size());
+        assertFalse(set.contains(removed));
+        iterator.nextLong();
+        assertThrows(NoSuchElementException.class, iterator::nextLong);
     }
 
     @Test
