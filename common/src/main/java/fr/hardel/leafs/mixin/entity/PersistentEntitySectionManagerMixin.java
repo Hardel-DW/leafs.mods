@@ -95,10 +95,6 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
 
     @WrapOperation(method = "requestChunkLoad", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenAccept(Ljava/util/function/Consumer;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$deliverOnTheOwner(CompletableFuture<ChunkEntities<T>> future, Consumer<? super ChunkEntities<T>> inboxAdd, Operation<CompletableFuture<Void>> original) {
-        if (leafs$persistence == null) {
-            return original.call(future, inboxAdd);
-        }
-
         Consumer<ChunkEntities<T>> delivery = chunk -> leafs$persistence.deliver(chunk.getPos(), () -> {
             addLegacyChunkEntities(chunk.getEntities());
             chunkLoadStatuses.put(chunk.getPos().pack(), PersistentEntitySectionManager.ChunkLoadStatus.LOADED);
@@ -109,14 +105,14 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
 
     @Inject(method = "processUnloads", at = @At("HEAD"), cancellable = true)
     private void leafs$unloadsOnTheOwner(CallbackInfo callbackInfo) {
-        if (leafs$persistence != null && !TickingManager.of(leafs$persistence.level().getServer()).halted()) {
+        if (!TickingManager.of(leafs$persistence.level().getServer()).halted()) {
             callbackInfo.cancel();
         }
     }
 
     @Inject(method = "autoSave", at = @At("HEAD"), cancellable = true)
     private void leafs$autosaveOnTheOwner(CallbackInfo callbackInfo) {
-        if (leafs$persistence != null && !leafs$persistence.level().getServer().getPlayerList().getPlayers().isEmpty()) {
+        if (!leafs$persistence.level().getServer().getPlayerList().getPlayers().isEmpty()) {
             callbackInfo.cancel();
         }
     }
@@ -124,11 +120,6 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     /** The saving thread runs the routed deliveries in line, or saveAll waits on them forever. */
     @WrapOperation(method = "saveAll", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;processPendingLoads()V"))
     private void leafs$drainDeliveriesWhileSavingAll(PersistentEntitySectionManager<?> manager, Operation<Void> original) {
-        if (leafs$persistence == null) {
-            original.call(manager);
-            return;
-        }
-
         leafs$persistence.drainPendingLoadsInline();
     }
 

@@ -60,7 +60,6 @@ public final class LevelTickUnit extends TickHandle {
         StageTimings stages = stages();
         stages.beginTick(System.nanoTime());
         work.run();
-        regions.rethrowFeedFailure();
 
         if (level.getGameTime() % CENSUS_INTERVAL_TICKS == 0) {
             lastChunkCount = level.getChunkSource().getLoadedChunksCount();

@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
@@ -41,7 +40,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     private volatile long destroyed;
     private volatile long merged;
     private volatile long split;
-    private volatile Throwable feedFailure;
     private final long slowTaskNanos;
 
     public LevelRegions(LeafsConfig config) {
@@ -146,16 +144,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
             return;
         }
 
-        int chunkX = ChunkPos.getX(chunkKey);
-        int chunkZ = ChunkPos.getZ(chunkKey);
-        try {
-            if (simulates) {
-                regionizer.addChunk(chunkX, chunkZ);
-            } else {
-                regionizer.removeChunk(chunkX, chunkZ);
-            }
-        } catch (RuntimeException exception) {
-            throw recordFeedFailure(simulates ? "simulate" : "unsimulate", chunkX, chunkZ, exception);
+        if (simulates) {
+            regionizer.addChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
+        } else {
+            regionizer.removeChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
         }
     }
 
@@ -169,7 +161,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     }
 
     public void settle() {
-        rethrowFeedFailure();
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             if (region.tryMarkTicking()) {
                 region.markNotTicking();
@@ -312,24 +303,5 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         return total;
-    }
-
-    private RuntimeException recordFeedFailure(String operation, int chunkX, int chunkZ, RuntimeException exception) {
-        Leafs.LOGGER.error("Leafs region feed failed to {} chunk [{}, {}]", operation, chunkX, chunkZ, exception);
-        if (feedFailure == null) {
-            feedFailure = exception;
-        }
-
-        return exception;
-    }
-
-    public void rethrowFeedFailure() {
-        Throwable failure = feedFailure;
-        if (failure == null) {
-            return;
-        }
-
-        feedFailure = null;
-        throw new IllegalStateException("Region feed failed earlier on this level", failure);
     }
 }

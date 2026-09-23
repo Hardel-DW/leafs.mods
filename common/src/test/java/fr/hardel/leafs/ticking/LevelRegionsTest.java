@@ -33,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MinecraftBootstrap.class)
@@ -137,17 +136,6 @@ class LevelRegionsTest {
         assertEquals(0, regionCount());
         assertEquals(0, regions.sections());
         assertEquals(0, regions.deadSections());
-    }
-
-    @Test
-    void aFeedFailureIsRethrownOnceByTheNextSettle() {
-        simulated(regions, 0, 0);
-
-        assertThrows(IllegalStateException.class, () -> unsimulated(regions, 500, 500));
-        assertThrows(IllegalStateException.class, regions::settle, "the recorded failure must reach the game thread");
-
-        regions.settle();
-        assertEquals(1, regionCount());
     }
 
     @Test

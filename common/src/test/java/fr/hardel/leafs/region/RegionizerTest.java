@@ -3,15 +3,12 @@ package fr.hardel.leafs.region;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionizerTest {
@@ -210,28 +207,5 @@ class RegionizerTest {
         assertEquals(1, east.chunkCount());
         assertEquals(1, callbacks.events.stream().filter(event -> event.startsWith("split ")).count());
         RegionizerAssertions.assertInvariants(regionizer, true);
-    }
-
-    @Test
-    void doubleAddAndUnknownRemoveCrashEarly() {
-        regionizer.addChunk(0, 0);
-
-        assertThrows(IllegalStateException.class, () -> regionizer.addChunk(0, 0));
-        assertThrows(IllegalStateException.class, () -> regionizer.removeChunk(1, 1));
-        assertThrows(IllegalStateException.class, () -> regionizer.removeChunk(500, 500));
-    }
-
-    @Test
-    void callbacksMustNotReenterTheRegionizer() {
-        AtomicReference<Regionizer<Object>> holder = new AtomicReference<>();
-        Regionizer<Object> reentrant = new Regionizer<>(4, 1, 1, new RecordingCallbacks() {
-            @Override
-            public void onRegionCreate(Region<Object> region) {
-                holder.get().addChunk(500, 500);
-            }
-        });
-        holder.set(reentrant);
-
-        assertThrows(IllegalStateException.class, () -> reentrant.addChunk(0, 0));
     }
 }

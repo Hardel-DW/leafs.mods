@@ -23,8 +23,4 @@ public final class CoordinateKey {
         int mask = (1 << sectionShift) - 1;
         return ((chunkZ & mask) << sectionShift) | (chunkX & mask);
     }
-
-    public static String describe(long key) {
-        return "[" + x(key) + ", " + z(key) + "]";
-    }
 }

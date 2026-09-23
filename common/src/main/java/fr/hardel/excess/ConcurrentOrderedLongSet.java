@@ -18,10 +18,6 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
     private final Bucket[] buckets;
 
     public ConcurrentOrderedLongSet(int groupShift) {
-        if (groupShift < 1 || groupShift > 63) {
-            throw new IllegalArgumentException("groupShift out of range: " + groupShift);
-        }
-
         this.groupShift = groupShift;
         this.buckets = new Bucket[BUCKET_COUNT];
         for (int i = 0; i < BUCKET_COUNT; i++) {
