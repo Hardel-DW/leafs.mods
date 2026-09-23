@@ -69,16 +69,8 @@ public final class Region<R> {
         return regionizer.deadSectionCountOf(this);
     }
 
-    public interface ChunkConsumer {
-        void accept(int chunkX, int chunkZ);
-    }
-
     public boolean owns(int chunkX, int chunkZ) {
         return regionizer.regionAtUnsynchronised(chunkX, chunkZ) == this;
-    }
-
-    public void forEachChunk(ChunkConsumer consumer) {
-        regionizer.forEachChunkOf(this, consumer);
     }
 
     // Used by the Leafs Debug mod

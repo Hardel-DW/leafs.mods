@@ -169,11 +169,7 @@ public final class TickingManager {
     }
 
     public void forgetLevel(ServerLevel level) {
-        LevelTickUnit unit = levelUnits.remove(level);
-        if (unit != null) {
-            unit.cancel();
-        }
-
+        levelUnits.remove(level);
         LevelRegions.of(level).retire();
     }
 

@@ -15,7 +15,6 @@ import java.util.function.BiConsumer;
 
 public final class ChunkPool implements Executor {
     public static final int FIRST = 0;
-    private static final long[] NO_RESERVATION = {};
 
     private final PriorityBuckets buckets;
     private final PlacedTasks placed = new PlacedTasks();
@@ -102,7 +101,7 @@ public final class ChunkPool implements Executor {
 
     @Override
     public void execute(@NonNull Runnable task) {
-        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, FIRST, NO_RESERVATION, task));
+        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, FIRST, ChunkTask.NO_RESERVATION, task));
     }
 
     public void shutdown() {

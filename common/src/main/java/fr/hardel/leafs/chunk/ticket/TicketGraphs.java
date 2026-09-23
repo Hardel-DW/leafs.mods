@@ -61,11 +61,11 @@ public final class TicketGraphs {
         };
     }
 
-    public void settleWritten(LevelListener listener) {
+    public void settleWritten() {
         for (LongIterator keys = written.iterator(); keys.hasNext(); ) {
             long key = keys.nextLong();
             keys.remove();
-            loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), listener, () -> null);
+            loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener, () -> null);
         }
     }
 

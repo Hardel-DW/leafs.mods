@@ -172,7 +172,7 @@ class LevelRegionsTest {
     }
 
     @Test
-    void aHandleTickSplitsAndItsChildrenCarryFreshHandles() {
+    void aReleaseSplitsAndTheChildrenCarryFreshHandles() {
         activateRegions();
         simulated(regions, 0, 0);
         simulated(regions, 32, 0);
@@ -183,8 +183,8 @@ class LevelRegionsTest {
         unsimulated(regions, 32, 0);
         unsimulated(regions, 64, 0);
 
-        parentHandle.tick();
-        assertEquals(2, regionCount(), "the handle's own release is what splits");
+        regions.settle();
+        assertEquals(2, regionCount(), "the release is what splits");
         assertEquals(1, regions.split());
         assertTrue(parentHandle.isCancelled());
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {

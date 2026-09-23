@@ -75,7 +75,7 @@ public abstract class ServerChunkCacheMixin {
     private boolean leafs$settleTheAddedTickets(Operation<Boolean> original) {
         boolean changed = original.call();
         LevelChunks chunks = LevelChunks.of(this.level);
-        chunks.graphs().settleWritten(chunks.holders());
+        chunks.graphs().settleWritten();
         return changed;
     }
 

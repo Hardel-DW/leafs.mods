@@ -1,5 +1,7 @@
 package fr.hardel.leafs.region;
 
+import java.util.function.LongConsumer;
+
 final class RegionSection<R> {
     private final long key;
     private final int indexShift;
@@ -78,13 +80,13 @@ final class RegionSection<R> {
         this.region = null;
     }
 
-    void forEachPosition(Region.ChunkConsumer consumer) {
+    void forEachChunkKey(LongConsumer consumer) {
         int baseX = CoordinateKey.x(key) << indexShift;
         int baseZ = CoordinateKey.z(key) << indexShift;
         int side = 1 << indexShift;
         for (int dz = 0; dz < side; dz++) {
             for (int dx = 0; dx < side; dx++) {
-                consumer.accept(baseX + dx, baseZ + dz);
+                consumer.accept(CoordinateKey.pack(baseX + dx, baseZ + dz));
             }
         }
     }
