@@ -1,4 +1,4 @@
-package fr.hardel.leafs.scheduler;
+package fr.hardel.leafs.global;
 
 import org.junit.jupiter.api.Test;
 

@@ -1,4 +1,4 @@
-package fr.hardel.leafs.chunk;
+package fr.hardel.leafs.world;
 
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.world.level.chunk.LevelChunk;

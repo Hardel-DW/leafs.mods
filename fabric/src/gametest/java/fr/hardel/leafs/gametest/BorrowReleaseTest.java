@@ -1,7 +1,7 @@
 package fr.hardel.leafs.gametest;
 
+import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;

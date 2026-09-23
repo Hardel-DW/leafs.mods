@@ -1,8 +1,7 @@
-package fr.hardel.leafs.chunk;
+package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.entity.PlayerMoveAccess;
 import fr.hardel.leafs.entity.RegionEntities;
-import fr.hardel.leafs.world.RegionChunks;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ChunkMap;

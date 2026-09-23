@@ -6,7 +6,7 @@ import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.pool.Urgency;
-import fr.hardel.leafs.scheduler.GlobalScheduler;
+import fr.hardel.leafs.global.GlobalScheduler;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;

@@ -1,6 +1,6 @@
 package fr.hardel.leafs.ticking;
 
-import fr.hardel.leafs.scheduler.GlobalScheduler;
+import fr.hardel.leafs.global.GlobalScheduler;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;

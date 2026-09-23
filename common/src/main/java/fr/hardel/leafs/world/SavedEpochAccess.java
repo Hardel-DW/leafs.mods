@@ -1,4 +1,4 @@
-package fr.hardel.leafs.chunk;
+package fr.hardel.leafs.world;
 
 public interface SavedEpochAccess {
 

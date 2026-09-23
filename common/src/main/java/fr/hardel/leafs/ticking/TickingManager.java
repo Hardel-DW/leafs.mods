@@ -7,7 +7,7 @@ import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.network.RegionNetworkTick;
-import fr.hardel.leafs.scheduler.GlobalScheduler;
+import fr.hardel.leafs.global.GlobalScheduler;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;

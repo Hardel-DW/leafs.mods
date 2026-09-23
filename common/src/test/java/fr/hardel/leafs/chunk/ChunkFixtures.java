@@ -2,7 +2,7 @@ package fr.hardel.leafs.chunk;
 
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import fr.hardel.leafs.scheduler.GlobalScheduler;
+import fr.hardel.leafs.global.GlobalScheduler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ChunkTaskPriorityQueue;
 
