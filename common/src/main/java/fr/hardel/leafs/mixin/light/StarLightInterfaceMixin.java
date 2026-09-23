@@ -1,6 +1,9 @@
 package fr.hardel.leafs.mixin.light;
 
+import ca.spottedleaf.starlight.common.light.BlockStarLightEngine;
+import ca.spottedleaf.starlight.common.light.SkyStarLightEngine;
 import ca.spottedleaf.starlight.common.light.StarLightInterface;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.LevelChunks;
@@ -19,5 +22,14 @@ public abstract class StarLightInterfaceMixin {
     @WrapOperation(method = "schedulePropagation0", at = @At(value = "INVOKE", target = "Lca/spottedleaf/starlight/common/thread/SchedulingUtil;scheduleTask(ILjava/lang/Runnable;III)V"))
     private void leafs$onTheChunkPool(int owner, Runnable task, int chunkX, int chunkZ, int radius, Operation<Void> original) {
         LevelChunks.of((ServerLevel) getWorld()).placement().onPool(ChunkTask.Kind.LIGHT, chunkX, chunkZ, radius, task);
+    }
+
+    @WrapMethod(method = "handleUpdateInternal")
+    private void leafs$completeOnFailure(StarLightInterface.LightQueue.ChunkTasks task, SkyStarLightEngine sky, BlockStarLightEngine block, Operation<Void> original) {
+        try {
+            original.call(task, sky, block);
+        } finally {
+            task.onComplete.complete(null);
+        }
     }
 }
