@@ -39,6 +39,15 @@ class RoutingRandomSourceTest {
         assertEquals(reference.nextInt(), routing.nextInt(), "the other thread seeded its own random, not this thread's");
     }
 
+    @Test
+    void offARegionEachLevelHasItsOwnRandom() {
+        RoutingRandomSource other = new RoutingRandomSource(null);
+        routing.setSeed(1);
+        other.setSeed(2);
+
+        assertEquals(RandomSource.create(1).nextInt(), routing.nextInt(), "the other level seeded its own random, not this level's");
+    }
+
     private static RandomSource fixed(int value) {
         return new RandomSource() {
             @Override
