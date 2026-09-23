@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.LeafsConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -61,7 +62,8 @@ class LeafsWatchdogTest {
     @Test
     void aStalledWaitOffTheTickUnitsIsReportedAtOnce() throws InterruptedException {
         LeafsWatchdog watchdog = watchdog(Duration.ofMillis(50), KILL_DISABLED);
-        Thread waiting = new Thread(() -> awaitQuietly(new CountDownLatch(1)), "Mod Thread");
+        CountDownLatch release = new CountDownLatch(1);
+        Thread waiting = new Thread(() -> TestThreads.await(release), "Mod Thread");
         waiting.setDaemon(true);
         waiting.start();
         stalledWaits.put(waiting, "Chunk wait stalled on a mod thread");
@@ -69,15 +71,8 @@ class LeafsWatchdogTest {
 
         assertTrue(reported.await(5, TimeUnit.SECONDS), "a stalled wait off the tick units must be reported");
         assertTrue(reports.peek().contains("mod thread"));
+        release.countDown();
         watchdog.stop();
-    }
-
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     @Test
@@ -149,11 +144,7 @@ class LeafsWatchdogTest {
     private static Thread stalledTick(LeafsWatchdog watchdog, TestTickHandle handle, CountDownLatch release) {
         Thread stalled = new Thread(() -> {
             watchdog.beginTick(handle);
-            try {
-                release.await();
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-            }
+            TestThreads.await(release);
             watchdog.endTick(handle);
         }, "Stalled Test Thread");
         stalled.start();

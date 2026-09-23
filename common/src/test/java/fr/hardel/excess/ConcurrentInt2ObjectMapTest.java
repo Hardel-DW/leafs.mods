@@ -1,5 +1,6 @@
 package fr.hardel.excess;
 
+import fr.hardel.TestThreads;
 import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +34,7 @@ class ConcurrentInt2ObjectMapTest {
         Int2ObjectFunction<Object> factory = _ -> {
             if (builds.incrementAndGet() == 1) {
                 building.countDown();
-                awaitQuietly(finish);
+                TestThreads.await(finish);
             }
 
             return new Object();
@@ -52,14 +53,6 @@ class ConcurrentInt2ObjectMapTest {
             } finally {
                 finish.countDown();
             }
-        }
-    }
-
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
         }
     }
 

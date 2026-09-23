@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -34,10 +35,10 @@ class ChunkHolderDependenciesTest {
         CompletableFuture<Void> secondLight = new CompletableFuture<>();
 
         Thread firstOwner = Thread.ofPlatform().daemon().start(() -> holder.addSendDependency(firstLight));
-        barrier.awaitComposition();
+        TestThreads.await(barrier.composing);
         Thread secondOwner = Thread.ofPlatform().daemon().start(() -> holder.addSendDependency(secondLight));
         awaitDoneOrWaiting(secondOwner);
-        barrier.resume();
+        barrier.resumed.countDown();
         firstOwner.join(TimeUnit.SECONDS.toMillis(PATIENCE_SECONDS));
         secondOwner.join(TimeUnit.SECONDS.toMillis(PATIENCE_SECONDS));
 
@@ -67,34 +68,17 @@ class ChunkHolderDependenciesTest {
         };
     }
 
-    private static void await(CountDownLatch latch, String what) {
-        try {
-            assertTrue(latch.await(PATIENCE_SECONDS, TimeUnit.SECONDS), what);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new AssertionError(what, exception);
-        }
-    }
-
     private static final class PausedBarrier extends CompletableFuture<Void> {
         private final AtomicBoolean pauseOnce = new AtomicBoolean(true);
         private final CountDownLatch composing = new CountDownLatch(1);
         private final CountDownLatch resumed = new CountDownLatch(1);
-
-        void awaitComposition() {
-            await(composing, "the first owner reached the composition");
-        }
-
-        void resume() {
-            resumed.countDown();
-        }
 
         @Override
         public <U, V> CompletableFuture<V> thenCombine(CompletionStage<? extends U> other, BiFunction<? super Void, ? super U, ? extends V> function) {
             CompletableFuture<V> combined = super.thenCombine(other, function);
             if (pauseOnce.getAndSet(false)) {
                 composing.countDown();
-                await(resumed, "the paused owner was resumed");
+                TestThreads.await(resumed);
             }
 
             return combined;

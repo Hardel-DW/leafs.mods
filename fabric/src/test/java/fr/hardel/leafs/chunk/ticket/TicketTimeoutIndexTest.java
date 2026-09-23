@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.server.level.Ticket;
@@ -32,7 +33,7 @@ class TicketTimeoutIndexTest {
         CountDownLatch release = new CountDownLatch(1);
         timeouts.pauseWhile(_ -> {
             countingDown.countDown();
-            await(release);
+            TestThreads.await(release);
             return false;
         });
 
@@ -47,14 +48,6 @@ class TicketTimeoutIndexTest {
         purger.join();
         refresher.join();
         assertEquals(1, storage.getTickets(CHUNK).size());
-    }
-
-    private static void await(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     private static void assertBlocked(Thread thread) {

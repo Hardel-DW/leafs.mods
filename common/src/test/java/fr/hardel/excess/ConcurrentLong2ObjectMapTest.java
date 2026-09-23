@@ -1,5 +1,6 @@
 package fr.hardel.excess;
 
+import fr.hardel.TestThreads;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -85,12 +86,7 @@ class ConcurrentLong2ObjectMapTest {
         List<Thread> threads = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             threads.add(new Thread(() -> {
-                try {
-                    start.await();
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                }
-
+                TestThreads.await(start);
                 map.computeIfAbsent(42L, (Long2ObjectFunction<String>) key -> {
                     invocations.incrementAndGet();
                     return "shared";

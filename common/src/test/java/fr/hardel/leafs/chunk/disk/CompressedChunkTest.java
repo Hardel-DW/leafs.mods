@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.disk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -18,19 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MinecraftBootstrap.class)
 class CompressedChunkTest {
-    private static CompoundTag chunkTag() {
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("DataVersion", 4882);
-        tag.putString("Status", "minecraft:full");
-        CompoundTag section = new CompoundTag();
-        section.putLongArray("data", new long[] {1L, 2L, 3L, Long.MAX_VALUE});
-        tag.put("section", section);
-        return tag;
-    }
-
     @Test
     void vanillaReadsBackWhatThePoolCompressed() throws IOException {
-        CompoundTag tag = chunkTag();
+        CompoundTag tag = ChunkFixtures.photo(4882);
         ChunkPos pos = new ChunkPos(3, -7);
         Path folder = Files.createTempDirectory("leafs-region");
         RegionStorageInfo info = new RegionStorageInfo("test", Level.OVERWORLD, "chunk");

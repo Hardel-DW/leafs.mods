@@ -1,5 +1,6 @@
 package fr.hardel.leafs.network;
 
+import fr.hardel.TestThreads;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.PacketListener;
@@ -131,11 +132,7 @@ class PlayerPacketQueueTest {
         CountDownLatch release = new CountDownLatch(1);
         queue.add(listener, new FakePacket("blocker", _ -> {
             insideDrain.countDown();
-            try {
-                release.await();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            }
+            TestThreads.await(release);
         }));
 
         Thread regionDrainer = new Thread(() -> queue.drain());
@@ -163,7 +160,7 @@ class PlayerPacketQueueTest {
         Thread previousOwner = new Thread(() -> queue.handleAs(() -> {
             insidePass.set(true);
             passStarted.countDown();
-            awaitQuietly(release);
+            TestThreads.await(release);
             insidePass.set(false);
         }));
         previousOwner.start();
@@ -176,14 +173,6 @@ class PlayerPacketQueueTest {
         previousOwner.join();
         assertTrue(queue.drain());
         assertFalse(overlapped.get(), "no packet may be handled while the player's pass runs");
-    }
-
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     @Test

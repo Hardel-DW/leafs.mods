@@ -1,5 +1,6 @@
 package fr.hardel.leafs.scheduler;
 
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
@@ -16,14 +17,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeferredWorkTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4, (_, _) -> { });
+    private final ChunkPool pool = ChunkFixtures.pool(1);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private final DeferStats stats = new DeferStats();
     private final List<String> ran = new ArrayList<>();
     private boolean holding;
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, work) -> { work.run(); return true; },
+        new GlobalScheduler(Runnable::run));
 
     private DeferredWork work(DeferReason reason, Runnable task) {
-        ChunkOwners owners = new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, work) -> { work.run(); return true; }, new GlobalScheduler(Runnable::run), Long.MAX_VALUE);
         return new DeferredWork(owners, stats, 0, 0, reason, () -> true, task);
     }
 

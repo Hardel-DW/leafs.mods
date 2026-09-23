@@ -1,5 +1,7 @@
 package fr.hardel.leafs.chunk.pool;
 
+import fr.hardel.TestThreads;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChunkPoolTest {
     private static final long[] NONE = {};
-    private final List<String> failures = new CopyOnWriteArrayList<>();
     private ChunkPool pool;
 
     @AfterEach
@@ -26,15 +27,11 @@ class ChunkPoolTest {
         pool.shutdown();
     }
 
-    private ChunkPool start(int threads, int priorities) {
-        return new ChunkPool(Thread.currentThread().getThreadGroup(), threads, priorities, (task, failure) -> failures.add(task.kind() + " " + failure.getMessage()));
-    }
-
     /** 2026-09-05: the steps of chunks the players had left kept running, a quarter of the pool for nothing. */
     @Test
     void aWithdrawnQueuedTaskIsDroppedWhenReached() throws InterruptedException {
-        pool = start(1, 8);
-        CountDownLatch gate = occupyTheWorker();
+        pool = ChunkFixtures.pool(1);
+        CountDownLatch gate = TestThreads.occupy(pool);
         List<String> ran = new CopyOnWriteArrayList<>();
         CountDownLatch done = new CountDownLatch(1);
         ChunkTask stale = new ChunkTask(ChunkTask.Kind.STEP, 1, NONE) {
@@ -60,14 +57,14 @@ class ChunkPoolTest {
 
     @Test
     void aTaskParkedBehindAReservationIsCounted() throws InterruptedException {
-        pool = start(2, 4);
+        pool = ChunkFixtures.pool(2);
         CountDownLatch holding = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(1);
         long[] chunk = {ChunkTask.key(0, 1, 1)};
         pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, 1, chunk, () -> {
             holding.countDown();
-            await(release);
+            TestThreads.await(release);
         }));
         assertTrue(holding.await(5, TimeUnit.SECONDS));
 
@@ -83,18 +80,10 @@ class ChunkPoolTest {
         assertEquals(1, pool.blocks().total());
     }
 
-    private static void await(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
     @Test
     void theMostUrgentQueuedTaskRunsFirst() throws InterruptedException {
-        pool = start(1, 8);
-        CountDownLatch gate = occupyTheWorker();
+        pool = ChunkFixtures.pool(1);
+        CountDownLatch gate = TestThreads.occupy(pool);
         List<Integer> order = new CopyOnWriteArrayList<>();
         CountDownLatch done = new CountDownLatch(3);
         for (int priority : new int[] {5, 1, 3}) {
@@ -112,7 +101,7 @@ class ChunkPoolTest {
 
     @Test
     void twoTasksOnTheSameChunkNeverOverlap() throws InterruptedException {
-        pool = start(4, 4);
+        pool = ChunkFixtures.pool(4);
         AtomicInteger inside = new AtomicInteger();
         AtomicInteger overlaps = new AtomicInteger();
         CountDownLatch done = new CountDownLatch(20);
@@ -134,7 +123,7 @@ class ChunkPoolTest {
 
     @Test
     void tasksOnDifferentChunksRunTogether() throws InterruptedException {
-        pool = start(2, 4);
+        pool = ChunkFixtures.pool(2);
         CyclicBarrier both = new CyclicBarrier(2);
         CountDownLatch done = new CountDownLatch(2);
         for (long chunk : new long[] {1L, 2L}) {
@@ -149,7 +138,7 @@ class ChunkPoolTest {
 
     @Test
     void aReturnedFutureKeepsTheReservation() throws InterruptedException {
-        pool = start(2, 4);
+        pool = ChunkFixtures.pool(2);
         CompletableFuture<Void> pending = new CompletableFuture<>();
         CountDownLatch first = new CountDownLatch(1);
         CountDownLatch second = new CountDownLatch(1);
@@ -172,7 +161,8 @@ class ChunkPoolTest {
     /** 2026-09-22: a failed task was only logged, its holder or its drain left half done without a crash report. */
     @Test
     void aFailingTaskReportsItsFailureAndFreesItsChunk() throws InterruptedException {
-        pool = start(1, 4);
+        List<String> failures = new CopyOnWriteArrayList<>();
+        pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4, (task, failure) -> failures.add("%s %s".formatted(task.kind(), failure.getMessage())));
         pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, 0, new long[] {4L}, () -> {
             throw new IllegalStateException("boom");
         }));
@@ -186,8 +176,8 @@ class ChunkPoolTest {
 
     @Test
     void countsWhatWaitsAndWhatRuns() throws InterruptedException {
-        pool = start(1, 4);
-        CountDownLatch gate = occupyTheWorker();
+        pool = ChunkFixtures.pool(1);
+        CountDownLatch gate = TestThreads.occupy(pool);
         pool.execute(() -> {
         });
 
@@ -196,25 +186,6 @@ class ChunkPoolTest {
         gate.countDown();
         pool.shutdown();
         assertEquals(0, pool.queued());
-    }
-
-    private CountDownLatch occupyTheWorker() throws InterruptedException {
-        CountDownLatch gate = new CountDownLatch(1);
-        CountDownLatch started = new CountDownLatch(1);
-        pool.execute(() -> {
-            started.countDown();
-            wait(gate);
-        });
-        assertTrue(started.await(5, TimeUnit.SECONDS));
-        return gate;
-    }
-
-    private static void wait(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     private static void meet(CyclicBarrier barrier) {
