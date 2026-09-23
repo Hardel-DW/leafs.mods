@@ -3,7 +3,6 @@ package fr.hardel.leafs.world;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,18 +12,13 @@ class RoutingRandomSourceTest {
     private final RoutingRandomSource routing = new RoutingRandomSource(null);
     private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache());
 
-    @AfterEach
-    void exitContext() {
-        WorldTickContext.exit();
-    }
-
     @Test
     void contextForTheLevelResolvesTheRegionRandom() {
         routing.setSeed(7);
-        WorldTickContext.enter(null, null, worldData);
+        WorldTickContext context = WorldTickContext.enter(null, null, worldData);
 
         assertEquals(2, routing.nextInt());
-        WorldTickContext.exit();
+        context.exit();
         assertEquals(RandomSource.create(7).nextInt(), routing.nextInt(), "back to this thread's own random, untouched by the region");
     }
 

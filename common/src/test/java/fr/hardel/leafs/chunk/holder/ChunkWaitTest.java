@@ -1,5 +1,7 @@
 package fr.hardel.leafs.chunk.holder;
 
+import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.world.WorldTickContext;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -10,24 +12,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ChunkWaitTest {
     private final List<String> released = new ArrayList<>();
 
-    @Test
-    void aDemandWithoutAScopeIsReleasedAtOnce() {
-        ChunkWait.keep(() -> released.add("now"));
-
-        assertEquals(List.of("now"), released);
-    }
-
     /** 2026-09-06: the portal spiral re-read the same nether chunks, each unloaded as soon as its wait ended; vanilla keeps them until its tick ends. */
     @Test
-    void aDemandLivesUntilTheOutermostScopeEnds() {
-        ChunkWait.enterScope();
-        ChunkWait.keep(() -> released.add("read"));
-        ChunkWait.enterScope();
-        ChunkWait.keep(() -> released.add("write"));
-        ChunkWait.exitScope();
-        assertEquals(List.of(), released, "a chunk taken inside the tick closes before it, the reads hold");
+    void aDemandLivesUntilTheTickEnds() {
+        WorldTickContext tick = WorldTickContext.enter(null, null, null);
+        tick.keep(() -> released.add("read"));
+        tick.keep(() -> released.add("write"));
+        assertEquals(List.of(), released);
 
-        ChunkWait.exitScope();
+        tick.exit();
         assertEquals(List.of("read", "write"), released);
+    }
+
+    @Test
+    void aDemandLivesUntilTheBorrowEnds() {
+        RegionBorrow borrow = RegionBorrow.enter();
+        borrow.keep(() -> released.add("read"));
+        assertEquals(List.of(), released);
+
+        borrow.exit();
+        assertEquals(List.of("read"), released);
     }
 }

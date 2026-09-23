@@ -28,7 +28,10 @@ class RegionBorrowTest {
 
     @AfterEach
     void exitBorrow() {
-        RegionBorrow.exit();
+        RegionBorrow borrow = RegionBorrow.current();
+        if (borrow != null) {
+            borrow.exit();
+        }
     }
 
     @Test

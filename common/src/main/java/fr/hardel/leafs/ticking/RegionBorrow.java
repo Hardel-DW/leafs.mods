@@ -1,7 +1,6 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.holder.ChunkWait;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.region.Region;
@@ -12,6 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +26,7 @@ public final class RegionBorrow {
 
     private final Set<Region<RegionTickData>> held = new LinkedHashSet<>();
     private final Map<LevelRegions, Long2ObjectOpenHashMap<RegionInbox>> heldChunks = new LinkedHashMap<>();
+    private final List<Runnable> releases = new ArrayList<>();
 
     private RegionBorrow() {
     }
@@ -33,13 +34,16 @@ public final class RegionBorrow {
     public static RegionBorrow enter() {
         RegionBorrow borrow = new RegionBorrow();
         CURRENT.set(borrow);
-        ChunkWait.enterScope();
         return borrow;
     }
 
-    public static void exit() {
-        ChunkWait.exitScope();
+    public void exit() {
+        releases.forEach(Runnable::run);
         CURRENT.remove();
+    }
+
+    public void keep(Runnable release) {
+        releases.add(release);
     }
 
     public static <T> T hold(Function<RegionBorrow, T> body) {
@@ -53,7 +57,7 @@ public final class RegionBorrow {
             return body.apply(borrow);
         } finally {
             borrow.releaseAll();
-            exit();
+            borrow.exit();
         }
     }
 
