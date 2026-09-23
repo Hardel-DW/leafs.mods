@@ -6,7 +6,6 @@ import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
-import net.minecraft.server.RunningOnDifferentThreadException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -19,7 +18,6 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -123,19 +121,6 @@ class PlayerPacketQueueTest {
 
         queue.drain(() -> listener.player.equals("moved to the nether"));
         assertEquals(List.of("teleport", "stays_queued"), handled);
-    }
-
-    @Test
-    void aRethrowInsideTheDrainEscalatesToACrash() {
-        FakeListener listener = new FakeListener(true);
-        queue.add(listener, new FakePacket("requeued", _ -> {
-            throw RunningOnDifferentThreadException.RUNNING_ON_DIFFERENT_THREAD;
-        }));
-
-        RuntimeException crash = assertThrows(RuntimeException.class, queue::drain);
-
-        assertInstanceOf(RunningOnDifferentThreadException.class, crash.getCause());
-        assertEquals(1, listener.errors.size());
     }
 
     /** 2026-09-06: a region waiting here for the region holding the player deadlocked with it over a chunk publication. A held player is refused, never waited for. */

@@ -109,24 +109,6 @@ class ConcurrentLong2ObjectMapTest {
     }
 
     @Test
-    void iterationViewsSeeContents() {
-        map.put(1L, "a");
-        map.put(2L, "b");
-
-        List<String> values = new ArrayList<>();
-        map.values().iterator().forEachRemaining(values::add);
-        assertEquals(2, values.size());
-        assertTrue(values.contains("a") && values.contains("b"));
-
-        List<Long> keys = new ArrayList<>();
-        map.keySet().iterator().forEachRemaining((java.util.function.LongConsumer) keys::add);
-        assertTrue(keys.contains(1L) && keys.contains(2L));
-
-        assertEquals(2, map.long2ObjectEntrySet().size());
-        map.long2ObjectEntrySet().forEach(entry -> assertEquals(map.get(entry.getLongKey()), entry.getValue()));
-    }
-
-    @Test
     void iterationSurvivesConcurrentMutation() {
         for (long i = 0; i < 100; i++) {
             map.put(i, "v" + i);

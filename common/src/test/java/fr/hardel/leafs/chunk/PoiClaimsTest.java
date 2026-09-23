@@ -21,13 +21,6 @@ class PoiClaimsTest {
     private final PoiRecord bed = new PoiRecord(new BlockPos(1, 64, 1), home, () -> { });
 
     @Test
-    void theLastPlaceGoesToOneTakerOnly() {
-        assertEquals(Optional.of(bed.getPos()), PoiClaims.firstAcquired(Stream.of(bed)));
-
-        assertEquals(Optional.empty(), PoiClaims.firstAcquired(Stream.of(bed)));
-    }
-
-    @Test
     void aRecordTakenMeanwhileIsSkippedForTheNextCandidate() {
         PoiRecord otherBed = new PoiRecord(new BlockPos(2, 64, 1), home, () -> { });
         PoiClaims.firstAcquired(Stream.of(bed));

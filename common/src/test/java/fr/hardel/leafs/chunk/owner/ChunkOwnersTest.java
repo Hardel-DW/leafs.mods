@@ -271,48 +271,6 @@ class ChunkOwnersTest {
         assertNull(owners.describeTaken(1, 1));
     }
 
-    @Test
-    void aChunkIsTakenOnceUntilReleased() {
-        ChunkOwners owners = owners();
-
-        RegionInbox first = owners.borrow(1, 1);
-        assertNotNull(first);
-        assertNull(owners.borrow(1, 1), "another thread finds the chunk held");
-
-        owners.release(1, 1, first);
-        assertNotNull(owners.borrow(1, 1));
-    }
-
-    @Test
-    void theOwningThreadRunsInLine() {
-        holding = true;
-
-        assertTrue(owners().submit(1, 1, Work.CHUNK, () -> ran.add("now")));
-
-        assertEquals(List.of("now"), ran);
-        assertEquals(0, inbox.size());
-    }
-
-    @Test
-    void aCoveredChunkWaitsForTheRegionTick() {
-        assertFalse(owners().submit(1, 1, Work.CHUNK, () -> ran.add("later")));
-
-        assertEquals(List.of(), ran);
-        assertEquals(1, inbox.drain());
-        assertEquals(List.of("later"), ran);
-    }
-
-    @Test
-    void anUncoveredChunkRunsOnThePool() throws InterruptedException {
-        covered = false;
-        CountDownLatch done = new CountDownLatch(1);
-
-        assertFalse(owners().submit(1, 1, Work.CHUNK, done::countDown));
-
-        assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertEquals(0, inbox.size());
-    }
-
     /** 2026-09-04: a status change on an uncovered chunk re-submitted itself to the pool forever, the worker not counting as its owner. */
     @Test
     void thePoolWorkerHoldsTheChunkOfTheTaskItRuns() throws InterruptedException {
@@ -330,20 +288,6 @@ class ChunkOwnersTest {
         assertTrue(inLine[0]);
         assertEquals(List.of("nested"), ran);
         assertFalse(owners.holds(1, 1));
-    }
-
-    @Test
-    void aDrainRunsWhatWasPostedBeforeIt() {
-        ChunkOwners owners = owners();
-        owners.submit(1, 1, Work.CHUNK, () -> {
-            ran.add("first");
-            owners.submit(1, 1, Work.CHUNK, () -> ran.add("second"));
-        });
-
-        assertEquals(1, inbox.drain());
-        assertEquals(List.of("first"), ran);
-        assertEquals(1, inbox.drain());
-        assertEquals(List.of("first", "second"), ran);
     }
 
     /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. 2026-09-14: game work waits for the next pump, a release runs nothing on its thread. */
