@@ -131,11 +131,6 @@ public final class ChunkHolders implements LevelListener {
         return loading.settled(chunkX, chunkZ, this, body);
     }
 
-    public boolean busy(long chunkKey) {
-        ChunkHolder holder = table.get(chunkKey);
-        return holder != null && !holder.isReadyForSaving();
-    }
-
     private static void queueLevelFollows(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel) {
         setQueueLevel.accept(newLevel);
     }

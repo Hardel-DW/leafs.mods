@@ -1,7 +1,6 @@
 package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.MinecraftBootstrap;
-import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
 import fr.hardel.leafs.region.CoordinateKey;
 import net.minecraft.server.level.Ticket;
@@ -10,9 +9,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,39 +19,18 @@ class TicketTimeoutIndexTest {
     private static final long SECTION = CoordinateKey.pack(1, 1);
 
     @Test
-    void aRefreshWaitsForTheCountdownOfItsSection() throws InterruptedException {
+    void aTicketExpiresOnceItsTimeoutIsCountedDown() {
         TicketStorage storage = new TicketStorage();
         TicketStorageAccess access = (TicketStorageAccess) storage;
-        TicketTimeoutIndex timeouts = new TicketTimeoutIndex(storage, access.leafs$graphs(), 1);
+        TicketTimeoutIndex timeouts = new TicketTimeoutIndex(storage, null, access.leafs$graphs(), 1);
         access.leafs$bindTimeouts(timeouts);
-        storage.addTicket(CHUNK, new Ticket(TicketType.PORTAL, 33));
-        CountDownLatch countingDown = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        timeouts.pauseWhile(_ -> {
-            countingDown.countDown();
-            TestThreads.await(release);
-            return false;
-        });
+        storage.addTicket(CHUNK, new Ticket(TicketType.UNKNOWN, 33));
 
-        Thread purger = new Thread(() -> timeouts.purgeSections(new long[]{SECTION}));
-        purger.start();
-        countingDown.await();
-        Thread refresher = new Thread(() -> storage.addTicket(CHUNK, new Ticket(TicketType.PORTAL, 33)));
-        refresher.start();
-
-        assertBlocked(refresher);
-        release.countDown();
-        purger.join();
-        refresher.join();
-        assertEquals(1, storage.getTickets(CHUNK).size());
-    }
-
-    private static void assertBlocked(Thread thread) {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (thread.getState() != Thread.State.BLOCKED) {
-            assertTrue(thread.isAlive(), "the refresh ran during the countdown");
-            assertTrue(System.nanoTime() < deadline, "the refresh never reached the storage monitor");
-            Thread.onSpinWait();
+        for (long countdown = 0; countdown <= TicketType.UNKNOWN.timeout(); countdown++) {
+            assertEquals(1, storage.getTickets(CHUNK).size());
+            timeouts.purgeSections(new long[]{SECTION});
         }
+
+        assertTrue(storage.getTickets(CHUNK).isEmpty());
     }
 }
