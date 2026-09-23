@@ -11,10 +11,6 @@ import java.util.ArrayList;
 
 @Pseudo
 @Mixin(targets = {
-    // Direwolf20-MC/LaserIO, particle lists, filled by cards from their region and sent and cleared by the server tick.
-    "com.direwolf20.laserio.common.events.ServerTickHandler",
-    // Direwolf20-MC/MiningGadgets, durability sync list, filled by mining from the player's region and sent and cleared by the server tick.
-    "com.direwolf20.mininggadgets.common.events.ServerTickHandler",
     // JDKDigital/utilitarian, leaf decay queue, filled by onLogBreak from the breaking player's region and walked by the server tick.
     "cy.jdkdigital.utilitarian.event.ModEventHandler"
 })

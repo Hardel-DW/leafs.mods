@@ -8,10 +8,11 @@
 		"CullingUpdateTrackerMixin",
 		"GraphBufferMixin",
 		"LeafDecayMixin",
+		"ListFieldMixin",
 		"MapFieldMixin",
 		"PlacedBlockSetMixin",
+		"QueueFieldMixin",
 		"SetFieldMixin",
-		"StaticArrayDequeMixin",
 		"StaticArrayListMixin",
 		"StaticHashMapMixin",
 		"StaticObject2ObjectMapMixin"
