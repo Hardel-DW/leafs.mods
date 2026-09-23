@@ -70,14 +70,14 @@ class ChunkPoolTest {
 
         pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, 1, chunk, done::countDown));
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (pool.blocks().total() == 0) {
+        while (pool.blocks().of(ChunkTask.Kind.STEP, ChunkTask.Kind.STEP).perMinute() == 0) {
             assertTrue(System.nanoTime() < deadline, "the second task parks behind the first");
             Thread.onSpinWait();
         }
 
         release.countDown();
         assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertEquals(1, pool.blocks().total());
+        assertEquals(1, pool.blocks().of(ChunkTask.Kind.STEP, ChunkTask.Kind.STEP).perMinute());
     }
 
     @Test

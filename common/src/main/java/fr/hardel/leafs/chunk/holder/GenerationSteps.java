@@ -6,7 +6,6 @@ import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
-import fr.hardel.leafs.metrics.ServerMetrics;
 import net.minecraft.CrashReport;
 import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkMap;
@@ -35,14 +34,12 @@ public final class GenerationSteps {
     private final ChunkMap chunkMap;
     private final ChunkPool pool;
     private final ChunkOwners owners;
-    private final ServerMetrics metrics;
     private final ConcurrentLong2ObjectMap<StepTask[]> queued = new ConcurrentLong2ObjectMap<>();
 
-    public GenerationSteps(ChunkMap chunkMap, ChunkPool pool, ChunkOwners owners, ServerMetrics metrics) {
+    public GenerationSteps(ChunkMap chunkMap, ChunkPool pool, ChunkOwners owners) {
         this.chunkMap = chunkMap;
         this.pool = pool;
         this.owners = owners;
-        this.metrics = metrics;
     }
 
     public void run(ChunkGenerationTask task) {
@@ -156,7 +153,6 @@ public final class GenerationSteps {
             }
 
             forget(this);
-            metrics.stepRan(step.targetStatus());
             CompletableFuture<ChunkAccess> applied;
             try {
                 applied = body.get();

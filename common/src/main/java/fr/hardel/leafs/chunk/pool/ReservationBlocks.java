@@ -22,15 +22,4 @@ public final class ReservationBlocks {
     public MinuteCounter of(Kind blocked, Kind holder) {
         return counts[blocked.ordinal()][holder.ordinal()];
     }
-
-    public long total() {
-        long total = 0;
-        for (MinuteCounter[] row : counts) {
-            for (MinuteCounter counter : row) {
-                total += counter.total();
-            }
-        }
-
-        return total;
-    }
 }
