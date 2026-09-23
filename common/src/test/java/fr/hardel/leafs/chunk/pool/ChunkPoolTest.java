@@ -102,6 +102,28 @@ class ChunkPoolTest {
         assertEquals(List.of(1, 3, 5), order);
     }
 
+    /** 2026-09-24: the pool housekeeping shared the first bucket with the awaited chunks, and a region waited behind an autosave. */
+    @Test
+    void anAwaitedTaskPassesBeforeTheQueuedHousekeeping() {
+        pool = ChunkFixtures.pool(1);
+        CountDownLatch gate = TestThreads.occupy(pool);
+        List<String> order = new CopyOnWriteArrayList<>();
+        CountDownLatch done = new CountDownLatch(2);
+
+        pool.execute(() -> {
+            order.add("housekeeping");
+            done.countDown();
+        });
+        pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, ChunkPool.FIRST, NONE, () -> {
+            order.add("awaited");
+            done.countDown();
+        }));
+        gate.countDown();
+        TestThreads.await(done);
+
+        assertEquals(List.of("awaited", "housekeeping"), order);
+    }
+
     @Test
     void twoTasksOnTheSameChunkNeverOverlap() throws InterruptedException {
         pool = ChunkFixtures.pool(4);
