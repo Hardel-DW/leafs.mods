@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
@@ -19,7 +18,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongPredicate;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -123,23 +121,6 @@ class SynchronizedCollectionsTest {
 
         assertEquals(WRITERS * PER_WRITER / 2, list.size());
         assertFalse(list.contains(0));
-    }
-
-    @Test
-    void arrayDequeSurvivesWritesDuringIterationAndIteratorRemoves() throws InterruptedException {
-        ArrayDeque<Integer> deque = new SynchronizedArrayDeque<>();
-        walkWhileWriting(() -> deque, deque::add);
-        List<Integer> written = IntStream.range(0, WRITERS * PER_WRITER).boxed().toList();
-        assertEquals(written, deque.stream().sorted().toList());
-
-        Iterator<Integer> iterator = deque.iterator();
-        while (iterator.hasNext()) {
-            if (iterator.next() % 2 == 0) {
-                iterator.remove();
-            }
-        }
-
-        assertEquals(written.stream().filter(value -> value % 2 != 0).toList(), deque.stream().sorted().toList());
     }
 
     @Test

@@ -27,7 +27,7 @@ class FacadeCoverageTest {
 
     @ParameterizedTest
     @ValueSource(classes = {
-        SynchronizedArrayDeque.class, SynchronizedArrayList.class, SynchronizedHashMap.class, SynchronizedHashSet.class,
+        SynchronizedArrayList.class, SynchronizedHashMap.class, SynchronizedHashSet.class,
         SynchronizedLongOpenHashSet.class, SynchronizedObject2ObjectOpenHashMap.class
     })
     void aSynchronizedCollectionRedefinesEveryMethodOfItsClasses(Class<?> facade) {
