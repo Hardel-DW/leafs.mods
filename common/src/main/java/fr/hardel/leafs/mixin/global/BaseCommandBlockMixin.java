@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.global.CommandEngine;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BaseCommandBlock;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,6 +19,6 @@ public abstract class BaseCommandBlockMixin {
 
     @WrapMethod(method = "performCommand")
     private boolean leafs$runThroughTheEngine(ServerLevel level, Operation<Boolean> original) {
-        return CommandEngine.runCommandBlock(level, createCommandSourceStack(level, CommandSource.NULL).getPosition(), () -> original.call(level));
+        return CommandEngine.runCommandBlock(level, BlockPos.containing(createCommandSourceStack(level, CommandSource.NULL).getPosition()), () -> original.call(level));
     }
 }
