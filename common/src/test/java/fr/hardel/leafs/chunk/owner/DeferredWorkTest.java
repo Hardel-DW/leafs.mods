@@ -25,7 +25,7 @@ class DeferredWorkTest {
     private final List<String> ran = new ArrayList<>();
     private boolean holding;
     private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, work) -> { work.run(); return true; },
-        new GlobalScheduler(Runnable::run));
+        new GlobalScheduler(Runnable::run), (_, _) -> 0);
 
     private DeferredWork work(DeferReason reason, Runnable task) {
         return new DeferredWork(owners, stats, 0, 0, reason, () -> true, task);

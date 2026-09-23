@@ -30,7 +30,7 @@ class RoutingNeighborUpdaterTest {
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private boolean holding;
     private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, task) -> { task.run(); return true; },
-        new GlobalScheduler(Runnable::run));
+        new GlobalScheduler(Runnable::run), (_, _) -> 0);
 
     private static final class RecordingUpdater extends CollectingNeighborUpdater {
         final List<String> calls = new ArrayList<>();

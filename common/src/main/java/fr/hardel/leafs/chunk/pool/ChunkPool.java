@@ -15,6 +15,7 @@ import java.util.function.BiConsumer;
 
 public final class ChunkPool implements Executor {
     public static final int FIRST = 0;
+    public static final int SECOND = 1;
 
     private final PriorityBuckets buckets;
     private final PlacedTasks placed = new PlacedTasks();

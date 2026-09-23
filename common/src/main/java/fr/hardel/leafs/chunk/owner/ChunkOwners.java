@@ -113,7 +113,7 @@ public final class ChunkOwners implements Router {
     }
 
     private void onPool(int chunkX, int chunkZ, Runnable task) {
-        pool.submit(ChunkTask.of(ChunkTask.Kind.OWNER, ChunkPool.FIRST, placement.area(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0), () -> onPoolStart(chunkX, chunkZ, task)));
+        placement.onPool(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0, () -> onPoolStart(chunkX, chunkZ, task));
     }
 
     public boolean holds(int chunkX, int chunkZ) {

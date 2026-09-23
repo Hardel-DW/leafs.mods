@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 class WaitReportTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, (_, _) -> null, (_, _) -> false, (_, _, _) -> false, new GlobalScheduler(Runnable::run));
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, (_, _) -> null, (_, _) -> false, (_, _, _) -> false, new GlobalScheduler(Runnable::run), (_, _) -> 0);
 
     @AfterEach
     void stop() {
