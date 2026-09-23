@@ -1,7 +1,6 @@
 package fr.hardel.leafs;
 
 import fr.hardel.leafs.metrics.ModAttribution;
-import fr.hardel.leafs.metrics.TickStages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +20,6 @@ public final class Leafs {
     public static void bootstrap(Platform platform) {
         Leafs.platform = platform;
         LeafsConfig.register(platform.configDir(), platform.gameDir());
-        TickStages.register();
 
         LeafsConfig config = LeafsConfig.get();
         LOGGER.info("Leafs initialised - {} region workers, {} chunk workers, {}x{}-chunk sections", config.effectiveRegionThreads(), config.effectiveChunkThreads(), config.sectionSize(), config.sectionSize());
