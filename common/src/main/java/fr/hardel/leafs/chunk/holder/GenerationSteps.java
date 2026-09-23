@@ -6,13 +6,9 @@ import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
-import net.minecraft.CrashReport;
 import net.minecraft.server.level.ChunkGenerationTask;
-import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.util.StaticCache2D;
-import net.minecraft.util.thread.BlockableEventLoop;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -20,23 +16,20 @@ import net.minecraft.world.level.chunk.status.ChunkStep;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 public final class GenerationSteps {
     private static final int STATUSES = ChunkStatus.getStatusList().size();
-    private static final RuntimeException CANCELLED = new RuntimeException("Step cancelled in the queue", null, false, false) {
+    public static final RuntimeException CANCELLED = new RuntimeException("Step cancelled in the queue", null, false, false) {
     };
 
-    private final ChunkMap chunkMap;
     private final ChunkPool pool;
     private final ChunkOwners owners;
     private final ConcurrentLong2ObjectMap<StepTask[]> queued = new ConcurrentLong2ObjectMap<>();
 
-    public GenerationSteps(ChunkMap chunkMap, ChunkPool pool, ChunkOwners owners) {
-        this.chunkMap = chunkMap;
+    public GenerationSteps(ChunkPool pool, ChunkOwners owners) {
         this.pool = pool;
         this.owners = owners;
     }
@@ -51,33 +44,6 @@ public final class GenerationSteps {
         if (waiting != null) {
             waiting.thenRun(() -> pool.execute(() -> drive(task)));
         }
-    }
-
-    public CompletableFuture<ChunkResult<ChunkAccess>> applyOnHolder(GenerationChunkHolder holder, ChunkStep step, StaticCache2D<GenerationChunkHolder> cache) {
-        ChunkStatus status = step.targetStatus();
-        if (holder.isStatusDisallowed(status)) {
-            return GenerationChunkHolder.UNLOADED_CHUNK_FUTURE;
-        }
-
-        if (!holder.acquireStatusBump(status)) {
-            return holder.getOrCreateFuture(status);
-        }
-
-        return chunkMap.applyStep(holder, step, cache).handle((chunk, failure) -> {
-            Throwable cause = failure instanceof CompletionException wrapped ? wrapped.getCause() : failure;
-            if (cause == CANCELLED) {
-                holder.startedWork.compareAndSet(status, status == ChunkStatus.EMPTY ? null : status.getParent());
-                return GenerationChunkHolder.UNLOADED_CHUNK;
-            }
-
-            if (cause != null) {
-                BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(cause, "Exception chunk generation/loading"));
-            } else {
-                holder.completeFuture(status, chunk);
-            }
-
-            return ChunkResult.of(chunk);
-        });
     }
 
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {

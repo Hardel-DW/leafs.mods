@@ -29,9 +29,6 @@ accessible class net/minecraft/world/level/entity/PersistentEntitySectionManager
 accessible method net/minecraft/server/level/ChunkMap saveChunkIfNeeded (Lnet/minecraft/server/level/ChunkHolder;J)Z
 accessible method net/minecraft/server/level/GenerationChunkHolder updateHighestAllowedStatus (Lnet/minecraft/server/level/ChunkMap;)V
 accessible method net/minecraft/server/level/GenerationChunkHolder isStatusDisallowed (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
-accessible method net/minecraft/server/level/GenerationChunkHolder acquireStatusBump (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Z
-accessible method net/minecraft/server/level/GenerationChunkHolder getOrCreateFuture (Lnet/minecraft/world/level/chunk/status/ChunkStatus;)Ljava/util/concurrent/CompletableFuture;
-accessible method net/minecraft/server/level/GenerationChunkHolder completeFuture (Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/world/level/chunk/ChunkAccess;)V
 accessible method net/minecraft/server/level/ChunkHolder updateFutures (Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/Executor;)V
 accessible field net/minecraft/server/level/ChunkMap serverViewDistance I
 accessible method net/minecraft/server/players/PlayerList save (Lnet/minecraft/server/level/ServerPlayer;)V
