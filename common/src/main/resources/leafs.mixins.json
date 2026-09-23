@@ -36,6 +36,7 @@
 		"entity.ServerPlayerMixin",
 		"entity.TrackedEntityMixin",
 		"global.BaseCommandBlockMixin",
+		"global.CommandBlockMixin",
 		"global.CommandsMixin",
 		"global.MapIndexMixin",
 		"global.MapItemSavedDataMixin",

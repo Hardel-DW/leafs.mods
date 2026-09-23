@@ -7,7 +7,8 @@
 	"entrypoints": {
 		"fabric-gametest": [
 			"fr.hardel.leafs.gametest.ChunkLoadEventsTest",
-			"fr.hardel.leafs.gametest.BorrowReleaseTest"
+			"fr.hardel.leafs.gametest.BorrowReleaseTest",
+			"fr.hardel.leafs.gametest.CommandBlockChainTest"
 		]
 	},
 	"depends": {
