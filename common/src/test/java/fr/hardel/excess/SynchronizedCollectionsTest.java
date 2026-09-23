@@ -9,14 +9,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongPredicate;
@@ -192,22 +190,6 @@ class SynchronizedCollectionsTest {
     }
 
     @Test
-    void weakAndIdentityMapsShareTheSameContract() {
-        WeakHashMap<Object, Integer> weak = new SynchronizedWeakHashMap<>();
-        Object key = new Object();
-        weak.merge(key, 1, Integer::sum);
-        weak.merge(key, 1, Integer::sum);
-        assertEquals(2, weak.get(key));
-
-        IdentityHashMap<Object, Runnable> identity = new SynchronizedIdentityHashMap<>();
-        Runnable task = () -> {};
-        identity.putIfAbsent(key, task);
-        identity.values().forEach(Runnable::run);
-        identity.clear();
-        assertTrue(identity.isEmpty());
-    }
-
-    @Test
     void longOpenHashSetSurvivesWritesDuringIteration() throws InterruptedException {
         SynchronizedLongOpenHashSet set = new SynchronizedLongOpenHashSet();
         runWriters(set::add, () -> {
@@ -231,13 +213,6 @@ class SynchronizedCollectionsTest {
         entries.next();
         entries.remove();
         assertEquals(7, map.size());
-
-        SynchronizedReference2ObjectOpenHashMap<Object, Integer> byIdentity = new SynchronizedReference2ObjectOpenHashMap<>();
-        Object key = new Object();
-        byIdentity.computeIfAbsent(key, _ -> 1);
-        assertTrue(byIdentity.keySet().contains(key));
-        byIdentity.reference2ObjectEntrySet().clear();
-        assertTrue(byIdentity.isEmpty());
     }
 
     private static int walkWhileWriting(Supplier<Iterable<?>> view, Writer writer) throws InterruptedException {
