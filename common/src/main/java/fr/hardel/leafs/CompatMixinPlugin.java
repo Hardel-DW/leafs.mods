@@ -55,7 +55,7 @@ public final class CompatMixinPlugin implements IMixinConfigPlugin {
             .filter(target -> target.startsWith(owner))
             .map(target -> target.substring(owner.length(), target.indexOf(':')))
             .collect(Collectors.toSet());
-        // A wrapped field write runs in a MixinExtras bridge, and the JVM refuses a final field written outside its initializer.
+
         targetClass.fields.stream().filter(field -> wrapped.contains(field.name)).forEach(field -> field.access &= ~Opcodes.ACC_FINAL);
     }
 
