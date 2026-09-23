@@ -36,7 +36,8 @@ class SynchronizedCollectionsTest {
 
     @Test
     void hashSetIteratorRemoveReachesTheLiveSet() {
-        Set<Integer> set = new SynchronizedHashSet<>(List.of(1, 2, 3));
+        Set<Integer> set = new SynchronizedHashSet<>();
+        set.addAll(List.of(1, 2, 3));
         Iterator<Integer> iterator = set.iterator();
         iterator.next();
         iterator.remove();
@@ -106,7 +107,8 @@ class SynchronizedCollectionsTest {
 
     @Test
     void hashMapViewsWriteBackToTheLiveMap() {
-        HashMap<String, Integer> map = new SynchronizedHashMap<>(Map.of("a", 1, "b", 2, "c", 3));
+        HashMap<String, Integer> map = new SynchronizedHashMap<>();
+        map.putAll(Map.of("a", 1, "b", 2, "c", 3));
 
         Iterator<Map.Entry<String, Integer>> entries = map.entrySet().iterator();
         Map.Entry<String, Integer> first = entries.next();

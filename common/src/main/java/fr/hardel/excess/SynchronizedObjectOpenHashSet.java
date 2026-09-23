@@ -13,13 +13,6 @@ import java.util.function.Predicate;
 
 public final class SynchronizedObjectOpenHashSet<E> extends ObjectOpenHashSet<E> {
 
-    public SynchronizedObjectOpenHashSet() {
-    }
-
-    public SynchronizedObjectOpenHashSet(Collection<? extends E> elements) {
-        super(elements);
-    }
-
     @Override
     public synchronized boolean add(E element) {
         return super.add(element);

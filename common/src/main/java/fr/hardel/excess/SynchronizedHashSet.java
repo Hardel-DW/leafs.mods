@@ -11,13 +11,6 @@ import java.util.function.Predicate;
 
 public final class SynchronizedHashSet<E> extends HashSet<E> {
 
-    public SynchronizedHashSet() {
-    }
-
-    public SynchronizedHashSet(Collection<? extends E> elements) {
-        super(elements);
-    }
-
     @Override
     public synchronized boolean add(E element) {
         return super.add(element);
