@@ -62,7 +62,6 @@
 		"ticking.ChunkMainThreadExecutorMixin",
 		"ticking.MinecraftServerMixin",
 		"ticking.ServerLevelMixin",
-		"ticking.ServerWatchdogMixin",
 		"world.ChunkAccessMixin",
 		"world.EuclideanGameEventListenerRegistryMixin",
 		"world.LevelChunkMixin",

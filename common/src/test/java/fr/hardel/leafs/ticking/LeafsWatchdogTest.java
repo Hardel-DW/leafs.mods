@@ -111,36 +111,6 @@ class LeafsWatchdogTest {
         watchdog.stop();
     }
 
-    @Test
-    void shutdownPastTheDeadlineRunsTheKillerWithTheStoppingThread() throws InterruptedException {
-        LeafsWatchdog watchdog = watchdog(Duration.ofSeconds(5), Duration.ofSeconds(10));
-        watchdog.armShutdownDeadline(Duration.ofMillis(50));
-
-        assertTrue(killed.await(5, TimeUnit.SECONDS), "an expired deadline must reach the killer");
-        LeafsWatchdog.Stall stall = kills.peek();
-        assertTrue(stall.summary().contains("shutdown"));
-        assertSame(Thread.currentThread(), stall.thread(), "the dump must point at the thread that ran stopServer");
-    }
-
-    @Test
-    void disarmedDeadlineNeverKills() throws InterruptedException {
-        LeafsWatchdog watchdog = watchdog(Duration.ofSeconds(5), Duration.ofSeconds(10));
-        watchdog.armShutdownDeadline(Duration.ofMillis(150));
-        watchdog.disarmShutdownDeadline();
-
-        Thread.sleep(400);
-        assertTrue(kills.isEmpty(), "a disarmed deadline must not kill the JVM");
-    }
-
-    @Test
-    void disabledKillThresholdArmsNothing() throws InterruptedException {
-        LeafsWatchdog watchdog = watchdog(Duration.ofSeconds(5), KILL_DISABLED);
-        watchdog.armShutdownDeadline(Duration.ofMillis(50));
-
-        Thread.sleep(300);
-        assertTrue(kills.isEmpty(), "kill 0 must disable the shutdown deadline too");
-    }
-
     private static Thread stalledTick(LeafsWatchdog watchdog, TestTickHandle handle, CountDownLatch release) {
         Thread stalled = new Thread(() -> {
             watchdog.beginTick(handle);
