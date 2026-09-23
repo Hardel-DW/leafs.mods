@@ -8,17 +8,8 @@ import java.util.ArrayList;
 import java.util.function.Consumer;
 
 final class Reservations {
-    private final ConcurrentLong2ObjectMap<Waiters> held = new ConcurrentLong2ObjectMap<>();
+    private final ConcurrentLong2ObjectMap<ChunkTask> held = new ConcurrentLong2ObjectMap<>();
     private final Consumer<ChunkTask> requeue;
-
-    private static final class Waiters extends ArrayList<ChunkTask> {
-        private final ChunkTask holder;
-        private boolean freed;
-
-        private Waiters(ChunkTask holder) {
-            this.holder = holder;
-        }
-    }
 
     Reservations(Consumer<ChunkTask> requeue) {
         this.requeue = requeue;
@@ -28,27 +19,30 @@ final class Reservations {
         long[] keys = task.reserved();
         retry:
         while (true) {
-            Waiters mine = new Waiters(task);
             for (int index = 0; index < keys.length; index++) {
-                Waiters present = held.putIfAbsent(keys[index], mine);
+                ChunkTask present = held.putIfAbsent(keys[index], task);
                 if (present == null) {
                     continue;
                 }
 
                 for (int taken = 0; taken < index; taken++) {
-                    held.remove(keys[taken], mine);
+                    held.remove(keys[taken], task);
                 }
 
-                free(mine);
+                free(task);
                 synchronized (present) {
-                    if (present.freed) {
+                    if (held.get(keys[index]) != present) {
                         continue retry;
                     }
 
-                    present.add(task);
+                    if (present.waiters == null) {
+                        present.waiters = new ArrayList<>();
+                    }
+
+                    present.waiters.add(task);
                 }
 
-                return present.holder;
+                return present;
             }
 
             return null;
@@ -56,21 +50,19 @@ final class Reservations {
     }
 
     void release(ChunkTask task) {
-        Waiters holder = null;
         for (long key : task.reserved()) {
-            holder = held.remove(key);
+            held.remove(key);
         }
 
-        if (holder != null) {
-            free(holder);
-        }
+        free(task);
     }
 
-    private void free(Waiters waiters) {
-        synchronized (waiters) {
-            waiters.freed = true;
-            waiters.forEach(requeue);
-            waiters.clear();
+    private void free(ChunkTask holder) {
+        synchronized (holder) {
+            if (holder.waiters != null) {
+                holder.waiters.forEach(requeue);
+                holder.waiters = null;
+            }
         }
     }
 }
