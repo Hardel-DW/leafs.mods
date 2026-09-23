@@ -171,10 +171,7 @@ public final class TickingManager {
 
     public void tickLevel(ServerLevel level, Runnable vanillaTick) {
         globalTicking = true;
-        LevelTickUnit unit = levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler));
-        unit.ensureActivated();
-        unit.prepareAttached(vanillaTick);
-        scheduler.runAttached(unit);
+        levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler)).tick(vanillaTick);
     }
 
     public void forgetLevel(ServerLevel level) {
