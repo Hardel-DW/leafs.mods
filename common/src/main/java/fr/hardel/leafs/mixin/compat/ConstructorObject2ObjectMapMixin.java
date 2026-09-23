@@ -11,11 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 @Pseudo
 @Mixin(targets = {
     // LootrMinecraft/Lootr, block entity entries, registered by chunk loads from any thread and walked and removed by the server tick.
-    "noobanidus.mods.lootr.common.block.entity.BlockEntityTicker",
-    // LootrMinecraft/Lootr#895, container stores, inserted by getStore from every chunk owner.
-    "noobanidus.mods.lootr.common.data.Section",
-    // klikli-dev/theurgy, logistics networks, written by leaf nodes from their region while other regions read them.
-    "com.klikli_dev.theurgy.logistics.Logistics"
+    "noobanidus.mods.lootr.common.block.entity.BlockEntityTicker"
 })
 public abstract class ConstructorObject2ObjectMapMixin {
 
