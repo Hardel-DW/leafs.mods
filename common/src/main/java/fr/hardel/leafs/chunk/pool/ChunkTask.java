@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public abstract class ChunkTask {
@@ -39,6 +40,7 @@ public abstract class ChunkTask {
     private volatile int priority;
     private volatile int bucket = UNQUEUED;
     private volatile boolean withdrawn;
+    @Nullable List<ChunkTask> waiters;
 
     protected ChunkTask(Kind kind, int priority, long... reserved) {
         this.kind = kind;
