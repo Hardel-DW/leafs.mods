@@ -1,5 +1,6 @@
 package fr.hardel.leafs.scheduler;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
@@ -8,6 +9,7 @@ import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.metrics.DeferStats;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class DeferredWorkTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);

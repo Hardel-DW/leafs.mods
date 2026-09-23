@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
@@ -15,6 +16,7 @@ import net.minecraft.world.level.redstone.CollectingNeighborUpdater;
 import net.minecraft.world.level.redstone.Orientation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class RoutingNeighborUpdaterTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
