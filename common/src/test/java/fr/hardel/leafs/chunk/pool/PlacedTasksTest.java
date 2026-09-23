@@ -1,11 +1,13 @@
 package fr.hardel.leafs.chunk.pool;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 import java.util.Set;
@@ -17,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 2026-09-04: a villager read a chunk behind fifteen thousand equally urgent tasks, its region waited four seconds. 2026-09-05: a region waited 54 s for a light task no index knew. */
+@ExtendWith(MinecraftBootstrap.class)
 class PlacedTasksTest {
     private static final long[] NONE = {};
     private static final int FAR = 10;

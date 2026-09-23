@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.owner;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
@@ -7,6 +8,7 @@ import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -20,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class ChunkOwnersTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final GlobalScheduler server = new GlobalScheduler(Runnable::run);

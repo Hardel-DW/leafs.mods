@@ -1,9 +1,11 @@
 package fr.hardel.leafs.chunk.pool;
 
+import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 import java.util.concurrent.BrokenBarrierException;
@@ -18,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MinecraftBootstrap.class)
 class ChunkPoolTest {
     private static final long[] NONE = {};
     private ChunkPool pool;
