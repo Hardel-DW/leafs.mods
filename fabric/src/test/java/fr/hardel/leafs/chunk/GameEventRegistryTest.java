@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.world.GameEventListeners;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -44,12 +45,7 @@ class GameEventRegistryTest {
             var outer = workers.submit(() -> registry.visitInRangeListeners(GameEvent.STEP, Vec3.ZERO, new GameEvent.Context(null, null), (listener, _) -> {
                 seen.add(listener);
                 visiting.countDown();
-                try {
-                    assertTrue(release.await(5, TimeUnit.SECONDS));
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    throw new AssertionError(exception);
-                }
+                TestThreads.await(release);
             }));
             try {
                 assertTrue(visiting.await(5, TimeUnit.SECONDS));

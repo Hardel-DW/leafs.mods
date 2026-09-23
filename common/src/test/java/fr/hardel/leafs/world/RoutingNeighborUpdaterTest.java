@@ -1,5 +1,6 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.scheduler.GlobalScheduler;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
@@ -22,9 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoutingNeighborUpdaterTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 4, (_, _) -> { });
+    private final ChunkPool pool = ChunkFixtures.pool(1);
     private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
     private boolean holding;
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, task) -> { task.run(); return true; },
+        new GlobalScheduler(Runnable::run));
 
     private static final class RecordingUpdater extends CollectingNeighborUpdater {
         final List<String> calls = new ArrayList<>();
@@ -59,10 +62,6 @@ class RoutingNeighborUpdaterTest {
         pool.shutdown();
     }
 
-    private ChunkOwners owners() {
-        return new ChunkOwners(pool, 0, (x, z) -> inbox, (x, z) -> holding, (x, z) -> 0, () -> true, Runnable::run, (x, z, task) -> { task.run(); return true; }, new GlobalScheduler(Runnable::run), Long.MAX_VALUE);
-    }
-
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
         return new RegionWorldData(() -> 0L, RandomSource.create(), updater, new PathTypeCache());
     }
@@ -84,7 +83,7 @@ class RoutingNeighborUpdaterTest {
             RecordingUpdater updater = new RecordingUpdater();
             created.add(updater);
             return updater;
-        }, this::owners);
+        }, () -> owners);
 
         callAll(router);
         Thread other = new Thread(() -> callAll(router));
@@ -101,7 +100,7 @@ class RoutingNeighborUpdaterTest {
         holding = true;
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, this::owners);
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, () -> owners);
         WorldTickContext.enter(null, null, dataWith(regional));
         try {
             callAll(router);
@@ -116,7 +115,7 @@ class RoutingNeighborUpdaterTest {
     @Test
     void aForeignChunkUpdateIsMailedToItsOwner() {
         RecordingUpdater fallback = new RecordingUpdater();
-        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, this::owners);
+        RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, () -> owners);
 
         callAll(router);
         assertTrue(fallback.calls.isEmpty(), "nothing runs on the thread that does not own the chunk");

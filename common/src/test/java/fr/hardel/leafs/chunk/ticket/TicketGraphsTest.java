@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import net.minecraft.world.level.ChunkPos;
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** 2026-09-04: a region paid 30 ms of level bookkeeping at every chunk its player crossed. */
 @ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 46, (_, _) -> { });
+    private final ChunkPool pool = ChunkFixtures.pool(1);
     private final TicketGraphs graphs = new TicketGraphs();
     private final List<String> threads = new CopyOnWriteArrayList<>();
     private final CountDownLatch published = new CountDownLatch(1);

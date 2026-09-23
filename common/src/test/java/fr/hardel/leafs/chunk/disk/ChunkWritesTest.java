@@ -1,8 +1,9 @@
 package fr.hardel.leafs.chunk.disk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
@@ -25,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Timeout(30)
 @ExtendWith(MinecraftBootstrap.class)
 class ChunkWritesTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 2, 4, (_, _) -> { });
+    private final ChunkPool pool = ChunkFixtures.pool(2);
     private SimpleRegionStorage storage;
 
     @AfterEach
@@ -45,32 +46,17 @@ class ChunkWritesTest {
 
         PendingWrite older = writes.photograph(pos, () -> {
             olderTaken.countDown();
-            await(newerWritten);
-            return photo(1);
+            TestThreads.await(newerWritten);
+            return ChunkFixtures.photo(1);
         });
         olderTaken.await(5, TimeUnit.SECONDS);
-        PendingWrite newer = writes.photograph(pos, () -> photo(2));
+        PendingWrite newer = writes.photograph(pos, () -> ChunkFixtures.photo(2));
         newer.written().join();
         newerWritten.countDown();
         older.written().join();
         writes.settled().join();
 
         CompoundTag onDisk = storage.worker.loadAsync(pos).join().orElseThrow();
-        assertEquals(2, onDisk.getIntOr("version", 0), "the disk keeps the last photo");
-    }
-
-    private static CompoundTag photo(int version) {
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("version", version);
-        tag.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
-        return tag;
-    }
-
-    private static void await(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
+        assertEquals(2, onDisk.getIntOr("DataVersion", 0), "the disk keeps the last photo");
     }
 }

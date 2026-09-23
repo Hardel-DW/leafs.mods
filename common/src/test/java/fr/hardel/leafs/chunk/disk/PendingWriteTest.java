@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.disk;
 
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.visitors.CollectFields;
@@ -18,9 +19,7 @@ class PendingWriteTest {
 
     private CompoundTag photo() {
         photos.incrementAndGet();
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("DataVersion", 4882);
-        return tag;
+        return ChunkFixtures.photo(4882);
     }
 
     @Test

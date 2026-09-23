@@ -1,5 +1,7 @@
 package fr.hardel.leafs.chunk.pool;
 
+import fr.hardel.TestThreads;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.AfterEach;
@@ -19,22 +21,20 @@ class PlacedTasksTest {
     private static final long[] NONE = {};
     private static final int FAR = 10;
 
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 46, (_, _) -> { });
+    private final ChunkPool pool = ChunkFixtures.pool(1);
     private final Long2IntOpenHashMap distances = new Long2IntOpenHashMap();
     private final Urgency urgency = (chunkX, chunkZ) -> distances.getOrDefault(ChunkPos.pack(chunkX, chunkZ), FAR);
     private final List<String> order = new CopyOnWriteArrayList<>();
-    private final CountDownLatch gate = new CountDownLatch(1);
 
     @AfterEach
     void stop() {
-        gate.countDown();
         pool.shutdown();
     }
 
     @Test
     void whatAThreadWaitsForMovesToTheHead() throws InterruptedException {
         CountDownLatch done = new CountDownLatch(3);
-        holdTheOnlyWorker();
+        CountDownLatch gate = TestThreads.occupy(pool);
 
         distances.put(ChunkPos.pack(100, 100), 5);
         queue("far", 100, 100, 100, 100, done);
@@ -52,7 +52,7 @@ class PlacedTasksTest {
     @Test
     void aChunkThatCameCloserToThePlayersMovesUp() throws InterruptedException {
         CountDownLatch done = new CountDownLatch(2);
-        holdTheOnlyWorker();
+        CountDownLatch gate = TestThreads.occupy(pool);
 
         distances.put(ChunkPos.pack(100, 100), 5);
         queue("behind", 100, 100, 100, 100, done);
@@ -70,28 +70,11 @@ class PlacedTasksTest {
         return ChunkTask.key(0, chunkX, chunkZ);
     }
 
-    private void holdTheOnlyWorker() throws InterruptedException {
-        CountDownLatch started = new CountDownLatch(1);
-        pool.execute(() -> {
-            started.countDown();
-            await(gate);
-        });
-        assertTrue(started.await(5, TimeUnit.SECONDS));
-    }
-
     private void queue(String name, int chunkX, int chunkZ, int centerX, int centerZ, CountDownLatch done) {
         ChunkTask.Place place = new ChunkTask.Place(key(chunkX, chunkZ), key(centerX, centerZ), urgency);
         pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, place, NONE, () -> {
             order.add(name);
             done.countDown();
         }));
-    }
-
-    private static void await(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-        }
     }
 }
