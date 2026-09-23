@@ -1,8 +1,6 @@
 package fr.hardel.leafs.metrics;
 
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.LeafsBuiltInRegistries;
-import net.minecraft.core.Registry;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
@@ -70,14 +68,6 @@ public final class TickStages {
 
     public static int count(TickFamily family) {
         return byFamily.get(family).size();
-    }
-
-    public static void register() {
-        for (List<TickStage> stages : byFamily.values()) {
-            for (TickStage stage : stages) {
-                Registry.register(LeafsBuiltInRegistries.TICK_STAGE, stage.id(), stage);
-            }
-        }
     }
 
     private static TickStage create(TickFamily family, String name) {
