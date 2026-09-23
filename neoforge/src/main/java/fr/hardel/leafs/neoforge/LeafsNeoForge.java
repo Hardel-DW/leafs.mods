@@ -23,6 +23,7 @@ import java.util.Map;
 @Mod(Leafs.MOD_ID)
 public final class LeafsNeoForge {
     public LeafsNeoForge(IEventBus modBus) {
+        // Workers join SidedThreadGroups.SERVER: EffectiveSide reads the thread group.
         Leafs.bootstrap(new Leafs.Platform(FMLPaths.CONFIGDIR.get(), FMLPaths.GAMEDIR.get(), ModAttribution.fromOrigins(origins()), SidedThreadGroups.SERVER));
         modBus.addListener((RegisterEvent event) -> event.register(Registries.TICKET_TYPE, LeafsTicketTypes.DEMAND, () -> LeafsTicketTypes.demand));
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> event.getDispatcher().register(LeafsCommand.node()));

@@ -59,7 +59,6 @@ import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-/** Leafs owns the holder bookkeeping: the table, the generation on the pool, the publication on the owner, the unload. Vanilla's serial passes are cut. */
 @Mixin(ChunkMap.class)
 public abstract class ChunkMapMixin implements LevelChunksAccess {
     @Mutable
@@ -107,6 +106,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     }
 
     @Unique
+    /** The thread that creates a generation task installs it in its holder, then starts it; no other thread drains the list. */
     private final ThreadLocal<List<ChunkGenerationTask>> leafs$tasksCreatedHere = ThreadLocal.withInitial(ArrayList::new);
 
     @Unique
@@ -117,7 +117,6 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         return leafs$chunks;
     }
 
-    /** Before the view distance lands: the table sits in both vanilla fields, the shared sets take writers from every thread, the bricks exist. */
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;setServerViewDistance(I)V"))
     private void leafs$buildTheChunkSystem(CallbackInfo callbackInfo) {
         this.chunksToEagerlySave = new ConcurrentLongSet();
@@ -133,24 +132,20 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         ((DistanceManagerAccess) self.getDistanceManager()).leafs$bind(leafs$chunks);
     }
 
-    /** A move is one ticket change: the old and the new position land together, so no graph ever sees a player-less instant. */
     @WrapMethod(method = "move")
     private void leafs$moveAsOneChange(ServerPlayer player, Operation<Void> original) {
         leafs$chunks.graphs().batch(() -> original.call(player));
     }
 
-    /** The visibility pass of a move runs on the regions, against every player that moved; the rest of the move stays. */
     @WrapOperation(method = "move", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;values()Lit/unimi/dsi/fastutil/objects/ObjectCollection;"))
     private ObjectCollection<ChunkMap.TrackedEntity> leafs$noLevelWidePassOnMove(Int2ObjectMap<ChunkMap.TrackedEntity> instance, Operation<ObjectCollection<ChunkMap.TrackedEntity>> original) {
         return ObjectLists.emptyList();
     }
 
-    /** Each step is a pool task under the radius it writes. */
     @WrapOperation(method = "applyStep", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/status/ChunkStep;apply(Lnet/minecraft/world/level/chunk/status/WorldGenContext;Lnet/minecraft/util/StaticCache2D;Lnet/minecraft/world/level/chunk/ChunkAccess;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkAccess> leafs$stepOnThePool(ChunkStep step, WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Operation<CompletableFuture<ChunkAccess>> original) {
         return leafs$chunks.steps().apply(step, cache, chunk, () -> original.call(step, context, cache, chunk));
     }
-
 
     @Inject(method = "runGenerationTask", at = @At("HEAD"), cancellable = true)
     private void leafs$driveOnThePool(ChunkGenerationTask task, CallbackInfo callbackInfo) {
@@ -158,13 +153,11 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         callbackInfo.cancel();
     }
 
-    /** Vanilla's list of created tasks, one per thread: the thread that creates a task installs it in its holder, then starts it; no other thread drains it. */
     @WrapOperation(method = {"scheduleGenerationTask", "runGenerationTasks"}, at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;pendingGenerationTasks:Ljava/util/List;"))
     private List<ChunkGenerationTask> leafs$tasksOfThisThread(ChunkMap self, Operation<List<ChunkGenerationTask>> original) {
         return leafs$tasksCreatedHere.get();
     }
 
-    /** Both halves of a load, parse and read, run on the pool under the chunk. */
     @WrapOperation(method = "scheduleChunkLoad", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<?> leafs$loadOnThePool(CompletableFuture<?> future, Function<?, ?> body, Executor executor, Operation<CompletableFuture<?>> original, @Local(argsOnly = true) ChunkPos pos) {
         return original.call(future, body, leafs$chunks.steps().loading(pos));
@@ -211,25 +204,21 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         callbackInfo.cancel();
     }
 
-    /** The unload leaves from the loading graph to the owner; vanilla's drop loop, unload queue and eager pass have nothing left. */
     @Inject(method = "processUnloads", at = @At("HEAD"), cancellable = true)
     private void leafs$noSerialUnloads(CallbackInfo callbackInfo) {
         callbackInfo.cancel();
     }
 
-    /** The teardown runs on the owner once the save sync is done; vanilla skips it for a holder revived meanwhile. */
     @WrapOperation(method = "scheduleUnload", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenRunAsync(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$teardownOnTheOwner(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original, @Local(argsOnly = true) long pos) {
         return original.call(future, body, leafs$owners().executor(ChunkPos.getX(pos), ChunkPos.getZ(pos)));
     }
 
-    /** One table, nothing to promote. */
     @Inject(method = "promoteChunkMap", at = @At("HEAD"), cancellable = true)
     private void leafs$noDoubleBuffer(CallbackInfoReturnable<Boolean> callbackInfo) {
         callbackInfo.setReturnValue(false);
     }
 
-    /** The tracking pass moved to the region bodies while they run. */
     @Inject(method = "tick()V", at = @At("HEAD"), cancellable = true)
     private void leafs$noSerialTracking(CallbackInfo callbackInfo) {
         if (leafs$regions().live()) {
@@ -237,7 +226,6 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         }
     }
 
-    /** The periodic autosave is the epoch bump, each owner saves its own chunks in its slice; a flush runs on the server thread with every region of the level locked, then vanilla's walk as it is. */
     @WrapMethod(method = "saveAllChunks")
     private void leafs$autosave(boolean flushStorage, Operation<Void> original) {
         LevelRegions regions = leafs$regions();
@@ -256,7 +244,6 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         original.call(true);
     }
 
-    /** View diffs run on the player's owner, the region ticking him; a call from anywhere else is that region's next pass. */
     @WrapMethod(method = "updateChunkTracking")
     private void leafs$viewDiffsOnTheOwner(ServerPlayer player, Operation<Void> original) {
         ChunkPos chunk = player.chunkPosition();

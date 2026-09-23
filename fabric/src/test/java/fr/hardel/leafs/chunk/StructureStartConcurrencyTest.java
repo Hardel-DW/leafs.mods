@@ -92,7 +92,6 @@ class StructureStartConcurrencyTest {
         }
     }
 
-    /** A structure of a real type whose generation point only runs the probe. */
     private static final class Probe extends Structure {
         private final StructureType<?> type;
         private final Runnable body;

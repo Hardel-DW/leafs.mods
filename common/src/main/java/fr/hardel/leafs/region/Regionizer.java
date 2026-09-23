@@ -20,9 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.IntSupplier;
 
-/** Groups the chunks that tick into {@link Region}s. A ticking section carries a buffer ring the region owns without ticking it, so two regions' rings never overlap. */
 public final class Regionizer<R> {
-    /** Dead sections are reclaimed, and a split looked for, once they make up this share of the region. */
     private static final int DEAD_SECTION_DIVISOR = 6;
 
     private final int sectionShift;
@@ -51,7 +49,6 @@ public final class Regionizer<R> {
         this.callbacks = Objects.requireNonNull(callbacks, "callbacks");
     }
 
-    /** A chunk starts ticking. Lock-free bit set while the section already ticks; a section starting to tick reshapes regions under the write lock. */
     public void addChunk(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         RegionSection<R> section = sections.get(key);
@@ -68,7 +65,6 @@ public final class Regionizer<R> {
         }
     }
 
-    /** A chunk stops ticking. A section left without any marks isolated sections dead; their removal is deferred to the owner's release. */
     public void removeChunk(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         RegionSection<R> section = sections.get(key);
@@ -89,7 +85,6 @@ public final class Regionizer<R> {
         }
     }
 
-    /** Falls back to a full read lock if a concurrent structural change invalidates the optimistic read. */
     public Region<R> regionAt(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
         long stamp = lock.tryOptimisticRead();
@@ -113,14 +108,12 @@ public final class Regionizer<R> {
         return sectionShift;
     }
 
-    /** Lock-free lookup for threads whose view cannot change, i.e. the thread ticking the owning region. */
     public Region<R> regionAtUnsynchronised(int chunkX, int chunkZ) {
         RegionSection<R> section = sections.get(CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift));
 
         return section == null ? null : section.region();
     }
 
-    /** Live, read-only view: iteration is weakly consistent, so a region read from it may already be dead. */
     public Collection<Region<R>> regionsView() {
         return regionsView;
     }
@@ -166,7 +159,6 @@ public final class Regionizer<R> {
         return readCount(() -> sumChunkCounts(region));
     }
 
-    /** Snapshot under the read lock: the feed grows a ticking region's sections, so the owner never iterates the live set. */
     long[] sectionKeysOf(Region<R> region) {
         if (writeLockOwner == Thread.currentThread()) {
             return region.sectionKeys.toLongArray();
@@ -180,8 +172,6 @@ public final class Regionizer<R> {
         }
     }
 
-
-    /** The bypass is what lets a callback read a count: taking the read lock while owning the write lock deadlocks a {@link StampedLock}. */
     private int readCount(IntSupplier count) {
         if (writeLockOwner == Thread.currentThread()) {
             return count.getAsInt();
@@ -195,7 +185,6 @@ public final class Regionizer<R> {
         }
     }
 
-    /** The section is non-empty before the ring walk: a buffer section created here already counts it. */
     private void addChunkToEmptySection(int chunkX, int chunkZ, long key) {
         RegionSection<R> section = sections.get(key);
         List<RegionSection<R>> created = new ArrayList<>();
@@ -312,7 +301,6 @@ public final class Regionizer<R> {
         }
     }
 
-    /** Runs every pending merge around {@code region} whose two sides are idle, following the survivor as merges chain. */
     private Region<R> resolvePendingMerges(Region<R> region) {
         boolean progress = true;
         while (progress && region.state() != RegionState.DEAD && region.state() != RegionState.TICKING) {
@@ -499,7 +487,6 @@ public final class Regionizer<R> {
         return section;
     }
 
-    /** A ticking neighbour is a legal target (sections only ever arrive); an idle one is preferred. */
     private Region<R> preferredTarget(Collection<Region<R>> nearby) {
         Region<R> chosen = null;
         for (Region<R> candidate : nearby) {
@@ -551,7 +538,6 @@ public final class Regionizer<R> {
         owner.deadSectionKeys.add(section.key());
     }
 
-    /** Every position of a snapshot of the sections, ring included: the feed adopts sections while the region ticks, a dead one may vanish under another's release. */
     void forEachChunkOf(Region<R> region, Region.ChunkConsumer consumer) {
         for (long key : sectionKeysOf(region)) {
             RegionSection<R> section = sections.get(key);

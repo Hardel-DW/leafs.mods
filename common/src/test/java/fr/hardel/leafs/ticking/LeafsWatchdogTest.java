@@ -100,7 +100,6 @@ class LeafsWatchdogTest {
         watchdog.stop();
     }
 
-    /** The config maps a disabled warn to a threshold never reached; the kill is untouched by it. */
     @Test
     void disabledWarnStaysSilentAndStillKills() throws InterruptedException {
         LeafsConfig.Debug debug = new LeafsConfig.Debug(LeafsConfig.Debug.DISABLED, false, LeafsConfig.Debug.DISABLED);

@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.LongAccumulator;
 
-/** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
     private final DeferStats deferStats = new DeferStats();
     private final StageTimings globalStages = new StageTimings(TickStages.count(TickFamily.GLOBAL));
@@ -30,27 +29,22 @@ public final class ServerMetrics {
         return globalStages;
     }
 
-    /** Inbound play packets, counted where the routing files them into a player's queue. */
     public MinuteCounter packetsIn() {
         return packetsIn;
     }
 
-    /** Outbound packets, counted at the listener send choke point; raw connection sends bypass it. */
     public MinuteCounter packetsOut() {
         return packetsOut;
     }
 
-    /** Chunk holders created; the load-side half of the churn. */
     public MinuteCounter chunkLoads() {
         return chunkLoads;
     }
 
-    /** Unload decisions taken; the drop-side half of the churn. */
     public MinuteCounter chunkUnloads() {
         return chunkUnloads;
     }
 
-    /** Generation steps the pool ran, by target status: against the FULL count, the work spent on chunks that never completed. */
     public void stepRan(ChunkStatus status) {
         stepsRan.incrementAndGet(status.getIndex());
     }
@@ -59,12 +53,10 @@ public final class ServerMetrics {
         return stepsRan.get(status.getIndex());
     }
 
-    /** Chunks that ran their FULL step, the generation pipeline's output. */
     public MinuteCounter chunksFull() {
         return chunksFull;
     }
 
-    /** A thread that needed an absent chunk and waited for it. */
     public void chunkWaited(long nanos) {
         chunkWaits.increment();
         chunkWaitNanos.addAndGet(nanos);
@@ -83,7 +75,6 @@ public final class ServerMetrics {
         return longestChunkWaitNanos.get();
     }
 
-    /** Times a thread waited for a player another thread held: before his tick joined that exclusion, the two ran on him together. */
     public MinuteCounter sharedPlayers() {
         return sharedPlayers;
     }

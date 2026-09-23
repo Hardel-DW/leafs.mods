@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-/** Names the mod behind a failure: the first frame of the root cause whose class comes from a mod other than the game, the loader and Leafs. */
 public final class ModAttribution {
     private static final Set<String> NOT_SUSPECTS = Set.of("minecraft", "java", "mixinextras", Leafs.MOD_ID);
 
@@ -24,7 +23,6 @@ public final class ModAttribution {
         this.ownerOfClass = ownerOfClass;
     }
 
-    /** Backed by the loader's mod list: a class maps to the mod whose file holds its code source, keyed by absolute normalised path. A nested jar has no path of its own, its classes count for the parent. */
     public static ModAttribution fromOrigins(Map<Path, Suspect> byOrigin) {
         return new ModAttribution(className -> ownerOf(className, byOrigin));
     }

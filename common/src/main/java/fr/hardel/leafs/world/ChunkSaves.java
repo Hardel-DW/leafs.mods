@@ -14,9 +14,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 
 import java.util.List;
 
-/** The save primitives an owner applies to its own chunks and players: vanilla's eager saves, and the epoch walk that visits everything once per autosave. */
 public final class ChunkSaves {
-    /** The lot of a pool sweep pass over the chunks no region covers. */
     public static final int CHUNKS_PER_TICK = 20;
 
     private final ServerLevel level;
@@ -25,7 +23,6 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    /** Vanilla's saveChunksEagerly over the owner's chunks that sit in the level's dirty set, until the deadline: the owner walks its own chunks, never the whole set. */
     public void saveEagerly(List<ChunkHolder> holders, long deadlineNanos) {
         LongSet dirty = level.getChunkSource().chunkMap.chunksToEagerlySave;
         for (ChunkHolder holder : holders) {
@@ -35,7 +32,6 @@ public final class ChunkSaves {
         }
     }
 
-    /** One dirty chunk whose save cadence elapsed; a clean one leaves the eager set. */
     public boolean saveEagerly(ChunkHolder holder) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         long key = holder.getPos().pack();
@@ -53,7 +49,6 @@ public final class ChunkSaves {
         return true;
     }
 
-    /** False when the holder already saved this epoch; true after its chunk and entity chunk went out, vanilla's autosave for one chunk. */
     public boolean saveBehindEpoch(ChunkHolder holder, long epoch) {
         SavedEpochAccess access = (SavedEpochAccess) holder;
         if (access.leafs$savedEpoch() >= epoch) {

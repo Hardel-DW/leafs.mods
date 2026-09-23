@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Regionizer feed: chunk holder creation and destruction. Mutations alternate strictly per position. */
 @Mixin(ChunkMap.class)
 public abstract class ChunkMapMixin {
 

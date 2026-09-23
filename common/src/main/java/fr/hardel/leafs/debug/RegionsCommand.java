@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** Server-side region introspection: a per-dimension overview, per-region detail behind a dimension argument. */
 public final class RegionsCommand {
 
     private RegionsCommand() {

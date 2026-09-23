@@ -70,7 +70,6 @@ class ConcurrentInt2ObjectMapTest {
         assertTrue(seen > 0);
     }
 
-    /** A fixed-size stream over a growing map throws once it sees more than it was told. */
     @Test
     void aStreamOverTheValuesSurvivesGrowth() {
         map.put(1, "a");

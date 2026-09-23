@@ -14,7 +14,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Watched by players of every region, joined and left from other threads while a boss ticks its progress: the player set goes concurrent. */
 @Mixin(ServerBossEvent.class)
 public abstract class ServerBossEventMixin {
 

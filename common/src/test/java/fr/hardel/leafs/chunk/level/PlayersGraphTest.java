@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The players graph as the bench drives it: five bots on a ring, one source each, moving a chunk at a time from five threads. */
 class PlayersGraphTest {
     private static final int LEVELS = 34;
     private static final int PLAYERS = 5;

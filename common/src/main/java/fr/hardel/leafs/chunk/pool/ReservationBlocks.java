@@ -3,7 +3,6 @@ package fr.hardel.leafs.chunk.pool;
 import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
 import fr.hardel.leafs.metrics.MinuteCounter;
 
-/** Tasks parked behind a reservation, by their kind and the holder's: what one reservation space for light and generation alike costs. */
 public final class ReservationBlocks {
     private final MinuteCounter[][] counts = new MinuteCounter[Kind.values().length][Kind.values().length];
 

@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Five players flying: each step a view square of tickets slides one chunk, and the graph must settle in milliseconds. */
 class MovingViewTest {
     private static final int LEVELS = 46;
     private static final int VIEW = 10;

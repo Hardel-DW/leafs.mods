@@ -17,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-// Entity hooks: every move and every portal search leave through the teleport funnel, whatever thread is running; one thread ticks an entity at a time.
 @Mixin(Entity.class)
 public abstract class EntityMixin implements EntityTickAccess {
     @Unique
@@ -33,7 +32,6 @@ public abstract class EntityMixin implements EntityTickAccess {
         leafs$ticking.set(false);
     }
 
-
     @Inject(method = "teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/world/entity/Entity;", at = @At("HEAD"), cancellable = true)
     private void leafs$divertOffOwnerTeleport(TeleportTransition transition, CallbackInfoReturnable<Entity> callbackInfo) {
         Entity self = (Entity) (Object) this;
@@ -47,7 +45,6 @@ public abstract class EntityMixin implements EntityTickAccess {
         }
     }
 
-    // The search and the teleport leave through the funnel; vanilla gets no destination here and does nothing more.
     @WrapOperation(method = "handlePortal", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/PortalProcessor;getPortalDestination(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/world/level/portal/TeleportTransition;"))
     private TeleportTransition leafs$portalThroughTheFunnel(PortalProcessor processor, ServerLevel level, Entity entity, Operation<TeleportTransition> original) {
         ((ServerLevelEntityAccess) level).leafs$entityTeleports().deferPortal(entity, processor);

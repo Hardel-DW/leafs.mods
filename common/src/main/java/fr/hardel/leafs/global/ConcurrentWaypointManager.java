@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
-/** Vanilla's waypoint manager without its lock: a row per receiver, written cell by cell from every region. With the locator bar off, nothing is walked. */
 public final class ConcurrentWaypointManager extends ServerWaypointManager {
     private final ServerLevel level;
     private final Set<WaypointTransmitter> waypoints = ConcurrentHashMap.newKeySet();
@@ -33,7 +32,6 @@ public final class ConcurrentWaypointManager extends ServerWaypointManager {
         rows.forEach((player, row) -> row.connect(waypoint, maker(player, waypoint)));
     }
 
-    /** The transmitter's side of a move: every receiver's cell for it. */
     @Override
     public void updateWaypoint(@NonNull WaypointTransmitter waypoint) {
         if (!enabled() || !waypoints.contains(waypoint)) {
@@ -65,7 +63,6 @@ public final class ConcurrentWaypointManager extends ServerWaypointManager {
         }
     }
 
-    /** The receiver's side of a move: its whole row. */
     @Override
     public void updatePlayer(@NonNull ServerPlayer player) {
         WaypointRow row = rows.get(player);
@@ -117,7 +114,6 @@ public final class ConcurrentWaypointManager extends ServerWaypointManager {
         }
     }
 
-    /** Asked inside the cell step, so a transmitter untracked meanwhile makes no connection; a receiver never connects to itself, as in vanilla. */
     private Supplier<Optional<Connection>> maker(ServerPlayer player, WaypointTransmitter waypoint) {
         return () -> player != waypoint && waypoints.contains(waypoint) ? waypoint.makeWaypointConnectionWith(player) : Optional.empty();
     }

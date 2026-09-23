@@ -27,7 +27,6 @@ public final class LeafsFabric implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> dispatcher.register(LeafsCommand.node()));
     }
 
-    /** Every mod with a file of its own; the loader and the Fabric API modules are the platform, never suspects. */
     private static Map<Path, Suspect> origins(FabricLoader loader) {
         Map<Path, Suspect> byOrigin = new HashMap<>();
         for (ModContainer mod : loader.getAllMods()) {

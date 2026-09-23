@@ -31,7 +31,6 @@ class LeafsConfigTest {
         assertEquals(70, written.gameplay().mobCap(MobCategory.MONSTER));
     }
 
-    /** The file is the persisted config: a second change starts from it, not from the config the server booted with. */
     @Test
     void aSecondRewriteKeepsTheFirstChange(@TempDir Path directory) {
         Path file = directory.resolve("leafs.json");
@@ -84,7 +83,6 @@ class LeafsConfigTest {
         assertEquals(Runtime.getRuntime().availableProcessors() / 2, LeafsConfig.defaults().effectiveChunkThreads());
     }
 
-    /** A negative threshold is one the consumers never reach; the log stays off without a branch on their side. */
     @Test
     void negativeThresholdsAreNeverReached(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");

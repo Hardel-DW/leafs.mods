@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The loaded chunks no region covers, once per level tick: their timeouts, saves and broadcasts, each handed to the pool under its chunk. */
 public final class UnownedSweep {
     private final ServerLevel level;
     private final LevelRegions regions;
@@ -45,7 +44,6 @@ public final class UnownedSweep {
         this.saves = new ChunkSaves(level);
     }
 
-    /** One pass in flight at most; a second ask while one runs is the next tick's. */
     public void soon() {
         if (sweeping.compareAndSet(false, true)) {
             pool.execute(this::sweep);
@@ -78,7 +76,6 @@ public final class UnownedSweep {
         timeouts.purgeUnowned(section -> regionizer.regionAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) != null);
     }
 
-    /** Twenty a pass, like the saves; a chunk whose entities are still loading stays for a later pass. */
     private void unloadHiddenEntities() {
         RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
         int attempts = 0;
@@ -94,7 +91,6 @@ public final class UnownedSweep {
         }
     }
 
-    /** Vanilla's twenty attempts per tick from the head of the set; a chunk that is not ready stays for the next pass. The one walk of the whole set, so a key whose chunk left goes here. */
     private void saveEagerly() {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         int attempts = 0;
@@ -113,7 +109,6 @@ public final class UnownedSweep {
         }
     }
 
-    /** A new epoch lists every unowned holder once; each pass takes its budget off the list. */
     private void saveBehindEpoch() {
         long epoch = regions.autosaveEpoch();
         if (epoch != epochSeen) {
@@ -137,7 +132,6 @@ public final class UnownedSweep {
         }
     }
 
-    /** A changed holder leaves the set as its broadcast is handed out; a change after that puts it back. */
     private void broadcast() {
         Set<ChunkHolder> changed = ((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders();
         for (ChunkHolder holder : changed) {

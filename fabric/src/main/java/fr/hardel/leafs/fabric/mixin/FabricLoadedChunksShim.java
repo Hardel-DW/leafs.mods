@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Swaps fabric-lifecycle-events' loaded-chunks HashSet for a concurrent set; priority 1100 for ordering. */
+/** Priority 1100: the Fabric API field exists when this applies. */
 @Mixin(value = Level.class, priority = 1100)
 public abstract class FabricLoadedChunksShim {
 

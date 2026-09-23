@@ -14,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Scenario tests with shift 4 (16x16-chunk sections), merge radius 1, buffer radius 1. */
 class RegionizerTest {
     private RecordingCallbacks callbacks;
     private Regionizer<Object> regionizer;

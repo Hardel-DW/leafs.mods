@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.LongFunction;
 
-/** ConcurrentHashMap-backed Long2ObjectMap over spread keys: lock-free reads, atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
     private final ConcurrentHashMap<Long, V> map = new ConcurrentHashMap<>();
 
@@ -35,7 +34,6 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
         return previous == null ? defaultReturnValue() : previous;
     }
 
-    /** The value in place, or null when the key was free and the value stored. */
     public V putIfAbsent(long key, V value) {
         return map.putIfAbsent(LongSpread.mix(key), value);
     }
@@ -69,7 +67,6 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
         return map.computeIfAbsent(LongSpread.mix(key), _ -> mappingFunction.get(key));
     }
 
-    /** Atomic read-modify-write of one key; a null result removes it. */
     @Override
     public V compute(long key, BiFunction<? super Long, ? super V, ? extends V> remappingFunction) {
         return map.compute(LongSpread.mix(key), (_, value) -> remappingFunction.apply(key, value));
@@ -108,7 +105,6 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
                 return ObjectIterators.asObjectIterator(map.values().iterator());
             }
 
-            /** A stream must not trust a size the map outgrows while it runs. */
             @Override
             public @NonNull ObjectSpliterator<V> spliterator() {
                 return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);

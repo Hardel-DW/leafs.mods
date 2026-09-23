@@ -20,7 +20,6 @@ import java.util.function.BiFunction;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The send barrier of a holder under two owners: vanilla composes it by a read then a write, and one of two lights added at once is lost. */
 @ExtendWith(MinecraftBootstrap.class)
 class ChunkHolderDependenciesTest {
     private static final long PATIENCE_SECONDS = 5;
@@ -53,7 +52,6 @@ class ChunkHolderDependenciesTest {
         return new ChunkHolder(new ChunkPos(0, 0), ChunkLevel.byStatus(ChunkStatus.FULL), LevelHeightAccessor.create(-64, 384), null, (_, _, _, _) -> { }, (_, _) -> List.of());
     }
 
-    /** Done, or parked on a lock the first owner holds: a registration made atomic waits here instead of finishing. */
     private static void awaitDoneOrWaiting(Thread owner) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(PATIENCE_SECONDS);
         while (owner.isAlive() && !parked(owner)) {
@@ -78,7 +76,6 @@ class ChunkHolderDependenciesTest {
         }
     }
 
-    /** The barrier already in the holder: the first owner composing on it stops inside the composition, before its write of the new barrier. */
     private static final class PausedBarrier extends CompletableFuture<Void> {
         private final AtomicBoolean pauseOnce = new AtomicBoolean(true);
         private final CountDownLatch composing = new CountDownLatch(1);

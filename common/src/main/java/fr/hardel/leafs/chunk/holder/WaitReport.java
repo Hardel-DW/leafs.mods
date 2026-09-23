@@ -16,7 +16,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/** What a thread waits for, for a stall report. */
 public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus status, CompletableFuture<?> delivery, long startedNanos) {
     @Override
     public String toString() {
@@ -42,7 +41,6 @@ public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus 
             task == null ? "no task" : task(task));
     }
 
-    /** A task, its layer, and the first holder of that layer whose future still holds it up. */
     static String task(ChunkGenerationTask task) {
         String head = "task to %s at %s, cancelled %b".formatted(task.targetStatus, task.scheduledStatus, task.markedForCancellation);
         ChunkStatus layer = task.scheduledStatus;

@@ -26,7 +26,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 
-/** Moves route through the teleport funnel; the pearl set goes concurrent for cross-region registration. */
 @Mixin(ServerPlayer.class)
 public abstract class ServerPlayerMixin implements PlayerMoveAccess, SavedEpochAccess {
 
@@ -66,7 +65,6 @@ public abstract class ServerPlayerMixin implements PlayerMoveAccess, SavedEpochA
         leafs$savedEpoch = epoch;
     }
 
-    /** The search loads chunks on its own future; the waiter drains what it must meanwhile, server thread or region alike. */
     @WrapOperation(method = "adjustSpawnLocation", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;managedBlock(Ljava/util/function/BooleanSupplier;)V"))
     private void leafs$spawnSearchWaits(MinecraftServer server, BooleanSupplier done, Operation<Void> original, @Local(argsOnly = true) ServerLevel level) {
         TickingManager.of(server).await(done);

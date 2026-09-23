@@ -7,7 +7,6 @@ import net.minecraft.resources.Identifier;
 
 import java.util.Locale;
 
-/** The shared text vocabulary of the {@code /leafs} commands: columns, stats, colors, TPS coloring. */
 final class CommandText {
 
     private CommandText() {

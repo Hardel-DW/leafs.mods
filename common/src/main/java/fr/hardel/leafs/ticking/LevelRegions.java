@@ -30,23 +30,18 @@ import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
-/** One per level, owns the regionizer and the handle lifecycle. Callbacks run under the regionizer's write lock: no tickets, no lookup, no re-entry. */
 public final class LevelRegions implements RegionCallbacks<RegionTickData>, LevelListener {
-    /** Mutated only by the simulation graph; every other method just reads it. */
     private final Regionizer<RegionTickData> regionizer;
     private volatile String dimension;
     private volatile LongSupplier gameTime;
     private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
-    /** Bumped by the periodic autosave only; each chunk and player compares it against the epoch that last saved it. A flush is vanilla's walk under a head. */
     private volatile long autosaveEpoch;
-    /** Written only from the callbacks, which run under the regionizer write lock, hence plain increments. */
     private volatile long created;
     private volatile long destroyed;
     private volatile long merged;
     private volatile long split;
-    /** Totals of the handles that are gone; a sampler adds the live ones to get the level's work, whatever the churn did in between. */
     private volatile long retiredBusyNanos;
     private volatile long retiredLagNanos;
     private volatile long retiredTicks;
@@ -58,7 +53,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         this.slowTaskNanos = config.debug().slowTaskNanos();
     }
 
-    /** Above this, an inbox task is logged with its class and chunk. */
     public long slowTaskNanos() {
         return slowTaskNanos;
     }
@@ -71,7 +65,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return regionizer;
     }
 
-    /** Once, on the server thread, before the level's first tick. Regions equip, then the handles schedule. */
     public void activate(String dimension, RegionTickScheduler scheduler, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
         if (this.scheduler != null) {
             return;
@@ -99,18 +92,15 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return body;
     }
 
-    /** The budget of one region tick, from the tick rate in force. */
     public long tickPeriodNanos() {
         return scheduler.periodNanos();
     }
 
-    /** Regions tick between activation and the halt; outside that window the server thread owns every chunk. */
     public boolean live() {
         RegionTickBody body = this.body;
         return body != null && !TickingManager.of(body.level().getServer()).halted();
     }
 
-    /** The level, once activated. */
     public ServerLevel level() {
         return body.level();
     }
@@ -119,7 +109,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return LevelChunks.of(body.level()).owners();
     }
 
-    /** The inbox of the region covering a chunk, null without one or while the regions do not run. */
     public @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
         if (!live()) {
             return null;
@@ -129,7 +118,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return region == null ? null : region.data().inbox();
     }
 
-    /** Every region's inbox, for the thread that owns them all. */
     public int drainInboxes() {
         int drained = 0;
         for (Region<RegionTickData> region : regionizer.regionsView()) {
@@ -139,13 +127,11 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return drained;
     }
 
-    /** The owning region's payload, null for a chunk without a region or before activation. */
     public RegionWorldData worldDataAt(int chunkX, int chunkZ) {
         Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
         return region == null ? null : region.data().worldData();
     }
 
-    /** The clock a scheduled tick at this chunk lives on: the owning region's, or game time when nobody owns it. */
     public long timeAt(int chunkX, int chunkZ, long gameTime) {
         RegionWorldData data = worldDataAt(chunkX, chunkZ);
         return data == null ? gameTime : data.currentTick();
@@ -159,7 +145,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return autosaveEpoch;
     }
 
-    /** The simulation graph: a chunk entering or leaving block ticking is what shapes the regions. */
     @Override
     public void changed(long chunkKey, int oldLevel, int newLevel) {
         boolean simulates = ChunkLevel.isBlockTicking(newLevel);
@@ -180,7 +165,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
-    /** Every region handle cancelled: the level is closing, nothing of it ticks again. */
     public void retire() {
         for (Region<RegionTickData> region : regionizer.regionsView()) {
             RegionTickHandle handle = region.data().handle();
@@ -190,7 +174,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
-    /** An empty tick on every region triggers splits, destroys and reclaims; for the shutdown drain and levels whose pool never bound. */
     public void settle() {
         rethrowFeedFailure();
         for (Region<RegionTickData> region : regionizer.regionsView()) {
@@ -250,7 +233,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return data;
     }
 
-    /** A clock starts at game time, so ticks unpacked before the region existed keep their delays. */
     private void equipWorld(RegionTickData data) {
         RegionClock clock = new RegionClock(gameTime.getAsLong());
         data.equipWorld(clock, worldDataFactory.apply(clock::currentTick));
@@ -262,7 +244,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return handle;
     }
 
-    /** A dead region's handle stops being used; its totals stay in the level's, so no work goes missing. */
     private void retire(RegionTickHandle handle) {
         StageTimings stages = handle.stages();
         retiredBusyNanos += stages.busyNanos();
@@ -275,7 +256,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         created++;
     }
 
-    /** A dead region's inbox goes back through the owners, off this lock. */
     @Override
     public void onRegionDestroy(Region<RegionTickData> region) {
         destroyed++;
@@ -305,7 +285,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
-    /** The moved chunks carry their scheduled ticks onto the survivor's clock, and the dead region's inbox pours into the survivor's. */
     @Override
     public void merge(Region<RegionTickData> from, Region<RegionTickData> into, LongList movedChunks) {
         RegionTickBody body = this.body;
@@ -333,7 +312,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
-    /** Children start on the parent's clock once regions are equipped; each posted task follows its section to its child, one on a section the parent just lost goes back through the owners. */
     @Override
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
         if (worldDataFactory != null) {
@@ -366,7 +344,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return total;
     }
 
-    /** The feed can run where exceptions are swallowed, so the first failure is kept and rethrown by the tick unit or settle. */
     private RuntimeException recordFeedFailure(String operation, int chunkX, int chunkZ, RuntimeException exception) {
         Leafs.LOGGER.error("Leafs region feed failed to {} chunk [{}, {}]", operation, chunkX, chunkZ, exception);
         if (feedFailure == null) {

@@ -37,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Drives LevelRegions like the simulation feed: a chunk alternates entering and leaving simulation, one settle per tick. */
 @ExtendWith(MinecraftBootstrap.class)
 class LevelRegionsTest {
     private static final int FEED_EVENTS = 100_000;
@@ -62,8 +61,6 @@ class LevelRegionsTest {
         LongArrayList presentList = new LongArrayList();
 
         for (int event = 0; event < FEED_EVENTS; event++) {
-            /* Alternating grow and shrink phases: a purely random walk settles at half density, where the
-               whole area stays one region for ever and neither split nor reclaim is ever exercised. */
             int createChance = (event / PHASE_EVENTS) % 2 == 0 ? 70 : 30;
             if (presentList.isEmpty() || (presentList.size() < POSITION_COUNT && random.nextInt(100) < createChance)) {
                 feedCreate(random, present, presentList);
@@ -89,7 +86,6 @@ class LevelRegionsTest {
         assertTrue(regions.split() > 0, "the replay never split a region");
     }
 
-    /** The bridge section is reclaimed before the split buckets the mail: a task posted on it has no child to go to. */
     @Test
     void aTaskPostedOnTheBridgeSurvivesTheSplit() {
         simulated(regions, 0, 0);
@@ -215,7 +211,6 @@ class LevelRegionsTest {
         }
     }
 
-    /** Nothing positional moves any more: a merge keeps the survivor's clock, a split hands the parent's clock to every child. */
     @Test
     void mergeKeepsTheSurvivorClockAndSplitChildrenStartOnTheParentClock() {
         activateRegions();

@@ -5,7 +5,6 @@ import net.minecraft.server.level.ChunkHolder;
 
 import java.util.List;
 
-/** Vanilla's pendingUnloads: the holders between their last level and their teardown, claimed under one monitor from any thread. */
 public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
     @Override
     public synchronized ChunkHolder put(long key, ChunkHolder value) {
@@ -17,7 +16,6 @@ public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHold
         return super.remove(key);
     }
 
-    /** The primitive overload is the one vanilla's teardown resolves to. */
     @Override
     public synchronized boolean remove(long key, Object value) {
         if (super.get(key) != value) {

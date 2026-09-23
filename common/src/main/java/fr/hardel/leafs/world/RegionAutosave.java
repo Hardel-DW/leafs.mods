@@ -4,7 +4,6 @@ import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Region autosave driven by the level's epoch: players and chunks behind the epoch save on their owner, in the slice of the tick the save is allowed, plus vanilla's eager saves. */
 public final class RegionAutosave {
     private final ChunkSaves saves;
 
@@ -12,7 +11,6 @@ public final class RegionAutosave {
         this.saves = new ChunkSaves(level);
     }
 
-    /** Runs while TICKING on the owner, where the chunk walk and the entity photo are legal. The walk stops at the deadline and resumes next tick; once through, the epoch is done for this region until the next one. */
     public void tick(RegionWorldData worldData, long epoch, long deadline) {
         saves.saveEagerly(worldData.chunks().holders(), deadline);
         worldData.entities().forEach(entity -> {

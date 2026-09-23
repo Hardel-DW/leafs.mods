@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Collections;
 import java.util.List;
 
+/** Priority 1500: runs after PlayerListMixin swaps the player list. */
 @Mixin(value = PlayerList.class, priority = 1500)
 public abstract class PlayerListViewShim {
 

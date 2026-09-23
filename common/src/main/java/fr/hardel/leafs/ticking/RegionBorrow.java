@@ -20,11 +20,6 @@ import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
-/**
- * The locks a thread holds, taken at first contact and kept until it releases them all. The server thread locks the regions it touches and the chunks
- * no region covers, and waits for them, until its tick or its task ends. Any other thread reads regions without locking, takes a chunk no region covers,
- * and never waits: a region never locks a region.
- */
 public final class RegionBorrow {
     private static final ThreadLocal<RegionBorrow> CURRENT = new ThreadLocal<>();
     private static final long WAIT_NANOS = 50_000L;
@@ -47,7 +42,6 @@ public final class RegionBorrow {
         CURRENT.remove();
     }
 
-    /** Reuses the locks already open on this thread, or opens a set and releases everything at the end: what runs inside a tick or a task shares its locks. */
     public static <T> T hold(Function<RegionBorrow, T> body) {
         RegionBorrow current = CURRENT.get();
         if (current != null) {
@@ -63,12 +57,10 @@ public final class RegionBorrow {
         }
     }
 
-    /** Null on every thread that is not borrowing. */
     public static RegionBorrow current() {
         return CURRENT.get();
     }
 
-    /** A borrowing thread meets an entity: it takes the region of the entity's position, as it does for a chunk it reads or writes. Nothing happens without a borrow. */
     public static void atContact(Entity entity) {
         if (entity.level() instanceof ServerLevel level) {
             ChunkPos chunk = entity.chunkPosition();
@@ -83,7 +75,6 @@ public final class RegionBorrow {
         }
     }
 
-    /** Every region of the level, for a save or a reload. Without a lock context the server thread runs outside its loop, before the first tick or after the halt, and owns everything. */
     public static void lockAll(LevelRegions regions) {
         RegionBorrow borrow = CURRENT.get();
         if (borrow != null) {
@@ -91,7 +82,6 @@ public final class RegionBorrow {
         }
     }
 
-    /** Locks the region of the position, or the chunk itself when no region covers it; a region that dies under the wait is looked up again at the position. Off the server thread nothing waits: a region is read, a chunk another thread holds is left to it. */
     public void borrow(LevelRegions regions, int chunkX, int chunkZ) {
         boolean serverThread = serverThread(regions);
         while (true) {
@@ -111,7 +101,6 @@ public final class RegionBorrow {
         }
     }
 
-    /** Locks every region of the level, the idle ones first so a tick in flight finds its merge partner already locked, looping until a pass locks nothing new: the feed may create one while the pass runs. Only the server thread locks. */
     public void borrowAll(LevelRegions regions) {
         if (!serverThread(regions)) {
             return;
@@ -132,12 +121,10 @@ public final class RegionBorrow {
         } while (held.size() != before);
     }
 
-    /** Before the regions run the server thread owns everything; once they run, only it locks and waits. */
     private static boolean serverThread(LevelRegions regions) {
         return !regions.live() || TickingManager.of(regions.level().getServer()).onServerThread();
     }
 
-    /** Locks the region, waiting for a tick in flight. A pending merge does not stop the server thread: it runs at the release, as after a tick. False once the region is dead. */
     private boolean take(LevelRegions regions, Region<RegionTickData> region) {
         while (region.state() != RegionState.DEAD) {
             if (held.contains(region) || region.tryHold()) {
@@ -151,7 +138,6 @@ public final class RegionBorrow {
         return false;
     }
 
-    /** Waits for the tick in flight, running what this thread owns meanwhile: that tick may be waiting for a task it handed the server thread, a spawn search ends there. The work run meanwhile may take the region for this very borrow, which ends the wait too. */
     private void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
         if (!regions.live()) {
             LockSupport.parkNanos(WAIT_NANOS);
@@ -166,7 +152,6 @@ public final class RegionBorrow {
         }
     }
 
-    /** Whether this thread holds the chunk itself, taken before any region covered it, or the region of the position. */
     public boolean holds(LevelRegions regions, int chunkX, int chunkZ) {
         Long2ObjectOpenHashMap<RegionInbox> chunks = heldChunks.get(regions);
         if (chunks != null && chunks.containsKey(ChunkPos.pack(chunkX, chunkZ))) {
@@ -177,7 +162,6 @@ public final class RegionBorrow {
         return region != null && held.contains(region);
     }
 
-    /** A chunk no region covers, taken once until the release: what lands there waits in its inbox for this thread. False when another thread holds it; before the regions run the server thread owns everything. */
     public boolean tryBorrowChunk(LevelRegions regions, int chunkX, int chunkZ) {
         if (!regions.live()) {
             return true;
@@ -198,7 +182,6 @@ public final class RegionBorrow {
         return true;
     }
 
-    /** The regions go back first, then the chunks; a released chunk hands its leftover back through the owners, nothing runs on this thread. */
     public void releaseAll() {
         for (Region<RegionTickData> region : held) {
             region.markNotTicking();
@@ -215,7 +198,6 @@ public final class RegionBorrow {
         heldChunks.clear();
     }
 
-    /** What this thread holds runs here while it waits: the chunk work of its regions and of its chunks, never their game work. A promotion may take a neighbour chunk on this thread meanwhile, so the walk is a snapshot. */
     public int drainInboxes() {
         int drained = 0;
         for (Region<RegionTickData> region : List.copyOf(held)) {

@@ -18,7 +18,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** The chunk carries its tickers and its block events; a thread that does not own it reads block entities without creating one. */
 @Mixin(LevelChunk.class)
 public abstract class LevelChunkMixin implements ChunkTickAccess {
 
@@ -36,7 +35,6 @@ public abstract class LevelChunkMixin implements ChunkTickAccess {
         this.gameEventListenerRegistrySections = concurrent;
     }
 
-    /** A caller may still hold the empty registry and register into it; its identity lasts until the chunk is discarded. */
     @Inject(method = "removeGameEventListenerRegistry", at = @At("HEAD"), cancellable = true)
     private void leafs$keepListenerRegistry(CallbackInfo callbackInfo) {
         callbackInfo.cancel();

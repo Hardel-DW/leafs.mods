@@ -16,6 +16,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
+/** Priority 1100: wraps outside the Leafs chunk read contract. */
 @Mixin(value = ServerChunkCache.class, priority = 1100)
 public abstract class LoadingChunkShim {
     @Shadow

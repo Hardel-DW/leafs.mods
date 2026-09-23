@@ -68,7 +68,6 @@ class ChunkPoolTest {
         assertEquals(0, pool.queued());
     }
 
-    /** Roadmap, two reservation spaces: the count of tasks parked behind a reservation comes before any decision. */
     @Test
     void aTaskParkedBehindAReservationIsCounted() throws InterruptedException {
         pool = start(2, 4);
@@ -209,7 +208,6 @@ class ChunkPoolTest {
         assertEquals(0, pool.queued());
     }
 
-    /** Holds the single worker, so later submits queue up. */
     private CountDownLatch occupyTheWorker() throws InterruptedException {
         CountDownLatch gate = new CountDownLatch(1);
         CountDownLatch started = new CountDownLatch(1);

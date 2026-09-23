@@ -15,7 +15,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.Arrays;
 
-/** {@code /leafs config [key [value]]}: reads the tunable keys, one of them, or rewrites one in the file for the next start. */
 public final class ConfigCommand {
 
     private ConfigCommand() {

@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
-/** A concurrent map whose values are always copy-on-write lists, whatever list the writer stores. A list already copy-on-write keeps its identity. */
 public final class CopyOnWriteListMap<K, T> extends ConcurrentHashMap<K, List<T>> {
 
     @Override

@@ -6,7 +6,6 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.Collection;
 
-/** A LongOpenHashSet other threads may write while one iterates: writes take the set's lock, iteration walks a snapshot that cannot remove. Fits a field declared LongOpenHashSet. */
 public final class SynchronizedLongOpenHashSet extends LongOpenHashSet {
 
     @Override
@@ -104,7 +103,6 @@ public final class SynchronizedLongOpenHashSet extends LongOpenHashSet {
         return super.clone();
     }
 
-    /** Copied from the parent's own iterator: the parent's array conversions call iterator(), which is this snapshot. */
     private synchronized long[] snapshot() {
         long[] values = new long[super.size()];
         LongIterator live = super.iterator();

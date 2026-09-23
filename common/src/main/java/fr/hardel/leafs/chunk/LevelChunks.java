@@ -76,7 +76,6 @@ public final class LevelChunks {
         return !regions.live() && TickingManager.of(level.getServer()).onServerThread();
     }
 
-    /** Game work on a chunk no region covers: the calling thread takes the chunk for the task and reads back what it writes, like vanilla; false when another thread holds it. */
     private static boolean take(LevelRegions regions, int chunkX, int chunkZ, Runnable task) {
         return RegionBorrow.hold(borrow -> {
             if (!borrow.tryBorrowChunk(regions, chunkX, chunkZ)) {
@@ -88,7 +87,6 @@ public final class LevelChunks {
         });
     }
 
-    /** The head of the pool while a thread waits for it, the distance to the nearest player otherwise. */
     private int urgency(int chunkX, int chunkZ) {
         return holders.demands().near(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
     }

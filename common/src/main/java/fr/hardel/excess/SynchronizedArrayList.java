@@ -12,7 +12,6 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-/** An ArrayList other threads may write while one iterates: writes take the list's lock, iteration walks a snapshot. Fits a field declared ArrayList or List. */
 public final class SynchronizedArrayList<E> extends ArrayList<E> {
 
     @Override
@@ -120,7 +119,6 @@ public final class SynchronizedArrayList<E> extends ArrayList<E> {
         return super.toArray(array);
     }
 
-    /** Remove through the iterator takes out the first equal element of the live list. */
     @Override
     public Iterator<E> iterator() {
         return new SnapshotIterator<>(snapshot().iterator(), element -> remove((Object) element));

@@ -13,7 +13,6 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
 import java.util.Locale;
 
-/** {@code /leafs ram}: the heap right now, what each collector cost since the JVM started, and per dimension what Leafs holds that must not grow with the terrain visited. */
 public final class RamCommand {
     private static final double BYTES_PER_GIGABYTE = 1e9;
 

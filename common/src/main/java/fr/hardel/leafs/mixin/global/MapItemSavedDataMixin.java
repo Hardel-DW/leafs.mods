@@ -14,7 +14,6 @@ import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.spongepowered.asm.mixin.Mixin;
 
-/** Per-instance lock: maps carried by players in different regions serialize their ticks and writes. */
 @Mixin(MapItemSavedData.class)
 public abstract class MapItemSavedDataMixin {
 

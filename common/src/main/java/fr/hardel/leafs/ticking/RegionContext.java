@@ -1,6 +1,5 @@
 package fr.hardel.leafs.ticking;
 
-/** What the current thread is for the region system. A thread without context (Netty, pools, mods) owns nothing. */
 public sealed interface RegionContext {
 
     record Region(long id, String dimension) implements RegionContext {

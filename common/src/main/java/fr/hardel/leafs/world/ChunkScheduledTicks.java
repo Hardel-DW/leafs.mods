@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-/** The level's tick field: a concurrent map of the chunk containers, nothing else. A write reaches a container on the chunk's owner; the drain belongs to the owning region, see {@link ScheduledTickDrain}. */
 public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     private final ConcurrentLong2ObjectMap<LevelChunkTicks<T>> containers = new ConcurrentLong2ObjectMap<>();
     private final ServerLevel level;
@@ -62,7 +61,6 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    /** Vanilla's scheduleTick as one write: the owner stamps its clock and its order counter when it runs it, so a tick from another thread lands in step with its own. */
     public void schedule(BlockPos pos, T type, int delay, TickPriority priority) {
         long chunkKey = ChunkPos.pack(pos);
         if (containers.containsKey(chunkKey)) {
@@ -70,7 +68,6 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    /** The serial level tick calls this; every chunk is drained by its region instead. */
     @Override
     public void tick(long currentTick, int maxTicksToProcess, @NonNull BiConsumer<BlockPos, T> output) {
     }
@@ -102,7 +99,6 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         copyAreaFrom(this, area, offset);
     }
 
-    /** A foreign source keeps vanilla's walk of its own containers; ours has no such walk, so the area is collected here, the pass in progress first. The copies land after the originals in sub-tick order, as vanilla's do. */
     @Override
     public void copyAreaFrom(@NonNull LevelTicks<T> source, @NonNull BoundingBox area, @NonNull Vec3i offset) {
         if (!(source instanceof ChunkScheduledTicks<T> chunked)) {
@@ -124,7 +120,6 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    /** A chunk changing owner carries its ticks in the old owner's time; the live queues move by the clock difference, packed ticks are delay-relative already. */
     public static void rebase(LevelChunk chunk, long tickOffset) {
         rebase(chunk.blockTicks, tickOffset);
         rebase(chunk.fluidTicks, tickOffset);
@@ -167,7 +162,6 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    /** The owner finds the container when it runs the write: mail outlives an unload and a reload, and a chunk gone since drops it like vanilla's unloaded position. */
     private void write(long chunkKey, Consumer<LevelChunkTicks<T>> write) {
         owners.route(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey), () -> {
             LevelChunkTicks<T> container = containers.get(chunkKey);

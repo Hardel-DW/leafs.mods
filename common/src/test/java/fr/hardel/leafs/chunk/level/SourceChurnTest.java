@@ -13,7 +13,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Sources that appear, weaken, strengthen and leave in any order, from several threads, must settle like the brute force and never run away. */
 class SourceChurnTest {
     private static final int LEVELS = 46;
     private static final int NONE = LEVELS - 1;
@@ -49,7 +48,6 @@ class SourceChurnTest {
         }
     }
 
-    /** Threads interleave their writes, so the exact picture is not defined; what must hold is that every level stays in range and the run ends. */
     @Test
     void churnFromEightThreadsEndsWithLevelsInRange() throws InterruptedException {
         int threads = 8;

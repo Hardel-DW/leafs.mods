@@ -10,7 +10,6 @@ import net.minecraft.world.level.NaturalSpawner;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** The spawn census of a region counts the entities of that region; vanilla's counts the whole level from the server thread. */
 @Mixin(NaturalSpawner.class)
 public abstract class NaturalSpawnerMixin {
     @WrapOperation(method = "createState", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;getAllEntities()Ljava/lang/Iterable;"))

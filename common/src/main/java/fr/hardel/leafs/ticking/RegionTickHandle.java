@@ -10,7 +10,6 @@ import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.world.level.ChunkPos;
 
-/** The schedulable side of one region; the gate only tries, a worker never parks. */
 public final class RegionTickHandle extends TickHandle {
     private final Region<RegionTickData> region;
     private final LevelRegions regions;

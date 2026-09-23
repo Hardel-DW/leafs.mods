@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The block entity map is read across region seams while its owner writes it, so it goes concurrent. */
 @Mixin(ChunkAccess.class)
 public abstract class ChunkAccessMixin {
 

@@ -24,7 +24,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Concurrent player lists for cross-region reads; a join or a leave on the server thread locks the player's region first. */
 @Mixin(PlayerList.class)
 public abstract class PlayerListMixin {
 
@@ -59,7 +58,6 @@ public abstract class PlayerListMixin {
         this.advancements = new ConcurrentHashMap<>();
     }
 
-    /** Vanilla order kept; a region thread already owns or mails what it touches. */
     @WrapMethod(method = "placeNewPlayer")
     private void leafs$lockThePlayerOnJoin(Connection connection, ServerPlayer player, CommonListenerCookie cookie, Operation<Void> original) {
         RegionBorrow.atContact(player);

@@ -14,7 +14,6 @@ import net.minecraft.world.ticks.TickPriority;
 
 import java.util.function.LongSupplier;
 
-/** What a region carries between ticks: its clock's view, its random, its updaters, and the two photos it retakes every tick. Nothing here moves on a merge or a split. */
 public final class RegionWorldData {
     private final LongSupplier time;
     private final RandomSource random;
@@ -79,7 +78,6 @@ public final class RegionWorldData {
         this.census = census;
     }
 
-    /** Vanilla's shape on the region clock; the sub-tick counter keeps the drain order deterministic within a tick. */
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
         return new ScheduledTick<>(type, pos, currentTick() + delay, priority, subTick++);
     }
@@ -88,7 +86,6 @@ public final class RegionWorldData {
         return new ScheduledTick<>(type, pos, currentTick() + delay, subTick++);
     }
 
-    /** The autosave epoch every chunk of the region has reached; the walk that found them all done set it. */
     public long savedEpoch() {
         return savedEpoch;
     }
@@ -97,7 +94,6 @@ public final class RegionWorldData {
         savedEpoch = epoch;
     }
 
-    /** Chunks joined the region: the next pass walks them. */
     public void forgetEpoch() {
         savedEpoch = Long.MIN_VALUE;
     }

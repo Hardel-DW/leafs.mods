@@ -12,7 +12,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** ConcurrentHashMap-backed Object2BooleanMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentObject2BooleanMap<K> extends AbstractObject2BooleanMap<K> {
     private final ConcurrentHashMap<K, Boolean> map = new ConcurrentHashMap<>();
 

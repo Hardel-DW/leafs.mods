@@ -83,7 +83,6 @@ class PoiDirtySetConcurrencyTest {
             writer.flush(new ChunkPos(chunk, 0));
         }
 
-        // A read behind the writes: the disk thread takes its tasks in order, so the close that follows finds every write queued instead of dropping the last.
         writer.exists(new BlockPos(CHUNKS << 4, 64, 0), type -> true);
         writer.close();
         PoiManager reader = poiManager(directory);

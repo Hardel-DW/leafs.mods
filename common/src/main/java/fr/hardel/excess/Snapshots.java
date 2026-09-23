@@ -18,16 +18,11 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-/**
- * What the synchronized collections share. The live collection locks itself on every call, so the helpers lock on it too and stay re-entrant.
- * The functions of compute run outside the lock, and the views walk a snapshot while writing back to the live map.
- */
 final class Snapshots {
 
     private Snapshots() {
     }
 
-    /** The filter runs outside the lock, it may read the world; what matched is then removed under it. */
     static <E> boolean removeIf(Collection<E> live, List<E> snapshot, Predicate<? super E> filter) {
         List<E> matched = new ArrayList<>();
         for (E element : snapshot) {
@@ -39,7 +34,6 @@ final class Snapshots {
         return !matched.isEmpty() && live.removeAll(matched);
     }
 
-    /** The mapping runs outside the lock; two threads racing on an absent key both build, the first published wins. */
     static <K, V> V computeIfAbsent(Map<K, V> live, K key, Function<? super K, ? extends V> mapping) {
         V current = live.get(key);
         if (current != null) {
@@ -62,7 +56,6 @@ final class Snapshots {
         }
     }
 
-    /** Applies the change to the value read outside the lock, and publishes only if the entry still holds that value, else reads again. */
     static <K, V> V update(Map<K, V> live, K key, UnaryOperator<V> change) {
         while (true) {
             V current = live.get(key);
@@ -83,7 +76,6 @@ final class Snapshots {
         }
     }
 
-    /** An entry of a snapshot: setValue writes to the live map. It is an entry of every map flavour at once so one view class serves them all. */
     static final class Entry<K, V> implements Object2ObjectMap.Entry<K, V>, Reference2ObjectMap.Entry<K, V> {
         private final Map<K, V> live;
         private final K key;
@@ -129,7 +121,6 @@ final class Snapshots {
         }
     }
 
-    /** The keys of a snapshot; membership and removal go to the live map. A ReferenceSet too, for the maps keyed by identity. */
     static final class Keys<K, V> extends AbstractObjectSet<K> implements ReferenceSet<K> {
         private final Map<K, V> live;
         private final List<Entry<K, V>> entries;
@@ -174,7 +165,6 @@ final class Snapshots {
         }
     }
 
-    /** The values of a snapshot; removal through the iterator takes the entry's key out of the live map. */
     static final class Values<K, V> extends AbstractObjectCollection<V> {
         private final Map<K, V> live;
         private final List<Entry<K, V>> entries;
@@ -221,7 +211,6 @@ final class Snapshots {
         }
     }
 
-    /** The entries of a snapshot, typed as the map flavour wants them; removal goes to the live map. */
     static class Entries<K, V, E extends Map.Entry<K, V>> extends AbstractObjectSet<E> {
         private final Map<K, V> live;
         private final List<E> entries;

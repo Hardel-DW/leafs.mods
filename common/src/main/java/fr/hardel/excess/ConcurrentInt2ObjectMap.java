@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 
-/** ConcurrentHashMap-backed Int2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     private final ConcurrentHashMap<Integer, V> map = new ConcurrentHashMap<>();
 
@@ -78,7 +77,6 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
                 return ObjectIterators.asObjectIterator(map.values().iterator());
             }
 
-            /** A stream must not trust a size the map outgrows while it runs. */
             @Override
             public @NonNull ObjectSpliterator<V> spliterator() {
                 return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);

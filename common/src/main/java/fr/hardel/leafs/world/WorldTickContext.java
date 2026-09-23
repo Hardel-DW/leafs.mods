@@ -5,7 +5,6 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.server.level.ServerLevel;
 
-/** The region whose tick body runs on this thread, and its level. Absent on the server thread, where vanilla's own state serves. */
 public final class WorldTickContext {
     private static final ThreadLocal<WorldTickContext> CURRENT = new ThreadLocal<>();
 

@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.List;
 
-/** Server-side scoreboard lock: dirty flag, tracked objectives, packet builds and save serialized with the base half. */
 @Mixin(ServerScoreboard.class)
 public abstract class ServerScoreboardMixin {
 

@@ -87,7 +87,6 @@ class RegionTickSchedulerTest {
         assertFalse(RegionTickScheduler.onWorker());
     }
 
-    /** The drain that follows on the server thread must find every region idle: a tick in flight ends before shutdown returns, however long it takes. */
     @Test
     void shutdownWaitsForATickInFlight(@TempDir Path crashDirectory) throws InterruptedException {
         RegionTickScheduler scheduler = createScheduler(1, crashDirectory);
@@ -142,7 +141,6 @@ class RegionTickSchedulerTest {
         }
     }
 
-    /** A crash path must not crash: a report that cannot be built must not hide what actually failed. */
     @Test
     void aFailingCrashReportNeverReplacesTheOriginalFailure(@TempDir Path crashDirectory) {
         RegionTickScheduler attached = createScheduler(1, crashDirectory);

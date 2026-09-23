@@ -6,7 +6,6 @@ import it.unimi.dsi.fastutil.longs.LongList;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Records every callback invocation as a readable event line, in order. */
 class RecordingCallbacks implements RegionCallbacks<Object> {
     final List<String> events = new ArrayList<>();
 

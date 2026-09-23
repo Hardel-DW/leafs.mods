@@ -19,7 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.Executor;
 
-/** Entity chunk deserialization moves to the chunk pool like the chunk reads; the empty-chunk cache goes concurrent. */
 @Mixin(EntityStorage.class)
 public abstract class EntityStorageMixin {
 

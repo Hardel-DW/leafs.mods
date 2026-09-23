@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** A region reads an entity section across a seam while its owner writes it: the walk never tears, the class cache never misses an entity. */
 class EntitySectionConcurrencyTest {
     private static final int WRITES = 20_000;
 

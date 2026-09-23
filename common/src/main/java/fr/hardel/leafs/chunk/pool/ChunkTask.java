@@ -6,7 +6,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.CompletableFuture;
 
-/** A unit of chunk work. A returned future keeps the reservation until it completes. */
 public abstract class ChunkTask {
     static final int UNQUEUED = -1;
     private static final VarHandle BUCKET;
@@ -19,7 +18,6 @@ public abstract class ChunkTask {
         }
     }
 
-    /** What a task is for; the reservation counts say which kind waits behind which. */
     public enum Kind {
         STEP,
         LIGHT,
@@ -27,7 +25,6 @@ public abstract class ChunkTask {
         HOUSEKEEPING
     }
 
-    /** Where a task works, in reservation keys: the chunk it writes and the centre it serves. The more urgent of the two is its priority, so a dependency inherits the urgency of its user. */
     public record Place(long chunkKey, long centerKey, Urgency urgency) {
         public int priority() {
             int chunk = urgency.of(chunkX(chunkKey), chunkZ(chunkKey));
@@ -42,7 +39,6 @@ public abstract class ChunkTask {
     private volatile int bucket = UNQUEUED;
     private volatile boolean withdrawn;
 
-    /** A fixed priority, invisible to the re-prioritisation. */
     protected ChunkTask(Kind kind, int priority, long... reserved) {
         this.kind = kind;
         this.place = null;
@@ -77,7 +73,6 @@ public abstract class ChunkTask {
         };
     }
 
-    /** Chunk coordinates fit in 22 bits each, the owner in the 20 above, so two levels never share a key. */
     public static long key(int owner, int chunkX, int chunkZ) {
         return ((long) owner << 44) | ((chunkX & 0x3FFFFFL) << 22) | (chunkZ & 0x3FFFFFL);
     }
@@ -106,7 +101,6 @@ public abstract class ChunkTask {
         return priority;
     }
 
-    /** Null when the work is done on return. */
     protected abstract @Nullable CompletableFuture<?> run();
 
     @Override
@@ -114,7 +108,6 @@ public abstract class ChunkTask {
         return place == null ? "%s at priority %d".formatted(kind, priority) : "%s at [%d, %d] priority %d".formatted(kind, chunkX(place.chunkKey()), chunkZ(place.chunkKey()), priority);
     }
 
-    /** Left the queue before running: the pool drops it when it reaches it. */
     protected final void withdraw() {
         withdrawn = true;
     }
@@ -133,7 +126,6 @@ public abstract class ChunkTask {
         }
     }
 
-    /** False for a stale entry a move left behind. */
     final boolean claimAt(int bucket) {
         return BUCKET.compareAndSet(this, bucket, UNQUEUED);
     }

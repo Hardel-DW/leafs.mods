@@ -14,17 +14,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Queue;
 
-/** Hook only, logic in network/: play packets are routed to their player's queue. */
 @Mixin(PacketProcessor.class)
 public abstract class PacketProcessorMixin {
 
-    /** On the enqueue itself, so a closed processor still rejects (vanilla's shutdown disconnect). */
     @WrapOperation(method = "scheduleIfPossible", at = @At(value = "INVOKE", target = "Ljava/util/Queue;add(Ljava/lang/Object;)Z"))
     private <T extends PacketListener> boolean leafs$routePlayPackets(Queue<Object> queue, Object entry, Operation<Boolean> original, T listener, Packet<T> packet) {
         return PacketRouting.routeToPlayer(listener, packet) || original.call(queue, entry);
     }
 
-    /** A unit draining a player queue is a packet-handling thread. */
     @Inject(method = "isSameThread", at = @At("HEAD"), cancellable = true)
     private void leafs$drainingUnitIsAPacketThread(CallbackInfoReturnable<Boolean> callback) {
         if (PlayerPacketQueue.handlingPackets()) {

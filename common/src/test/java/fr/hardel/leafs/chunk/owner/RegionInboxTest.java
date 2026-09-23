@@ -22,7 +22,6 @@ class RegionInboxTest {
         assertEquals(0, inbox.size());
     }
 
-    /** The region lost the section meanwhile: the task is not its work any more, it leaves through the owners instead of running here. */
     @Test
     void aTaskOnAChunkTheOwnerLostLeavesInsteadOfRunning() {
         List<RegionInbox.Posted> left = new ArrayList<>();

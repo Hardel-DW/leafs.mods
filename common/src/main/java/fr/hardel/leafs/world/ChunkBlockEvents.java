@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Vanilla's block event set, cut per chunk. An event keeps the level-wide sequence it arrived with, so a region replays vanilla's FIFO across its chunks, and it leaves its set only as it runs. */
 public final class ChunkBlockEvents {
     private static final Comparator<Pending> ORDER = Comparator.comparingLong(Pending::sequence);
 
@@ -28,7 +27,6 @@ public final class ChunkBlockEvents {
 
     private final Map<BlockEventData, Long> events = new LinkedHashMap<>();
 
-    /** Vanilla's blockEvent: the event joins its chunk's set on the chunk's owner. False for an unloaded position, which keeps vanilla's level set. */
     public static boolean post(ServerLevel level, BlockEventData event, long sequence) {
         int chunkX = SectionPos.blockToSectionCoord(event.pos().getX());
         int chunkZ = SectionPos.blockToSectionCoord(event.pos().getZ());
@@ -40,7 +38,6 @@ public final class ChunkBlockEvents {
         return true;
     }
 
-    /** Vanilla's clearBlockEvents over the loaded chunks of the box, each on its owner. */
     public static void clearArea(ServerLevel level, BoundingBox area) {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         for (int chunkX = SectionPos.blockToSectionCoord(area.minX()); chunkX <= SectionPos.blockToSectionCoord(area.maxX()); chunkX++) {
@@ -62,7 +59,6 @@ public final class ChunkBlockEvents {
         });
     }
 
-    /** Vanilla's runBlockEvents over the sets of one region's ticking chunks: sequence order across chunks, an event leaves its set as it runs, cascades replay until nothing is left. */
     public static void runAll(List<ChunkBlockEvents> sets, Consumer<BlockEventData> runner) {
         List<Pending> batch = new ArrayList<>();
         do {
@@ -84,7 +80,6 @@ public final class ChunkBlockEvents {
         return ((ChunkTickAccess) chunk).leafs$blockEvents();
     }
 
-    /** Same event twice in a tick collapses onto the first, as vanilla's set does. */
     public void add(BlockEventData event, long sequence) {
         events.putIfAbsent(event, sequence);
     }

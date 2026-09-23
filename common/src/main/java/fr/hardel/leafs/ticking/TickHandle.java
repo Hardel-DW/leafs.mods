@@ -2,7 +2,6 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.metrics.StageTimings;
 
-/** One schedulable tick unit, subclassed by the whole-level attached tick and by a real region. */
 public abstract class TickHandle {
     private final RegionContext context;
     private final StageTimings stages;
@@ -46,7 +45,6 @@ public abstract class TickHandle {
         this.scheduledStartNanos = scheduledStartNanos;
     }
 
-    /** The region clock, or game time for the level-serial unit. */
     public abstract long currentTick();
 
     protected abstract boolean tick();

@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
-/** Each visit keeps its registration order and skips removed entries; additions wait until the open visits finish. */
 public final class GameEventListeners extends AbstractList<GameEventListener> {
     private final List<Registration> listeners = new ArrayList<>();
     private final List<Registration> pending = new ArrayList<>();

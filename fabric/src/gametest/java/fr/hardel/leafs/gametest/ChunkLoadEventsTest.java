@@ -9,7 +9,6 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** What LootR and every chunk tracker rely on: the loader's load events of a chunk reaching FULL. */
 public final class ChunkLoadEventsTest {
     private final Set<ChunkPos> loaded = ConcurrentHashMap.newKeySet();
     private final Set<ChunkPos> generated = ConcurrentHashMap.newKeySet();

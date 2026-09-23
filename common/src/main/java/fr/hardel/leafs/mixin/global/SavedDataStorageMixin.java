@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.Mixin;
 
 import java.util.Map;
 
-/** Serializes SavedData cache population and dirty sweeps; encodes lock per instance to order against region writes. */
 @Mixin(SavedDataStorage.class)
 public abstract class SavedDataStorageMixin {
 

@@ -20,7 +20,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
-/** Vanilla keeps filtering, callbacks and debug notifications; the list owns concurrent and nested visits. */
 @Mixin(EuclideanGameEventListenerRegistry.class)
 public abstract class EuclideanGameEventListenerRegistryMixin {
     @Shadow

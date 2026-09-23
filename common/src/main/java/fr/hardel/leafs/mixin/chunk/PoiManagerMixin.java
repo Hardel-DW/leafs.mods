@@ -29,7 +29,6 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-/** Concurrent loadedChunks facade; the village distance graph and the section consistency pass take the storage's lock, no facade can carry a graph. */
 @Mixin(PoiManager.class)
 public abstract class PoiManagerMixin {
 
@@ -61,7 +60,6 @@ public abstract class PoiManagerMixin {
         leafs$lock().runLocked(() -> original.call(sectionPos));
     }
 
-    /** Chunk deserialization runs on the chunk workers and rewrites a section's records, so it takes the same lock as the save that packs them. */
     @WrapMethod(method = "checkConsistencyWithBlocks")
     private void leafs$consistencyUnderTheLock(SectionPos sectionPos, LevelChunkSection blockSection, Operation<Void> original) {
         leafs$lock().runLocked(() -> original.call(sectionPos, blockSection));

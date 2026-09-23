@@ -11,7 +11,6 @@ import net.minecraft.util.Util;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
-/** Dumps every thread into a crash report then {@code Runtime.halt}: a wedged server cannot run its own shutdown. */
 public final class WatchdogKill implements Consumer<LeafsWatchdog.Stall> {
     private final MinecraftServer server;
 

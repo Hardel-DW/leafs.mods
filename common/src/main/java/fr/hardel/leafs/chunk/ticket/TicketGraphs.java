@@ -13,7 +13,6 @@ import net.minecraft.world.level.TicketStorage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/** The three graphs. The writer drains the players graph, whose tickets feed the two others, and its own simulation writes; the pool drains the loading graph. */
 public final class TicketGraphs {
     private static final int LEVELS = ChunkLevel.MAX_LEVEL + 2;
 
@@ -37,12 +36,10 @@ public final class TicketGraphs {
         return simulation;
     }
 
-    /** The sections the three graphs hold, what grows if levels are never forgotten. */
     public int sectionCount() {
         return loading.sectionCount() + simulation.sectionCount() + players.sectionCount();
     }
 
-    /** Where the players stand, one level per chunk of distance to the nearest. */
     public ChunkLevels players() {
         return players;
     }
@@ -78,7 +75,6 @@ public final class TicketGraphs {
         };
     }
 
-    /** Several writes, one drain at the end, once every monitor is released. */
     public void batch(Runnable writes) {
         batch(() -> {
             writes.run();
@@ -103,7 +99,6 @@ public final class TicketGraphs {
         return result;
     }
 
-    /** The players drain writes tickets, so it runs as one more batch; off the pool, one loading pass is handed over at a time. */
     public boolean drain() {
         if (loadingListener == null || batching.get()) {
             return false;
@@ -131,7 +126,6 @@ public final class TicketGraphs {
         return changed;
     }
 
-    /** A bystander leaves a region's pending move alone. */
     private boolean drainOwnSimulation() {
         if (!wroteSimulation.get()) {
             return false;

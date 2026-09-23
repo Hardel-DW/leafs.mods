@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Vanilla keeps one ticket per type and level: two waiters share it, so it leaves with the last of them, not the first. */
 @ExtendWith(MinecraftBootstrap.class)
 class DemandsTest {
     private static final long CHUNK = ChunkPos.pack(3, 3);

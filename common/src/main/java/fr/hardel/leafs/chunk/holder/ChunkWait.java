@@ -18,7 +18,6 @@ import java.util.List;
 
 import java.util.concurrent.CompletableFuture;
 
-/** A required chunk that is not there: the thread asks for it and runs what it owns until it lands. The server thread borrows first. */
 public final class ChunkWait {
     private static final ThreadLocal<Scope> SCOPE = new ThreadLocal<>();
 
@@ -40,7 +39,6 @@ public final class ChunkWait {
         scope.depth++;
     }
 
-    /** Only the outermost scope releases: a chunk taken inside a region tick closes before the tick, whose reads must hold. */
     public static void exitScope() {
         Scope scope = SCOPE.get();
         if (scope == null || --scope.depth > 0) {
@@ -51,7 +49,6 @@ public final class ChunkWait {
         scope.releases.forEach(Runnable::run);
     }
 
-    /** A delivered demand: kept until the scope ends, released at once without one. */
     static void keep(Runnable release) {
         Scope scope = SCOPE.get();
         if (scope == null) {
@@ -73,7 +70,6 @@ public final class ChunkWait {
         });
     }
 
-    /** The first frame that is neither the wait nor the chunk read it serves: the game code that needed the chunk. */
     private static String asker() {
         for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
             String owner = frame.getClassName();

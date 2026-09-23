@@ -1,6 +1,5 @@
 package fr.hardel.leafs.region;
 
-/** One section of 2^shift chunks a side. The bits are the chunks that tick; every position of the section is owned. Bits are single-writer, the rest is under the regionizer's write lock. */
 final class RegionSection<R> {
     private final long key;
     private final int indexShift;

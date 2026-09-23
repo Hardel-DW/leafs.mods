@@ -49,7 +49,6 @@ class RegionBorrowTest {
         region.markNotTicking();
     }
 
-    /** A write is a contact like a read: the server thread locks the region of the chunk before deciding whether to defer. */
     @Test
     void aBorrowingThreadTakesTheRegionOfAChunkItMeets() {
         simulated(regions, 0, 0);
@@ -89,7 +88,6 @@ class RegionBorrowTest {
         borrower.join();
     }
 
-    /** The server thread locks an idle region owed a merge with one it holds, like a ticking region keeps merges waiting; the fold runs at the release. */
     @Test
     void aHeadTakesARegionOwedAMergeAndTheMergeRunsAtItsRelease() {
         simulated(regions, 0, 0);
@@ -114,7 +112,6 @@ class RegionBorrowTest {
         assertEquals(RegionState.READY, survivor.state());
     }
 
-    /** The whole level locked: a region owed a merge with one it holds is taken too, the fold waits for the release. */
     @Test
     void borrowAllHoldsARegionOwedAMergeUntilTheRelease() throws InterruptedException {
         simulated(regions, 0, 0);

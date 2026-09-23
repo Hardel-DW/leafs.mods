@@ -10,10 +10,6 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-/**
- * A HashMap other threads may write while one iterates: every call takes the map's lock, the views walk a snapshot and write back, and the functions
- * of compute and merge run outside the lock, published only if the entry did not move meanwhile. Fits a field declared HashMap or Map.
- */
 public final class SynchronizedHashMap<K, V> extends HashMap<K, V> {
 
     public SynchronizedHashMap() {
