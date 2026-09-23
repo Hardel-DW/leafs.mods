@@ -1,5 +1,6 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import org.jspecify.annotations.NonNull;
@@ -13,17 +14,17 @@ public final class ConcurrentLongSet extends AbstractLongSet {
 
     @Override
     public boolean add(long value) {
-        return set.add(LongSpread.mix(value));
+        return set.add(HashCommon.mix(value));
     }
 
     @Override
     public boolean remove(long value) {
-        return set.remove(LongSpread.mix(value));
+        return set.remove(HashCommon.mix(value));
     }
 
     @Override
     public boolean contains(long value) {
-        return set.contains(LongSpread.mix(value));
+        return set.contains(HashCommon.mix(value));
     }
 
     @Override
@@ -52,7 +53,7 @@ public final class ConcurrentLongSet extends AbstractLongSet {
 
             @Override
             public long nextLong() {
-                return LongSpread.unmix(backing.next());
+                return HashCommon.invMix(backing.next());
             }
 
             @Override
