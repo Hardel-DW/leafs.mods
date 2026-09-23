@@ -50,8 +50,8 @@ public final class ChunkWait {
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = demand.delivery();
         WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
         ThreadWaits.Wait outer = ThreadWaits.open(report::toString);
-        String found = report.toString();
         TickingManager ticking = TickingManager.of(level.getServer());
+        String found = ticking.slowTaskNanos() == Long.MAX_VALUE ? null : report.toString();
         try {
             ticking.await(delivery::isDone);
         } finally {
