@@ -63,7 +63,7 @@ public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<
 
     @Override
     public V computeIfAbsent(short key, Short2ObjectFunction<? extends V> mapping) {
-        return orDefault(map.computeIfAbsent(key, mapping::get));
+        return orDefault(map.computeIfAbsent(key, boxed -> mapping.get((short) boxed)));
     }
 
     @Override

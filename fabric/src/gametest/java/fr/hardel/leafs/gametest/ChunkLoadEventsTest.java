@@ -14,8 +14,12 @@ public final class ChunkLoadEventsTest {
     private final Set<ChunkPos> generated = ConcurrentHashMap.newKeySet();
 
     public ChunkLoadEventsTest() {
-        ServerChunkEvents.CHUNK_LOAD.register((_, chunk, _) -> loaded.add(chunk.getPos()));
-        ServerChunkEvents.CHUNK_GENERATE.register((_, chunk) -> generated.add(chunk.getPos()));
+        ServerChunkEvents.CHUNK_LOAD.register((_, chunk, newlyGenerated) -> {
+            loaded.add(chunk.getPos());
+            if (newlyGenerated) {
+                generated.add(chunk.getPos());
+            }
+        });
     }
 
     @GameTest(maxTicks = 100)
@@ -26,7 +30,7 @@ public final class ChunkLoadEventsTest {
 
         helper.succeedWhen(() -> {
             helper.assertTrue(loaded.contains(far), "CHUNK_LOAD fired for %s".formatted(far));
-            helper.assertTrue(generated.contains(far), "CHUNK_GENERATE fired for %s".formatted(far));
+            helper.assertTrue(generated.contains(far), "CHUNK_LOAD reported %s as newly generated".formatted(far));
         });
     }
 }
