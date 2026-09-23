@@ -18,6 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -27,7 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @ExtendWith(MinecraftBootstrap.class)
 class ChunkWritesTest {
     private final ChunkPool pool = ChunkFixtures.pool(2);
-    private SimpleRegionStorage storage;
+    private final SimpleRegionStorage storage;
+
+    ChunkWritesTest() throws IOException {
+        storage = new SimpleRegionStorage(new RegionStorageInfo("test", Level.OVERWORLD, "chunk"), Files.createTempDirectory("leafs-writes"), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK);
+    }
 
     @AfterEach
     void stop() throws IOException {
@@ -37,8 +44,7 @@ class ChunkWritesTest {
 
     /** B01: the older photo of a chunk finished encoding after the newer one and wrote its stale state over it; the disk keeps the last photo, like vanilla's write queue. */
     @Test
-    void anOlderPhotoFinishingAfterANewerOneIsNeverWritten() throws IOException, InterruptedException {
-        storage = new SimpleRegionStorage(new RegionStorageInfo("test", Level.OVERWORLD, "chunk"), Files.createTempDirectory("leafs-writes"), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK);
+    void anOlderPhotoFinishingAfterANewerOneIsNeverWritten() throws InterruptedException {
         ChunkWrites writes = new ChunkWrites(pool, storage.worker);
         ChunkPos pos = new ChunkPos(3, 4);
         CountDownLatch olderTaken = new CountDownLatch(1);
@@ -58,5 +64,28 @@ class ChunkWritesTest {
 
         CompoundTag onDisk = storage.worker.loadAsync(pos).join().orElseThrow();
         assertEquals(2, onDisk.getIntOr("DataVersion", 0), "the disk keeps the last photo");
+    }
+
+    /** 2026-09-24: the chunk bytes went to the disk in the foreground, so a chunk read waited behind every queued write. */
+    @Test
+    void aChunkReadPassesBeforeTheQueuedWrites() {
+        ChunkWrites writes = new ChunkWrites(pool, storage.worker);
+        List<String> order = new CopyOnWriteArrayList<>();
+        CountDownLatch disk = TestThreads.occupy(task -> storage.worker.submitThrowingTask(() -> {
+            task.run();
+            return null;
+        }));
+
+        CompletableFuture<Void> first = writes.photograph(new ChunkPos(0, 0), () -> ChunkFixtures.photo(1)).written().thenRun(() -> order.add("write"));
+        CompletableFuture<Void> second = writes.photograph(new ChunkPos(1, 0), () -> ChunkFixtures.photo(1)).written().thenRun(() -> order.add("write"));
+        while (storage.worker.consecutiveExecutor.size() < 2) {
+            Thread.onSpinWait();
+        }
+
+        CompletableFuture<Void> read = storage.worker.loadAsync(new ChunkPos(5, 5)).thenRun(() -> order.add("read"));
+        disk.countDown();
+        CompletableFuture.allOf(first, second, read).join();
+
+        assertEquals(List.of("read", "write", "write"), order);
     }
 }

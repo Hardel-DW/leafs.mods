@@ -61,16 +61,19 @@ public final class ChunkWrites {
     }
 
     private CompletableFuture<Void> store(ChunkPos pos, PendingWrite write) {
-        return disk.submitThrowingTask(() -> {
-            if (pending.get(pos.pack()) != write) {
-                return null;
-            }
+        return disk.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.BACKGROUND.ordinal(), future -> {
+            try {
+                if (pending.get(pos.pack()) == write) {
+                    CompressedChunk bytes = write.bytes();
+                    RegionFile file = files.getOrCreateRegionFile(pos);
+                    JvmProfiler.INSTANCE.onRegionFileWrite(files.info(), pos, bytes.version(), bytes.streamLength());
+                    file.write(pos, bytes.buffer());
+                }
 
-            CompressedChunk bytes = write.bytes();
-            RegionFile file = files.getOrCreateRegionFile(pos);
-            JvmProfiler.INSTANCE.onRegionFileWrite(files.info(), pos, bytes.version(), bytes.streamLength());
-            file.write(pos, bytes.buffer());
-            return null;
+                future.complete(null);
+            } catch (Exception exception) {
+                future.completeExceptionally(exception);
+            }
         });
     }
 }
