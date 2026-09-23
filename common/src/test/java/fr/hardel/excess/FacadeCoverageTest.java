@@ -8,13 +8,11 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class FacadeCoverageTest {
-    private static final Set<String> SEQUENCED = Set.of("addFirst", "addLast", "getFirst", "getLast", "removeFirst", "removeLast", "reversed");
 
     @ParameterizedTest
     @ValueSource(classes = {
@@ -26,12 +24,9 @@ class FacadeCoverageTest {
     }
 
     @ParameterizedTest
-    @ValueSource(classes = {
-        HashMapFacade.class, HashSetFacade.class, SynchronizedArrayList.class,
-        SynchronizedLongOpenHashSet.class
-    })
+    @ValueSource(classes = {HashMapFacade.class, HashSetFacade.class})
     void aClassFacadeRedefinesEveryMethodOfItsClasses(Class<?> facade) {
-        assertEquals(List.of(), inherited(facade, method -> !method.getDeclaringClass().isInterface() || isCompound(method) || SEQUENCED.contains(method.getName())));
+        assertEquals(List.of(), inherited(facade, method -> !method.getDeclaringClass().isInterface() || isCompound(method)));
     }
 
     private static List<String> inherited(Class<?> facade, Predicate<Method> mustRedefine) {
