@@ -63,10 +63,6 @@ public final class RegionTickScheduler {
         }
     }
 
-    public void runAttached(TickHandle handle) {
-        executeTick(handle);
-    }
-
     /** Vanilla and mods see a worker as the server thread. */
     public static boolean onWorker() {
         return Thread.currentThread() instanceof Worker;
@@ -99,8 +95,9 @@ public final class RegionTickScheduler {
             }
 
             boolean started;
+            watchdog.beginTick(handle);
             try {
-                started = executeTick(handle);
+                started = handle.tick();
             } catch (Throwable throwable) {
                 if (running) {
                     failurePolicy.accept(handle, throwable);
@@ -108,6 +105,7 @@ public final class RegionTickScheduler {
 
                 continue;
             } finally {
+                watchdog.endTick(handle);
                 if (regionThreadNames) {
                     worker.setName(workerName);
                 }
@@ -125,15 +123,6 @@ public final class RegionTickScheduler {
 
             handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos.getAsLong()));
             queue.add(next);
-        }
-    }
-
-    private boolean executeTick(TickHandle handle) {
-        watchdog.beginTick(handle);
-        try {
-            return handle.tick();
-        } finally {
-            watchdog.endTick(handle);
         }
     }
 
