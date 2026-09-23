@@ -141,11 +141,11 @@ public final class Regionizer<R> {
     }
 
     int sectionCountOf(Region<R> region) {
-        return readCount(() -> region.sectionKeys.size());
+        return readCount(region.sectionKeys::size);
     }
 
     int deadSectionCountOf(Region<R> region) {
-        return readCount(() -> region.deadSectionKeys.size());
+        return readCount(region.deadSectionKeys::size);
     }
 
     int chunkCountOf(Region<R> region) {

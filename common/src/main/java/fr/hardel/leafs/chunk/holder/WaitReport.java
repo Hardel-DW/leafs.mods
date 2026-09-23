@@ -88,7 +88,7 @@ public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus 
     private static String pending(ChunkHolder holder) {
         List<ChunkStatus> statuses = ChunkStatus.getStatusList();
         String names = IntStream.range(0, holder.futures.length())
-            .filter(index -> holder.futures.get(index) != null && !holder.futures.get(index).isDone())
+            .filter(index -> holder.futures.get(index) instanceof CompletableFuture<?> future && !future.isDone())
             .mapToObj(index -> statuses.get(index).toString())
             .collect(Collectors.joining(" "));
         return names.isEmpty() ? "none" : names;
