@@ -31,6 +31,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ChunkTaskDispatcher;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.server.level.ServerPlayer;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 @Mixin(ChunkMap.class)
@@ -147,10 +149,9 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         return leafs$chunks.steps().apply(step, cache, chunk, () -> original.call(step, context, cache, chunk));
     }
 
-    @Inject(method = "runGenerationTask", at = @At("HEAD"), cancellable = true)
-    private void leafs$driveOnThePool(ChunkGenerationTask task, CallbackInfo callbackInfo) {
-        leafs$chunks.steps().run(task);
-        callbackInfo.cancel();
+    @WrapOperation(method = "runGenerationTask", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkTaskDispatcher;submit(Ljava/lang/Runnable;JLjava/util/function/IntSupplier;)V"))
+    private void leafs$driveOnThePool(ChunkTaskDispatcher dispatcher, Runnable task, long chunkKey, IntSupplier queueLevel, Operation<Void> original) {
+        leafs$chunks.steps().run(task, chunkKey);
     }
 
     @WrapOperation(method = {"scheduleGenerationTask", "runGenerationTasks"}, at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;pendingGenerationTasks:Ljava/util/List;"))
