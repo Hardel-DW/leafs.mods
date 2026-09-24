@@ -2,11 +2,16 @@ package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongIterators;
+import it.unimi.dsi.fastutil.longs.LongSpliterator;
+import it.unimi.dsi.fastutil.longs.LongSpliterators;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Set;
+import java.util.Spliterator;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ConcurrentLongSet extends AbstractLongSet {
@@ -61,5 +66,20 @@ public final class ConcurrentLongSet extends AbstractLongSet {
                 backing.remove();
             }
         };
+    }
+
+    @Override
+    public @NonNull LongSpliterator spliterator() {
+        return LongSpliterators.asSpliteratorUnknownSize(iterator(), Spliterator.DISTINCT);
+    }
+
+    @Override
+    public long[] toLongArray() {
+        return LongIterators.unwrap(iterator());
+    }
+
+    @Override
+    public long[] toArray(long[] array) {
+        return new LongArrayList(iterator()).toArray(array);
     }
 }
