@@ -15,6 +15,7 @@ public final class MobCaps {
     private static final MobCategory[] SPAWNING = Arrays.stream(MobCategory.values()).filter(category -> category != MobCategory.MISC).toArray(MobCategory[]::new);
     private final LeafsConfig.Gameplay gameplay;
     private final LevelRegions regions;
+    private volatile MobCensus levelCensus = MobCensus.EMPTY;
 
     public MobCaps(ServerLevel level) {
         this.gameplay = LeafsConfig.get().gameplay();
@@ -22,7 +23,7 @@ public final class MobCaps {
     }
 
     public List<MobCategory> spawnable(RegionWorldData worldData, boolean spawnEnemies, boolean spawnPersistent) {
-        MobCensus census = gameplay.mobCapScope() == LeafsConfig.MobCapScope.LEVEL ? levelCensus() : worldData.census();
+        MobCensus census = gameplay.mobCapScope() == LeafsConfig.MobCapScope.LEVEL ? levelCensus : worldData.census();
         List<MobCategory> categories = new ArrayList<>(SPAWNING.length);
         for (MobCategory category : SPAWNING) {
             if ((spawnEnemies || category.isFriendly()) && (spawnPersistent || !category.isPersistent()) && census.below(category, gameplay.mobCap(category))) {
@@ -33,12 +34,17 @@ public final class MobCaps {
         return categories;
     }
 
-    private MobCensus levelCensus() {
-        MobCensus total = MobCensus.EMPTY;
+    public void sumLevel() {
+        int spawnableChunks = 0;
+        int[] counts = new int[MobCategory.values().length];
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-            total = total.plus(region.data().worldData().census());
+            MobCensus census = region.data().worldData().census();
+            spawnableChunks += census.spawnableChunks();
+            for (int index = 0; index < counts.length; index++) {
+                counts[index] += census.counts()[index];
+            }
         }
 
-        return total;
+        levelCensus = new MobCensus(spawnableChunks, counts);
     }
 }
