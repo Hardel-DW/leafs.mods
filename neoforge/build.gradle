@@ -30,14 +30,37 @@ def accessTransformer = tasks.register('accessTransformer') {
 
 sourceSets.main.resources.srcDir(accessTransformer.map { layout.buildDirectory.dir('generated/accesstransformer').get() })
 
+sourceSets {
+	gametest {
+		compileClasspath += main.output
+		runtimeClasspath += main.output
+	}
+}
+
 neoForge {
 	version = rootProject.neoforge_version
 	accessTransformers.from(accessTransformer.map { it.outputs.files.singleFile })
+	addModdingDependenciesTo(sourceSets.gametest)
+
+	mods {
+		leafs {
+			sourceSet sourceSets.main
+		}
+
+		leafs_gametest {
+			sourceSet sourceSets.gametest
+		}
+	}
 
 	runs {
+		configureEach {
+			jvmArguments.addAll('-ea', '-XX:+UseZGC')
+			loadedMods = [mods.leafs]
+		}
+
 		client {
 			client()
-			jvmArguments.addAll('-ea', '-XX:+UseZGC', '-Xmx6G')
+			jvmArguments.add('-Xmx6G')
 			if (project.hasProperty('world')) {
 				programArguments.addAll('--quickPlaySingleplayer', project.world)
 			}
@@ -46,13 +69,14 @@ neoForge {
 		server {
 			server()
 			programArguments.add('nogui')
-			jvmArguments.addAll('-ea', '-XX:+UseZGC', '-Xms14G', '-Xmx14G', '-XX:+AlwaysPreTouch')
+			jvmArguments.addAll('-Xms14G', '-Xmx14G', '-XX:+AlwaysPreTouch')
 		}
-	}
 
-	mods {
-		leafs {
-			sourceSet sourceSets.main
+		gameTest {
+			type = 'gameTestServer'
+			sourceSet = sourceSets.gametest
+			gameDirectory = layout.buildDirectory.dir('run/gameTest')
+			loadedMods.add(mods.leafs_gametest)
 		}
 	}
 }
@@ -61,6 +85,7 @@ configurations {
 	mods
 	compileOnly.extendsFrom(mods)
 	runtimeClasspath.extendsFrom(mods)
+	gametestRuntimeClasspath.extendsFrom(mods)
 }
 
 dependencies {
