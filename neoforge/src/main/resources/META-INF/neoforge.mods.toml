@@ -55,7 +55,7 @@ config = "leafs.mixins.json"
 config = "compat.mixins.json"
 
 [[mixins]]
-config = "neoforge.mixins.json"
+config = "leafs.neoforge.mixins.json"
 
 ["lithium:options"]
 "mixin.ai.poi" = false
