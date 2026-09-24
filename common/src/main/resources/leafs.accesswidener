@@ -6,6 +6,7 @@ accessible method net/minecraft/server/level/ServerChunkCache tickSpawningChunk 
 accessible method net/minecraft/server/level/ServerChunkCache getFullChunk (JLjava/util/function/Consumer;)V
 accessible method net/minecraft/world/level/TicketStorage canTicketExpire (Lnet/minecraft/server/level/ChunkMap;Lnet/minecraft/server/level/Ticket;J)Z
 accessible field net/minecraft/server/network/ServerCommonPacketListenerImpl connection Lnet/minecraft/network/Connection;
+accessible class net/minecraft/network/PacketProcessor$ListenerAndPacket
 accessible method net/minecraft/world/entity/ai/village/poi/PoiRecord acquireTicket ()Z
 
 accessible method net/minecraft/server/level/ServerLevel tickBlock (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/Block;)V

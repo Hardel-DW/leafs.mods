@@ -1,10 +1,7 @@
 package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
-import net.minecraft.ReportedException;
-import net.minecraft.network.PacketListener;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketUtils;
+import net.minecraft.network.PacketProcessor;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -22,12 +19,12 @@ public final class PlayerPacketQueue {
         return DRAINING.get() != null;
     }
 
-    public <T extends PacketListener> void add(T listener, Packet<T> packet) {
-        packets.add(new QueuedPacket<>(listener, packet, System.nanoTime()));
+    public void add(PacketProcessor.ListenerAndPacket<?> entry) {
+        packets.add(new Entry(entry::handle, entry.packet().getClass().getSimpleName(), System.nanoTime()));
     }
 
     public void addTask(Runnable task) {
-        packets.add(new QueuedContinuation(task, System.nanoTime()));
+        packets.add(new Entry(task, "Handler continuation", System.nanoTime()));
     }
 
     public boolean handledByCurrentThread() {
@@ -96,10 +93,10 @@ public final class PlayerPacketQueue {
             long age = System.nanoTime() - next.enqueuedNanos();
             if (age > slowestAge) {
                 slowestAge = age;
-                slowestEntry = next.describe();
+                slowestEntry = next.name();
             }
 
-            next.handle();
+            next.work().run();
         }
 
         if (slowestAge > QUEUE_AGE_WARN_NANOS) {
@@ -107,48 +104,6 @@ public final class PlayerPacketQueue {
         }
     }
 
-    private interface Entry {
-        void handle();
-
-        long enqueuedNanos();
-
-        String describe();
-    }
-
-    private record QueuedContinuation(Runnable task, long enqueuedNanos) implements Entry {
-        @Override
-        public void handle() {
-            task.run();
-        }
-
-        @Override
-        public String describe() {
-            return "Handler continuation";
-        }
-    }
-
-    private record QueuedPacket<T extends PacketListener>(T listener, Packet<T> packet, long enqueuedNanos) implements Entry {
-        @Override
-        public String describe() {
-            return packet.getClass().getSimpleName();
-        }
-
-        @Override
-        public void handle() {
-            if (!listener.shouldHandleMessage(packet)) {
-                Leafs.LOGGER.debug("Ignoring packet due to disconnection: {}", packet);
-                return;
-            }
-
-            try {
-                packet.handle(listener);
-            } catch (Exception exception) {
-                if (exception instanceof ReportedException reported && reported.getCause() instanceof OutOfMemoryError) {
-                    throw PacketUtils.makeReportedException(exception, packet, listener);
-                }
-
-                listener.onPacketError(packet, exception);
-            }
-        }
+    private record Entry(Runnable work, String name, long enqueuedNanos) {
     }
 }

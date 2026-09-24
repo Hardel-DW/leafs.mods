@@ -52,7 +52,6 @@
 		"network.ConnectionMixin",
 		"network.MinecraftServerMixin",
 		"network.PacketProcessorMixin",
-		"network.PacketUtilsMixin",
 		"network.PlayerChunkSenderMixin",
 		"network.PlayerListMixin",
 		"network.PrepareSpawnTaskPreparingMixin",
