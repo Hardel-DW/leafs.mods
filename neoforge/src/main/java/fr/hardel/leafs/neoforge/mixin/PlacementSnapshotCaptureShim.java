@@ -15,18 +15,18 @@ import java.util.ArrayList;
 @Mixin(CommonHooks.class)
 public abstract class PlacementSnapshotCaptureShim {
 
-    @WrapOperation(method = "onPlaceItemIntoWorld", at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;captureBlockSnapshots:Z", opcode = Opcodes.PUTFIELD))
+    @WrapOperation(method = "*", at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;captureBlockSnapshots:Z", opcode = Opcodes.PUTFIELD))
     private static void leafs$captureHere(Level level, boolean capturing, Operation<Void> original) {
-        BlockSnapshotCapture.current().capturing = capturing;
+        BlockSnapshotCapture.current().setCapturing(capturing);
     }
 
-    @WrapOperation(method = "onPlaceItemIntoWorld", at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;restoringBlockSnapshots:Z", opcode = Opcodes.PUTFIELD))
+    @WrapOperation(method = "*", at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;restoringBlockSnapshots:Z", opcode = Opcodes.PUTFIELD))
     private static void leafs$restoreHere(Level level, boolean restoring, Operation<Void> original) {
-        BlockSnapshotCapture.current().restoring = restoring;
+        BlockSnapshotCapture.current().setRestoring(restoring);
     }
 
-    @WrapOperation(method = "onPlaceItemIntoWorld", at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;capturedBlockSnapshots:Ljava/util/ArrayList;", opcode = Opcodes.GETFIELD))
+    @WrapOperation(method = "*", at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;capturedBlockSnapshots:Ljava/util/ArrayList;", opcode = Opcodes.GETFIELD))
     private static ArrayList<BlockSnapshot> leafs$capturedHere(Level level, Operation<ArrayList<BlockSnapshot>> original) {
-        return BlockSnapshotCapture.current().snapshots;
+        return BlockSnapshotCapture.current().snapshots();
     }
 }

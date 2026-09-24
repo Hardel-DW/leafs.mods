@@ -21,7 +21,8 @@ public final class LeafsGameTests {
     static final String MOD_ID = "leafs_gametest";
     private static final List<Test> TESTS = List.of(
             new Test("the_test_chunk_is_owned_by_a_region", 20, RegionOwnershipTest::theTestChunkIsOwnedByARegion),
-            new Test("mod_work_runs_on_the_player_queue", 40, PayloadWorkTest::modWorkRunsOnThePlayerQueue)
+            new Test("mod_work_runs_on_the_player_queue", 40, PayloadWorkTest::modWorkRunsOnThePlayerQueue),
+            new Test("a_cancelled_placement_primes_no_tnt", 20, CancelledPlacementTest::aCancelledPlacementPrimesNoTnt)
     );
 
     public LeafsGameTests(IEventBus modBus) {
