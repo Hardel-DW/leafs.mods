@@ -15,7 +15,15 @@ import java.util.Spliterator;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ConcurrentLongSet extends AbstractLongSet {
-    private final Set<Long> set = ConcurrentHashMap.newKeySet();
+    private final Set<Long> set;
+
+    public ConcurrentLongSet() {
+        this(ConcurrentHashMap.newKeySet());
+    }
+
+    ConcurrentLongSet(Set<Long> mixedKeys) {
+        this.set = mixedKeys;
+    }
 
     @Override
     public boolean add(long value) {

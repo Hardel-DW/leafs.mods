@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.AbstractLongSortedSet;
 import it.unimi.dsi.fastutil.longs.LongBidirectionalIterator;
 import it.unimi.dsi.fastutil.longs.LongComparator;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
+import it.unimi.dsi.fastutil.longs.LongSpliterator;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
@@ -100,12 +101,12 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
 
     @Override
     public @NonNull LongBidirectionalIterator iterator() {
-        return snapshot(false, 0L, false, 0L).iterator();
+        return whole().iterator();
     }
 
     @Override
     public LongBidirectionalIterator iterator(long fromElement) {
-        return snapshot(false, 0L, false, 0L).iterator(fromElement);
+        return whole().iterator(fromElement);
     }
 
     @Override
@@ -129,12 +130,12 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
 
     @Override
     public long firstLong() {
-        return snapshot(false, 0L, false, 0L).firstLong();
+        return whole().firstLong();
     }
 
     @Override
     public long lastLong() {
-        return snapshot(false, 0L, false, 0L).lastLong();
+        return whole().lastLong();
     }
 
     @Override
@@ -142,8 +143,27 @@ public final class ConcurrentOrderedLongSet extends AbstractLongSortedSet {
         return null;
     }
 
+    @Override
+    public @NonNull LongSpliterator spliterator() {
+        return whole().spliterator();
+    }
+
+    @Override
+    public long[] toLongArray() {
+        return whole().toLongArray();
+    }
+
+    @Override
+    public long[] toArray(long[] array) {
+        return whole().toArray(array);
+    }
+
     private Bucket bucketOf(long value) {
         return buckets[(int) HashCommon.mix(value >> groupShift) & (BUCKET_COUNT - 1)];
+    }
+
+    private Snapshot whole() {
+        return snapshot(false, 0L, false, 0L);
     }
 
     private Snapshot snapshot(boolean hasFrom, long from, boolean hasTo, long to) {
