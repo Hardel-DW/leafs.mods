@@ -5,6 +5,7 @@
 	"mixins": [
 		"BlockCaptureShim",
 		"FreshBlockEntitiesShim",
+		"LevelChunkSnapshotCaptureShim",
 		"LevelSnapshotCaptureShim",
 		"LoadingChunkShim",
 		"PayloadWorkShim",

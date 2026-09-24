@@ -10,6 +10,7 @@ import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 
 import java.util.List;
 
@@ -30,9 +31,11 @@ public abstract class BlockCaptureShim {
         leafs$capturedDrops.set(drops);
     }
 
-    @WrapOperation(method = "popResource(Lnet/minecraft/world/level/Level;Ljava/util/function/Supplier;Lnet/minecraft/world/item/ItemStack;)V",
-        at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;restoringBlockSnapshots:Z", opcode = Opcodes.GETFIELD))
-    private static boolean leafs$restoringHere(Level level, Operation<Boolean> original) {
-        return BlockSnapshotCapture.current().restoring || original.call(level);
+    @WrapOperation(method = "*", at = {
+        @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;restoringBlockSnapshots:Z", opcode = Opcodes.GETFIELD),
+        @At(value = "FIELD", target = "Lnet/minecraft/server/level/ServerLevel;restoringBlockSnapshots:Z", opcode = Opcodes.GETFIELD)
+    })
+    private static boolean leafs$restoringHere(@Coerce Level level, Operation<Boolean> original) {
+        return BlockSnapshotCapture.current().restoring() || original.call(level);
     }
 }
