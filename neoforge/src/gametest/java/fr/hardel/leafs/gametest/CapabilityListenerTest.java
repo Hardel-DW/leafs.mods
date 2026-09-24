@@ -23,10 +23,12 @@ public final class CapabilityListenerTest {
         List<CompletableFuture<List<Invalidation>>> threads = IntStream.range(0, THREADS)
                 .mapToObj(offset -> CompletableFuture.supplyAsync(() -> register(holder, offset), DAEMONS))
                 .toList();
+                
         long missed = threads.stream()
                 .flatMap(thread -> thread.orTimeout(30, TimeUnit.SECONDS).join().stream())
                 .filter(invalidation -> !invalidation.received)
                 .count();
+                
         helper.assertTrue(missed == 0, "%s of %s listeners missed their invalidation".formatted(missed, THREADS * CHUNKS));
         helper.succeed();
     }
@@ -36,11 +38,13 @@ public final class CapabilityListenerTest {
             BlockPos pos = new BlockPos(chunk * 16 + offset, 64, 0);
             Invalidation invalidation = new Invalidation();
             holder.addListener(pos, invalidation);
+            
             if (chunk % 2 == 0) {
                 holder.invalidatePos(pos);
             } else {
                 holder.invalidateChunk(ChunkPos.containing(pos));
             }
+            
             holder.clean();
             return invalidation;
         }).toList();
