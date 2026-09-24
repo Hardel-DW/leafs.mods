@@ -16,17 +16,22 @@ public final class ChunkTickers {
         (ticking ? pending : tickers).add(ticker);
     }
 
-    public void beforePass(Runnable work) {
+    public boolean beforePass(Runnable work) {
         openers.add(work);
+        return openers.size() == 1;
     }
 
-    public void tickAll(boolean runsNormally) {
-        ticking = true;
+    public void open() {
         for (int i = 0; i < openers.size(); i++) {
             openers.get(i).run();
         }
 
         openers.clear();
+    }
+
+    public void tickAll(boolean runsNormally) {
+        ticking = true;
+        open();
         if (!pending.isEmpty()) {
             tickers.addAll(pending);
             pending.clear();
