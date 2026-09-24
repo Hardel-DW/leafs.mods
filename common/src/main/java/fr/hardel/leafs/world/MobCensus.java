@@ -17,15 +17,6 @@ public record MobCensus(int spawnableChunks, int[] counts) {
         return new MobCensus(state.getSpawnableChunkCount(), counts);
     }
 
-    public MobCensus plus(MobCensus other) {
-        int[] sum = counts.clone();
-        for (int index = 0; index < sum.length; index++) {
-            sum[index] += other.counts[index];
-        }
-
-        return new MobCensus(spawnableChunks + other.spawnableChunks, sum);
-    }
-
     public boolean below(MobCategory category, int capPerArea) {
         return counts[category.ordinal()] < capPerArea * spawnableChunks / VANILLA_SPAWNABLE_AREA;
     }

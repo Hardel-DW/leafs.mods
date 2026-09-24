@@ -113,6 +113,7 @@ public final class RegionTickBody {
     }
 
     public void tickSerial(boolean spawnEnemies) {
+        mobCaps.sumLevel();
         LevelChunks.of(level).sweep().soon();
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
