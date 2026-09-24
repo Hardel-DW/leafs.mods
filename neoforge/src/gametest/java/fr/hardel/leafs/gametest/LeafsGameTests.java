@@ -30,8 +30,7 @@ public final class LeafsGameTests {
         modBus.addListener((RegisterEvent event) -> TESTS.forEach(test -> event.register(Registries.TEST_FUNCTION, test.id(), test::function)));
         modBus.addListener((RegisterGameTestsEvent event) -> {
             Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(Identifier.fromNamespaceAndPath(MOD_ID, "default"));
-            TESTS.forEach(test -> event.registerTest(test.id(), new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, test.id()),
-                    new TestData<>(environment, Identifier.withDefaultNamespace("empty"), test.maxTicks(), 0, true))));
+            TESTS.forEach(test -> event.registerTest(test.id(), new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, test.id()), new TestData<>(environment, Identifier.withDefaultNamespace("empty"), test.maxTicks(), 0, true))));
         });
     }
 

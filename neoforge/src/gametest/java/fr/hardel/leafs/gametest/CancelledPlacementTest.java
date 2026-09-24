@@ -31,11 +31,11 @@ public final class CancelledPlacementTest {
                 cancelled.set(true);
             }
         });
+        
         helper.setBlock(REDSTONE, Blocks.REDSTONE_BLOCK);
-
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.TNT));
+        
         helper.placeAt(player, player.getMainHandItem(), REDSTONE, Direction.WEST);
-
         helper.startSequence()
                 .thenIdle(1)
                 .thenExecute(() -> helper.assertTrue(cancelled.get(), "the placement never reached the place event"))
