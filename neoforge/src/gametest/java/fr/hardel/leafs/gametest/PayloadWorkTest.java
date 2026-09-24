@@ -1,6 +1,6 @@
 package fr.hardel.leafs.gametest;
 
-import fr.hardel.leafs.network.PacketRouting;
+import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,7 +19,8 @@ public final class PayloadWorkTest {
         ServerPayloadContext context = new ServerPayloadContext(player.connection, Identifier.fromNamespaceAndPath(LeafsGameTests.MOD_ID, "payload"));
         AtomicBoolean onThePlayerQueue = new AtomicBoolean();
 
-        CompletableFuture.runAsync(() -> context.enqueueWork(() -> onThePlayerQueue.set(PacketRouting.handledByCurrentDrain(player.connection))));
+        CompletableFuture.runAsync(() -> context.enqueueWork(
+                () -> onThePlayerQueue.set(((GameListenerNetworkAccess) player.connection).leafs$inboundQueue().handledByCurrentThread())));
 
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(onThePlayerQueue.get(), "the payload work did not run on the queue of the player"))
