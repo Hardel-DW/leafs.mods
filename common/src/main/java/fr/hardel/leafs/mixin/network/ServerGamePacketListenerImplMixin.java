@@ -10,7 +10,6 @@ import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.ticking.RegionBorrow;
-import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
@@ -44,7 +43,7 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     @WrapMethod(method = "tickPlayer")
     private boolean leafs$tickOnLandedChunks(Operation<Boolean> original) {
         ChunkPos chunk = player.chunkPosition();
-        if (WorldTickContext.current() != null && !RegionChunkAccess.fullAround(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
+        if (!RegionChunkAccess.fullAround(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
             return false;
         }
 
