@@ -10,7 +10,8 @@
 			"fr.hardel.leafs.gametest.BorrowReleaseTest",
 			"fr.hardel.leafs.gametest.CommandBlockChainTest",
 			"fr.hardel.leafs.gametest.PoiWriteTest",
-			"fr.hardel.leafs.gametest.PlayerTickTest"
+			"fr.hardel.leafs.gametest.PlayerTickTest",
+			"fr.hardel.leafs.gametest.MobCensusTest"
 		]
 	},
 	"depends": {

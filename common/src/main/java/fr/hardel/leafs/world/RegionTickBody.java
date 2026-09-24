@@ -127,10 +127,11 @@ public final class RegionTickBody {
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(chunks, chunkMap, view, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, level, chunkSource::getFullChunk, new LocalMobCapCalculator(chunkMap));
-        List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
-            ? List.of()
-            : mobCaps.spawnable(worldData, state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
+        NaturalSpawner.SpawnState state = NaturalSpawner.createState(spawnableChunks, level, chunkSource::getFullChunk, new LocalMobCapCalculator(chunkMap));
+        worldData.publishCensus(MobCensus.of(state));
+        List<MobCategory> categories = level.getGameRules().get(GameRules.SPAWN_MOBS)
+            ? mobCaps.spawnable(worldData, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L)
+            : List.of();
 
         stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());

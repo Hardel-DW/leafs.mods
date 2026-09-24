@@ -6,7 +6,6 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.level.NaturalSpawner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,8 +21,7 @@ public final class MobCaps {
         this.regions = LevelRegions.of(level);
     }
 
-    public List<MobCategory> spawnable(RegionWorldData worldData, NaturalSpawner.SpawnState state, boolean spawnEnemies, boolean spawnPersistent) {
-        worldData.publishCensus(MobCensus.of(state));
+    public List<MobCategory> spawnable(RegionWorldData worldData, boolean spawnEnemies, boolean spawnPersistent) {
         MobCensus census = gameplay.mobCapScope() == LeafsConfig.MobCapScope.LEVEL ? levelCensus() : worldData.census();
         List<MobCategory> categories = new ArrayList<>(SPAWNING.length);
         for (MobCategory category : SPAWNING) {
