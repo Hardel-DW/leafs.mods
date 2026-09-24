@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -20,6 +21,7 @@ import java.util.function.LongFunction;
 
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
     private final ConcurrentHashMap<Long, V> map = new ConcurrentHashMap<>();
+    private final ConcurrentLongSet keys = new ConcurrentLongSet(map.keySet());
     private final ConcurrentValues<V> values = new ConcurrentValues<>(map);
 
     @Override
@@ -114,6 +116,11 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
     @Override
     public void clear() {
         map.clear();
+    }
+
+    @Override
+    public @NonNull LongSet keySet() {
+        return keys;
     }
 
     @Override
