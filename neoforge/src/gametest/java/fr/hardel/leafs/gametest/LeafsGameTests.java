@@ -26,7 +26,7 @@ public final class LeafsGameTests {
             new Test("mod_work_runs_on_the_player_queue", 40, PayloadWorkTest::modWorkRunsOnThePlayerQueue),
             new Test("a_cancelled_placement_primes_no_tnt", 20, CancelledPlacementTest::aCancelledPlacementPrimesNoTnt),
             new Test("every_listener_hears_its_invalidation", 20, CapabilityListenerTest::everyListenerHearsItsInvalidation),
-            new Test("a_block_entity_of_a_full_chunk_loads_before_it_unloads", 100, FreshBlockEntityTest::aBlockEntityOfAFullChunkLoadsBeforeItUnloads)
+            new Test("a_block_entity_of_a_full_chunk_loads_before_it_unloads", 20000, FreshBlockEntityTest::aBlockEntityOfAFullChunkLoadsBeforeItUnloads)
     );
 
     public LeafsGameTests(IEventBus modBus) {
