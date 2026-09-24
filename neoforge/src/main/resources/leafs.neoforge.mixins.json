@@ -7,6 +7,7 @@
 		"FreshBlockEntitiesShim",
 		"LevelSnapshotCaptureShim",
 		"LoadingChunkShim",
+		"PayloadWorkShim",
 		"PlacementSnapshotCaptureShim",
 		"PlayerListViewShim"
 	],
