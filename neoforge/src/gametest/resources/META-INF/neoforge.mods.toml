@@ -1,0 +1,13 @@
+modLoader = "javafml"
+loaderVersion = "*"
+license = "All-Rights-Reserved"
+
+[[mods]]
+modId = "leafs_gametest"
+version = "1"
+displayName = "Leafs Game Tests"
+
+[[dependencies.leafs_gametest]]
+modId = "leafs"
+type = "required"
+versionRange = "*"
