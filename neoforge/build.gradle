@@ -57,8 +57,15 @@ neoForge {
 	}
 }
 
+configurations {
+	mods
+	compileOnly.extendsFrom(mods)
+	runtimeClasspath.extendsFrom(mods)
+}
+
 dependencies {
-	compileOnly "maven.modrinth:scalablelux:${rootProject.scalablelux_neoforge}"
+	mods "maven.modrinth:scalablelux:${rootProject.scalablelux_neoforge}"
+	mods "fr.hardel:mapple-neoforge-${minecraftMajor}:${rootProject.mapple_version}"
 }
 
 tasks.named('compileJava') {
