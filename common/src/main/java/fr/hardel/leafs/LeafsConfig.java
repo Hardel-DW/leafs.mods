@@ -27,7 +27,6 @@ import java.util.function.ToIntFunction;
 public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug, Gameplay gameplay) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static LeafsConfig instance;
     private static Path file;
 
     public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
@@ -139,6 +138,8 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug),
         GAMEPLAY.codec().optionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
     ).apply(builder, LeafsConfig::new));
+
+    private static LeafsConfig instance = defaults();
 
     private static Map<MobCategory, Integer> vanillaMobCaps() {
         Map<MobCategory, Integer> caps = new EnumMap<>(MobCategory.class);

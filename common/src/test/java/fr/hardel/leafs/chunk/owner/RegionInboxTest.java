@@ -8,7 +8,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RegionInboxTest {
-    private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
+    private final RegionInbox inbox = new RegionInbox();
     private final List<String> ran = new ArrayList<>();
 
     @Test
@@ -25,7 +25,7 @@ class RegionInboxTest {
     @Test
     void aTaskOnAChunkTheOwnerLostLeavesInsteadOfRunning() {
         List<RegionInbox.Posted> left = new ArrayList<>();
-        RegionInbox owned = new RegionInbox(Long.MAX_VALUE, posted -> posted.chunkX() == 0, left::add);
+        RegionInbox owned = new RegionInbox(posted -> posted.chunkX() == 0, left::add);
         owned.post(0, 0, Work.GAME, () -> ran.add("mine"));
         owned.post(5, 0, Work.GAME, () -> ran.add("lost"));
 

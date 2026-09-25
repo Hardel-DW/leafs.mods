@@ -50,7 +50,7 @@ public final class LevelChunks {
         storage.leafs$bindTimeouts(timeouts);
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
         this.placement = new ChunkPlacement(pool, IDS.getAndIncrement(), this::urgency);
-        this.owners = new ChunkOwners(pool, placement, regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
+        this.owners = new ChunkOwners(pool, placement, regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), regions::live, serial, taker, ticking.globalScheduler());
         this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs);

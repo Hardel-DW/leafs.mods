@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class DeferredWorkTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
+    private final RegionInbox inbox = new RegionInbox();
     private final DeferStats stats = new DeferStats();
     private final List<String> ran = new ArrayList<>();
     private boolean holding;

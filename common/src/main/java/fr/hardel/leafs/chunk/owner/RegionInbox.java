@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.LeafsConfig;
 
 import java.util.ArrayDeque;
 import java.util.function.Consumer;
@@ -12,17 +13,15 @@ public final class RegionInbox {
 
     private final ArrayDeque<Posted> chunkWork = new ArrayDeque<>();
     private final ArrayDeque<Posted> gameWork = new ArrayDeque<>();
-    private final long slowTaskNanos;
     private final Predicate<Posted> owns;
     private final Consumer<Posted> elsewhere;
     private boolean closed;
 
-    public RegionInbox(long slowTaskNanos) {
-        this(slowTaskNanos, _ -> true, _ -> { });
+    public RegionInbox() {
+        this(_ -> true, _ -> { });
     }
 
-    public RegionInbox(long slowTaskNanos, Predicate<Posted> owns, Consumer<Posted> elsewhere) {
-        this.slowTaskNanos = slowTaskNanos;
+    public RegionInbox(Predicate<Posted> owns, Consumer<Posted> elsewhere) {
         this.owns = owns;
         this.elsewhere = elsewhere;
     }
@@ -74,7 +73,7 @@ public final class RegionInbox {
             long began = System.nanoTime();
             next.task().run();
             long took = System.nanoTime() - began;
-            if (took >= slowTaskNanos) {
+            if (took >= LeafsConfig.get().debug().slowTaskNanos()) {
                 String owner = next.task().getClass().getName();
                 Leafs.LOGGER.warn("Inbox task at [{}, {}] took {} ms: {}", next.chunkX(), next.chunkZ(), took / 1_000_000L, owner.substring(owner.lastIndexOf('.') + 1));
             }

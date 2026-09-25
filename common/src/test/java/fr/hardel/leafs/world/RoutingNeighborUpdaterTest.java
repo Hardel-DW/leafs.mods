@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class RoutingNeighborUpdaterTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final RegionInbox inbox = new RegionInbox(Long.MAX_VALUE);
+    private final RegionInbox inbox = new RegionInbox();
     private boolean holding;
     private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, task) -> { task.run(); return true; },
         new GlobalScheduler(Runnable::run), (_, _) -> 0);

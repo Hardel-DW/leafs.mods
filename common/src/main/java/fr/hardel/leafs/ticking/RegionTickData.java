@@ -13,8 +13,8 @@ public final class RegionTickData {
     private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
 
-    RegionTickData(Region<RegionTickData> region, long slowTaskNanos, Supplier<ChunkOwners> owners) {
-        this.inbox = new RegionInbox(slowTaskNanos, posted -> region.owns(posted.chunkX(), posted.chunkZ()),
+    RegionTickData(Region<RegionTickData> region, Supplier<ChunkOwners> owners) {
+        this.inbox = new RegionInbox(posted -> region.owns(posted.chunkX(), posted.chunkZ()),
             posted -> owners.get().submit(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
     }
 
