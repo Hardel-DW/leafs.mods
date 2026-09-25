@@ -78,20 +78,22 @@ class TicketGraphsTest {
         assertTrue(simulation.stream().allMatch(Thread.currentThread().getName()::equals));
     }
 
+    /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
     @Test
-    void aWorkerDrainsInLine() throws InterruptedException {
+    void aWorkerHandsTheLoadingDrainOver() throws InterruptedException {
         graphs.listen(() -> loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
-        boolean[] changed = new boolean[1];
+        long[] publishedInLine = new long[1];
         CountDownLatch done = new CountDownLatch(1);
 
         pool.execute(() -> {
             graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, false);
-            changed[0] = graphs.drain();
+            graphs.drain();
+            publishedInLine[0] = published.getCount();
             done.countDown();
         });
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertTrue(changed[0]);
-        assertEquals(0, published.getCount());
+        assertEquals(1, publishedInLine[0]);
+        assertTrue(published.await(5, TimeUnit.SECONDS));
     }
 }
