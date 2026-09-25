@@ -109,9 +109,10 @@ public final class ConcurrentWaypointManager extends ServerWaypointManager {
     private void refresh(WaypointRow row, ServerPlayer player, WaypointTransmitter waypoint) {
         if (row.has(waypoint)) {
             row.update(waypoint, maker(player, waypoint));
-        } else {
-            row.connect(waypoint, maker(player, waypoint));
+            return;
         }
+
+        row.connect(waypoint, maker(player, waypoint));
     }
 
     private Supplier<Optional<Connection>> maker(ServerPlayer player, WaypointTransmitter waypoint) {
