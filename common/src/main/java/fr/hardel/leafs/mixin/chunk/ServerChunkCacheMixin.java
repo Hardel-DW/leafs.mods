@@ -83,6 +83,11 @@ public abstract class ServerChunkCacheMixin {
         return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(chunkMap, holder, radius, distanceToStatus));
     }
 
+    @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getVisibleChunkIfPresent(J)Lnet/minecraft/server/level/ChunkHolder;"))
+    private ChunkHolder leafs$readTheHolderUnderTheGraphLocks(ServerChunkCache cache, long key, Operation<ChunkHolder> original) {
+        return LevelChunks.of(this.level).holders().settled(ChunkPos.getX(key), ChunkPos.getZ(key), () -> original.call(cache, key));
+    }
+
     @Unique
     private ChunkMap leafs$chunkMap() {
         return ((ServerChunkCache) (Object) this).chunkMap;
