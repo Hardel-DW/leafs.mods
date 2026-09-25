@@ -30,9 +30,10 @@ public final class PacketRouting {
     public static void runTeardown(MinecraftServer server, Runnable teardown, Runnable vanillaBlocking) {
         if (TickingManager.of(server).onServerThread()) {
             vanillaBlocking.run();
-        } else {
-            server.execute(teardown);
+            return;
         }
+
+        server.execute(teardown);
     }
 
     public static Executor playerTaskExecutor(ServerGamePacketListenerImpl listener) {

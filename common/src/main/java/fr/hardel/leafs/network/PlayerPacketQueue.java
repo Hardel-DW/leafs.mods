@@ -2,6 +2,7 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import net.minecraft.network.PacketProcessor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,16 +73,20 @@ public final class PlayerPacketQueue {
         try {
             body.run();
         } finally {
-            if (outer == null) {
-                DRAINING.remove();
-            } else {
-                DRAINING.set(outer);
-            }
-
+            restoreDrainer(outer);
             claimed.set(false);
         }
 
         return true;
+    }
+
+    private static void restoreDrainer(@Nullable PlayerPacketQueue outer) {
+        if (outer == null) {
+            DRAINING.remove();
+            return;
+        }
+
+        DRAINING.set(outer);
     }
 
     private void drainLoop(BooleanSupplier ownerHolds) {
