@@ -64,9 +64,10 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     private void leafs$chatHandlerOnTheOwner(MinecraftServer server, Runnable chatHandler, Operation<Void> original, @Local(argsOnly = true) boolean isCommand) {
         if (isCommand) {
             original.call(server, chatHandler);
-        } else {
-            PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this).execute(chatHandler);
+            return;
         }
+
+        PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this).execute(chatHandler);
     }
 
     @Inject(method = "handleClientCommand", at = @At("HEAD"), cancellable = true)
