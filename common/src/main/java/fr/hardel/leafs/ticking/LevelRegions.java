@@ -139,9 +139,10 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
         if (simulates) {
             regionizer.addChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
-        } else {
-            regionizer.removeChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
+            return;
         }
+
+        regionizer.removeChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
     }
 
     public void retire() {
@@ -273,7 +274,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
             RegionInbox target = child == null ? orphans : child.data().inbox();
             target.post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task());
         });
-        
+
         if (body != null && orphans.size() > 0) {
             owners().abandon(orphans);
         }

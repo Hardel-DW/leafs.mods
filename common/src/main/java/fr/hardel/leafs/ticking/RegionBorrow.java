@@ -110,19 +110,25 @@ public final class RegionBorrow {
             return;
         }
 
-        int before;
-        do {
-            before = held.size();
-            for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-                if (region.tryHold()) {
-                    held.add(region);
-                }
-            }
+        boolean tookMore = true;
+        while (tookMore) {
+            tookMore = takeEveryRegion(regions);
+        }
+    }
 
-            for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-                take(regions, region);
+    private boolean takeEveryRegion(LevelRegions regions) {
+        int before = held.size();
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+            if (region.tryHold()) {
+                held.add(region);
             }
-        } while (held.size() != before);
+        }
+
+        for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
+            take(regions, region);
+        }
+
+        return held.size() != before;
     }
 
     private static boolean serverThread(LevelRegions regions) {
@@ -198,7 +204,7 @@ public final class RegionBorrow {
                 owners.release(ChunkPos.getX(entry.getLongKey()), ChunkPos.getZ(entry.getLongKey()), entry.getValue());
             }
         });
-        
+
         heldChunks.clear();
     }
 
