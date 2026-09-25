@@ -63,7 +63,7 @@ class LevelRegionsTest {
             }
 
             if (event % EVENTS_PER_TICK == EVENTS_PER_TICK - 1) {
-                regions.settle();
+                settle();
                 RegionizerAssertions.assertInvariants(regions.regionizer(), true);
             }
         }
@@ -71,7 +71,7 @@ class LevelRegionsTest {
         while (!presentList.isEmpty()) {
             feedDestroy(random, present, presentList);
         }
-        regions.settle();
+        settle();
 
         assertEquals(0, regionCount(), "regions survived an empty chunk-holder map");
         assertEquals(0, regions.sections());
@@ -86,17 +86,17 @@ class LevelRegionsTest {
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
         simulated(regions, 96, 0);
-        regions.settle();
+        settle();
         assertEquals(1, regionCount());
         assertEquals(1, regions.created());
 
         unsimulated(regions, 32, 0);
         unsimulated(regions, 64, 0);
 
-        assertEquals(1, regionCount(), "splitting is what settle() exists for - the feed alone never splits");
+        assertEquals(1, regionCount(), "the feed alone never splits, the end of a tick does");
         assertEquals(0, regions.split());
 
-        regions.settle();
+        settle();
 
         assertEquals(2, regionCount());
         assertEquals(1, regions.split());
@@ -107,7 +107,7 @@ class LevelRegionsTest {
 
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
-        regions.settle();
+        settle();
 
         assertEquals(1, regionCount());
         assertEquals(1, regions.merged());
@@ -120,14 +120,14 @@ class LevelRegionsTest {
         simulated(regions, 0, 0);
         simulated(regions, 1, 0);
         simulated(regions, 200, 200);
-        regions.settle();
+        settle();
         assertEquals(2, regionCount());
         assertTrue(regions.sections() > 0);
 
         unsimulated(regions, 0, 0);
         unsimulated(regions, 1, 0);
         unsimulated(regions, 200, 200);
-        regions.settle();
+        settle();
 
         assertEquals(0, regionCount());
         assertEquals(0, regions.sections());
@@ -150,7 +150,7 @@ class LevelRegionsTest {
 
         RegionTickHandle doomed = regions.regionizer().regionAt(200, 200).data().handle();
         unsimulated(regions, 200, 200);
-        regions.settle();
+        settle();
         assertTrue(doomed.isCancelled());
         assertEquals(1, regionCount());
     }
@@ -167,7 +167,7 @@ class LevelRegionsTest {
         unsimulated(regions, 32, 0);
         unsimulated(regions, 64, 0);
 
-        regions.settle();
+        settle();
         assertEquals(2, regionCount(), "the release is what splits");
         assertEquals(1, regions.split());
         assertTrue(parentHandle.isCancelled());
@@ -182,7 +182,7 @@ class LevelRegionsTest {
         activateRegions();
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
+        settle();
         assertEquals(2, regionCount());
         RegionClock west = regions.regionizer().regionAt(0, 0).data().clock();
         RegionClock east = regions.regionizer().regionAt(96, 0).data().clock();
@@ -192,7 +192,7 @@ class LevelRegionsTest {
 
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
-        regions.settle();
+        settle();
         assertEquals(1, regionCount());
         RegionClock survivor = regions.regionizer().regionAt(0, 0).data().clock();
         assertTrue(survivor == west || survivor == east, "the survivor keeps one of the two clocks untouched");
@@ -200,7 +200,7 @@ class LevelRegionsTest {
         survivor.advance();
         unsimulated(regions, 32, 0);
         unsimulated(regions, 64, 0);
-        regions.settle();
+        settle();
         assertEquals(2, regionCount());
         assertEquals(survivor.currentTick(), regions.regionizer().regionAt(0, 0).data().clock().currentTick());
         assertEquals(survivor.currentTick(), regions.regionizer().regionAt(96, 0).data().clock().currentTick());
@@ -213,6 +213,13 @@ class LevelRegionsTest {
         RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> 50_000_000L, false, watchdog, (_, _) -> {
         });
         regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache()), null);
+    }
+
+    private void settle() {
+        RegionBorrow borrow = RegionBorrow.enter();
+        borrow.borrowAll(regions);
+        borrow.releaseAll();
+        borrow.exit();
     }
 
     private int regionCount() {

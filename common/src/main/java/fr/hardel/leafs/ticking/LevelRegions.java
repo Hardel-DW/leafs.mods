@@ -159,14 +159,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
-    public void settle() {
-        for (Region<RegionTickData> region : regionizer.regionsView()) {
-            if (region.tryMarkTicking()) {
-                region.markNotTicking();
-            }
-        }
-    }
-
     public int sections() {
         return sumOverRegions(Region::sectionCount);
     }

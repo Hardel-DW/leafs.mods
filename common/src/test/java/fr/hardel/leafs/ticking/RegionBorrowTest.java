@@ -95,7 +95,6 @@ class RegionBorrowTest {
     void aHeadTakesARegionOwedAMergeAndTheMergeRunsAtItsRelease() {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
         Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
         Region<RegionTickData> east = regions.regionizer().regionAt(96, 0);
 
@@ -119,7 +118,6 @@ class RegionBorrowTest {
     void borrowAllHoldsARegionOwedAMergeUntilTheRelease() throws InterruptedException {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
 
         AtomicInteger heldAfter = new AtomicInteger();
         CountDownLatch done = new CountDownLatch(1);
@@ -146,12 +144,10 @@ class RegionBorrowTest {
     void borrowAllWaitsForTheTickInFlightAndHoldsBothSidesOfTheMerge() throws InterruptedException {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
         Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
         assertTrue(west.tryMarkTicking(), "a worker ticks the west region");
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
-        regions.settle();
         CountDownLatch done = new CountDownLatch(1);
         AtomicInteger heldAfter = new AtomicInteger();
 
