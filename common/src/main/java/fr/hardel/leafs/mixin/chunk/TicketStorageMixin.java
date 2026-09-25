@@ -57,7 +57,7 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
             }
         });
         if (added) {
-            leafs$graphs.settle(key);
+            leafs$graphs.settle(key, ticket);
         }
 
         return added;
