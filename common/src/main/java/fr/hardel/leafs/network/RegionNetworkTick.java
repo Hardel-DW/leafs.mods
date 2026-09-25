@@ -123,12 +123,10 @@ public final class RegionNetworkTick {
 
     public static void drainPaused(ServerLevel level) {
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            if (player.level() != level) {
-                continue;
+            if (player.level() == level) {
+                ServerGamePacketListenerImpl listener = player.connection;
+                PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
             }
-
-            ServerGamePacketListenerImpl listener = player.connection;
-            PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
         }
     }
 }
