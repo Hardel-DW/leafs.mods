@@ -106,15 +106,9 @@ processResources {
 		exclude '*.accesswidener'
 	}
 
-	def metadata = [
-		version: project.version,
-		minecraft: "[${rootProject.minecraft_version}]",
-		scalablelux: "[${rootProject.scalablelux_neoforge.tokenize('+')[0]},${rootProject.scalablelux_below})"
-	]
-	inputs.properties metadata
-
+	inputs.property 'version', project.version
 	filesMatching('META-INF/neoforge.mods.toml') {
-		expand metadata
+		expand version: project.version, minecraft_range: "[${rootProject.minecraft_version},)"
 	}
 }
 

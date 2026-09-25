@@ -28,11 +28,11 @@
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
-		"minecraft": "${minecraft}",
+		"minecraft": "~26.1",
 		"java": ">=25",
 		"fabric-api": "*",
 		"mapple": "*",
-		"scalablelux": "${scalablelux}"
+		"scalablelux": ">=0.3.0-alpha.0.2 <0.4"
 	},
 	"custom": {
 		"lithium:options": {
