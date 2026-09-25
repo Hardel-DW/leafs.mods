@@ -42,7 +42,10 @@ public final class ChunkTickers {
             TickingBlockEntity ticker = iterator.next();
             if (ticker.isRemoved()) {
                 iterator.remove();
-            } else if (runsNormally) {
+                continue;
+            }
+
+            if (runsNormally) {
                 ticker.tick();
             }
         }
