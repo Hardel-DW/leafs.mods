@@ -40,7 +40,6 @@ public final class TickingManager {
     private final AtomicLong nextUnitId = new AtomicLong(1);
     private final AtomicReference<CrashReport> regionCrash = new AtomicReference<>();
     private volatile boolean globalTicking;
-    private final long slowTaskNanos;
     private volatile boolean halted;
     private volatile boolean paused;
 
@@ -51,7 +50,6 @@ public final class TickingManager {
         ThreadGroup serverThreads = Leafs.serverThreads();
         this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), () -> server.tickRateManager().nanosecondsPerTick(),
             config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
-        this.slowTaskNanos = config.debug().slowTaskNanos();
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
         watchdog.start();
         scheduler.start();
@@ -91,10 +89,6 @@ public final class TickingManager {
 
     public GlobalScheduler globalScheduler() {
         return globalScheduler;
-    }
-
-    public long slowTaskNanos() {
-        return slowTaskNanos;
     }
 
     public boolean halted() {

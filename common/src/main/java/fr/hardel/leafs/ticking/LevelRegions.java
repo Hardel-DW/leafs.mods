@@ -39,15 +39,9 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     private volatile long destroyed;
     private volatile long merged;
     private volatile long split;
-    private final long slowTaskNanos;
 
     public LevelRegions(LeafsConfig config) {
         this.regionizer = new Regionizer<>(config.sectionShift(), config.regionMergeDistance(), config.regionBufferDistance(), this);
-        this.slowTaskNanos = config.debug().slowTaskNanos();
-    }
-
-    public long slowTaskNanos() {
-        return slowTaskNanos;
     }
 
     // Used by the Leafs Debug mod
@@ -185,7 +179,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     @Override
     public RegionTickData createData(Region<RegionTickData> region) {
-        RegionTickData data = new RegionTickData(region, slowTaskNanos, this::owners);
+        RegionTickData data = new RegionTickData(region, this::owners);
         if (worldDataFactory != null) {
             equipWorld(data);
         }
@@ -273,7 +267,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         int shift = regionizer.sectionShift();
-        RegionInbox orphans = new RegionInbox(slowTaskNanos);
+        RegionInbox orphans = new RegionInbox();
         parent.data().inbox().close(posted -> {
             Region<RegionTickData> child = sectionToChild.get(ChunkPos.pack(posted.chunkX() >> shift, posted.chunkZ() >> shift));
             RegionInbox target = child == null ? orphans : child.data().inbox();

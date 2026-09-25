@@ -36,10 +36,9 @@ public final class ChunkOwners implements Router {
     private final Executor serial;
     private final Taker taker;
     private final GlobalScheduler server;
-    private final long slowTaskNanos;
     private final ConcurrentLong2ObjectMap<ChunkClaim> borrowed = new ConcurrentLong2ObjectMap<>();
 
-    public ChunkOwners(ChunkPool pool, ChunkPlacement placement, Inboxes inboxes, Ownership ownership, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server, long slowTaskNanos) {
+    public ChunkOwners(ChunkPool pool, ChunkPlacement placement, Inboxes inboxes, Ownership ownership, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server) {
         this.pool = pool;
         this.placement = placement;
         this.inboxes = inboxes;
@@ -48,7 +47,6 @@ public final class ChunkOwners implements Router {
         this.serial = serial;
         this.taker = taker;
         this.server = server;
-        this.slowTaskNanos = slowTaskNanos;
     }
 
     public boolean submit(int chunkX, int chunkZ, Work work, Runnable task) {
@@ -135,7 +133,7 @@ public final class ChunkOwners implements Router {
     }
 
     public @Nullable ChunkClaim borrow(int chunkX, int chunkZ) {
-        ChunkClaim claim = new ChunkClaim(Thread.currentThread(), new RegionInbox(slowTaskNanos));
+        ChunkClaim claim = new ChunkClaim(Thread.currentThread(), new RegionInbox());
         return borrowed.putIfAbsent(ChunkPos.pack(chunkX, chunkZ), claim) == null ? claim : null;
     }
 

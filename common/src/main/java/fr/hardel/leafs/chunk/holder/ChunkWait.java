@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.holder;
 
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
@@ -51,14 +52,15 @@ public final class ChunkWait {
         WaitReport report = new WaitReport(level, chunkX, chunkZ, status, delivery, System.nanoTime());
         ThreadWaits.Wait outer = ThreadWaits.open(report::toString);
         TickingManager ticking = TickingManager.of(level.getServer());
-        String found = ticking.slowTaskNanos() == Long.MAX_VALUE ? null : report.toString();
+        long slowNanos = LeafsConfig.get().debug().slowTaskNanos();
+        String found = slowNanos == Long.MAX_VALUE ? null : report.toString();
         try {
             ticking.await(delivery::isDone);
         } finally {
             keep.accept(demand.release());
             long waited = System.nanoTime() - report.startedNanos();
             ticking.metrics().chunkWaited(waited);
-            if (waited >= ticking.slowTaskNanos()) {
+            if (waited >= slowNanos) {
                 Leafs.LOGGER.warn("Waited {} ms for a chunk, asked by {}, found {}", waited / 1_000_000L, asker(), found);
             }
 

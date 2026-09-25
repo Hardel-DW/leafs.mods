@@ -17,7 +17,7 @@ public final class ChunkFixtures {
     }
 
     public static ChunkOwners owners(ChunkPool pool, ChunkOwners.Inboxes inboxes, ChunkOwners.Ownership ownership, ChunkOwners.Taker taker, GlobalScheduler server, Urgency urgency) {
-        return new ChunkOwners(pool, new ChunkPlacement(pool, 0, urgency), inboxes, ownership, () -> true, Runnable::run, taker, server, Long.MAX_VALUE);
+        return new ChunkOwners(pool, new ChunkPlacement(pool, 0, urgency), inboxes, ownership, () -> true, Runnable::run, taker, server);
     }
 
     public static CompoundTag photo(int dataVersion) {
