@@ -45,9 +45,10 @@ public final class RegionEntityPersistence {
     public void saveChunkOnOwner(long chunkKey) {
         if (manager.leafs$visibility(chunkKey) == Visibility.HIDDEN) {
             unload(chunkKey);
-        } else {
-            manager.leafs$storeChunk(chunkKey);
+            return;
         }
+
+        manager.leafs$storeChunk(chunkKey);
     }
 
     public void drainPendingLoadsInline() {

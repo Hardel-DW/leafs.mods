@@ -101,18 +101,10 @@ public final class RegionsCommand {
             : regions.regionizer().regionAt(player.chunkPosition().x(), player.chunkPosition().z());
 
         for (Region<RegionTickData> region : live) {
-            RegionTickHandle handle = region.data().handle();
             MutableComponent line = Component.empty()
                 .append(CommandText.sep()).append(CommandText.white("R#%s".formatted(region.id())))
                 .append(CommandText.sep()).append(state(region.state()));
-            if (handle != null && !handle.isCancelled()) {
-                line.append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now)))
-                    .append(CommandText.stat("chunks", handle.chunkCount()))
-                    .append(CommandText.stat("entities", handle.entityCount()));
-            } else {
-                line.append(CommandText.stat("chunks", region.chunkCount()));
-            }
-
+            appendLoad(line, region, now);
             if (region == playerRegion) {
                 line.append(CommandText.sep()).append(Component.literal("<- you").withStyle(ChatFormatting.GOLD));
             }
@@ -121,6 +113,18 @@ public final class RegionsCommand {
         }
 
         return live.size();
+    }
+
+    private static void appendLoad(MutableComponent line, Region<RegionTickData> region, long now) {
+        RegionTickHandle handle = region.data().handle();
+        if (handle == null || handle.isCancelled()) {
+            line.append(CommandText.stat("chunks", region.chunkCount()));
+            return;
+        }
+
+        line.append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now)))
+            .append(CommandText.stat("chunks", handle.chunkCount()))
+            .append(CommandText.stat("entities", handle.entityCount()));
     }
 
     private static void playerLine(CommandSourceStack source, long now) {

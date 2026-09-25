@@ -26,11 +26,13 @@ public final class RegionEntityTracking {
         List<ServerPlayer> near = new ArrayList<>();
         List<ServerPlayer> nearMoved = new ArrayList<>();
         for (ServerPlayer player : level.players()) {
-            if (chunks.within(player.chunkPosition(), reach)) {
-                near.add(player);
-                if (movedSince(player, since)) {
-                    nearMoved.add(player);
-                }
+            if (!chunks.within(player.chunkPosition(), reach)) {
+                continue;
+            }
+
+            near.add(player);
+            if (movedSince(player, since)) {
+                nearMoved.add(player);
             }
         }
 
