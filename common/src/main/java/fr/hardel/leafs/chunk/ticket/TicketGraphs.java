@@ -103,10 +103,6 @@ public final class TicketGraphs {
         }
 
         boolean changed = drainOwnSimulation();
-        if (ChunkPool.isWorker()) {
-            return loading.drain(loadingListener.get()) | changed;
-        }
-
         if (handed.compareAndSet(false, true)) {
             pool.execute(() -> {
                 handed.set(false);
