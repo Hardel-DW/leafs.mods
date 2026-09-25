@@ -15,7 +15,7 @@ Regionised multithreading for the dedicated server: the world is cut into indepe
 [[dependencies.leafs]]
 modId = "minecraft"
 type = "required"
-versionRange = "${minecraft_range}"
+versionRange = "${minecraft}"
 ordering = "NONE"
 side = "BOTH"
 
@@ -29,7 +29,7 @@ side = "BOTH"
 [[dependencies.leafs]]
 modId = "scalablelux"
 type = "required"
-versionRange = "[0.3.0-alpha.0.17,0.4)"
+versionRange = "${scalablelux}"
 ordering = "BEFORE"
 side = "BOTH"
 
