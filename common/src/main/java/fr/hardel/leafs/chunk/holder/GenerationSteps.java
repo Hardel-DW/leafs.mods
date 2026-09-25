@@ -21,8 +21,7 @@ import java.util.function.Supplier;
 
 public final class GenerationSteps {
     private static final int STATUSES = ChunkStatus.getStatusList().size();
-    public static final RuntimeException CANCELLED = new RuntimeException("Step cancelled in the queue", null, false, false) {
-    };
+    public static final RuntimeException CANCELLED = new CancelledStep();
 
     private final ChunkPool pool;
     private final ChunkPlacement placement;
@@ -120,11 +119,12 @@ public final class GenerationSteps {
             }
 
             applied.whenComplete((generated, failure) -> {
-                if (failure == null) {
-                    result.complete(generated);
-                } else {
+                if (failure != null) {
                     fail(failure);
+                    return;
                 }
+
+                result.complete(generated);
             });
             return applied;
         }
@@ -140,6 +140,12 @@ public final class GenerationSteps {
         private void fail(Throwable failure) {
             Leafs.LOGGER.error("Step {} of chunk {} failed", step.targetStatus(), chunk.getPos(), failure);
             result.completeExceptionally(failure);
+        }
+    }
+
+    private static final class CancelledStep extends RuntimeException {
+        private CancelledStep() {
+            super("Step cancelled in the queue", null, false, false);
         }
     }
 }

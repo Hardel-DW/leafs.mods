@@ -103,7 +103,10 @@ public final class UnownedSweep {
             ChunkHolder holder = table.get(chunkKey);
             if (holder == null) {
                 chunkMap.chunksToEagerlySave.remove(chunkKey);
-            } else if (unowned(chunkKey)) {
+                continue;
+            }
+
+            if (unowned(chunkKey)) {
                 dispatch(chunkKey, () -> saves.saveEagerly(holder));
                 attempts++;
             }
