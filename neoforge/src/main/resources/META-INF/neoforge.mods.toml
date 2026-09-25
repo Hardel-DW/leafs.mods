@@ -29,7 +29,7 @@ side = "BOTH"
 [[dependencies.leafs]]
 modId = "scalablelux"
 type = "required"
-versionRange = "[0.3.0-alpha.0.17,0.4)"
+versionRange = "[0.3.0-alpha.0.16,0.4)"
 ordering = "BEFORE"
 side = "BOTH"
 

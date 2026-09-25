@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class RoutingRandomSourceTest {
     private final RandomSource unitRandom = fixed(2);
     private final RoutingRandomSource routing = new RoutingRandomSource(null);
-    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache());
+    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache(), 0L);
 
     @Test
     void contextForTheLevelResolvesTheRegionRandom() {

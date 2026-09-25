@@ -11,7 +11,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -30,9 +29,9 @@ public abstract class StructureMixin {
 
     @WrapMethod(method = "generate")
     private StructureStart leafs$oneStartPerType(Holder<Structure> selected, ResourceKey<Level> dimension, RegistryAccess registryAccess, ChunkGenerator chunkGenerator,
-        BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos sourceChunkPos,
+        BiomeSource biomeSource, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos sourceChunkPos,
         int references, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome, Operation<StructureStart> original) {
-        return SharedStateMonitor.call(type(), () -> original.call(selected, dimension, registryAccess, chunkGenerator, biomeSource, climateSampler, randomState,
+        return SharedStateMonitor.call(type(), () -> original.call(selected, dimension, registryAccess, chunkGenerator, biomeSource, randomState,
             structureTemplateManager, seed, sourceChunkPos, references, heightAccessor, validBiome));
     }
 }
