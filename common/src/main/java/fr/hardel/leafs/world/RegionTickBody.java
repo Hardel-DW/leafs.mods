@@ -124,11 +124,13 @@ public final class RegionTickBody {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
         long gameTime = level.getGameTime();
+        long timeDiff = worldData.advanceInhabitedTime(gameTime);
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(chunks, chunkMap, view, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = NaturalSpawner.createState(spawnableChunks, level, chunkSource::getFullChunk, new LocalMobCapCalculator(chunkMap));
+        NaturalSpawner.SpawnState state = NaturalSpawner.createState(spawnableChunks, worldData.entities().accessible(), chunkSource::getFullChunk,
+            new LocalMobCapCalculator(chunkMap));
         worldData.publishCensus(MobCensus.of(state));
         List<MobCategory> categories = level.getGameRules().get(GameRules.SPAWN_MOBS)
             ? mobCaps.spawnable(worldData, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L)
@@ -137,7 +139,7 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
-            chunkSource.tickSpawningChunk(chunk, categories, state);
+            chunkSource.tickSpawningChunk(chunk, timeDiff, categories, state);
         }
 
         for (LevelChunk chunk : randomTickingChunks) {

@@ -62,11 +62,11 @@ public abstract class ServerChunkCacheMixin implements ChangedChunksAccess {
         }
     }
 
-    @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;tickChunks(Lnet/minecraft/util/profiling/ProfilerFiller;)V"))
-    private void leafs$serialChunkTickRemainder(ServerChunkCache instance, ProfilerFiller profiler, Operation<Void> original) {
+    @WrapOperation(method = "tickChunks()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;tickChunks(Lnet/minecraft/util/profiling/ProfilerFiller;J)V"))
+    private void leafs$serialChunkTickRemainder(ServerChunkCache instance, ProfilerFiller profiler, long timeDiff, Operation<Void> original) {
         RegionTickBody body = LevelRegions.of(this.level).body();
         if (body == null) {
-            original.call(instance, profiler);
+            original.call(instance, profiler, timeDiff);
 
             return;
         }

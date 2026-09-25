@@ -42,8 +42,13 @@ public final class EntityTeleports {
 
     private void searchAndEnterPortal(Entity entity, PortalProcessor process) {
         TeleportTransition transition = process.getPortalDestination(level, entity);
-        if (transition != null) {
-            entity.teleportToPortalDestination(level, transition);
+        if (transition == null) {
+            return;
+        }
+
+        ServerLevel target = transition.newLevel();
+        if (level.isAllowedToEnterPortal(target) && (target.dimension() == level.dimension() || entity.canTeleport(level, target))) {
+            entity.teleport(transition);
         }
     }
 
