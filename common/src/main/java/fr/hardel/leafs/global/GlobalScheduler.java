@@ -38,17 +38,20 @@ public final class GlobalScheduler {
         Runnable task;
         while (budget-- > 0 && (task = tasks.poll()) != null) {
             ran = true;
-
-            try {
-                runner.accept(task);
-            } catch (Exception exception) {
-                Leafs.LOGGER.error("Global task failed", exception);
-                if (BlockableEventLoop.isNonRecoverable(exception)) {
-                    throw exception;
-                }
-            }
+            runLogged(task);
         }
 
         return ran;
+    }
+
+    private void runLogged(Runnable task) {
+        try {
+            runner.accept(task);
+        } catch (Exception exception) {
+            Leafs.LOGGER.error("Global task failed", exception);
+            if (BlockableEventLoop.isNonRecoverable(exception)) {
+                throw exception;
+            }
+        }
     }
 }
