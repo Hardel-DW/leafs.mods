@@ -20,7 +20,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** The three graphs answer every question vanilla asked its four trackers; the trackers run empty. */
 @Mixin(DistanceManager.class)
 public abstract class DistanceManagerMixin implements DistanceManagerAccess {
     @Unique

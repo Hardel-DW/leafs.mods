@@ -16,12 +16,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
-
-/**
- * A level per chunk, one step weaker per chunk of distance, like vanilla's ChunkTracker. Any thread posts sources, any thread drains.
- * A drain locks the 3 by 3 sections around the changed one; a source never reaches farther than 64 chunks, so no wavefront leaves the area.
- * A section exists while a chunk of it has a level, like vanilla's tracker entries, and is retired by the drain that emptied it.
- */
 public final class ChunkLevels {
     private static final int STRIPES = 256;
     private static final ThreadLocal<ChunkLevels> DRAINING = new ThreadLocal<>();
@@ -31,7 +25,6 @@ public final class ChunkLevels {
     private final ConcurrentLinkedQueue<Section> dirty = new ConcurrentLinkedQueue<>();
     private final ReentrantLock[] stripes = new ReentrantLock[STRIPES];
 
-    /** Levels 0 to levelCount - 2 are real, levelCount - 1 means none. */
     public ChunkLevels(int levelCount) {
         this.none = levelCount - 1;
         Arrays.setAll(stripes, _ -> new ReentrantLock());
@@ -61,6 +54,7 @@ public final class ChunkLevels {
         return sections.size();
     }
 
+    // Used by the Leafs Debug mod
     public int level(long chunkKey) {
         int chunkX = ChunkPos.getX(chunkKey);
         int chunkZ = ChunkPos.getZ(chunkKey);
@@ -99,13 +93,13 @@ public final class ChunkLevels {
     }
 
     public <T> T settled(int chunkX, int chunkZ, LevelListener listener, Supplier<T> body) {
-        long[] area = area(Section.keyOf(chunkX, chunkZ));
-        lock(area);
+        long key = Section.keyOf(chunkX, chunkZ);
+        int[] taken = lock(key);
         try {
             if (DRAINING.get() == null) {
                 DRAINING.set(this);
                 try {
-                    propagate(sections.get(area[4]), listener);
+                    propagate(sections.get(key), listener);
                 } finally {
                     DRAINING.remove();
                 }
@@ -113,21 +107,19 @@ public final class ChunkLevels {
 
             return body.get();
         } finally {
-            unlock(area);
+            unlock(taken);
         }
     }
 
     private boolean drainSection(Section center, LevelListener listener) {
-        long[] area = area(center.key);
-        lock(area);
+        int[] taken = lock(center.key);
         try {
             return propagate(center, listener);
         } finally {
-            unlock(area);
+            unlock(taken);
         }
     }
 
-    /** The drain, then the sections the drain emptied leave; a retired section refuses the sources posted after, whose writer asks again. */
     private boolean propagate(@Nullable Section center, LevelListener listener) {
         if (center == null) {
             return false;
@@ -135,50 +127,46 @@ public final class ChunkLevels {
 
         Short2ByteMap batch = center.takePending();
         boolean changed = !batch.isEmpty() && new Propagation(center, batch).run(listener);
-        for (long key : area(center.key)) {
-            Section section = sections.get(key);
-            if (section != null && section.retire()) {
-                sections.remove(key, section);
+        int sectionX = ChunkPos.getX(center.key);
+        int sectionZ = ChunkPos.getZ(center.key);
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                long key = ChunkPos.pack(sectionX + dx, sectionZ + dz);
+                Section section = sections.get(key);
+                if (section != null && section.retire()) {
+                    sections.remove(key, section);
+                }
             }
         }
 
         return changed;
     }
 
-    /** The keys of the 3 by 3 around a section, the centre fifth. */
-    private static long[] area(long centerKey) {
-        int sectionX = (int) centerKey;
-        int sectionZ = (int) (centerKey >> 32);
-        long[] area = new long[9];
+    private int[] lock(long centerKey) {
+        int sectionX = ChunkPos.getX(centerKey);
+        int sectionZ = ChunkPos.getZ(centerKey);
+        int[] taken = new int[9];
         int count = 0;
         for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
-                area[count++] = Section.keyOf((sectionX + dx) << Section.SHIFT, (sectionZ + dz) << Section.SHIFT);
+                taken[count++] = (int) ((ChunkPos.pack(sectionX + dx, sectionZ + dz) * 0x9E3779B97F4A7C15L) >>> 56);
             }
         }
 
-        return area;
-    }
-
-    /** One global order over striped locks, so two drains never wait on each other crosswise; a stripe shared by two keys is taken once. */
-    private void lock(long[] area) {
-        for (int stripe : stripesOf(area)) {
+        Arrays.sort(taken);
+        for (int stripe : taken) {
             stripes[stripe].lock();
         }
+
+        return taken;
     }
 
-    private void unlock(long[] area) {
-        int[] taken = stripesOf(area);
+    private void unlock(int[] taken) {
         for (int index = taken.length - 1; index >= 0; index--) {
             stripes[taken[index]].unlock();
         }
     }
 
-    private static int[] stripesOf(long[] area) {
-        return Arrays.stream(area).mapToInt(key -> (int) ((key * 0x9E3779B97F4A7C15L) >>> 56)).distinct().sorted().toArray();
-    }
-
-    /** One drain's min fixed point on an overlay: only settled values reach the shared arrays, never a transient. */
     private final class Propagation {
         private final Section center;
         private final Short2ByteMap batch;
@@ -194,8 +182,8 @@ public final class ChunkLevels {
         }
 
         private boolean run(LevelListener listener) {
-            int originX = (int) center.key << Section.SHIFT;
-            int originZ = (int) (center.key >> 32) << Section.SHIFT;
+            int originX = ChunkPos.getX(center.key) << Section.SHIFT;
+            int originZ = ChunkPos.getZ(center.key) << Section.SHIFT;
             for (ObjectIterator<Short2ByteMap.Entry> iterator = batch.short2ByteEntrySet().iterator(); iterator.hasNext(); ) {
                 Short2ByteMap.Entry entry = iterator.next();
                 int index = entry.getShortKey() & 0xFFFF;
@@ -217,7 +205,6 @@ public final class ChunkLevels {
             }
         }
 
-        /** What may descend from a weakened level drops to none and stays none until the raise; the sources and neighbours still standing become seeds. */
         private void lower() {
             while (!removals.isEmpty()) {
                 long key = removals.dequeueLong();
@@ -250,7 +237,6 @@ public final class ChunkLevels {
             }
         }
 
-        /** Seeds push outward, strongest first, until nothing improves. */
         private void raise() {
             for (int level = 0; level < none; level++) {
                 LongArrayList atLevel = seeds[level];
@@ -267,7 +253,6 @@ public final class ChunkLevels {
                         continue;
                     }
 
-                    // A seed that fell in the lowering only lands again on its own source; a standing one pushes as it is.
                     if (current > level) {
                         if (source(chunkX, chunkZ) != level) {
                             continue;
@@ -294,7 +279,6 @@ public final class ChunkLevels {
             removals.enqueue(key);
         }
 
-        /** A candidate level for the raise; the chunk keeps what it has until then. */
         private void seed(int chunkX, int chunkZ, int level) {
             long key = ChunkPos.pack(chunkX, chunkZ);
             olds.putIfAbsent(key, (byte) level(chunkX, chunkZ));
@@ -306,7 +290,6 @@ public final class ChunkLevels {
             atLevel.add(key);
         }
 
-        /** The raise found a better level: it lands at once, so the same chunk is pushed once per level. */
         private void push(int chunkX, int chunkZ, int level) {
             seed(chunkX, chunkZ, level);
             overlay.put(ChunkPos.pack(chunkX, chunkZ), (byte) level);
@@ -327,7 +310,6 @@ public final class ChunkLevels {
             return section == null ? none : section.source(Section.index(chunkX, chunkZ));
         }
 
-        /** A level landing outside every section makes one. */
         private Section sectionOf(int chunkX, int chunkZ) {
             return sections.computeIfAbsent(Section.keyOf(chunkX, chunkZ), key -> new Section(key, none));
         }

@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChunkScheduledTicksTest {
     private static final BlockPos POS = new BlockPos(3, 64, 3);
 
-    /** The level as tick factory: a clock and an order counter the test moves by hand. */
     private static final class StampingLevel implements ScheduledTickAccess {
         private long time = 100;
         private long order;
@@ -75,7 +74,6 @@ class ChunkScheduledTicksTest {
         assertFalse(index.hasScheduledTick(POS, Blocks.STONE));
     }
 
-    /** A merge moves a chunk onto the survivor's clock: its live ticks keep their delay, not their absolute trigger. */
     @Test
     void rebaseShiftsTheLiveQueueByTheClockDifference() {
         LevelChunkTicks<Block> container = new LevelChunkTicks<>();
@@ -89,7 +87,6 @@ class ChunkScheduledTicksTest {
         assertTrue(container.hasScheduledTick(POS.above(), Blocks.STONE));
     }
 
-    /** Vanilla shifts the copies past the originals, so a clone ticks after what it was cloned from. */
     @Test
     void aCopyLandsAfterTheOriginalsInSubTickOrder() {
         ChunkScheduledTicks<Block> index = index((_, _, task) -> task.run());
@@ -104,7 +101,6 @@ class ChunkScheduledTicksTest {
         assertEquals(List.of(8L, 11L), copies, "sub-tick order minus the smallest plus the largest plus one");
     }
 
-    /** A tick is a write into the chunk: a thread that does not hold it hands the write to the owner instead of touching the queue. */
     @Test
     void aScheduleOnAChunkThisThreadDoesNotHoldGoesToTheOwner() {
         List<Runnable> mailed = new ArrayList<>();
@@ -119,7 +115,6 @@ class ChunkScheduledTicksTest {
         assertTrue(index.hasScheduledTick(POS, Blocks.STONE));
     }
 
-    /** Mail outlives an unload and a reload of its chunk: the write lands in the container the owner has when it runs, never in the detached one. */
     @Test
     void mailReachesTheContainerLiveWhenItRuns() {
         List<Runnable> mailed = new ArrayList<>();
@@ -140,7 +135,6 @@ class ChunkScheduledTicksTest {
         assertFalse(reloaded.hasScheduledTick(POS.above(), Blocks.STONE), "the clear reached the reloaded container");
     }
 
-    /** Vanilla stamps clock and order in the same call as the insert; mailed, the owner stamps them when it runs the write, in step with its own ticks. */
     @Test
     void aMailedScheduleIsStampedWhenTheOwnerRunsIt() {
         List<Runnable> mailed = new ArrayList<>();

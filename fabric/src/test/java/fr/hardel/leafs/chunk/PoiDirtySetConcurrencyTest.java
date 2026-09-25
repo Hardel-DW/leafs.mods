@@ -83,7 +83,6 @@ class PoiDirtySetConcurrencyTest {
             writer.flush(new ChunkPos(chunk, 0));
         }
 
-        // A read behind the writes: the disk thread takes its tasks in order, so the close that follows finds every write queued instead of dropping the last.
         writer.exists(new BlockPos(CHUNKS << 4, 64, 0), type -> true);
         writer.close();
         PoiManager reader = poiManager(directory);
@@ -106,7 +105,7 @@ class PoiDirtySetConcurrencyTest {
             for (int chunk = 0; chunk < CHUNKS; chunk++) {
                 BlockPos pos = new BlockPos(chunk << 4, 64, 0);
                 if (!poiManager.exists(pos, type -> type.is(PoiTypes.ARMORER))) {
-                    throw new AssertionError("the stored armorer at " + pos + " was not read");
+                    throw new AssertionError("the stored armorer at %s was not read".formatted(pos));
                 }
             }
         });
@@ -114,7 +113,7 @@ class PoiDirtySetConcurrencyTest {
 
     private static Thread owner(PoiManager poiManager, Holder<PoiType> type, int firstChunk, AtomicReference<Throwable> failure) {
 
-        return Thread.ofPlatform().name("test-owner-" + firstChunk).uncaughtExceptionHandler((_, e) -> failure.set(e)).start(() -> {
+        return Thread.ofPlatform().name("test-owner-%s".formatted(firstChunk)).uncaughtExceptionHandler((_, e) -> failure.set(e)).start(() -> {
             for (int pass = 0; pass < PASSES; pass++) {
                 for (int chunk = firstChunk; chunk < firstChunk + CHUNKS; chunk++) {
                     BlockPos pos = new BlockPos(chunk << 4 | pass & 15, 64, 0);

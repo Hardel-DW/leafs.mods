@@ -4,8 +4,8 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
@@ -33,7 +33,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** The level random, the neighbor updater and block-entity ticker registration become unit-owned. */
 @Mixin(Level.class)
 public abstract class LevelMixin {
 
@@ -74,7 +73,6 @@ public abstract class LevelMixin {
         return placed.booleanValue();
     }
 
-    /** The chunk contract decides what any thread may read; only the chunk's owner creates a block entity, another thread reads what exists. */
     @Inject(method = "getBlockEntity(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/entity/BlockEntity;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionBlockEntityPath(BlockPos pos, CallbackInfoReturnable<BlockEntity> callbackInfo) {
         if (!((Object) this instanceof ServerLevel level) || !level.isInValidBounds(pos)) {
@@ -83,10 +81,9 @@ public abstract class LevelMixin {
 
         LevelChunk chunk = level.getChunkAt(pos);
         boolean owner = LevelChunks.of(level).owners().holds(chunk.getPos().x(), chunk.getPos().z());
-        callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : ((ChunkTickAccess) chunk).leafs$existingBlockEntity(pos));
+        callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : chunk.getBlockEntities().get(pos));
     }
 
-    /** Every ticker, the chunk's own at load and an anchored one from outside, joins its chunk; an unloaded position keeps vanilla's serial list. */
     @Inject(method = "addBlockEntityTicker", at = @At("HEAD"), cancellable = true)
     private void leafs$routeBlockEntityTicker(TickingBlockEntity ticker, CallbackInfo callbackInfo) {
         if (!(this instanceof ServerLevelRegionAccess)) {

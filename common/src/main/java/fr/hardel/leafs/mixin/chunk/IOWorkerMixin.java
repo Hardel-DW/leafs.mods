@@ -16,7 +16,6 @@ import org.spongepowered.asm.mixin.Unique;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** The disk thread of a chunk storage serves the writes still on their way before the file, as vanilla serves its pending tree. */
 @Mixin(IOWorker.class)
 public abstract class IOWorkerMixin implements ChunkWritesAccess {
     @Unique

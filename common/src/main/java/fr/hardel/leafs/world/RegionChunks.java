@@ -13,7 +13,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The region's chunks this tick, taken at tick start from the section index: every holder, the ticking chunks among them, and the box they span. Every phase walks these two lists. */
 public final class RegionChunks {
     private final List<ChunkHolder> holders = new ArrayList<>();
     private final List<LevelChunk> ticking = new ArrayList<>();
@@ -37,7 +36,6 @@ public final class RegionChunks {
         }
     }
 
-    /** A chunk another thread took before the region covered it stays that thread's for the pass. The ticket level says whether the ticking future can hold a chunk, so most holders never touch it. */
     private void collect(ChunkHolder holder, ChunkOwners owners) {
         ChunkPos pos = holder.getPos();
         if (owners.heldElsewhere(pos.x(), pos.z())) {
@@ -67,7 +65,6 @@ public final class RegionChunks {
         return ticking;
     }
 
-    /** Whether the chunk lies within {@code margin} chunks of the box the region's loaded chunks span. */
     public boolean within(ChunkPos chunk, int margin) {
         return chunk.x() >= minX - margin && chunk.x() <= maxX + margin && chunk.z() >= minZ - margin && chunk.z() <= maxZ + margin;
     }

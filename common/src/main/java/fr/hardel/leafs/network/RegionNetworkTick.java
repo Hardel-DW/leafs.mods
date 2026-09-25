@@ -2,8 +2,8 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
@@ -21,18 +21,15 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelData;
 
-/** Player network split: the owning region drains his packets and runs his pass, both as his packet-handling thread; the global loop keeps transport. */
 public final class RegionNetworkTick {
     private RegionNetworkTick() {
     }
 
-    /** Region tick start: the owned player's packets, stopped if a handler moves the player off-level. */
     public static void drainOnRegion(ServerPlayer player, ServerLevel level) {
         ServerGamePacketListenerImpl listener = player.connection;
         countIfHeld(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
     }
 
-    /** Region tick end: the player's whole pass, as his packet-handling thread, so no other thread touches him while it runs. The view and the chunk sends run for every player, as vanilla's; the listener ticks only behind a channel, as vanilla's connection list. */
     public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
@@ -46,14 +43,12 @@ public final class RegionNetworkTick {
         }));
     }
 
-    /** A region tick never waits for another thread: a player another thread holds is skipped this tick, and the counter says how often two threads wanted the same player. */
     private static void countIfHeld(MinecraftServer server, boolean handled) {
         if (!handled) {
             TickingManager.of(server).metrics().sharedPlayers().increment();
         }
     }
 
-    /** The full vanilla listener tick, with vanilla's kick-instead-of-crash catch. */
     private static void tickListener(ServerGamePacketListenerImpl listener, Connection connection, MinecraftServer server) {
         try {
             listener.tick();
@@ -69,7 +64,6 @@ public final class RegionNetworkTick {
         }
     }
 
-    /** {@code Connection.tick}'s listener half: a game listener ticks on the region that ticks its player; one no region ticks, dead or without tickets, ticks here on the server thread. Every other listener stays here. */
     public static void tickListenerGlobally(TickablePacketListener listener, Runnable original) {
         if (!(listener instanceof ServerGamePacketListenerImpl game)) {
             original.run();
@@ -87,7 +81,6 @@ public final class RegionNetworkTick {
         }));
     }
 
-    /** The region's photo of its entities: the player is in the world and a live region covers his chunk. */
     private static boolean tickedByARegion(ServerPlayer player) {
         if (player.isRemoved()) {
             return false;
@@ -98,7 +91,6 @@ public final class RegionNetworkTick {
         return regions.live() && regions.regionizer().regionAt(chunk.x(), chunk.z()) != null;
     }
 
-    /** The respawn runs on the owner of the respawn spot as that listener's packet-handling thread; this drain ends here, the rest of the queue follows the player. */
     public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {
         if (packet.getAction() != ServerboundClientCommandPacket.Action.PERFORM_RESPAWN) {
             return false;
@@ -129,13 +121,14 @@ public final class RegionNetworkTick {
         }).validIf(listener.connection::isConnected);
     }
 
-
     public static void drainPaused(ServerLevel level) {
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            if (player.level() == level) {
-                ServerGamePacketListenerImpl listener = player.connection;
-                PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
+            if (player.level() != level) {
+                continue;
             }
+
+            ServerGamePacketListenerImpl listener = player.connection;
+            PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level);
         }
     }
 }

@@ -8,7 +8,6 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.TicketStorage;
 
-/** Vanilla's player ticket tracker: a chunk within the view distance of any player carries one PLAYER_LOADING ticket. Fed by the players graph. */
 public final class ViewTickets implements LevelListener {
     private static final int LEVEL = ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING);
 
@@ -26,22 +25,15 @@ public final class ViewTickets implements LevelListener {
         return viewDistance;
     }
 
-    /** Every chunk that crosses the new limit gains or loses its ticket. */
     public void viewDistance(int distance) {
         int previous = viewDistance;
         viewDistance = distance;
         if (distance > previous) {
-            players.forEachAtMost(distance, key -> {
-                if (players.level(key) > previous) {
-                    tickets.addTicket(key, ticket());
-                }
-            });
-        } else if (distance < previous) {
-            players.forEachAtMost(previous, key -> {
-                if (players.level(key) > distance) {
-                    tickets.removeTicket(key, ticket());
-                }
-            });
+            players.forEachAtMost(distance, chunkKey -> addBeyond(chunkKey, previous));
+        }
+
+        if (distance < previous) {
+            players.forEachAtMost(previous, chunkKey -> removeBeyond(chunkKey, distance));
         }
     }
 
@@ -51,7 +43,21 @@ public final class ViewTickets implements LevelListener {
         boolean sees = newLevel <= viewDistance;
         if (sees && !saw) {
             tickets.addTicket(chunkKey, ticket());
-        } else if (saw && !sees) {
+        }
+
+        if (saw && !sees) {
+            tickets.removeTicket(chunkKey, ticket());
+        }
+    }
+
+    private void addBeyond(long chunkKey, int distance) {
+        if (players.level(chunkKey) > distance) {
+            tickets.addTicket(chunkKey, ticket());
+        }
+    }
+
+    private void removeBeyond(long chunkKey, int distance) {
+        if (players.level(chunkKey) > distance) {
             tickets.removeTicket(chunkKey, ticket());
         }
     }

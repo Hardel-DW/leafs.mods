@@ -9,17 +9,14 @@ import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-/** The chunk contract, decided here, never at call sites: any thread reads what is published, and a required read of an absent chunk waits for it. */
 public final class RegionChunkAccess {
     private RegionChunkAccess() {
     }
 
-    /** The peek form, backing getChunkNow and hasChunk from any thread. */
     public static LevelChunk fullChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
         return fullChunkOrNull(chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ)));
     }
 
-    /** The chunk a block entity registers into: published full, or still inside its FULL step behind the imposter. */
     public static LevelChunk levelChunkOrNull(ChunkMap chunkMap, int chunkX, int chunkZ) {
         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
         ChunkAccess latest = holder == null ? null : holder.getLatestChunk();
@@ -30,29 +27,29 @@ public final class RegionChunkAccess {
         };
     }
 
-    /** Presence, never the ticket level: a ticket only says the chunk is due. */
     public static LevelChunk fullChunkOrNull(ChunkHolder holder) {
         return holder != null && holder.getChunkIfPresent(ChunkStatus.FULL) instanceof LevelChunk levelChunk ? levelChunk : null;
     }
 
-    public static ChunkAccess presentChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status) {
-        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
-        return holder == null ? null : holder.getChunkIfPresent(status);
+    public static boolean fullAround(ChunkMap chunkMap, int chunkX, int chunkZ) {
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (fullChunkOrNull(chunkMap, chunkX + dx, chunkZ + dz) == null) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
-    /** The full form: a published chunk serves every thread, a required absent one is waited for. */
     public static ChunkAccess contractedChunk(ChunkMap chunkMap, int chunkX, int chunkZ, ChunkStatus status, boolean required) {
-        ChunkAccess chunk = presentChunk(chunkMap, chunkX, chunkZ, status);
+        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(ChunkPos.pack(chunkX, chunkZ));
+        ChunkAccess chunk = holder == null ? null : holder.getChunkIfPresent(status);
         if (chunk != null || !required) {
             return chunk;
         }
 
         return ChunkWait.chunk(chunkMap.level, chunkX, chunkZ, status);
-    }
-
-    /** Vanilla's readiness of a chunk for the client, whoever owns it; the send reads a chunk like any thread does, the section writes are monitored. */
-    public static LevelChunk readyToSend(ChunkMap chunkMap, long key) {
-        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(key);
-        return holder == null ? null : holder.getChunkToSend();
     }
 }

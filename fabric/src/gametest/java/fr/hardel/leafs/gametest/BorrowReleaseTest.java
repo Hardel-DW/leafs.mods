@@ -1,7 +1,7 @@
 package fr.hardel.leafs.gametest;
 
+import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.scheduler.DeferredWork;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -13,7 +13,6 @@ import net.minecraft.world.level.block.Blocks;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The server thread releasing its chunks at the end of its tick: the mail left on one of them ends up reading its neighbour, on a thread that can lock it. */
 public final class BorrowReleaseTest {
 
     /** ATM11, 13 September 2026: the mail of a released chunk replayed on the releasing thread, read its neighbour chunk, still registered to that thread but no longer counted as held, and the server thread waited for itself. */
@@ -47,8 +46,8 @@ public final class BorrowReleaseTest {
         }
 
         helper.succeedWhen(() -> {
-            helper.assertFalse(waitedForItself.get(), "reading " + b + " from the mail of " + a + " would wait for the reading thread itself");
-            helper.assertTrue(sawStone.get(), "the mail of " + a + " read the stone placed in " + b);
+            helper.assertFalse(waitedForItself.get(), "reading %s from the mail of %s would wait for the reading thread itself".formatted(b, a));
+            helper.assertTrue(sawStone.get(), "the mail of %s read the stone placed in %s".formatted(a, b));
         });
     }
 }

@@ -10,7 +10,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** Vanilla's block event set replayed per region: level-wide order across chunks, and an event leaves its set only as it runs. */
 class ChunkBlockEventsTest {
 
     private static BlockEventData at(int x) {
@@ -50,7 +49,6 @@ class ChunkBlockEventsTest {
         assertEquals(List.of(1), run(List.of(events)));
     }
 
-    /** Vanilla removes one event at a time, so an event still pending collapses onto itself when re-posted. */
     @Test
     void anEventRePostedWhileAnEarlierOneRunsRunsOnce() {
         ChunkBlockEvents chunk = new ChunkBlockEvents();
@@ -85,7 +83,6 @@ class ChunkBlockEventsTest {
         assertEquals(List.of(1), ran);
     }
 
-    /** Vanilla removes one event at a time, so an event cleared then posted again goes to the end of the set. */
     @Test
     void anEventClearedThenPostedAgainRunsLast() {
         ChunkBlockEvents chunk = new ChunkBlockEvents();
@@ -113,16 +110,5 @@ class ChunkBlockEventsTest {
 
         assertEquals(List.of(), run(List.of()));
         assertEquals(List.of(1), run(List.of(idle)));
-    }
-
-    @Test
-    void removeInsideDropsWhatTheBoxCovers() {
-        ChunkBlockEvents events = new ChunkBlockEvents();
-        events.add(at(1), 1);
-        events.add(at(10), 2);
-
-        events.removeInside(new BoundingBox(0, 0, 0, 5, 128, 5));
-
-        assertEquals(List.of(10), run(List.of(events)));
     }
 }

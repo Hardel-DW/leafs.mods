@@ -1,6 +1,5 @@
 package fr.hardel.leafs.metrics;
 
-/** Deferral counters per reason: what crossed to an owner, and what was dropped at the destination. */
 public final class DeferStats {
     private final MinuteCounter[] deferrals = counters();
     private final MinuteCounter[] drops = counters();
@@ -22,10 +21,12 @@ public final class DeferStats {
         drops[reason.ordinal()].increment();
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter deferrals(DeferReason reason) {
         return deferrals[reason.ordinal()];
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter drops(DeferReason reason) {
         return drops[reason.ordinal()];
     }

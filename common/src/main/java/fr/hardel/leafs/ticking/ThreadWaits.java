@@ -35,7 +35,7 @@ public final class ThreadWaits {
         WAITING.forEach((thread, wait) -> {
             long waited = nowNanos - wait.startedNanos();
             if (waited >= thresholdNanos) {
-                stalled.put(thread, "Wait stalled for " + waited / 1_000_000_000L + "s on thread '" + thread.getName() + "': " + wait.what().get());
+                stalled.put(thread, "Wait stalled for %ss on thread '%s': %s".formatted(waited / 1_000_000_000L, thread.getName(), wait.what().get()));
             }
         });
 

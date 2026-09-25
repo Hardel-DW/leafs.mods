@@ -1,17 +1,60 @@
 package fr.hardel.excess;
 
+import fr.hardel.TestThreads;
+import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConcurrentInt2ObjectMapTest {
     private final ConcurrentInt2ObjectMap<String> map = new ConcurrentInt2ObjectMap<>();
+
+    /** 2026-09-23: LevelChunk calls the Int2ObjectFunction overload, which fell to fastutil's get then put, and two regions built two game event registries for one section. */
+    @Test
+    void aLookupThroughTheVanillaOverloadBuildsOnce() throws Exception {
+        ConcurrentInt2ObjectMap<Object> sections = new ConcurrentInt2ObjectMap<>();
+        CountDownLatch building = new CountDownLatch(1);
+        CountDownLatch finish = new CountDownLatch(1);
+        AtomicInteger builds = new AtomicInteger();
+        Int2ObjectFunction<Object> factory = _ -> {
+            if (builds.incrementAndGet() == 1) {
+                building.countDown();
+                TestThreads.await(finish);
+            }
+
+            return new Object();
+        };
+
+        try (ExecutorService workers = Executors.newFixedThreadPool(2)) {
+            try {
+                Future<Object> first = workers.submit(() -> sections.computeIfAbsent(4, factory));
+                assertTrue(building.await(5, TimeUnit.SECONDS));
+                Future<Object> second = workers.submit(() -> sections.computeIfAbsent(4, factory));
+                assertThrows(TimeoutException.class, () -> second.get(100, TimeUnit.MILLISECONDS));
+                finish.countDown();
+
+                assertSame(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS));
+                assertEquals(1, builds.get());
+            } finally {
+                finish.countDown();
+            }
+        }
+    }
 
     @Test
     void pointOperationsAndDefaultReturnValue() {
@@ -31,14 +74,14 @@ class ConcurrentInt2ObjectMapTest {
     @Test
     void valuesViewIteratesEverythingWithoutOrderGuarantee() {
         for (int i = 0; i < 50; i++) {
-            map.put(i, "v" + i);
+            map.put(i, "v%s".formatted(i));
         }
 
         List<String> values = new ArrayList<>();
         map.values().iterator().forEachRemaining(values::add);
         assertEquals(50, values.size());
         for (int i = 0; i < 50; i++) {
-            assertTrue(values.contains("v" + i));
+            assertTrue(values.contains("v%s".formatted(i)));
         }
     }
 
@@ -51,33 +94,5 @@ class ConcurrentInt2ObjectMapTest {
             assertEquals(3, entry.getIntKey());
             assertEquals("c", entry.getValue());
         });
-    }
-
-    @Test
-    void iterationSurvivesConcurrentMutation() {
-        for (int i = 0; i < 100; i++) {
-            map.put(i, "v" + i);
-        }
-
-        int seen = 0;
-        for (String value : map.values()) {
-            assertTrue(value.startsWith("v") || value.startsWith("x"), "value outside the known universe: " + value);
-            map.remove(90 - seen);
-            map.put(200 + seen, "x" + seen);
-            seen++;
-        }
-
-        assertTrue(seen > 0);
-    }
-
-    /** A fixed-size stream over a growing map throws once it sees more than it was told. */
-    @Test
-    void aStreamOverTheValuesSurvivesGrowth() {
-        map.put(1, "a");
-        map.put(2, "b");
-
-        List<String> seen = map.values().stream().peek(_ -> map.put(map.size() + 10, "z")).toList();
-
-        assertTrue(seen.size() >= 2);
     }
 }

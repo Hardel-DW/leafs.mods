@@ -18,7 +18,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.BooleanSupplier;
 
-/** Hook only, the logic lives in ticking/TickingManager: each level tick runs through its region unit. */
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
@@ -30,10 +29,12 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         return leafs$ticking;
     }
 
-    /** The server thread locks what it touches during its tick and releases everything when the tick ends: tick events, commands, spawners and game tests alike. */
     @WrapOperation(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;processPacketsAndTick(Z)V"))
     private void leafs$lockDuringTheTick(MinecraftServer server, boolean sprinting, Operation<Void> original) {
+        leafs$ticking.throwRegionCrash();
+        int tickCount = server.getTickCount();
         RegionBorrow.hold(_ -> original.call(server, sprinting));
+        leafs$ticking.endServerTick(server.getTickCount() != tickCount);
     }
 
     @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V"))
@@ -41,7 +42,6 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         leafs$ticking.tickLevel(level, () -> original.call(level, haveTime));
     }
 
-    /** The global stage sample spans {@code tickServer}; an early pause-branch return still publishes at RETURN. */
     @Inject(method = "tickServer", at = @At("HEAD"))
     private void leafs$beginGlobalStages(BooleanSupplier haveTime, CallbackInfo callbackInfo) {
         leafs$ticking.metrics().globalStages().beginTick(System.nanoTime());
@@ -64,15 +64,13 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         globalStages.endTick(System.nanoTime());
     }
 
-    /** Vanilla drains its packet queue here every loop iteration, paused included; the stolen per-player queues must too. */
     @Inject(method = "processPacketsAndTick", at = @At("HEAD"))
     private void leafs$drainPlayerQueuesWhilePaused(boolean sprinting, CallbackInfo callbackInfo) {
-        if (((MinecraftServer) (Object) this).isPaused()) {
+        if (leafs$ticking.paused()) {
             leafs$ticking.tickPausedNetwork();
         }
     }
 
-    /** Before the worlds save: the pool stops so saves read settled state, then pending teleports place. */
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void leafs$haltTicking(CallbackInfo callbackInfo) {
         leafs$ticking.haltTicking();

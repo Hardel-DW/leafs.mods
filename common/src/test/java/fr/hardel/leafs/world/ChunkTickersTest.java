@@ -78,6 +78,4 @@ class ChunkTickersTest {
         assertEquals(List.of(), ticked);
         assertEquals(1, tickers.size());
     }
-
-    /** Hopper at the border: a refused block entity skips its own tick, the phase continues. */
 }

@@ -10,10 +10,10 @@ import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 
 import java.util.List;
 
-/** NeoForge captures a broken block's drops in one static list meant for the server thread alone; regions break blocks in parallel, so each thread captures its own. */
 @Mixin(Block.class)
 public abstract class BlockCaptureShim {
     @Unique
@@ -31,10 +31,11 @@ public abstract class BlockCaptureShim {
         leafs$capturedDrops.set(drops);
     }
 
-    /** No drops while a placement restores its snapshots: the thread's restore, or a mod driving the level's flag. */
-    @WrapOperation(method = "popResource(Lnet/minecraft/world/level/Level;Ljava/util/function/Supplier;Lnet/minecraft/world/item/ItemStack;)V",
-        at = @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;restoringBlockSnapshots:Z", opcode = Opcodes.GETFIELD))
-    private static boolean leafs$restoringHere(Level level, Operation<Boolean> original) {
-        return BlockSnapshotCapture.current().restoring || original.call(level);
+    @WrapOperation(method = "*", at = {
+        @At(value = "FIELD", target = "Lnet/minecraft/world/level/Level;restoringBlockSnapshots:Z", opcode = Opcodes.GETFIELD),
+        @At(value = "FIELD", target = "Lnet/minecraft/server/level/ServerLevel;restoringBlockSnapshots:Z", opcode = Opcodes.GETFIELD)
+    })
+    private static boolean leafs$restoringHere(@Coerce Level level, Operation<Boolean> original) {
+        return BlockSnapshotCapture.current().restoring() || original.call(level);
     }
 }

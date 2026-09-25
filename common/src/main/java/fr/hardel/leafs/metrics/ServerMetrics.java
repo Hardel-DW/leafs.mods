@@ -1,13 +1,9 @@
 package fr.hardel.leafs.metrics;
 
 import fr.hardel.leafs.metrics.TickStages.TickFamily;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.LongAccumulator;
 
-/** The server-wide counters and the global tick stages, one instance per server, owned by the ticking manager. */
 public final class ServerMetrics {
     private final DeferStats deferStats = new DeferStats();
     private final StageTimings globalStages = new StageTimings(TickStages.count(TickFamily.GLOBAL));
@@ -16,74 +12,61 @@ public final class ServerMetrics {
     private final MinuteCounter chunkLoads = new MinuteCounter();
     private final MinuteCounter chunkUnloads = new MinuteCounter();
     private final MinuteCounter chunksFull = new MinuteCounter();
-    private final AtomicLongArray stepsRan = new AtomicLongArray(ChunkStatus.getStatusList().size());
     private final MinuteCounter sharedPlayers = new MinuteCounter();
     private final MinuteCounter chunkWaits = new MinuteCounter();
-    private final AtomicLong chunkWaitNanos = new AtomicLong();
     private final LongAccumulator longestChunkWaitNanos = new LongAccumulator(Math::max, 0L);
 
+    // Used by the Leafs Debug mod
     public DeferStats deferStats() {
         return deferStats;
     }
 
+    // Used by the Leafs Debug mod
     public StageTimings globalStages() {
         return globalStages;
     }
 
-    /** Inbound play packets, counted where the routing files them into a player's queue. */
+    // Used by the Leafs Debug mod
     public MinuteCounter packetsIn() {
         return packetsIn;
     }
 
-    /** Outbound packets, counted at the listener send choke point; raw connection sends bypass it. */
+    // Used by the Leafs Debug mod
     public MinuteCounter packetsOut() {
         return packetsOut;
     }
 
-    /** Chunk holders created; the load-side half of the churn. */
+    // Used by the Leafs Debug mod
     public MinuteCounter chunkLoads() {
         return chunkLoads;
     }
 
-    /** Unload decisions taken; the drop-side half of the churn. */
+    // Used by the Leafs Debug mod
     public MinuteCounter chunkUnloads() {
         return chunkUnloads;
     }
 
-    /** Generation steps the pool ran, by target status: against the FULL count, the work spent on chunks that never completed. */
-    public void stepRan(ChunkStatus status) {
-        stepsRan.incrementAndGet(status.getIndex());
-    }
-
-    public long stepsRan(ChunkStatus status) {
-        return stepsRan.get(status.getIndex());
-    }
-
-    /** Chunks that ran their FULL step, the generation pipeline's output. */
+    // Used by the Leafs Debug mod
     public MinuteCounter chunksFull() {
         return chunksFull;
     }
 
-    /** A thread that needed an absent chunk and waited for it. */
     public void chunkWaited(long nanos) {
         chunkWaits.increment();
-        chunkWaitNanos.addAndGet(nanos);
         longestChunkWaitNanos.accumulate(nanos);
     }
 
+    // Used by the Leafs Debug mod
     public MinuteCounter chunkWaits() {
         return chunkWaits;
     }
 
-    public long chunkWaitNanos() {
-        return chunkWaitNanos.get();
-    }
-
+    // Used by the Leafs Debug mod
     public long longestChunkWaitNanos() {
         return longestChunkWaitNanos.get();
     }
 
-    /** Times a thread waited for a player another thread held: before his tick joined that exclusion, the two ran on him together. */
+    // Used by the Leafs Debug mod
     public MinuteCounter sharedPlayers() {
         return sharedPlayers;
     }

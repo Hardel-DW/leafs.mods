@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** The pending set takes writers from the marking thread and the sending region; the scalar state stays owner only. */
 @Mixin(PlayerChunkSender.class)
 public abstract class PlayerChunkSenderMixin {
 

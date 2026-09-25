@@ -12,8 +12,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 
-/** {@code /leafs crash <dimension> <id>}: throws inside the next tick of that region, the test tool of the region crash report. */
 public final class CrashCommand {
 
     private CrashCommand() {}
@@ -29,20 +29,17 @@ public final class CrashCommand {
         LevelRegions regions = LevelRegions.of(level);
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             if (region.id() == regionId && region.data().handle() != null && !region.data().handle().isCancelled()) {
-                int[] chunk = new int[2];
-                region.forEachChunk((chunkX, chunkZ) -> {
-                    chunk[0] = chunkX;
-                    chunk[1] = chunkZ;
+                long section = region.sectionKeySnapshot()[0];
+                int shift = regions.regionizer().sectionShift();
+                region.data().inbox().post(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift, Work.GAME, () -> {
+                    throw new IllegalStateException("Crash requested by /leafs crash on region #%s".formatted(regionId));
                 });
-                region.data().inbox().post(chunk[0], chunk[1], Work.GAME, () -> {
-                    throw new IllegalStateException("Crash requested by /leafs crash on region #" + regionId);
-                });
-                source.sendSuccess(() -> Component.literal("Region #" + regionId + " will throw on its next tick").withStyle(ChatFormatting.RED), true);
+                source.sendSuccess(() -> Component.literal("Region #%s will throw on its next tick".formatted(regionId)).withStyle(ChatFormatting.RED), true);
                 return 1;
             }
         }
 
-        source.sendFailure(Component.literal("No live region #" + regionId + " in this dimension, /leafs regions lists them"));
+        source.sendFailure(Component.literal("No live region #%s in this dimension, /leafs regions lists them".formatted(regionId)));
         return 0;
     }
 }

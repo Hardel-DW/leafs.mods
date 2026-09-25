@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-/** Vanilla's ticker list, per chunk: registration order, adds during the pass wait for the next one. */
 public final class ChunkTickers {
     private final List<TickingBlockEntity> tickers = new ArrayList<>();
     private final List<TickingBlockEntity> pending = new ArrayList<>();
@@ -17,18 +16,22 @@ public final class ChunkTickers {
         (ticking ? pending : tickers).add(ticker);
     }
 
-    /** Runs at the head of the chunk's next pass, before any ticker, frozen or not: a loader's load callback lands here. */
-    public void beforePass(Runnable work) {
+    public boolean beforePass(Runnable work) {
         openers.add(work);
+        return openers.size() == 1;
     }
 
-    public void tickAll(boolean runsNormally) {
-        ticking = true;
+    public void open() {
         for (int i = 0; i < openers.size(); i++) {
             openers.get(i).run();
         }
 
         openers.clear();
+    }
+
+    public void tickAll(boolean runsNormally) {
+        ticking = true;
+        open();
         if (!pending.isEmpty()) {
             tickers.addAll(pending);
             pending.clear();
@@ -39,7 +42,10 @@ public final class ChunkTickers {
             TickingBlockEntity ticker = iterator.next();
             if (ticker.isRemoved()) {
                 iterator.remove();
-            } else if (runsNormally) {
+                continue;
+            }
+
+            if (runsNormally) {
                 ticker.tick();
             }
         }

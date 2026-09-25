@@ -15,7 +15,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.Arrays;
 
-/** {@code /leafs config [key [value]]}: reads the tunable keys, one of them, or rewrites one in the file for the next start. */
 public final class ConfigCommand {
 
     private ConfigCommand() {
@@ -54,11 +53,11 @@ public final class ConfigCommand {
             throw new SimpleCommandExceptionType(Component.literal(exception.getMessage())).create();
         }
 
-        source.sendSuccess(() -> Component.literal(key + " = " + value + ", applied on the next start").withStyle(ChatFormatting.GREEN), true);
+        source.sendSuccess(() -> Component.literal("%s = %s, applied on the next start".formatted(key, value)).withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
     private static Setting setting(String key) throws CommandSyntaxException {
-        return Setting.byKey(key).orElseThrow(() -> new SimpleCommandExceptionType(Component.literal("Unknown key " + key)).create());
+        return Setting.byKey(key).orElseThrow(() -> new SimpleCommandExceptionType(Component.literal("Unknown key %s".formatted(key))).create());
     }
 }

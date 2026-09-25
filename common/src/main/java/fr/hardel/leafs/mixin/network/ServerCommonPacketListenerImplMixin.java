@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Hook only, the flush scope lives in network/PacketRouting: region-tick sends batch on the channel. */
 @Mixin(ServerCommonPacketListenerImpl.class)
 public abstract class ServerCommonPacketListenerImplMixin {
 
@@ -28,7 +27,6 @@ public abstract class ServerCommonPacketListenerImplMixin {
         original.call(connection, packet, listener, PacketRouting.scopedFlush(flush));
     }
 
-    /** Off the server thread the blocking teardown hand-off deadlocks a region worker; it queues instead. */
     @WrapOperation(method = "disconnect(Lnet/minecraft/network/DisconnectionDetails;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;executeBlocking(Ljava/lang/Runnable;)V"))
     private void leafs$nonBlockingTeardownOffThread(MinecraftServer server, Runnable teardown, Operation<Void> original) {
         PacketRouting.runTeardown(server, teardown, () -> original.call(server, teardown));

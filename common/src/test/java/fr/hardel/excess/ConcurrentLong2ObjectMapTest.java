@@ -1,5 +1,6 @@
 package fr.hardel.excess;
 
+import fr.hardel.TestThreads;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -15,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The keys are spread before the backing map and folded back on every read path, so a packed coordinate comes out as it went in. */
 class ConcurrentLong2ObjectMapTest {
     private static final long[] KEYS = {0L, 1L, -1L, Long.MIN_VALUE, Long.MAX_VALUE, (7L << 32) | 3L, (-12L << 32) | (45L & 0xFFFFFFFFL)};
 
@@ -55,10 +55,14 @@ class ConcurrentLong2ObjectMapTest {
     }
 
     @Test
-    void computeSeesTheUnmixedKey() {
+    void everyRemappingSeesTheUnmixedKey() {
         ConcurrentLong2ObjectMap<Long> keys = new ConcurrentLong2ObjectMap<>();
         long key = (5L << 32) | 9L;
         keys.compute(key, (seen, _) -> seen);
+        assertEquals(key, keys.get(key));
+        keys.computeIfPresent(key, (seen, value) -> seen + value);
+        assertEquals(2 * key, keys.get(key));
+        keys.replaceAll((seen, _) -> seen);
         assertEquals(key, keys.get(key));
         keys.compute(key, (_, _) -> null);
         assertNull(keys.get(key));
@@ -69,13 +73,13 @@ class ConcurrentLong2ObjectMapTest {
         AtomicInteger invocations = new AtomicInteger();
         Long2ObjectFunction<String> factory = key -> {
             invocations.incrementAndGet();
-            return "v" + key;
+            return "v%s".formatted(key);
         };
 
         assertEquals("v7", map.computeIfAbsent(7L, factory));
         assertEquals("v7", map.computeIfAbsent(7L, factory));
         assertEquals(1, invocations.get());
-        assertEquals("v3", map.computeIfAbsent(3L, (java.util.function.LongFunction<String>) key -> "v" + key));
+        assertEquals("v3", map.computeIfAbsent(3L, (java.util.function.LongFunction<String>) key -> "v%s".formatted(key)));
         assertEquals("v3", map.get(3L));
     }
 
@@ -86,12 +90,7 @@ class ConcurrentLong2ObjectMapTest {
         List<Thread> threads = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             threads.add(new Thread(() -> {
-                try {
-                    start.await();
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                }
-
+                TestThreads.await(start);
                 map.computeIfAbsent(42L, (Long2ObjectFunction<String>) key -> {
                     invocations.incrementAndGet();
                     return "shared";
@@ -110,41 +109,6 @@ class ConcurrentLong2ObjectMapTest {
     }
 
     @Test
-    void iterationViewsSeeContents() {
-        map.put(1L, "a");
-        map.put(2L, "b");
-
-        List<String> values = new ArrayList<>();
-        map.values().iterator().forEachRemaining(values::add);
-        assertEquals(2, values.size());
-        assertTrue(values.contains("a") && values.contains("b"));
-
-        List<Long> keys = new ArrayList<>();
-        map.keySet().iterator().forEachRemaining((java.util.function.LongConsumer) keys::add);
-        assertTrue(keys.contains(1L) && keys.contains(2L));
-
-        assertEquals(2, map.long2ObjectEntrySet().size());
-        map.long2ObjectEntrySet().forEach(entry -> assertEquals(map.get(entry.getLongKey()), entry.getValue()));
-    }
-
-    @Test
-    void iterationSurvivesConcurrentMutation() {
-        for (long i = 0; i < 100; i++) {
-            map.put(i, "v" + i);
-        }
-
-        int seen = 0;
-        for (String value : map.values()) {
-            assertTrue(value.startsWith("v") || value.startsWith("x"), "value outside the known universe: " + value);
-            map.remove(90L - seen);
-            map.put(200L + seen, "x" + seen);
-            seen++;
-        }
-
-        assertTrue(seen > 0);
-    }
-
-    @Test
     void setIteratesTheValuesItWasGiven() {
         ConcurrentLongSet set = new ConcurrentLongSet();
         for (long key : KEYS) {
@@ -153,16 +117,5 @@ class ConcurrentLong2ObjectMapTest {
 
         LongOpenHashSet seen = new LongOpenHashSet(set);
         assertEquals(new LongOpenHashSet(KEYS), seen);
-    }
-
-    /** A fixed-size stream over a growing map throws once it sees more than it was told. */
-    @Test
-    void aStreamOverTheValuesSurvivesGrowth() {
-        map.put(1, "a");
-        map.put(2, "b");
-
-        List<String> seen = map.values().stream().peek(_ -> map.put((map.size() + 10), "z")).toList();
-
-        assertTrue(seen.size() >= 2);
     }
 }

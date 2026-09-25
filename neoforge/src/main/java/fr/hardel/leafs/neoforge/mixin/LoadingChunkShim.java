@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-/** NeoForge lets a callback of the FULL body read the chunk being published; under Leafs only the thread publishing it, its owner, sees it. Priority 1100 to sit outside the read contract. */
+/** Priority 1100: wraps outside the Leafs chunk read contract. */
 @Mixin(value = ServerChunkCache.class, priority = 1100)
 public abstract class LoadingChunkShim {
     @Shadow

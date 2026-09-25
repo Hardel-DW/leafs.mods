@@ -5,10 +5,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.jspecify.annotations.NonNull;
 
-/** Swapped into the level's random field: resolves per call to the ticking region's random; a thread outside a region has its own, the server thread included. */
 public final class RoutingRandomSource implements RandomSource {
-    private static final ThreadLocal<RandomSource> OWN = ThreadLocal.withInitial(RandomSource::create);
-
+    private final ThreadLocal<RandomSource> own = ThreadLocal.withInitial(RandomSource::create);
     private final ServerLevel level;
 
     public RoutingRandomSource(ServerLevel level) {
@@ -17,7 +15,7 @@ public final class RoutingRandomSource implements RandomSource {
 
     private RandomSource resolve() {
         RegionWorldData data = WorldTickContext.activeFor(level);
-        return data == null ? OWN.get() : data.random();
+        return data == null ? own.get() : data.random();
     }
 
     @Override

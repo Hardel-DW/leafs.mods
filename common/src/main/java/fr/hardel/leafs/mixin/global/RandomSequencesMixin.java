@@ -9,7 +9,6 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.RandomSequences;
 import org.spongepowered.asm.mixin.Mixin;
 
-/** Loot rolls reach the sequences from every region; the map, the rolls and the save encode all take the instance monitor. */
 @Mixin(RandomSequences.class)
 public abstract class RandomSequencesMixin {
 

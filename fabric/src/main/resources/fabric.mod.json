@@ -18,8 +18,8 @@
 	},
 	"mixins": [
 		"leafs.mixins.json",
-		"compat.mixins.json",
-		"fabric.mixins.json"
+		"leafs.compat.mixins.json",
+		"leafs.fabric.mixins.json"
 	],
 	"breaks": {
 		"c2me": "*",
@@ -27,13 +27,12 @@
 		"vmp": "*"
 	},
 	"depends": {
-		"fabricloader": ">=0.19.3",
-		"minecraft": "~26.1",
+		"fabricloader": ">=0.19.5",
+		"minecraft": "${minecraft}",
 		"java": ">=25",
 		"fabric-api": "*",
 		"mapple": "*",
-		"scalablelux": "*",
-		"zfastnoise": "*"
+		"scalablelux": "${scalablelux}"
 	},
 	"custom": {
 		"lithium:options": {

@@ -1,13 +1,13 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
@@ -19,65 +19,83 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.LongFunction;
 
-/** ConcurrentHashMap-backed Long2ObjectMap over spread keys: lock-free reads, atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V> {
     private final ConcurrentHashMap<Long, V> map = new ConcurrentHashMap<>();
+    private final ConcurrentLongSet keys = new ConcurrentLongSet(map.keySet());
+    private final ConcurrentValues<V> values = new ConcurrentValues<>(map);
 
     @Override
     public V get(long key) {
-        V value = map.get(LongSpread.mix(key));
-        return value == null ? defaultReturnValue() : value;
+        return orDefault(map.get(HashCommon.mix(key)));
     }
 
     @Override
     public V put(long key, V value) {
-        V previous = map.put(LongSpread.mix(key), value);
-        return previous == null ? defaultReturnValue() : previous;
-    }
-
-    /** The value in place, or null when the key was free and the value stored. */
-    public V putIfAbsent(long key, V value) {
-        return map.putIfAbsent(LongSpread.mix(key), value);
+        return orDefault(map.put(HashCommon.mix(key), value));
     }
 
     @Override
     public V remove(long key) {
-        V previous = map.remove(LongSpread.mix(key));
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.remove(HashCommon.mix(key)));
     }
 
+    @Override
+    public V putIfAbsent(long key, V value) {
+        return orDefault(map.putIfAbsent(HashCommon.mix(key), value));
+    }
+
+    @Override
     public boolean remove(long key, Object value) {
-        return map.remove(LongSpread.mix(key), value);
+        return map.remove(HashCommon.mix(key), value);
     }
 
     @Override
-    public V computeIfAbsent(long key, LongFunction<? extends V> mappingFunction) {
-        return map.computeIfAbsent(LongSpread.mix(key), _ -> mappingFunction.apply(key));
+    public boolean replace(long key, V oldValue, V newValue) {
+        return map.replace(HashCommon.mix(key), oldValue, newValue);
     }
 
     @Override
-    public V computeIfAbsent(long key, Long2ObjectFunction<? extends V> mappingFunction) {
-        V existing = get(key);
-        if (existing != null) {
-            return existing;
-        }
-
-        if (!mappingFunction.containsKey(key)) {
-            return defaultReturnValue();
-        }
-
-        return map.computeIfAbsent(LongSpread.mix(key), _ -> mappingFunction.get(key));
+    public V replace(long key, V value) {
+        return orDefault(map.replace(HashCommon.mix(key), value));
     }
 
-    /** Atomic read-modify-write of one key; a null result removes it. */
     @Override
-    public V compute(long key, BiFunction<? super Long, ? super V, ? extends V> remappingFunction) {
-        return map.compute(LongSpread.mix(key), (_, value) -> remappingFunction.apply(key, value));
+    public V computeIfAbsent(long key, LongFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(HashCommon.mix(key), _ -> mapping.apply(key)));
+    }
+
+    @Override
+    public V computeIfAbsent(long key, Long2ObjectFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(HashCommon.mix(key), _ -> mapping.get(key)));
+    }
+
+    @Override
+    public V computeIfPresent(long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
+        return orDefault(map.computeIfPresent(HashCommon.mix(key), (_, value) -> remapping.apply(key, value)));
+    }
+
+    @Override
+    public V compute(long key, BiFunction<? super Long, ? super V, ? extends V> remapping) {
+        return orDefault(map.compute(HashCommon.mix(key), (_, value) -> remapping.apply(key, value)));
+    }
+
+    @Override
+    public V merge(long key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return orDefault(map.merge(HashCommon.mix(key), value, remapping));
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super Long, ? super V, ? extends V> function) {
+        map.replaceAll((mixed, value) -> function.apply(HashCommon.invMix(mixed), value));
+    }
+
+    private V orDefault(V value) {
+        return value == null ? defaultReturnValue() : value;
     }
 
     @Override
     public boolean containsKey(long key) {
-        return map.containsKey(LongSpread.mix(key));
+        return map.containsKey(HashCommon.mix(key));
     }
 
     @Override
@@ -101,34 +119,13 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
     }
 
     @Override
+    public @NonNull LongSet keySet() {
+        return keys;
+    }
+
+    @Override
     public @NonNull ObjectCollection<V> values() {
-        return new AbstractObjectCollection<>() {
-            @Override
-            public @NonNull ObjectIterator<V> iterator() {
-                return ObjectIterators.asObjectIterator(map.values().iterator());
-            }
-
-            /** A stream must not trust a size the map outgrows while it runs. */
-            @Override
-            public @NonNull ObjectSpliterator<V> spliterator() {
-                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
-            }
-
-            @Override
-            public int size() {
-                return map.size();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-                return map.containsValue(value);
-            }
-
-            @Override
-            public void clear() {
-                map.clear();
-            }
-        };
+        return values;
     }
 
     @Override
@@ -146,7 +143,7 @@ public final class ConcurrentLong2ObjectMap<V> extends AbstractLong2ObjectMap<V>
                     @Override
                     public Long2ObjectMap.Entry<V> next() {
                         Map.Entry<Long, V> entry = backing.next();
-                        return new BasicEntry<>(LongSpread.unmix(entry.getKey()), entry.getValue());
+                        return new BasicEntry<>(HashCommon.invMix(entry.getKey()), entry.getValue());
                     }
                 };
             }

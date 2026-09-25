@@ -15,6 +15,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -22,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** Server-side region introspection: a per-dimension overview, per-region detail behind a dimension argument. */
 public final class RegionsCommand {
 
     private RegionsCommand() {
@@ -57,7 +57,7 @@ public final class RegionsCommand {
     private static Component overviewLine(LevelTickUnit unit, long now) {
         List<Region<RegionTickData>> live = liveRegions(unit.regions());
         MutableComponent line = Component.empty()
-            .append(Component.literal(CommandText.shortDimension(unit.dimension())).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal(Identifier.parse(unit.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("regions", live.size()))
             .append(CommandText.stat("chunks", unit.chunkCount()))
             .append(CommandText.stat("entities", unit.entityCount()))
@@ -77,7 +77,7 @@ public final class RegionsCommand {
         }
 
         if (slowest != null) {
-            line.append(CommandText.stat("slowest", CommandText.white("R#" + slowest.id()))).append(CommandText.sep()).append(CommandText.tps(slowestTps));
+            line.append(CommandText.stat("slowest", CommandText.white("R#%s".formatted(slowest.id())))).append(CommandText.sep()).append(CommandText.tps(slowestTps));
         }
 
         return line;
@@ -88,7 +88,7 @@ public final class RegionsCommand {
         List<Region<RegionTickData>> live = liveRegions(regions);
         long now = System.nanoTime();
         source.sendSuccess(() -> Component.empty()
-            .append(Component.literal(CommandText.shortDimension(level.dimension().identifier().toString())).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal(level.dimension().identifier().toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.stat("regions", live.size()))
             .append(CommandText.stat("sections", regions.sections())).append(CommandText.gray(" (%d dead)".formatted(regions.deadSections())))
             .append(CommandText.stat("created", regions.created()))
@@ -101,18 +101,10 @@ public final class RegionsCommand {
             : regions.regionizer().regionAt(player.chunkPosition().x(), player.chunkPosition().z());
 
         for (Region<RegionTickData> region : live) {
-            RegionTickHandle handle = region.data().handle();
             MutableComponent line = Component.empty()
-                .append(CommandText.sep()).append(CommandText.white("R#" + region.id()))
+                .append(CommandText.sep()).append(CommandText.white("R#%s".formatted(region.id())))
                 .append(CommandText.sep()).append(state(region.state()));
-            if (handle != null && !handle.isCancelled()) {
-                line.append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now)))
-                    .append(CommandText.stat("chunks", handle.chunkCount()))
-                    .append(CommandText.stat("entities", handle.entityCount()));
-            } else {
-                line.append(CommandText.stat("chunks", region.chunkCount()));
-            }
-
+            appendLoad(line, region, now);
             if (region == playerRegion) {
                 line.append(CommandText.sep()).append(Component.literal("<- you").withStyle(ChatFormatting.GOLD));
             }
@@ -121,6 +113,18 @@ public final class RegionsCommand {
         }
 
         return live.size();
+    }
+
+    private static void appendLoad(MutableComponent line, Region<RegionTickData> region, long now) {
+        RegionTickHandle handle = region.data().handle();
+        if (handle == null || handle.isCancelled()) {
+            line.append(CommandText.stat("chunks", region.chunkCount()));
+            return;
+        }
+
+        line.append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now)))
+            .append(CommandText.stat("chunks", handle.chunkCount()))
+            .append(CommandText.stat("entities", handle.entityCount()));
     }
 
     private static void playerLine(CommandSourceStack source, long now) {
@@ -138,8 +142,8 @@ public final class RegionsCommand {
 
         source.sendSuccess(() -> Component.empty()
             .append(Component.literal("You ").withStyle(ChatFormatting.GOLD))
-            .append(CommandText.white("R#" + handle.id()))
-            .append(CommandText.gray(" in ")).append(Component.literal(CommandText.shortDimension(handle.dimension())).withStyle(ChatFormatting.AQUA))
+            .append(CommandText.white("R#%s".formatted(handle.id())))
+            .append(CommandText.gray(" in ")).append(Component.literal(Identifier.parse(handle.dimension()).toShortString()).withStyle(ChatFormatting.AQUA))
             .append(CommandText.sep()).append(CommandText.rate(handle.stages().sample(now))), false);
     }
 

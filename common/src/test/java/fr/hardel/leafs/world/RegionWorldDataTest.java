@@ -19,18 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RegionWorldDataTest {
 
     private static RegionWorldData worldData(AtomicLong clock) {
-        return new RegionWorldData(clock::get, RandomSource.create(), null, new PathTypeCache(), 0L);
+        return new RegionWorldData(clock::get, RandomSource.create(), null, new PathTypeCache());
     }
 
-    @Test
-    void inhabitedTimeAdvancesByGlobalDelta() {
-        RegionWorldData data = worldData(new AtomicLong());
-        assertEquals(0, data.advanceInhabitedTime(0));
-        assertEquals(7, data.advanceInhabitedTime(7));
-        assertEquals(3, data.advanceInhabitedTime(10));
-    }
-
-    /** A delay lands on the region clock, never on game time, and the sub-tick counter orders same-tick schedules. */
     @Test
     void aTickIsCreatedOnTheRegionClockInSchedulingOrder() {
         RegionWorldData data = worldData(new AtomicLong(40));

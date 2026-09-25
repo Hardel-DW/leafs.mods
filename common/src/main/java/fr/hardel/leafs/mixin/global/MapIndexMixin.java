@@ -7,7 +7,6 @@ import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapIndex;
 import org.spongepowered.asm.mixin.Mixin;
 
-/** The #26b counter half: two regions crafting maps must never mint the same id. */
 @Mixin(MapIndex.class)
 public abstract class MapIndexMixin {
 

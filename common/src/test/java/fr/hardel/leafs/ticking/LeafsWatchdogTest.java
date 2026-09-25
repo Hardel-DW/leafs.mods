@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.LeafsConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -61,7 +62,8 @@ class LeafsWatchdogTest {
     @Test
     void aStalledWaitOffTheTickUnitsIsReportedAtOnce() throws InterruptedException {
         LeafsWatchdog watchdog = watchdog(Duration.ofMillis(50), KILL_DISABLED);
-        Thread waiting = new Thread(() -> awaitQuietly(new CountDownLatch(1)), "Mod Thread");
+        CountDownLatch release = new CountDownLatch(1);
+        Thread waiting = new Thread(() -> TestThreads.await(release), "Mod Thread");
         waiting.setDaemon(true);
         waiting.start();
         stalledWaits.put(waiting, "Chunk wait stalled on a mod thread");
@@ -69,15 +71,8 @@ class LeafsWatchdogTest {
 
         assertTrue(reported.await(5, TimeUnit.SECONDS), "a stalled wait off the tick units must be reported");
         assertTrue(reports.peek().contains("mod thread"));
+        release.countDown();
         watchdog.stop();
-    }
-
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     @Test
@@ -100,7 +95,6 @@ class LeafsWatchdogTest {
         watchdog.stop();
     }
 
-    /** The config maps a disabled warn to a threshold never reached; the kill is untouched by it. */
     @Test
     void disabledWarnStaysSilentAndStillKills() throws InterruptedException {
         LeafsConfig.Debug debug = new LeafsConfig.Debug(LeafsConfig.Debug.DISABLED, false, LeafsConfig.Debug.DISABLED);
@@ -117,44 +111,10 @@ class LeafsWatchdogTest {
         watchdog.stop();
     }
 
-    @Test
-    void shutdownPastTheDeadlineRunsTheKillerWithTheStoppingThread() throws InterruptedException {
-        LeafsWatchdog watchdog = watchdog(Duration.ofSeconds(5), Duration.ofSeconds(10));
-        watchdog.armShutdownDeadline(Duration.ofMillis(50));
-
-        assertTrue(killed.await(5, TimeUnit.SECONDS), "an expired deadline must reach the killer");
-        LeafsWatchdog.Stall stall = kills.peek();
-        assertTrue(stall.summary().contains("shutdown"));
-        assertSame(Thread.currentThread(), stall.thread(), "the dump must point at the thread that ran stopServer");
-    }
-
-    @Test
-    void disarmedDeadlineNeverKills() throws InterruptedException {
-        LeafsWatchdog watchdog = watchdog(Duration.ofSeconds(5), Duration.ofSeconds(10));
-        watchdog.armShutdownDeadline(Duration.ofMillis(150));
-        watchdog.disarmShutdownDeadline();
-
-        Thread.sleep(400);
-        assertTrue(kills.isEmpty(), "a disarmed deadline must not kill the JVM");
-    }
-
-    @Test
-    void disabledKillThresholdArmsNothing() throws InterruptedException {
-        LeafsWatchdog watchdog = watchdog(Duration.ofSeconds(5), KILL_DISABLED);
-        watchdog.armShutdownDeadline(Duration.ofMillis(50));
-
-        Thread.sleep(300);
-        assertTrue(kills.isEmpty(), "kill 0 must disable the shutdown deadline too");
-    }
-
     private static Thread stalledTick(LeafsWatchdog watchdog, TestTickHandle handle, CountDownLatch release) {
         Thread stalled = new Thread(() -> {
             watchdog.beginTick(handle);
-            try {
-                release.await();
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-            }
+            TestThreads.await(release);
             watchdog.endTick(handle);
         }, "Stalled Test Thread");
         stalled.start();

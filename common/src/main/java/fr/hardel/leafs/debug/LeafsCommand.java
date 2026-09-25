@@ -4,7 +4,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 
-/** The {@code /leafs} root: every mod command mounts under it, gamemaster permission for all. */
 public final class LeafsCommand {
 
     private LeafsCommand() {

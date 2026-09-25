@@ -2,18 +2,12 @@ package fr.hardel.leafs.chunk.holder;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.Leafs;
-import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.pool.ChunkTask.Kind;
-import fr.hardel.leafs.metrics.ServerMetrics;
-import net.minecraft.CrashReport;
-import net.minecraft.server.level.ChunkGenerationTask;
-import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.util.StaticCache2D;
-import net.minecraft.util.thread.BlockableEventLoop;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -21,79 +15,33 @@ import net.minecraft.world.level.chunk.status.ChunkStep;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-
-/** Vanilla's generation on the pool: each step reserves the radius it writes, placed at the chunk it writes and the centre it serves, and leaves the queue when its status is no longer allowed. */
 public final class GenerationSteps {
-    private static final long[] NO_RESERVATION = {};
     private static final int STATUSES = ChunkStatus.getStatusList().size();
-    private static final RuntimeException CANCELLED = new RuntimeException("Step cancelled in the queue", null, false, false) {
-    };
+    public static final RuntimeException CANCELLED = new CancelledStep();
 
-    private final ChunkMap chunkMap;
     private final ChunkPool pool;
-    private final ChunkOwners owners;
-    private final ServerMetrics metrics;
+    private final ChunkPlacement placement;
     private final ConcurrentLong2ObjectMap<StepTask[]> queued = new ConcurrentLong2ObjectMap<>();
 
-    public GenerationSteps(ChunkMap chunkMap, ChunkPool pool, ChunkOwners owners, ServerMetrics metrics) {
-        this.chunkMap = chunkMap;
+    public GenerationSteps(ChunkPool pool, ChunkPlacement placement) {
         this.pool = pool;
-        this.owners = owners;
-        this.metrics = metrics;
+        this.placement = placement;
     }
 
-    /** A new task starts at the urgency of its centre. */
-    public void run(ChunkGenerationTask task) {
-        ChunkPos pos = task.getCenter().getPos();
-        pool.submit(ChunkTask.of(Kind.STEP, owners.place(pos.x(), pos.z(), pos.x(), pos.z()), NO_RESERVATION, () -> drive(task)));
+    public void run(Runnable task, long chunkKey) {
+        int chunkX = ChunkPos.getX(chunkKey);
+        int chunkZ = ChunkPos.getZ(chunkKey);
+        pool.submit(ChunkTask.of(Kind.STEP, placement.place(chunkX, chunkZ, chunkX, chunkZ), ChunkTask.NO_RESERVATION, task));
     }
 
-    /** A layer done, the task schedules the next one or releases its claims on 289 holders: a continuation, so it heads the pool like every continuation. */
-    private void drive(ChunkGenerationTask task) {
-        CompletableFuture<?> waiting = task.runUntilWait();
-        if (waiting != null) {
-            waiting.thenRun(() -> pool.execute(() -> drive(task)));
-        }
-    }
-
-    /** Vanilla's application of a step on its holder, with one more outcome: a step cancelled in the queue leaves the holder as if the status had been refused, its start mark erased. */
-    public CompletableFuture<ChunkResult<ChunkAccess>> applyOnHolder(GenerationChunkHolder holder, ChunkStep step, StaticCache2D<GenerationChunkHolder> cache) {
-        ChunkStatus status = step.targetStatus();
-        if (holder.isStatusDisallowed(status)) {
-            return GenerationChunkHolder.UNLOADED_CHUNK_FUTURE;
-        }
-
-        if (!holder.acquireStatusBump(status)) {
-            return holder.getOrCreateFuture(status);
-        }
-
-        return chunkMap.applyStep(holder, step, cache).handle((chunk, failure) -> {
-            Throwable cause = failure instanceof CompletionException wrapped ? wrapped.getCause() : failure;
-            if (cause == CANCELLED) {
-                holder.startedWork.compareAndSet(status, status == ChunkStatus.EMPTY ? null : status.getParent());
-                return GenerationChunkHolder.UNLOADED_CHUNK;
-            }
-
-            if (cause != null) {
-                BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(cause, "Exception chunk generation/loading"));
-            } else {
-                holder.completeFuture(status, chunk);
-            }
-
-            return ChunkResult.of(chunk);
-        });
-    }
-
-    /** The body is the wrapped call of {@code ChunkStep.apply}, so what another mod wraps around it runs on the pool too. */
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
         ChunkPos pos = chunk.getPos();
-        ChunkTask.Place place = owners.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
-        StepTask task = new StepTask(place, owners.area(Kind.STEP, pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
+        ChunkTask.Place place = placement.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
+        StepTask task = new StepTask(place, placement.area(Kind.STEP, pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
         queued.compute(pos.pack(), (_, slots) -> {
             StepTask[] target = slots == null ? new StepTask[STATUSES] : slots;
             target[step.targetStatus().getIndex()] = task;
@@ -103,7 +51,6 @@ public final class GenerationSteps {
         return task.result;
     }
 
-    /** The level dropped: every step still queued for a status the holder no longer allows leaves the pool. */
     public void cancelDisallowed(GenerationChunkHolder holder) {
         StepTask[] slots = queued.get(holder.getPos().pack());
         if (slots == null) {
@@ -118,7 +65,7 @@ public final class GenerationSteps {
     }
 
     public Executor loading(ChunkPos pos) {
-        return task -> owners.onPool(Kind.STEP, pos.x(), pos.z(), 0, task);
+        return task -> placement.onPool(Kind.STEP, pos.x(), pos.z(), 0, task);
     }
 
     private void forget(StepTask task) {
@@ -142,7 +89,6 @@ public final class GenerationSteps {
         });
     }
 
-    /** One step of one chunk in the pool: taken once, by its run or by its cancellation. */
     private final class StepTask extends ChunkTask {
         private final ChunkStep step;
         private final ChunkAccess chunk;
@@ -164,7 +110,6 @@ public final class GenerationSteps {
             }
 
             forget(this);
-            metrics.stepRan(step.targetStatus());
             CompletableFuture<ChunkAccess> applied;
             try {
                 applied = body.get();
@@ -174,11 +119,12 @@ public final class GenerationSteps {
             }
 
             applied.whenComplete((generated, failure) -> {
-                if (failure == null) {
-                    result.complete(generated);
-                } else {
+                if (failure != null) {
                     fail(failure);
+                    return;
                 }
+
+                result.complete(generated);
             });
             return applied;
         }
@@ -191,10 +137,15 @@ public final class GenerationSteps {
             }
         }
 
-        /** Vanilla keeps a failed step for the server thread's next loop, which may be the one waiting: logged here. */
         private void fail(Throwable failure) {
             Leafs.LOGGER.error("Step {} of chunk {} failed", step.targetStatus(), chunk.getPos(), failure);
             result.completeExceptionally(failure);
+        }
+    }
+
+    private static final class CancelledStep extends RuntimeException {
+        private CancelledStep() {
+            super("Step cancelled in the queue", null, false, false);
         }
     }
 }

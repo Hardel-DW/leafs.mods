@@ -6,7 +6,6 @@ import net.minecraft.world.entity.ai.village.poi.PoiType;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-/** Fabric defers vanilla's registry freeze to mod initialisation, which no test runs: the point of interest registry gets its tags and its freeze here, once, after the bootstrap. */
 public final class FabricRegistryFreeze implements BeforeAllCallback {
 
     static {

@@ -8,7 +8,6 @@ import net.minecraft.world.level.TicketStorage;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The waiters per chunk and level. Vanilla merges equal tickets, so the first waiter posts the ticket and the last removes it, inside the count's own atomic step. */
 public final class Demands {
     private record Key(long chunkKey, int level) {}
     private final TicketStorage tickets;
@@ -42,7 +41,6 @@ public final class Demands {
         });
     }
 
-    /** Whether a demanded chunk lies within vanilla's radius of this one: what the pool serves first. */
     public boolean near(int chunkX, int chunkZ) {
         for (Key key : waiters.keySet()) {
             int distance = Math.max(Math.abs(ChunkPos.getX(key.chunkKey()) - chunkX), Math.abs(ChunkPos.getZ(key.chunkKey()) - chunkZ));

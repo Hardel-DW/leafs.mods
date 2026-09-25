@@ -27,7 +27,6 @@ import java.util.function.ToIntFunction;
 public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, int regionMergeDistance, int regionBufferDistance, Debug debug, Gameplay gameplay) {
     public static final int ALL_CORES = -1;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static LeafsConfig instance;
     private static Path file;
 
     public record Debug(int watchdogWarnSeconds, boolean perRegionLogs, int slowTaskWarnMillis) {
@@ -99,7 +98,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     private static Codec<Integer> threads(Setting setting) {
         return atMost(setting.key(), 1024, "negative uses all cores")
             .validate(value -> value == 0
-                ? DataResult.error(() -> setting.key() + " 0 is invalid: negative uses all cores")
+                ? DataResult.error(() -> "%s 0 is invalid: negative uses all cores".formatted(setting.key()))
                 : DataResult.success(value));
     }
 
@@ -110,7 +109,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
 
     private static Codec<Integer> atMost(String key, int max, String negative) {
         return Codec.INT.validate(value -> value > max
-            ? DataResult.error(() -> key + " must be at most " + max + ", " + negative)
+            ? DataResult.error(() -> "%s must be at most %s, %s".formatted(key, max, negative))
             : DataResult.success(value));
     }
 
@@ -140,6 +139,8 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         GAMEPLAY.codec().optionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
     ).apply(builder, LeafsConfig::new));
 
+    private static LeafsConfig instance = defaults();
+
     private static Map<MobCategory, Integer> vanillaMobCaps() {
         Map<MobCategory, Integer> caps = new EnumMap<>(MobCategory.class);
         for (MobCategory category : MobCategory.values()) {
@@ -157,16 +158,10 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
             new ServerProperties(gameDir.resolve("server.properties")).set("sync-chunk-writes", "false");
         }
 
-
         instance = load(file);
     }
 
-
     public static LeafsConfig get() {
-        if (instance == null) {
-            throw new IllegalStateException("Leafs config accessed before mod initialisation");
-        }
-
         return instance;
     }
 
@@ -178,14 +173,14 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         return Files.notExists(file) ? write(file, defaults()) : parse(file, read(file));
     }
 
-    public static LeafsConfig rewrite(Setting setting, int value) {
-        return rewrite(file, setting, value);
+    public static void rewrite(Setting setting, int value) {
+        rewrite(file, setting, value);
     }
 
-    static LeafsConfig rewrite(Path file, Setting setting, int value) {
+    static void rewrite(Path file, Setting setting, int value) {
         JsonObject json = read(file).getAsJsonObject();
         json.addProperty(setting.key(), value);
-        return write(file, parse(file, json));
+        write(file, parse(file, json));
     }
 
     public int effectiveRegionThreads() {
@@ -213,16 +208,16 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     private static LeafsConfig parse(Path file, JsonElement json) {
-        return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config " + file + " is invalid: " + error));
+        return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config %s is invalid: %s".formatted(file, error)));
     }
 
     private static JsonElement read(Path file) {
         try {
             return JsonParser.parseString(Files.readString(file));
         } catch (JsonParseException exception) {
-            throw new IllegalArgumentException("Config " + file + " is not valid JSON", exception);
+            throw new IllegalArgumentException("Config %s is not valid JSON".formatted(file), exception);
         } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to read " + file, exception);
+            throw new UncheckedIOException("Unable to read %s".formatted(file), exception);
         }
     }
 
@@ -231,7 +226,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
             Files.createDirectories(file.getParent());
             Files.writeString(file, GSON.toJson(encode(config)) + System.lineSeparator());
         } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to write " + file, exception);
+            throw new UncheckedIOException("Unable to write %s".formatted(file), exception);
         }
 
         return config;

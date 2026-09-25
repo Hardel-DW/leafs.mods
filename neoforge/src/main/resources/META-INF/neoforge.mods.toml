@@ -15,7 +15,7 @@ Regionised multithreading for the dedicated server: the world is cut into indepe
 [[dependencies.leafs]]
 modId = "minecraft"
 type = "required"
-versionRange = "${minecraft_range}"
+versionRange = "${minecraft}"
 ordering = "NONE"
 side = "BOTH"
 
@@ -29,15 +29,8 @@ side = "BOTH"
 [[dependencies.leafs]]
 modId = "scalablelux"
 type = "required"
-versionRange = "*"
+versionRange = "${scalablelux}"
 ordering = "BEFORE"
-side = "BOTH"
-
-[[dependencies.leafs]]
-modId = "zfastnoise"
-type = "required"
-versionRange = "*"
-ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.leafs]]
@@ -59,10 +52,10 @@ versionRange = "*"
 config = "leafs.mixins.json"
 
 [[mixins]]
-config = "compat.mixins.json"
+config = "leafs.compat.mixins.json"
 
 [[mixins]]
-config = "neoforge.mixins.json"
+config = "leafs.neoforge.mixins.json"
 
 ["lithium:options"]
 "mixin.ai.poi" = false

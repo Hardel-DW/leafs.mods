@@ -16,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WaypointRowTest {
 
-    /** A transmitter that only serves as a cell key. */
     private static final class Beacon implements WaypointTransmitter {
         @Override
         public boolean isTransmittingWaypoint() {
@@ -34,7 +33,6 @@ class WaypointRowTest {
         }
     }
 
-    /** Records its life in the journal; {@code broken} decides what the next update does with it. */
     private static final class Link implements Connection {
         private final List<String> journal;
         private final String name;
@@ -47,17 +45,17 @@ class WaypointRowTest {
 
         @Override
         public void connect() {
-            journal.add(name + " connect");
+            journal.add("%s connect".formatted(name));
         }
 
         @Override
         public void disconnect() {
-            journal.add(name + " disconnect");
+            journal.add("%s disconnect".formatted(name));
         }
 
         @Override
         public void update() {
-            journal.add(name + " update");
+            journal.add("%s update".formatted(name));
         }
 
         @Override

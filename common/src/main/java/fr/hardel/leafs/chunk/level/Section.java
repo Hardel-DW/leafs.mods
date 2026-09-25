@@ -9,7 +9,6 @@ import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** 64 by 64 chunks of one graph: the settled levels, the sources, and the source changes not yet propagated. Exists while a level does, retired once empty. */
 final class Section {
     static final int SHIFT = 6;
     static final int SIZE = 1 << SHIFT;
@@ -37,10 +36,9 @@ final class Section {
     }
 
     static long keyOf(int chunkX, int chunkZ) {
-        return ((chunkX >> SHIFT) & 0xFFFFFFFFL) | (((long) (chunkZ >> SHIFT) & 0xFFFFFFFFL) << 32);
+        return ChunkPos.pack(chunkX >> SHIFT, chunkZ >> SHIFT);
     }
 
-    /** Last write wins until the next drain takes the batch. False once retired: the writer asks the graph for the section again. */
     boolean post(int index, int level) {
         synchronized (pending) {
             if (retired) {
@@ -60,7 +58,6 @@ final class Section {
         }
     }
 
-    /** Under the drain's locks, once its levels are all gone: nothing pending and nothing queued, or a source posted meanwhile would be lost. */
     boolean retire() {
         synchronized (pending) {
             if (occupied > 0 || !pending.isEmpty() || queued.get()) {
@@ -77,8 +74,8 @@ final class Section {
     }
 
     void forEachAtMost(int level, LongConsumer consumer) {
-        int originX = (int) key << SHIFT;
-        int originZ = (int) (key >> 32) << SHIFT;
+        int originX = ChunkPos.getX(key) << SHIFT;
+        int originZ = ChunkPos.getZ(key) << SHIFT;
         for (int index = 0; index < levels.length; index++) {
             if (level(index) <= level) {
                 consumer.accept(ChunkPos.pack(originX + (index & MASK), originZ + (index >> SHIFT)));

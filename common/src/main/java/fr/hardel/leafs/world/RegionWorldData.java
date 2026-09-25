@@ -14,7 +14,6 @@ import net.minecraft.world.ticks.TickPriority;
 
 import java.util.function.LongSupplier;
 
-/** What a region carries between ticks: its clock's view, its random, its updaters, and the two photos it retakes every tick. Nothing here moves on a merge or a split. */
 public final class RegionWorldData {
     private final LongSupplier time;
     private final RandomSource random;
@@ -26,19 +25,17 @@ public final class RegionWorldData {
     private final RegionEntities entities = new RegionEntities();
     private volatile MobCensus census = MobCensus.EMPTY;
     private long subTick;
-    private long lastInhabitedUpdate;
     private long savedEpoch;
 
-    public RegionWorldData(LongSupplier time, RandomSource random, CollectingNeighborUpdater neighborUpdater, PathTypeCache pathTypeCache, long inhabitedFrom) {
+    public RegionWorldData(LongSupplier time, RandomSource random, CollectingNeighborUpdater neighborUpdater, PathTypeCache pathTypeCache) {
         this.time = time;
         this.random = random;
         this.neighborUpdater = neighborUpdater;
         this.pathTypeCache = pathTypeCache;
-        this.lastInhabitedUpdate = inhabitedFrom;
     }
 
     public static RegionWorldData regional(ServerLevel level, LongSupplier time) {
-        return new RegionWorldData(time, RandomSource.create(), new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), new PathTypeCache(), level.getGameTime());
+        return new RegionWorldData(time, RandomSource.create(), new CollectingNeighborUpdater(level, level.getServer().getMaxChainedNeighborUpdates()), new PathTypeCache());
     }
 
     public long currentTick() {
@@ -81,7 +78,6 @@ public final class RegionWorldData {
         this.census = census;
     }
 
-    /** Vanilla's shape on the region clock; the sub-tick counter keeps the drain order deterministic within a tick. */
     public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
         return new ScheduledTick<>(type, pos, currentTick() + delay, priority, subTick++);
     }
@@ -90,7 +86,6 @@ public final class RegionWorldData {
         return new ScheduledTick<>(type, pos, currentTick() + delay, subTick++);
     }
 
-    /** The autosave epoch every chunk of the region has reached; the walk that found them all done set it. */
     public long savedEpoch() {
         return savedEpoch;
     }
@@ -99,14 +94,7 @@ public final class RegionWorldData {
         savedEpoch = epoch;
     }
 
-    /** Chunks joined the region: the next pass walks them. */
     public void forgetEpoch() {
         savedEpoch = Long.MIN_VALUE;
-    }
-
-    public long advanceInhabitedTime(long gameTime) {
-        long delta = gameTime - lastInhabitedUpdate;
-        lastInhabitedUpdate = gameTime;
-        return delta;
     }
 }

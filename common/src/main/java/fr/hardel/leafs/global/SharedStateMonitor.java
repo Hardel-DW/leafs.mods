@@ -2,7 +2,6 @@ package fr.hardel.leafs.global;
 
 import java.util.function.Supplier;
 
-/** Serializes server-global state (scoreboard, saved data, maps, sequences) across region workers and the global phase. */
 public final class SharedStateMonitor {
 
     private SharedStateMonitor() {

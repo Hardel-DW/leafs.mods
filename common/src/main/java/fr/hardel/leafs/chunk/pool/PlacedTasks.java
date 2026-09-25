@@ -6,7 +6,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-/** The placed tasks still waiting in the pool, under the chunk they write and the centre they serve. */
 final class PlacedTasks {
     private final ConcurrentLong2ObjectMap<Set<ChunkTask>> byChunk = new ConcurrentLong2ObjectMap<>();
 

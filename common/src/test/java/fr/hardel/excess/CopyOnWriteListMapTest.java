@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 2026-08-30: Lithium overwrites ClassInstanceMultiMap.find, so the class lists must become copy-on-write in the map, never at a call site inside find. */
 class CopyOnWriteListMapTest {
@@ -24,5 +26,13 @@ class CopyOnWriteListMapTest {
         assertSame(base, map.get("base"), "the base list is the one the owner appends to, its identity must survive the put");
         assertInstanceOf(CopyOnWriteArrayList.class, map.get("plain"));
         assertInstanceOf(CopyOnWriteArrayList.class, map.get("computed"));
+    }
+
+    @Test
+    void aNullMappingStoresNothing() {
+        CopyOnWriteListMap<String, Integer> map = new CopyOnWriteListMap<>();
+
+        assertNull(map.computeIfAbsent("absent", _ -> null));
+        assertTrue(map.isEmpty());
     }
 }

@@ -15,7 +15,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-/** Vanilla's FULL body stays whole and runs on the chunk's owner instead of the main thread, so what the loaders patched into it runs there too. */
 @Mixin(ChunkStatusTasks.class)
 public abstract class ChunkStatusTasksMixin {
 

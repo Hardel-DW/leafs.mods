@@ -1,30 +1,43 @@
 package fr.hardel.excess;
 
+import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongIterators;
+import it.unimi.dsi.fastutil.longs.LongSpliterator;
+import it.unimi.dsi.fastutil.longs.LongSpliterators;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Set;
+import java.util.Spliterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** LongSet over a ConcurrentHashMap key set of spread keys: atomic membership, weakly consistent iteration, boxing accepted. */
 public final class ConcurrentLongSet extends AbstractLongSet {
-    private final Set<Long> set = ConcurrentHashMap.newKeySet();
+    private final Set<Long> set;
+
+    public ConcurrentLongSet() {
+        this(ConcurrentHashMap.newKeySet());
+    }
+
+    ConcurrentLongSet(Set<Long> mixedKeys) {
+        this.set = mixedKeys;
+    }
 
     @Override
     public boolean add(long value) {
-        return set.add(LongSpread.mix(value));
+        return set.add(HashCommon.mix(value));
     }
 
     @Override
     public boolean remove(long value) {
-        return set.remove(LongSpread.mix(value));
+        return set.remove(HashCommon.mix(value));
     }
 
     @Override
     public boolean contains(long value) {
-        return set.contains(LongSpread.mix(value));
+        return set.contains(HashCommon.mix(value));
     }
 
     @Override
@@ -53,7 +66,7 @@ public final class ConcurrentLongSet extends AbstractLongSet {
 
             @Override
             public long nextLong() {
-                return LongSpread.unmix(backing.next());
+                return HashCommon.invMix(backing.next());
             }
 
             @Override
@@ -61,5 +74,20 @@ public final class ConcurrentLongSet extends AbstractLongSet {
                 backing.remove();
             }
         };
+    }
+
+    @Override
+    public @NonNull LongSpliterator spliterator() {
+        return LongSpliterators.asSpliteratorUnknownSize(iterator(), Spliterator.DISTINCT);
+    }
+
+    @Override
+    public long[] toLongArray() {
+        return LongIterators.unwrap(iterator());
+    }
+
+    @Override
+    public long[] toArray(long[] array) {
+        return new LongArrayList(iterator()).toArray(array);
     }
 }

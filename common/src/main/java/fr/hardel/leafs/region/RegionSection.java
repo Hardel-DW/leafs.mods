@@ -1,19 +1,17 @@
 package fr.hardel.leafs.region;
 
-/** One section of 2^shift chunks a side. The bits are the chunks that tick; every position of the section is owned. Bits are single-writer, the rest is under the regionizer's write lock. */
+import java.util.function.LongConsumer;
+
 final class RegionSection<R> {
     private final long key;
-    private final int indexShift;
-    private final long[] chunkBits;
+    private final int sectionShift;
     private int chunkCount;
     private int nonEmptyNeighbours;
     private volatile Region<R> region;
 
     RegionSection(long key, int sectionShift, int nonEmptyNeighbours) {
-        int chunksPerSection = 1 << (2 * sectionShift);
         this.key = key;
-        this.indexShift = sectionShift;
-        this.chunkBits = new long[(chunksPerSection + 63) >>> 6];
+        this.sectionShift = sectionShift;
         this.nonEmptyNeighbours = nonEmptyNeighbours;
     }
 
@@ -29,25 +27,11 @@ final class RegionSection<R> {
         return chunkCount;
     }
 
-    void addChunk(int chunkX, int chunkZ) {
-        int index = bitIndex(chunkX, chunkZ);
-        long bit = 1L << (index & 63);
-        if ((chunkBits[index >>> 6] & bit) != 0L) {
-            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] is already registered in section " + CoordinateKey.describe(key));
-        }
-
-        chunkBits[index >>> 6] |= bit;
+    void addChunk() {
         chunkCount++;
     }
 
-    void removeChunk(int chunkX, int chunkZ) {
-        int index = bitIndex(chunkX, chunkZ);
-        long bit = 1L << (index & 63);
-        if ((chunkBits[index >>> 6] & bit) == 0L) {
-            throw new IllegalStateException("Chunk [" + chunkX + ", " + chunkZ + "] is not registered in section " + CoordinateKey.describe(key));
-        }
-
-        chunkBits[index >>> 6] &= ~bit;
+    void removeChunk() {
         chunkCount--;
     }
 
@@ -60,10 +44,6 @@ final class RegionSection<R> {
     }
 
     void lostNonEmptyNeighbour() {
-        if (nonEmptyNeighbours == 0) {
-            throw new IllegalStateException("Non-empty neighbour count of section " + CoordinateKey.describe(key) + " dropped below zero");
-        }
-
         nonEmptyNeighbours--;
     }
 
@@ -79,18 +59,14 @@ final class RegionSection<R> {
         this.region = null;
     }
 
-    void forEachPosition(Region.ChunkConsumer consumer) {
-        int baseX = CoordinateKey.x(key) << indexShift;
-        int baseZ = CoordinateKey.z(key) << indexShift;
-        int side = 1 << indexShift;
+    void forEachChunkKey(LongConsumer consumer) {
+        int baseX = CoordinateKey.x(key) << sectionShift;
+        int baseZ = CoordinateKey.z(key) << sectionShift;
+        int side = 1 << sectionShift;
         for (int dz = 0; dz < side; dz++) {
             for (int dx = 0; dx < side; dx++) {
-                consumer.accept(baseX + dx, baseZ + dz);
+                consumer.accept(CoordinateKey.pack(baseX + dx, baseZ + dz));
             }
         }
-    }
-
-    private int bitIndex(int chunkX, int chunkZ) {
-        return CoordinateKey.index(chunkX, chunkZ, indexShift);
     }
 }

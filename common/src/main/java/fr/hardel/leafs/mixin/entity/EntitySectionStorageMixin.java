@@ -26,7 +26,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Concurrent section index, 42 being the SectionPos x-field shift so a range query reads a single stripe; a borrower takes the regions a box covers. */
 @Mixin(EntitySectionStorage.class)
 public abstract class EntitySectionStorageMixin<T extends EntityAccess> implements EntitySectionVisibilityAccess, LevelBoundAccess {
 
@@ -51,6 +50,7 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$swapForConcurrentFacades(CallbackInfo callbackInfo) {
         this.sections = new ConcurrentLong2ObjectMap<>();
+        // 42 is the SectionPos x-field shift, so a range query reads a single stripe.
         this.sectionIds = new ConcurrentOrderedLongSet(42);
     }
 
@@ -64,7 +64,6 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
         leafs$level = level;
     }
 
-    /** A box query from the borrowing server thread takes every region the box covers before it walks the sections. */
     @Inject(method = "forEachAccessibleNonEmptySection", at = @At("HEAD"))
     private void leafs$borrowTheBox(AABB box, AbortableIterationConsumer<EntitySection<T>> output, CallbackInfo callbackInfo) {
         RegionBorrow borrow = RegionBorrow.current();

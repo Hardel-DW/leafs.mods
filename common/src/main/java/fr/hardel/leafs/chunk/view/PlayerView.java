@@ -2,15 +2,16 @@ package fr.hardel.leafs.chunk.view;
 
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.TicketStorage;
 
-/** What follows from where the players stand: the view and simulation tickets, the spawn disk, the distance of a chunk to the nearest player. */
 public final class PlayerView {
     private static final int SPAWN_RADIUS = 8;
     private static final int DEFAULT_SIMULATION_DISTANCE = 10;
@@ -26,12 +27,10 @@ public final class PlayerView {
         this.tickets = new ViewTickets(storage, players, 0);
     }
 
-    /** The view tickets follow the players graph. */
     public LevelListener tickets() {
         return tickets;
     }
 
-    /** One write among the others of the batch: a move leaves and enters before any graph drains. */
     public void enter(long chunkKey) {
         graphs.batch(() -> sources.enter(chunkKey));
     }
@@ -48,12 +47,15 @@ public final class PlayerView {
         sources.simulationDistance(distance);
     }
 
-    /** The distance to the nearest player, no farther than the view: the halo beyond it exists for the view's edge and is as urgent as it. */
     public int urgency(int chunkX, int chunkZ) {
-        return Math.min(players.level(ChunkPos.pack(chunkX, chunkZ)), tickets.viewDistance());
+        long chunkKey = ChunkPos.pack(chunkX, chunkZ);
+        if (!ChunkLevel.isLoaded(graphs.loading().level(chunkKey))) {
+            return ChunkPool.SECOND;
+        }
+
+        return ChunkPool.SECOND + Math.min(players.level(chunkKey), tickets.viewDistance());
     }
 
-    /** Vanilla's TriState: TRUE inside the inscribed square, FALSE past 8, DEFAULT asks the exact euclidean test. */
     public TriState nearby(long chunkKey) {
         int distance = players.level(chunkKey);
         if (distance <= NaturalSpawner.INSCRIBED_SQUARE_SPAWN_DISTANCE_CHUNK) {

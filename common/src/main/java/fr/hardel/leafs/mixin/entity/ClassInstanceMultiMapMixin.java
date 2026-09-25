@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** An entity section read across a region seam: copy-on-write lists a reader walks lock-free, writes under the section's monitor. The map makes every list copy-on-write whoever builds {@code find}; the wraps land after Lithium's overwrite. */
+/** Priority 1100: the wraps land after Lithium's overwrite of find. */
 @Mixin(value = ClassInstanceMultiMap.class, priority = 1100)
 public abstract class ClassInstanceMultiMapMixin<T> {
 

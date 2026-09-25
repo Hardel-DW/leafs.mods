@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-/** A chunk between its save and its file write: vanilla's photo future, serving readers from the photo until the bytes exist. */
 public final class PendingWrite extends CompletableFuture<CompoundTag> {
     private final CompletableFuture<Void> written = new CompletableFuture<>();
     private volatile Supplier<CompoundTag> photo;
@@ -25,7 +24,6 @@ public final class PendingWrite extends CompletableFuture<CompoundTag> {
         return bytes;
     }
 
-    /** The photo is dropped; a reader that took it first still holds it. */
     public void compressed(CompressedChunk compressed) {
         bytes = compressed;
         photo = null;

@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 
-/** A chunk's bytes as the region file stores them: vanilla's five byte header, then the compressed NBT. */
 public record CompressedChunk(byte[] bytes) {
     private static final int HEADER = 5;
 
@@ -26,6 +25,7 @@ public record CompressedChunk(byte[] bytes) {
         buffer.write(0);
         buffer.write(0);
         buffer.write(version.getId());
+        
         try (DataOutputStream output = new DataOutputStream(version.wrap(buffer))) {
             NbtIo.write(tag, output);
         } catch (IOException exception) {

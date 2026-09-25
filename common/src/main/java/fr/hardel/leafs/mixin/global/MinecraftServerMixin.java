@@ -16,11 +16,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-/** The global drain, once per global tick after the level ticks, and the reload under every region. */
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin {
 
-    /** The swap of the reloaded data runs on the server thread with every region taken: they all read recipes, tags and functions each tick. */
     @WrapOperation(method = "reloadResources", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenAcceptAsync(Ljava/util/function/Consumer;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$applyReloadUnderEveryRegion(CompletableFuture<MinecraftServer.ReloadableResources> loaded, Consumer<MinecraftServer.ReloadableResources> apply, Executor server, Operation<CompletableFuture<Void>> original) {
         MinecraftServer self = (MinecraftServer) (Object) this;
@@ -28,7 +26,6 @@ public abstract class MinecraftServerMixin {
         return original.call(loaded, borrowed, server);
     }
 
-    /** Also hooked in {@code tickServer}: its pause-when-empty branch skips {@code tickChildren}, yet diverted tasks must still drain. */
     @Inject(method = {"tickChildren", "tickServer"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickConnection()V"))
     private void leafs$drainGlobalTasks(CallbackInfo callbackInfo) {
         TickingManager ticking = TickingManager.of((MinecraftServer) (Object) this);

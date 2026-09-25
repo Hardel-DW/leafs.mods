@@ -9,14 +9,17 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** What LootR and every chunk tracker rely on: the loader's load events of a chunk reaching FULL. */
 public final class ChunkLoadEventsTest {
     private final Set<ChunkPos> loaded = ConcurrentHashMap.newKeySet();
     private final Set<ChunkPos> generated = ConcurrentHashMap.newKeySet();
 
     public ChunkLoadEventsTest() {
-        ServerChunkEvents.CHUNK_LOAD.register((_, chunk, _) -> loaded.add(chunk.getPos()));
-        ServerChunkEvents.CHUNK_GENERATE.register((_, chunk) -> generated.add(chunk.getPos()));
+        ServerChunkEvents.CHUNK_LOAD.register((_, chunk, newlyGenerated) -> {
+            loaded.add(chunk.getPos());
+            if (newlyGenerated) {
+                generated.add(chunk.getPos());
+            }
+        });
     }
 
     @GameTest(maxTicks = 100)
@@ -26,8 +29,8 @@ public final class ChunkLoadEventsTest {
         helper.getLevel().getChunk(far.x(), far.z());
 
         helper.succeedWhen(() -> {
-            helper.assertTrue(loaded.contains(far), "CHUNK_LOAD fired for " + far);
-            helper.assertTrue(generated.contains(far), "CHUNK_GENERATE fired for " + far);
+            helper.assertTrue(loaded.contains(far), "CHUNK_LOAD fired for %s".formatted(far));
+            helper.assertTrue(generated.contains(far), "CHUNK_LOAD reported %s as newly generated".formatted(far));
         });
     }
 }

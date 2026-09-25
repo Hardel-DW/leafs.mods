@@ -28,7 +28,10 @@ class RegionBorrowTest {
 
     @AfterEach
     void exitBorrow() {
-        RegionBorrow.exit();
+        RegionBorrow borrow = RegionBorrow.current();
+        if (borrow != null) {
+            borrow.exit();
+        }
     }
 
     @Test
@@ -49,7 +52,6 @@ class RegionBorrowTest {
         region.markNotTicking();
     }
 
-    /** A write is a contact like a read: the server thread locks the region of the chunk before deciding whether to defer. */
     @Test
     void aBorrowingThreadTakesTheRegionOfAChunkItMeets() {
         simulated(regions, 0, 0);
@@ -89,12 +91,10 @@ class RegionBorrowTest {
         borrower.join();
     }
 
-    /** The server thread locks an idle region owed a merge with one it holds, like a ticking region keeps merges waiting; the fold runs at the release. */
     @Test
     void aHeadTakesARegionOwedAMergeAndTheMergeRunsAtItsRelease() {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
         Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
         Region<RegionTickData> east = regions.regionizer().regionAt(96, 0);
 
@@ -114,12 +114,10 @@ class RegionBorrowTest {
         assertEquals(RegionState.READY, survivor.state());
     }
 
-    /** The whole level locked: a region owed a merge with one it holds is taken too, the fold waits for the release. */
     @Test
     void borrowAllHoldsARegionOwedAMergeUntilTheRelease() throws InterruptedException {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
 
         AtomicInteger heldAfter = new AtomicInteger();
         CountDownLatch done = new CountDownLatch(1);
@@ -146,12 +144,10 @@ class RegionBorrowTest {
     void borrowAllWaitsForTheTickInFlightAndHoldsBothSidesOfTheMerge() throws InterruptedException {
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
-        regions.settle();
         Region<RegionTickData> west = regions.regionizer().regionAt(0, 0);
         assertTrue(west.tryMarkTicking(), "a worker ticks the west region");
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
-        regions.settle();
         CountDownLatch done = new CountDownLatch(1);
         AtomicInteger heldAfter = new AtomicInteger();
 

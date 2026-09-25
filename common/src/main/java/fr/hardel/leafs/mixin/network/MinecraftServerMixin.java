@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.List;
 
-/** The send-chunks section and the player saves belong to the regions: every player is owned, the global loop sees nobody. */
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin {
 
@@ -24,7 +23,6 @@ public abstract class MinecraftServerMixin {
         return List.of();
     }
 
-    /** The periodic save writes each player from his region's epoch walk; a flush runs on the server thread with every region locked, then vanilla's pass, which also survives once the pool stopped. */
     @WrapOperation(method = "saveEverything", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;saveAll()V"))
     private void leafs$savePlayersOnTheirRegions(PlayerList playerList, Operation<Void> original, @Local(argsOnly = true, ordinal = 1) boolean flush) {
         MinecraftServer server = (MinecraftServer) (Object) this;
