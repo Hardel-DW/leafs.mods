@@ -7,7 +7,6 @@ import net.minecraft.core.HolderSet;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.BiomeResolver;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -37,8 +36,8 @@ class StructureStartConcurrencyTest {
         }
 
         @Override
-        public BiomeResolver createResolver(Climate.Sampler sampler) {
-            return (_, _, _) -> null;
+        public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler) {
+            return null;
         }
     };
 
@@ -103,7 +102,7 @@ class StructureStartConcurrencyTest {
         }
 
         private void start() {
-            generate(Holder.direct(this), Level.OVERWORLD, null, null, NO_BIOMES, null, null, null, 0L, new ChunkPos(0, 0), 0, null, _ -> true);
+            generate(Holder.direct(this), Level.OVERWORLD, null, null, NO_BIOMES, null, null, 0L, new ChunkPos(0, 0), 0, null, _ -> true);
         }
 
         @Override
