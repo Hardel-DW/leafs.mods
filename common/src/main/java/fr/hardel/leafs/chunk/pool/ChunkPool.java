@@ -110,16 +110,23 @@ public final class ChunkPool implements Executor {
         permits.release();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         for (Thread worker : workers) {
-            try {
-                worker.join(Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
+            if (interruptedWhileJoining(worker, deadline)) {
                 return;
             }
         }
 
         if (queued.get() > 0) {
             Leafs.LOGGER.warn("Chunk pool still busy after 10 s, abandoning {} queued tasks", queued.get());
+        }
+    }
+
+    private static boolean interruptedWhileJoining(Thread worker, long deadline) {
+        try {
+            worker.join(Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
+            return false;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return true;
         }
     }
 

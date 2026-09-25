@@ -25,25 +25,22 @@ public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus 
     @Override
     public String toString() {
         LevelChunks chunks = LevelChunks.of(level);
-        LevelRegions regions = LevelRegions.of(level);
         long key = ChunkPos.pack(chunkX, chunkZ);
         ChunkHolder holder = chunks.holders().table().get(key);
-        return String.join(", ",
-            "waiting for chunk [%d, %d] at %s, delivered %b".formatted(chunkX, chunkZ, status, delivery.isDone()),
-            "loading level %d".formatted(chunks.graphs().loading().level(key)),
-            holder == null ? "no holder" : holder(holder),
-            queued(chunks.placement(), chunkX, chunkZ),
-            owner(regions),
-            "pool queued %d active %d".formatted(chunks.pool().queued(), chunks.pool().active()),
-            "tickets %s".formatted(level.getChunkSource().ticketStorage.getTicketDebugString(key, false)));
+        String holderState = holder == null ? "no holder" : holder(holder);
+        String nearbyTasks = queued(chunks.placement(), chunkX, chunkZ);
+        String owner = owner(LevelRegions.of(level));
+        String tickets = level.getChunkSource().ticketStorage.getTicketDebugString(key, false);
+        return "waiting for chunk [%d, %d] at %s, delivered %b, loading level %d, %s, %s, %s, pool queued %d active %d, tickets %s".formatted(
+            chunkX, chunkZ, status, delivery.isDone(), chunks.graphs().loading().level(key), holderState, nearbyTasks, owner,
+            chunks.pool().queued(), chunks.pool().active(), tickets);
     }
 
     public static String holder(ChunkHolder holder) {
         ChunkGenerationTask task = holder.task.get();
-        return String.join(", ",
-            "holder %s level %d, latest %s, started %s, generation refs %d".formatted(holder.getPos(), holder.getTicketLevel(), holder.getLatestStatus(), holder.startedWork.get(), holder.generationRefCount.get()),
-            "pending %s".formatted(pending(holder)),
-            task == null ? "no task" : task(task));
+        String taskState = task == null ? "no task" : task(task);
+        return "holder %s level %d, latest %s, started %s, generation refs %d, pending %s, %s".formatted(
+            holder.getPos(), holder.getTicketLevel(), holder.getLatestStatus(), holder.startedWork.get(), holder.generationRefCount.get(), pending(holder), taskState);
     }
 
     public static String queued(ChunkPlacement placement, int chunkX, int chunkZ) {
@@ -77,7 +74,7 @@ public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus 
                 stuck.add("%s latest %s started %s".formatted(member.getPos(), member.getLatestStatus(), member.startedWork.get()));
             }
         });
-        
+
         if (stuck.isEmpty()) {
             return "%s, layer pending on 0".formatted(head);
         }
@@ -91,6 +88,7 @@ public record WaitReport(ServerLevel level, int chunkX, int chunkZ, ChunkStatus 
             .filter(index -> holder.futures.get(index) instanceof CompletableFuture<?> future && !future.isDone())
             .mapToObj(index -> statuses.get(index).toString())
             .collect(Collectors.joining(" "));
+            
         return names.isEmpty() ? "none" : names;
     }
 

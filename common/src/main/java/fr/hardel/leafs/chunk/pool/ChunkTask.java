@@ -10,15 +10,7 @@ import java.util.concurrent.CompletableFuture;
 public abstract class ChunkTask {
     public static final long[] NO_RESERVATION = {};
     static final int UNQUEUED = -1;
-    private static final VarHandle BUCKET;
-
-    static {
-        try {
-            BUCKET = MethodHandles.lookup().findVarHandle(ChunkTask.class, "bucket", int.class);
-        } catch (ReflectiveOperationException exception) {
-            throw new ExceptionInInitializerError(exception);
-        }
-    }
+    private static final VarHandle BUCKET = findBucket();
 
     public enum Kind {
         STEP,
@@ -57,23 +49,11 @@ public abstract class ChunkTask {
     }
 
     public static ChunkTask of(Kind kind, int priority, long[] reserved, Runnable body) {
-        return new ChunkTask(kind, priority, reserved) {
-            @Override
-            protected @Nullable CompletableFuture<?> run() {
-                body.run();
-                return null;
-            }
-        };
+        return new RunnableTask(kind, priority, reserved, body);
     }
 
     public static ChunkTask of(Kind kind, Place place, long[] reserved, Runnable body) {
-        return new ChunkTask(kind, place, reserved) {
-            @Override
-            protected @Nullable CompletableFuture<?> run() {
-                body.run();
-                return null;
-            }
-        };
+        return new RunnableTask(kind, place, reserved, body);
     }
 
     public static long key(int owner, int chunkX, int chunkZ) {
@@ -143,6 +123,34 @@ public abstract class ChunkTask {
             if (BUCKET.compareAndSet(this, current, bucket)) {
                 return true;
             }
+        }
+    }
+
+    private static VarHandle findBucket() {
+        try {
+            return MethodHandles.lookup().findVarHandle(ChunkTask.class, "bucket", int.class);
+        } catch (ReflectiveOperationException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private static final class RunnableTask extends ChunkTask {
+        private final Runnable body;
+
+        private RunnableTask(Kind kind, int priority, long[] reserved, Runnable body) {
+            super(kind, priority, reserved);
+            this.body = body;
+        }
+
+        private RunnableTask(Kind kind, Place place, long[] reserved, Runnable body) {
+            super(kind, place, reserved);
+            this.body = body;
+        }
+
+        @Override
+        protected @Nullable CompletableFuture<?> run() {
+            body.run();
+            return null;
         }
     }
 }

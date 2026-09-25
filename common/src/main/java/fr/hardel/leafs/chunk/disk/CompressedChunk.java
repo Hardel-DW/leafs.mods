@@ -25,6 +25,7 @@ public record CompressedChunk(byte[] bytes) {
         buffer.write(0);
         buffer.write(0);
         buffer.write(version.getId());
+        
         try (DataOutputStream output = new DataOutputStream(version.wrap(buffer))) {
             NbtIo.write(tag, output);
         } catch (IOException exception) {
