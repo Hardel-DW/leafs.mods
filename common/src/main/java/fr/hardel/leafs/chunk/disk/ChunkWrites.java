@@ -9,7 +9,6 @@ import net.minecraft.world.level.chunk.storage.RegionFile;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
 import org.jspecify.annotations.Nullable;
 
-import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -49,27 +48,20 @@ public final class ChunkWrites {
     }
 
     private CompletableFuture<Void> store(ChunkPos pos, PendingWrite write) {
-        return disk.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.BACKGROUND.ordinal(), stored -> storeOnDisk(pos, write, stored));
-    }
+        return disk.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.BACKGROUND.ordinal(), future -> {
+            try {
+                if (pending.get(pos.pack()) == write) {
+                    CompressedChunk bytes = write.bytes();
+                    RegionFile file = files.getOrCreateRegionFile(pos);
+                    JvmProfiler.INSTANCE.onRegionFileWrite(files.info(), pos, bytes.version(), bytes.streamLength());
+                    file.write(pos, bytes.buffer());
+                }
 
-    private void storeOnDisk(ChunkPos pos, PendingWrite write, CompletableFuture<Void> stored) {
-        try {
-            writeIfStillPending(pos, write);
-            stored.complete(null);
-        } catch (Exception exception) {
-            stored.completeExceptionally(exception);
-        }
-    }
-
-    private void writeIfStillPending(ChunkPos pos, PendingWrite write) throws IOException {
-        if (pending.get(pos.pack()) != write) {
-            return;
-        }
-
-        CompressedChunk bytes = write.bytes();
-        RegionFile file = files.getOrCreateRegionFile(pos);
-        JvmProfiler.INSTANCE.onRegionFileWrite(files.info(), pos, bytes.version(), bytes.streamLength());
-        file.write(pos, bytes.buffer());
+                future.complete(null);
+            } catch (Exception exception) {
+                future.completeExceptionally(exception);
+            }
+        });
     }
 
     private void finish(ChunkPos pos, PendingWrite write, @Nullable Throwable failure) {
