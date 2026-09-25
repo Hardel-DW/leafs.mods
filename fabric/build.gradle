@@ -70,15 +70,10 @@ test {
 
 processResources {
 	from(project(':common').sourceSets.main.resources)
-	def metadata = [
-		version: project.version,
-		minecraft: rootProject.minecraft_version,
-		scalablelux: ">=${rootProject.scalablelux_fabric.tokenize('+')[0]} <${rootProject.scalablelux_below}"
-	]
-	inputs.properties metadata
+	inputs.property 'version', project.version
 
 	filesMatching('fabric.mod.json') {
-		expand metadata
+		expand version: project.version
 	}
 }
 
