@@ -2,11 +2,12 @@ package fr.hardel.leafs.mixin.chunk;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import fr.hardel.leafs.chunk.SectionStorageAccess;
 import fr.hardel.leafs.chunk.SectionStorageLock;
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import net.minecraft.server.level.ServerLevel;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.SectionStorage;
 import org.spongepowered.asm.mixin.Final;
@@ -15,6 +16,7 @@ import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -27,6 +29,18 @@ public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess 
     @Shadow
     @Final
     private Long2ObjectMap<Optional<R>> storage;
+
+    @Shadow
+    @Final
+    private LongSet loadedChunks;
+
+    @Shadow
+    @Final
+    private Long2ObjectMap<?> pendingLoads;
+
+    @Shadow
+    @Final
+    private Object loadLock;
 
     @Unique
     private final SectionStorageLock leafs$lock = new SectionStorageLock();
@@ -41,13 +55,24 @@ public abstract class SectionStorageMixin<R, P> implements SectionStorageAccess 
         this.storage = new ConcurrentLong2ObjectMap<>();
     }
 
-    @WrapMethod(method = "unpackChunk(Lnet/minecraft/world/level/ChunkPos;)V")
-    private void leafs$readFromDiskUnderTheLock(ChunkPos chunkPos, Operation<Void> original) {
-        leafs$lock.runLocked(() -> original.call(chunkPos));
+    @WrapOperation(method = "unpackChunk(Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;add(J)Z"))
+    private boolean leafs$loadedOnceUnpacked(LongSet loaded, long chunkKey, Operation<Boolean> original) {
+        return !loaded.contains(chunkKey);
+    }
+
+    @WrapOperation(method = "unpackChunk(Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/storage/SectionStorage;unpackChunk(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/storage/SectionStorage$PackedChunk;)V"))
+    private void leafs$unpackOnce(SectionStorage<R, P> self, ChunkPos pos, @Coerce Object packed, Operation<Void> original) {
+        leafs$lock.runLocked(() -> {
+            synchronized (loadLock) {
+                if (pendingLoads.remove(pos.pack()) != null) {
+                    original.call(self, pos, packed);
+                    loadedChunks.add(pos.pack());
+                }
+            }
+        });
     }
 
     @WrapMethod(method = "flushAll")
-
     private void leafs$flushUnderTheLock(Operation<Void> original) {
         leafs$lock.runLocked(original::call);
     }
