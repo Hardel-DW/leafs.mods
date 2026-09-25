@@ -65,7 +65,6 @@
 		"world.EuclideanGameEventListenerRegistryMixin",
 		"world.LevelChunkMixin",
 		"world.LevelMixin",
-		"world.NaturalSpawnerMixin",
 		"world.RaidMixin",
 		"world.RaidsMixin",
 		"world.SerializableChunkDataMixin",

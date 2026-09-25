@@ -212,7 +212,7 @@ class LevelRegionsTest {
         });
         RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> 50_000_000L, false, watchdog, (_, _) -> {
         });
-        regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache()), null);
+        regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache(), 0L), null);
     }
 
     private void settle() {

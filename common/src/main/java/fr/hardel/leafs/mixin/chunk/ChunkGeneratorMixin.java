@@ -10,7 +10,7 @@ import java.util.concurrent.Executor;
 
 @Mixin({ChunkGenerator.class, NoiseBasedChunkGenerator.class})
 public abstract class ChunkGeneratorMixin {
-    @ModifyArg(method = {"createBiomes", "buildTerrain"}, at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"), index = 1)
+    @ModifyArg(method = {"createBiomes", "fillFromNoise"}, at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"), index = 1)
     private Executor leafs$inLine(Executor workerMain) {
         return Runnable::run;
     }

@@ -5,7 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -39,7 +39,7 @@ public final class CancelledPlacementTest {
         helper.startSequence()
                 .thenIdle(1)
                 .thenExecute(() -> helper.assertTrue(cancelled.get(), "the placement never reached the place event"))
-                .thenExecute(() -> helper.assertEntityNotPresent(EntityTypes.TNT, new AABB(TNT).inflate(1)))
+                .thenExecute(() -> helper.assertEntityNotPresent(EntityType.TNT, new AABB(TNT).inflate(1)))
                 .thenExecute(() -> helper.assertBlockPresent(Blocks.AIR, TNT))
                 .thenExecute(() -> helper.getLevel().getServer().getPlayerList().remove(player))
                 .thenSucceed();
