@@ -5,6 +5,7 @@ import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.Ticket;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 
@@ -53,8 +54,8 @@ public final class TicketGraphs {
         return (key, level, _) -> loading.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
     }
 
-    public void settle(long key) {
-        if (loadingListener != null && !ChunkLevels.draining()) {
+    public void settle(long key, Ticket ticket) {
+        if (loadingListener != null && !ChunkLevels.draining() && ticket.getType().doesLoad() && ticket.getTicketLevel() < loading.level(key)) {
             loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener.get(), () -> null);
         }
     }
