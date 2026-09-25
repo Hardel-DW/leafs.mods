@@ -74,6 +74,7 @@ public final class ChunkSaves {
 
         RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
         level.getChunkSource().chunkMap.saveChunkIfNeeded(holder, Util.getMillis());
+        level.getPoiManager().flush(holder.getPos());
         persistence.saveChunkOnOwner(holder.getPos().pack());
         access.leafs$markSaved(epoch);
         return true;

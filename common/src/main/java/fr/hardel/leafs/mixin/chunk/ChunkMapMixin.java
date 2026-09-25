@@ -220,8 +220,8 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         callbackInfo.setReturnValue(false);
     }
 
-    @Inject(method = "tick()V", at = @At("HEAD"), cancellable = true)
-    private void leafs$noSerialTracking(CallbackInfo callbackInfo) {
+    @Inject(method = {"tick()V", "tick(Ljava/util/function/BooleanSupplier;)V"}, at = @At("HEAD"), cancellable = true)
+    private void leafs$noSerialChunkWork(CallbackInfo callbackInfo) {
         if (leafs$regions().live()) {
             callbackInfo.cancel();
         }
