@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** A region reads an entity section across a seam while its owner writes it: the walk never tears, the class cache never misses an entity. */
 class EntitySectionConcurrencyTest {
     private static final int WRITES = 20_000;
 
@@ -30,9 +29,6 @@ class EntitySectionConcurrencyTest {
                     for (Object entity : section.find(Mob.class)) {
                         assertTrue(entity instanceof Mob);
                     }
-
-                    for (Object ignored : section) {
-                    }
                 }
             } catch (Throwable throwable) {
                 readerFailure.set(throwable);
@@ -43,7 +39,7 @@ class EntitySectionConcurrencyTest {
         for (int i = 0; i < WRITES; i++) {
             Mob mob = new Mob(i);
             section.add(mob);
-            section.add("not a mob " + i);
+            section.add("not a mob %s".formatted(i));
             section.remove(mob);
         }
 

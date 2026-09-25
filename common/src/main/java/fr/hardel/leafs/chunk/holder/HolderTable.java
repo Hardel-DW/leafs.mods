@@ -14,7 +14,6 @@ import org.jspecify.annotations.NonNull;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
 
-/** The one holder table behind both vanilla fields, plus the same holders by region section. The empty superclass makes any surface not delegated here throw. */
 public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
     private final ConcurrentLong2ObjectMap<ChunkHolder> holders = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLong2ObjectMap<AtomicReferenceArray<ChunkHolder>> sections = new ConcurrentLong2ObjectMap<>();
@@ -25,7 +24,6 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
         this.sectionShift = sectionShift;
     }
 
-    /** A region photographs its chunks section by section. */
     public void forEachHolderIn(long sectionKey, Consumer<ChunkHolder> action) {
         AtomicReferenceArray<ChunkHolder> slots = sections.get(sectionKey);
         if (slots == null) {
@@ -93,7 +91,6 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
         sections.clear();
     }
 
-    /** One atomic compute per key, so a birth and a death on the same section never lose each other. */
     private void index(long key, ChunkHolder holder) {
         sections.compute(sectionOf(key), (_, slots) -> {
             AtomicReferenceArray<ChunkHolder> target = slots == null ? new AtomicReferenceArray<>(1 << (2 * sectionShift)) : slots;
@@ -120,17 +117,11 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     }
 
     private long sectionOf(long key) {
-        return CoordinateKey.pack(ChunkPos.getX(key) >> sectionShift, ChunkPos.getZ(key) >> sectionShift);
+        return ChunkPos.pack(ChunkPos.getX(key) >> sectionShift, ChunkPos.getZ(key) >> sectionShift);
     }
 
     private int slotOf(long key) {
         return CoordinateKey.index(ChunkPos.getX(key), ChunkPos.getZ(key), sectionShift);
-    }
-
-    /** Both vanilla fields observe the same instance. */
-    @Override
-    public Long2ObjectLinkedOpenHashMap<ChunkHolder> clone() {
-        return this;
     }
 
     @Override
@@ -138,7 +129,6 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
         return holders.values();
     }
 
-    /** The ordered views are snapshots: vanilla only walks them, from its debug dump. */
     @Override
     public @NonNull LongSortedSet keySet() {
         return snapshot().keySet();

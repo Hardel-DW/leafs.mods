@@ -9,7 +9,6 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-/** A projectile spawned on a region pairs its first watcher one tick after construction; the position base refreshes at pairing so the client does not start a tick behind. */
 @Mixin(ServerEntity.class)
 public abstract class ServerEntityMixin implements TrackedPairingRefresh {
 

@@ -11,11 +11,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
-/** Every piece of chunk work runs here, most urgent first, under its reservation. Lowest OS priority so region ticks win the cores. */
 public final class ChunkPool implements Executor {
     public static final int FIRST = 0;
-    private static final long[] NO_RESERVATION = {};
+    public static final int SECOND = 1;
 
     private final PriorityBuckets buckets;
     private final PlacedTasks placed = new PlacedTasks();
@@ -25,10 +25,12 @@ public final class ChunkPool implements Executor {
     private final AtomicInteger queued = new AtomicInteger();
     private final AtomicInteger active = new AtomicInteger();
     private final ReservationBlocks blocks = new ReservationBlocks();
+    private final BiConsumer<ChunkTask, Throwable> failures;
     private volatile boolean running = true;
 
-    public ChunkPool(ThreadGroup serverThreads, int threads, int priorities) {
+    public ChunkPool(ThreadGroup serverThreads, int threads, int priorities, BiConsumer<ChunkTask, Throwable> failures) {
         this.buckets = new PriorityBuckets(priorities);
+        this.failures = failures;
         List<Thread> started = new ArrayList<>(threads);
         for (int index = 1; index <= threads; index++) {
             Thread worker = new Worker(serverThreads, this::work, index);
@@ -40,7 +42,6 @@ public final class ChunkPool implements Executor {
         this.workers = List.copyOf(started);
     }
 
-    /** The lowest priority, Java's everywhere and the OS nice on Linux, for any thread that generates or saves chunks. */
     public static void yieldToRegions() {
         Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
         NativeThreadPriority.lowerCurrentThread();
@@ -54,19 +55,22 @@ public final class ChunkPool implements Executor {
         return workers.size();
     }
 
+    // Used by the Leafs Debug mod
     public List<Thread> workerThreads() {
         return workers;
     }
 
-    /** In a bucket or parked. */
+    // Used by the Leafs Debug mod
     public int queued() {
         return queued.get();
     }
 
+    // Used by the Leafs Debug mod
     public ReservationBlocks blocks() {
         return blocks;
     }
 
+    // Used by the Leafs Debug mod
     public int active() {
         return active.get();
     }
@@ -77,12 +81,10 @@ public final class ChunkPool implements Executor {
         enqueue(task);
     }
 
-    /** A chunk whose distance to the players changed: what waits on it takes its new priority. */
     public void changed(long key) {
         placed.forEachAt(key, task -> reprioritise(task, task.place().priority()));
     }
 
-    /** What a thread waits for heads the pool. */
     public void expedite(long key) {
         placed.forEachAt(key, task -> reprioritise(task, FIRST));
     }
@@ -91,7 +93,6 @@ public final class ChunkPool implements Executor {
         return placed.countAt(key);
     }
 
-    /** A running task is unaffected; a task parked behind a reservation takes the priority when it is requeued. */
     private void reprioritise(ChunkTask task, int priority) {
         task.wants(priority);
         if (buckets.move(task, priority)) {
@@ -101,19 +102,15 @@ public final class ChunkPool implements Executor {
 
     @Override
     public void execute(@NonNull Runnable task) {
-        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, FIRST, NO_RESERVATION, task));
+        submit(ChunkTask.of(ChunkTask.Kind.HOUSEKEEPING, SECOND, ChunkTask.NO_RESERVATION, task));
     }
 
-    /** Queued work still runs, within ten seconds. */
     public void shutdown() {
         running = false;
         permits.release();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         for (Thread worker : workers) {
-            try {
-                worker.join(Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
+            if (interruptedWhileJoining(worker, deadline)) {
                 return;
             }
         }
@@ -123,12 +120,21 @@ public final class ChunkPool implements Executor {
         }
     }
 
+    private static boolean interruptedWhileJoining(Thread worker, long deadline) {
+        try {
+            worker.join(Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
+            return false;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return true;
+        }
+    }
+
     private void enqueue(ChunkTask task) {
         buckets.add(task);
         permits.release();
     }
 
-    /** The released permit wakes the next sleeper, so every worker leaves. */
     private void work() {
         yieldToRegions();
         while (true) {
@@ -168,7 +174,7 @@ public final class ChunkPool implements Executor {
             pending = task.run();
         } catch (Throwable failure) {
             finish(task);
-            Leafs.LOGGER.error("Chunk task failed on {}", Thread.currentThread().getName(), failure);
+            failures.accept(task, failure);
             return;
         }
 
@@ -187,7 +193,7 @@ public final class ChunkPool implements Executor {
 
     private static final class Worker extends Thread {
         private Worker(ThreadGroup group, Runnable work, int index) {
-            super(group, work, "Leafs Chunk Worker #" + index);
+            super(group, work, "Leafs Chunk Worker #%s".formatted(index));
         }
     }
 }

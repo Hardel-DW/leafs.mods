@@ -7,6 +7,7 @@ import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.UnownedSweep;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class LevelChunks {
     private static final AtomicInteger IDS = new AtomicInteger();
     private final ChunkPool pool;
+    private final ChunkPlacement placement;
     private final TicketGraphs graphs;
     private final TicketTimeoutIndex timeouts;
     private final PlayerView view;
@@ -44,21 +46,22 @@ public final class LevelChunks {
         this.pool = ticking.chunkPool();
         TicketStorageAccess storage = (TicketStorageAccess) tickets;
         this.graphs = storage.leafs$graphs();
-        this.timeouts = new TicketTimeoutIndex(tickets, graphs, regions.regionizer().sectionShift());
+        this.timeouts = new TicketTimeoutIndex(tickets, chunkMap, graphs, regions.regionizer().sectionShift());
         storage.leafs$bindTimeouts(timeouts);
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
-        this.owners = new ChunkOwners(pool, IDS.getAndIncrement(), regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), this::urgency, regions::live, serial, taker, ticking.globalScheduler(), regions.slowTaskNanos());
-        this.steps = new GenerationSteps(chunkMap, pool, owners, ticking.metrics());
+        this.placement = new ChunkPlacement(pool, IDS.getAndIncrement(), this::urgency);
+        this.owners = new ChunkOwners(pool, placement, regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), regions::live, serial, taker, ticking.globalScheduler());
+        this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs);
-        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, tickets, steps, ticking.metrics());
+        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, placement, tickets, steps, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
-        graphs.listen(holders, regions, view.tickets().and(owners.follow()), pool);
-        timeouts.pauseWhile(holders::busy);
+        graphs.listen(holders::publication, regions, view.tickets().and(placement.follow()), pool);
     }
 
+    // Used by the Leafs Debug mod
     public static LevelChunks of(ServerLevel level) {
         return ((LevelChunksAccess) level.getChunkSource().chunkMap).leafs$chunks();
     }
@@ -76,7 +79,6 @@ public final class LevelChunks {
         return !regions.live() && TickingManager.of(level.getServer()).onServerThread();
     }
 
-    /** Game work on a chunk no region covers: the calling thread takes the chunk for the task and reads back what it writes, like vanilla; false when another thread holds it. */
     private static boolean take(LevelRegions regions, int chunkX, int chunkZ, Runnable task) {
         return RegionBorrow.hold(borrow -> {
             if (!borrow.tryBorrowChunk(regions, chunkX, chunkZ)) {
@@ -88,7 +90,6 @@ public final class LevelChunks {
         });
     }
 
-    /** The head of the pool while a thread waits for it, the distance to the nearest player otherwise. */
     private int urgency(int chunkX, int chunkZ) {
         return holders.demands().near(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
     }
@@ -97,6 +98,7 @@ public final class LevelChunks {
         return pool;
     }
 
+    // Used by the Leafs Debug mod
     public TicketGraphs graphs() {
         return graphs;
     }
@@ -107,6 +109,10 @@ public final class LevelChunks {
 
     public PlayerView view() {
         return view;
+    }
+
+    public ChunkPlacement placement() {
+        return placement;
     }
 
     public ChunkOwners owners() {

@@ -6,15 +6,19 @@ base {
 	archivesName = "Leafs-fabric-${minecraftMajor}"
 }
 
+configurations {
+	mods
+	compileOnly.extendsFrom(mods)
+	localRuntime.extendsFrom(mods)
+	testImplementation.extendsFrom(mods)
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
-	compileOnly rootProject.files("libs/${rootProject.scalablelux_fabric}")
-	localRuntime "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
-	localRuntime rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}")
-	testRuntimeOnly "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
-	testRuntimeOnly rootProject.files("libs/${rootProject.scalablelux_fabric}", "libs/${rootProject.fastnoise_fabric}")
+	mods "maven.modrinth:scalablelux:${rootProject.scalablelux_fabric}"
+	mods "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
 
 	testImplementation platform("org.junit:junit-bom:5.12.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"
@@ -33,15 +37,12 @@ loom {
 		}
 
 		client {
-			vmArg "-Xmx3G"
-			if (project.hasProperty('world')) {
-				programArgs "--quickPlaySingleplayer", project.world
-			}
+			vmArg "-Xmx8G"
 		}
 
 		server {
-			vmArg "-Xms14G"
-			vmArg "-Xmx14G"
+			vmArg "-Xms8G"
+			vmArg "-Xmx8G"
 			vmArg "-XX:+AlwaysPreTouch"
 		}
 	}
@@ -69,10 +70,15 @@ test {
 
 processResources {
 	from(project(':common').sourceSets.main.resources)
-	inputs.property 'version', project.version
+	def metadata = [
+		version: project.version,
+		minecraft: rootProject.minecraft_version,
+		scalablelux: ">=${rootProject.scalablelux_fabric.tokenize('+')[0]} <${rootProject.scalablelux_below}"
+	]
+	inputs.properties metadata
 
 	filesMatching('fabric.mod.json') {
-		expand version: project.version
+		expand metadata
 	}
 }
 

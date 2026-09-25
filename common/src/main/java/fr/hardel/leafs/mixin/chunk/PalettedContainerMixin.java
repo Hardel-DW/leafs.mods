@@ -8,7 +8,7 @@ import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.chunk.Strategy;
 import org.spongepowered.asm.mixin.Mixin;
 
-/** Reads ride vanilla's volatile snapshot; writes and serializations take the monitor (IO packs while the region writes), so vanilla's detector never trips. */
+/** The monitor sits on the public methods: Lithium overwrites acquire and release. */
 @Mixin(PalettedContainer.class)
 public abstract class PalettedContainerMixin {
 

@@ -13,7 +13,6 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-/** Seeded random churn with the invariant check applied throughout; shift 2 so the topology changes often. */
 class RegionizerFuzzTest {
     private static final int OPERATIONS = 4000;
     private static final int CHECK_INTERVAL = 50;
@@ -56,7 +55,7 @@ class RegionizerFuzzTest {
             int chunkX = CoordinateKey.x(chunkKey);
             int chunkZ = CoordinateKey.z(chunkKey);
             Region<Object> owner = regionizer.regionAt(chunkX, chunkZ);
-            assertNotNull(owner, "chunk [" + chunkX + ", " + chunkZ + "] lost its region");
+            assertNotNull(owner, "chunk [%s, %s] lost its region".formatted(chunkX, chunkZ));
             assertSame(owner, regionizer.regionAtUnsynchronised(chunkX, chunkZ));
         }
     }

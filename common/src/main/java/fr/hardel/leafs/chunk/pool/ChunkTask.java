@@ -4,22 +4,14 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/** A unit of chunk work. A returned future keeps the reservation until it completes. */
 public abstract class ChunkTask {
+    public static final long[] NO_RESERVATION = {};
     static final int UNQUEUED = -1;
-    private static final VarHandle BUCKET;
+    private static final VarHandle BUCKET = findBucket();
 
-    static {
-        try {
-            BUCKET = MethodHandles.lookup().findVarHandle(ChunkTask.class, "bucket", int.class);
-        } catch (ReflectiveOperationException exception) {
-            throw new ExceptionInInitializerError(exception);
-        }
-    }
-
-    /** What a task is for; the reservation counts say which kind waits behind which. */
     public enum Kind {
         STEP,
         LIGHT,
@@ -27,7 +19,6 @@ public abstract class ChunkTask {
         HOUSEKEEPING
     }
 
-    /** Where a task works, in reservation keys: the chunk it writes and the centre it serves. The more urgent of the two is its priority, so a dependency inherits the urgency of its user. */
     public record Place(long chunkKey, long centerKey, Urgency urgency) {
         public int priority() {
             int chunk = urgency.of(chunkX(chunkKey), chunkZ(chunkKey));
@@ -41,8 +32,8 @@ public abstract class ChunkTask {
     private volatile int priority;
     private volatile int bucket = UNQUEUED;
     private volatile boolean withdrawn;
+    @Nullable List<ChunkTask> waiters;
 
-    /** A fixed priority, invisible to the re-prioritisation. */
     protected ChunkTask(Kind kind, int priority, long... reserved) {
         this.kind = kind;
         this.place = null;
@@ -58,26 +49,13 @@ public abstract class ChunkTask {
     }
 
     public static ChunkTask of(Kind kind, int priority, long[] reserved, Runnable body) {
-        return new ChunkTask(kind, priority, reserved) {
-            @Override
-            protected @Nullable CompletableFuture<?> run() {
-                body.run();
-                return null;
-            }
-        };
+        return new RunnableTask(kind, priority, reserved, body);
     }
 
     public static ChunkTask of(Kind kind, Place place, long[] reserved, Runnable body) {
-        return new ChunkTask(kind, place, reserved) {
-            @Override
-            protected @Nullable CompletableFuture<?> run() {
-                body.run();
-                return null;
-            }
-        };
+        return new RunnableTask(kind, place, reserved, body);
     }
 
-    /** Chunk coordinates fit in 22 bits each, the owner in the 20 above, so two levels never share a key. */
     public static long key(int owner, int chunkX, int chunkZ) {
         return ((long) owner << 44) | ((chunkX & 0x3FFFFFL) << 22) | (chunkZ & 0x3FFFFFL);
     }
@@ -106,10 +84,13 @@ public abstract class ChunkTask {
         return priority;
     }
 
-    /** Null when the work is done on return. */
     protected abstract @Nullable CompletableFuture<?> run();
 
-    /** Left the queue before running: the pool drops it when it reaches it. */
+    @Override
+    public String toString() {
+        return place == null ? "%s at priority %d".formatted(kind, priority) : "%s at [%d, %d] priority %d".formatted(kind, chunkX(place.chunkKey()), chunkZ(place.chunkKey()), priority);
+    }
+
     protected final void withdraw() {
         withdrawn = true;
     }
@@ -124,11 +105,10 @@ public abstract class ChunkTask {
 
     final void enqueuedAt(int bucket) {
         if (!BUCKET.compareAndSet(this, UNQUEUED, bucket)) {
-            throw new IllegalStateException("Task already queued at bucket " + this.bucket);
+            throw new IllegalStateException("Task already queued at bucket %s".formatted(this.bucket));
         }
     }
 
-    /** False for a stale entry a move left behind. */
     final boolean claimAt(int bucket) {
         return BUCKET.compareAndSet(this, bucket, UNQUEUED);
     }
@@ -143,6 +123,34 @@ public abstract class ChunkTask {
             if (BUCKET.compareAndSet(this, current, bucket)) {
                 return true;
             }
+        }
+    }
+
+    private static VarHandle findBucket() {
+        try {
+            return MethodHandles.lookup().findVarHandle(ChunkTask.class, "bucket", int.class);
+        } catch (ReflectiveOperationException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private static final class RunnableTask extends ChunkTask {
+        private final Runnable body;
+
+        private RunnableTask(Kind kind, int priority, long[] reserved, Runnable body) {
+            super(kind, priority, reserved);
+            this.body = body;
+        }
+
+        private RunnableTask(Kind kind, Place place, long[] reserved, Runnable body) {
+            super(kind, place, reserved);
+            this.body = body;
+        }
+
+        @Override
+        protected @Nullable CompletableFuture<?> run() {
+            body.run();
+            return null;
         }
     }
 }

@@ -3,29 +3,22 @@ package fr.hardel.leafs.world;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RoutingRandomSourceTest {
     private final RandomSource unitRandom = fixed(2);
     private final RoutingRandomSource routing = new RoutingRandomSource(null);
-    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache(), 0L);
-
-    @AfterEach
-    void exitContext() {
-        WorldTickContext.exit();
-    }
+    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache());
 
     @Test
     void contextForTheLevelResolvesTheRegionRandom() {
         routing.setSeed(7);
-        WorldTickContext.enter(null, null, worldData);
+        WorldTickContext context = WorldTickContext.enter(null, null, worldData);
 
         assertEquals(2, routing.nextInt());
-        WorldTickContext.exit();
+        context.exit();
         assertEquals(RandomSource.create(7).nextInt(), routing.nextInt(), "back to this thread's own random, untouched by the region");
     }
 
@@ -44,6 +37,15 @@ class RoutingRandomSourceTest {
         RandomSource reference = RandomSource.create(1);
         reference.nextInt();
         assertEquals(reference.nextInt(), routing.nextInt(), "the other thread seeded its own random, not this thread's");
+    }
+
+    @Test
+    void offARegionEachLevelHasItsOwnRandom() {
+        RoutingRandomSource other = new RoutingRandomSource(null);
+        routing.setSeed(1);
+        other.setSeed(2);
+
+        assertEquals(RandomSource.create(1).nextInt(), routing.nextInt(), "the other level seeded its own random, not this level's");
     }
 
     private static RandomSource fixed(int value) {

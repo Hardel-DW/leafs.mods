@@ -35,7 +35,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Facade swap (dragonParts, players COW, waypoints), the entity adds and removes on their owner, passenger membership from the region photo. */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
@@ -82,14 +81,12 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 
-    /** A passenger ticks with its vehicle when the region's photo holds it; the vanilla list stays empty by routing. */
     @WrapOperation(method = "tickPassenger", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/EntityTickList;contains(Lnet/minecraft/world/entity/Entity;)Z"))
     private boolean leafs$containsInRegionPhoto(EntityTickList instance, Entity entity, Operation<Boolean> original) {
         RegionWorldData data = WorldTickContext.activeFor((ServerLevel) (Object) this);
         return data != null && data.entities().contains(entity);
     }
 
-    /** From a region of another level the add hops to this level's owner of the position; here the server thread locks the region at contact, and two regions serialize on the level-wide player maps. */
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
         if (leafs$fromAnotherLevel()) {
@@ -101,7 +98,6 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         SharedStateMonitor.run(this, () -> original.call(player));
     }
 
-    /** A hop answers what vanilla answers before touching the sections, an entity already removed or a UUID already known is refused here too. */
     @WrapMethod(method = "addEntity")
     private boolean leafs$addEntityOnTheOwner(Entity entity, Operation<Boolean> original) {
         if (!leafs$fromAnotherLevel()) {
@@ -109,7 +105,7 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
             return original.call(entity);
         }
 
-        if (entity.isRemoved() || ((EntityManagerAccess) ((ServerLevel) (Object) this).entityManager).leafs$knows(entity.getUUID())) {
+        if (entity.isRemoved() || ((ServerLevel) (Object) this).entityManager.isLoaded(entity.getUUID())) {
             return false;
         }
 

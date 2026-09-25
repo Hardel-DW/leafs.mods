@@ -1,12 +1,11 @@
 package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.ints.AbstractInt2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
@@ -15,33 +14,79 @@ import org.jspecify.annotations.NonNull;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 
-/** ConcurrentHashMap-backed Int2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
     private final ConcurrentHashMap<Integer, V> map = new ConcurrentHashMap<>();
+    private final ConcurrentValues<V> values = new ConcurrentValues<>(map);
 
     @Override
     public V get(int key) {
-        V value = map.get(key);
-        return value == null ? defaultReturnValue() : value;
+        return orDefault(map.get(key));
     }
 
     @Override
     public V put(int key, V value) {
-        V previous = map.put(key, value);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.put(key, value));
     }
 
     @Override
     public V remove(int key) {
-        V previous = map.remove(key);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.remove(key));
+    }
+
+    @Override
+    public V putIfAbsent(int key, V value) {
+        return orDefault(map.putIfAbsent(key, value));
+    }
+
+    @Override
+    public boolean remove(int key, Object value) {
+        return map.remove(key, value);
+    }
+
+    @Override
+    public boolean replace(int key, V oldValue, V newValue) {
+        return map.replace(key, oldValue, newValue);
+    }
+
+    @Override
+    public V replace(int key, V value) {
+        return orDefault(map.replace(key, value));
     }
 
     @Override
     public V computeIfAbsent(int key, IntFunction<? extends V> mapping) {
-        V value = map.computeIfAbsent(key, mapping::apply);
+        return orDefault(map.computeIfAbsent(key, mapping::apply));
+    }
+
+    @Override
+    public V computeIfAbsent(int key, Int2ObjectFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(key, boxed -> mapping.get((int) boxed)));
+    }
+
+    @Override
+    public V computeIfPresent(int key, BiFunction<? super Integer, ? super V, ? extends V> remapping) {
+        return orDefault(map.computeIfPresent(key, remapping));
+    }
+
+    @Override
+    public V compute(int key, BiFunction<? super Integer, ? super V, ? extends V> remapping) {
+        return orDefault(map.compute(key, remapping));
+    }
+
+    @Override
+    public V merge(int key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return orDefault(map.merge(key, value, remapping));
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super Integer, ? super V, ? extends V> function) {
+        map.replaceAll(function);
+    }
+
+    private V orDefault(V value) {
         return value == null ? defaultReturnValue() : value;
     }
 
@@ -72,33 +117,7 @@ public final class ConcurrentInt2ObjectMap<V> extends AbstractInt2ObjectMap<V> {
 
     @Override
     public @NonNull ObjectCollection<V> values() {
-        return new AbstractObjectCollection<>() {
-            @Override
-            public @NonNull ObjectIterator<V> iterator() {
-                return ObjectIterators.asObjectIterator(map.values().iterator());
-            }
-
-            /** A stream must not trust a size the map outgrows while it runs. */
-            @Override
-            public @NonNull ObjectSpliterator<V> spliterator() {
-                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
-            }
-
-            @Override
-            public int size() {
-                return map.size();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-                return map.containsValue(value);
-            }
-
-            @Override
-            public void clear() {
-                map.clear();
-            }
-        };
+        return values;
     }
 
     @Override

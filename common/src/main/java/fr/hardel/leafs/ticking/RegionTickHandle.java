@@ -10,7 +10,6 @@ import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.world.level.ChunkPos;
 
-/** The schedulable side of one region; the gate only tries, a worker never parks, a skipped pass is a tick that never happened. */
 public final class RegionTickHandle extends TickHandle {
     private final Region<RegionTickData> region;
     private final LevelRegions regions;
@@ -18,15 +17,17 @@ public final class RegionTickHandle extends TickHandle {
     private volatile int entityCensus;
 
     RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions) {
-        super(new RegionContext.Region(region.id(), dimension), TickStages.count(TickFamily.REGION));
+        super(region.id(), dimension, TickStages.count(TickFamily.REGION));
         this.region = region;
         this.regions = regions;
     }
 
+    // Used by the Leafs Debug mod
     public int chunkCount() {
         return chunkCensus;
     }
 
+    // Used by the Leafs Debug mod
     public int entityCount() {
         return entityCensus;
     }
@@ -37,46 +38,43 @@ public final class RegionTickHandle extends TickHandle {
     }
 
     @Override
-    protected void tick() {
+    protected boolean tick() {
         if (!region.tryMarkTicking()) {
-            return;
+            return false;
         }
 
         try {
-            RegionTickData data = region.data();
-            RegionWorldData worldData = data.worldData();
-            RegionTickBody body = regions.body();
-            if (worldData == null || body == null) {
-                return;
-            }
-
-            WorldTickContext.enter(body.level(), region, worldData);
-            try {
-                if (body.level().getServer().isPaused()) {
-                    data.inbox().drain();
-                    return;
-                }
-
-                StageTimings stages = stages();
-                long startNanos = System.nanoTime();
-                stages.recordLag(startNanos - scheduledStartNanos());
-                stages.beginTick(startNanos);
-                ((ServerLevelEntityAccess) body.level()).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
-                stages.mark(TickStages.regionUnloads);
-                body.tick(region, data.clock(), worldData, stages, regions, startNanos + regions.tickPeriodNanos());
-                chunkCensus = region.chunkCount();
-                entityCensus = worldData.entities().size();
-                stages.endTick(System.nanoTime());
-            } finally {
-                WorldTickContext.exit();
-            }
+            tickMarked();
         } finally {
             region.markNotTicking();
         }
+
+        return true;
     }
 
-    @Override
-    protected RegionCrashReport buildCrashReport() {
-        return new RegionCrashReport(id(), dimension(), currentTick(), region.chunkCount(), entityCensus);
+    private void tickMarked() {
+        RegionTickData data = region.data();
+        RegionWorldData worldData = data.worldData();
+        RegionTickBody body = regions.body();
+        WorldTickContext context = WorldTickContext.enter(body.level(), region, worldData);
+        try {
+            if (TickingManager.of(body.level().getServer()).paused()) {
+                data.inbox().drain();
+                return;
+            }
+
+            StageTimings stages = stages();
+            long startNanos = System.nanoTime();
+            stages.recordLag(startNanos - scheduledStartNanos());
+            stages.beginTick(startNanos);
+            ((ServerLevelEntityAccess) body.level()).leafs$entityPersistence().unloadHidden(chunkKey -> region.owns(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
+            stages.mark(TickStages.regionUnloads);
+            body.tick(region, data.clock(), worldData, stages, regions, startNanos + body.level().tickRateManager().nanosecondsPerTick());
+            chunkCensus = region.chunkCount();
+            entityCensus = worldData.entities().size();
+            stages.endTick(System.nanoTime());
+        } finally {
+            context.exit();
+        }
     }
 }

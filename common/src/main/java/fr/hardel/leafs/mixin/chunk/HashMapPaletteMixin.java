@@ -9,7 +9,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Vanilla adds the overflowing value before the resize, growing a palette a reader still snapshots. A full palette answers out of range instead, vanilla then resizes. */
 @Mixin(HashMapPalette.class)
 public abstract class HashMapPaletteMixin {
 

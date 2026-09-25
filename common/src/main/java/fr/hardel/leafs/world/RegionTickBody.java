@@ -1,8 +1,6 @@
 package fr.hardel.leafs.world;
 
-import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.RegionEntityTracking;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
 import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.entity.EntityTickAccess;
@@ -15,7 +13,6 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionClock;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerChunkCache;
@@ -27,7 +24,6 @@ import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.BlockEventData;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.LocalMobCapCalculator;
 import net.minecraft.world.level.NaturalSpawner;
@@ -36,18 +32,17 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Every chunk-anchored phase of the level tick, over one region's chunks, in vanilla order. Level-wide work stays on the server thread. */
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
 
     private final ServerLevel level;
-    private final RegionAutosave autosave;
+    private final ChunkSaves saves;
     private final MobCaps mobCaps;
 
     public RegionTickBody(ServerLevel level) {
         this.level = level;
-        this.autosave = new RegionAutosave(level);
+        this.saves = new ChunkSaves(level);
         this.mobCaps = new MobCaps(level);
     }
 
@@ -55,7 +50,6 @@ public final class RegionTickBody {
         return level;
     }
 
-    /** The save takes a tenth of the period at most, the inbox what is left of it and a tenth at least: a heavy tick still publishes, a light one publishes everything. */
     public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tickDeadlineNanos) {
         TickRateManager tickRateManager = level.tickRateManager();
         boolean runs = tickRateManager.runsNormally();
@@ -75,6 +69,7 @@ public final class RegionTickBody {
                 RegionNetworkTick.drainOnRegion(player, level);
             }
         });
+
         stages.mark(TickStages.regionPackets);
         if (runs && !level.isDebug()) {
             long currentTick = clock.currentTick();
@@ -86,7 +81,7 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionChunkTick);
         }
 
-        ChunkBroadcasts.changed(owned.holders());
+        ChunkBroadcasts.changed(((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders(), owned.holders());
         stages.mark(TickStages.regionBroadcast);
         RegionEntityTracking.tickRegion(level, owned, entities);
         stages.mark(TickStages.regionTracking);
@@ -107,17 +102,18 @@ public final class RegionTickBody {
                 RegionNetworkTick.tickPlayerOnRegion(player, level.getServer());
             }
         });
+
         stages.mark(TickStages.regionPlayers);
-        long slice = regions.tickPeriodNanos() / 10;
-        autosave.tick(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
+        long slice = level.tickRateManager().nanosecondsPerTick() / 10;
+        saves.autosave(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
         stages.mark(TickStages.regionAutosave);
         RegionInbox inbox = region.data().inbox();
         inbox.drain(Math.max(tickDeadlineNanos, System.nanoTime() + slice));
         stages.mark(TickStages.regionTasks);
     }
 
-    /** What is left of the serial {@code tickChunks} pass: the sweep of the chunks no region covers, then the custom spawners. */
     public void tickSerial(boolean spawnEnemies) {
+        mobCaps.sumLevel();
         LevelChunks.of(level).sweep().soon();
         if (level.getGameRules().get(GameRules.SPAWN_MOBS)) {
             level.tickCustomSpawners(spawnEnemies);
@@ -127,34 +123,21 @@ public final class RegionTickBody {
     private void tickChunks(RegionChunks chunks, RegionWorldData worldData, PlayerView view, StageTimings stages) {
         ServerChunkCache chunkSource = level.getChunkSource();
         ChunkMap chunkMap = chunkSource.chunkMap;
-        DistanceManager distanceManager = chunkMap.getDistanceManager();
         long gameTime = level.getGameTime();
-        long timeDiff = worldData.advanceInhabitedTime(gameTime);
         int tickSpeed = level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
         List<LevelChunk> spawningChunks = new ArrayList<>();
         List<LevelChunk> randomTickingChunks = new ArrayList<>();
         int spawnableChunks = countAndCollect(chunks, chunkMap, view, spawningChunks, randomTickingChunks);
-        NaturalSpawner.SpawnState state = spawningChunks.isEmpty() ? null : NaturalSpawner.createState(spawnableChunks, worldData.entities().accessible(), (chunkKey, output) -> {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkKey);
-            if (holder != null) {
-                holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).ifSuccess(output);
-            }
-        }, new LocalMobCapCalculator(chunkMap));
-        List<MobCategory> categories = state == null || !level.getGameRules().get(GameRules.SPAWN_MOBS)
-            ? List.of()
-            : mobCaps.spawnable(worldData, state, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L);
+        NaturalSpawner.SpawnState state = NaturalSpawner.createState(spawnableChunks, level, chunkSource::getFullChunk, new LocalMobCapCalculator(chunkMap));
+        worldData.publishCensus(MobCensus.of(state));
+        List<MobCategory> categories = level.getGameRules().get(GameRules.SPAWN_MOBS)
+            ? mobCaps.spawnable(worldData, chunkSource.spawnEnemies, gameTime % PERSISTENT_SPAWN_PERIOD == 0L)
+            : List.of();
+
         stages.mark(TickStages.regionSpawnCensus);
         Util.shuffle(spawningChunks, level.getRandom());
         for (LevelChunk chunk : spawningChunks) {
-            ChunkPos chunkPos = chunk.getPos();
-            chunk.incrementInhabitedTime(timeDiff);
-            if (distanceManager.inEntityTickingRange(chunkPos.pack())) {
-                level.tickThunder(chunk);
-            }
-
-            if (!categories.isEmpty() && level.canSpawnEntitiesInChunk(chunkPos)) {
-                NaturalSpawner.spawnForChunk(level, chunk, state, categories);
-            }
+            chunkSource.tickSpawningChunk(chunk, categories, state);
         }
 
         for (LevelChunk chunk : randomTickingChunks) {
@@ -162,7 +145,6 @@ public final class RegionTickBody {
         }
     }
 
-    /** One pass over the ticking chunks: the spawnable census, the spawning list and the random-tick list. */
     private int countAndCollect(RegionChunks chunks, ChunkMap chunkMap, PlayerView view, List<LevelChunk> spawningChunks, List<LevelChunk> randomTickingChunks) {
         DistanceManager distanceManager = chunkMap.getDistanceManager();
         int spawnable = 0;
@@ -210,7 +192,6 @@ public final class RegionTickBody {
                 return;
             }
 
-            // An entity moved far during its tick lands in the next region's photo while that tick still runs: the same rule as the player's queue, it is skipped.
             EntityTickAccess claim = (EntityTickAccess) entity;
             if (!claim.leafs$beginTick()) {
                 return;
@@ -242,7 +223,6 @@ public final class RegionTickBody {
 
         level.guardEntityTick(level::tickNonPassenger, entity);
     }
-
 
     private void tickBlockEntities(boolean runsNormally, RegionChunks chunks) {
         ServerChunkCache chunkSource = level.getChunkSource();

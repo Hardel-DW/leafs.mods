@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** One queue per priority, 0 first. A moved task leaves a stale entry behind, which the poll skips. */
 final class PriorityBuckets {
     private final List<ConcurrentLinkedQueue<ChunkTask>> buckets;
 
@@ -18,7 +17,6 @@ final class PriorityBuckets {
 
         buckets = List.copyOf(created);
     }
-
 
     void add(ChunkTask task) {
         int bucket = clamp(task.priority());

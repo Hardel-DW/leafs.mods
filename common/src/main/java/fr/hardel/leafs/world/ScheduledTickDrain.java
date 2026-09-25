@@ -19,7 +19,6 @@ import java.util.function.Function;
 import java.util.function.LongPredicate;
 import java.util.function.ToLongFunction;
 
-/** Vanilla's {@code LevelTicks} drain over the chunks of one region: same cross-chunk order, same cap, no index to migrate. */
 public final class ScheduledTickDrain<C, T> {
     private static final int MAX_TICKS_PER_DRAIN = 65536;
     private static final Comparator<LevelChunkTicks<?>> CONTAINER_DRAIN_ORDER = (left, right) -> ScheduledTick.INTRA_TICK_DRAIN_ORDER.compare(left.peek(), right.peek());
@@ -92,7 +91,6 @@ public final class ScheduledTickDrain<C, T> {
         }
     }
 
-    /** Keeps pulling from the same container while its ticks come before the best other container's head. */
     private void drainFrom(LevelChunkTicks<T> current, long currentTick) {
         LevelChunkTicks<T> nextBest = containersToTick.peek();
         ScheduledTick<T> nextFromOther = nextBest == null ? null : nextBest.peek();

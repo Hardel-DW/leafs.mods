@@ -4,7 +4,6 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 
 import java.util.Arrays;
 
-/** Per-tick ring of one unit, stage durations plus tick length; single writer, torn reads tolerated, skipped passes count for nothing. */
 public final class StageTimings {
     public static final int CAPACITY = 240;
     private static final long WINDOW_NANOS = 5_000_000_000L;
@@ -17,8 +16,8 @@ public final class StageTimings {
     private long beginNanos;
     private long lastMarkNanos;
     private volatile int cursor;
-    private volatile long busyNanos;
     private volatile long lagNanos;
+    private volatile long missedStarts;
 
     public StageTimings(int stageCount) {
         this.ring = new long[CAPACITY][stageCount];
@@ -31,7 +30,6 @@ public final class StageTimings {
         lastMarkNanos = nowNanos;
     }
 
-    /** Time since the previous mark goes to this stage; additive. */
     public void mark(TickStage stage) {
         mark(stage, System.nanoTime());
     }
@@ -47,38 +45,39 @@ public final class StageTimings {
 
     public void endTick(long nowNanos) {
         int index = cursor % CAPACITY;
-        long duration = nowNanos - beginNanos;
         endNanos[index] = nowNanos;
-        durationNanos[index] = duration;
-        busyNanos += duration;
+        durationNanos[index] = nowNanos - beginNanos;
         row = null;
         cursor++;
     }
 
-    /** How long the unit waited past its due time. Regions only, an attached unit never queues so it stays at zero. */
     public void recordLag(long nanos) {
         lagNanos += nanos;
-    }
-
-    /** Total ticking time; a sampler differences two reads to get the work done in between. */
-    public long busyNanos() {
-        return busyNanos;
     }
 
     public long lagNanos() {
         return lagNanos;
     }
 
+    public void recordMissedStart() {
+        missedStarts++;
+    }
+
+    public long missedStarts() {
+        return missedStarts;
+    }
+
+    // Used by the Leafs Debug mod
     public int stageCount() {
         return ring[0].length;
     }
 
-    /** Ticks ended so far; a sampler reads from the last count it saw. */
+    // Used by the Leafs Debug mod
     public int completedTicks() {
         return cursor;
     }
 
-    /** Copies of the rows of the ticks ended since {@code fromTick}, oldest first; the ring bounds how far back that reaches. */
+    // Used by the Leafs Debug mod
     public long[][] rowsSince(int fromTick) {
         int end = cursor;
         int start = Math.max(fromTick, end - (CAPACITY - 1));
@@ -90,7 +89,6 @@ public final class StageTimings {
         return rows;
     }
 
-    /** Average nanos per stage over the last ticks. */
     public long[] averageNanos(int ticks) {
         int end = cursor;
         int count = Math.min(ticks, Math.min(end, CAPACITY - 1));
@@ -113,7 +111,7 @@ public final class StageTimings {
         return averages;
     }
 
-    /** TPS and tick length over the last five seconds. */
+    // Used by the Leafs Debug mod
     public Snapshot sample(long nowNanos) {
         long cutoff = nowNanos - WINDOW_NANOS;
         long[] window = new long[CAPACITY];
@@ -138,13 +136,13 @@ public final class StageTimings {
         return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50), percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
     }
 
-    /** Nearest rank, ~100 samples make interpolation false precision. */
     private static double percentile(long[] sorted, int count, double fraction) {
         int rank = Math.clamp((long) Math.ceil(fraction * count) - 1, 0, count - 1);
 
         return sorted[rank] / NANOS_PER_MILLI;
     }
 
+    // Used by the Leafs Debug mod
     public record Snapshot(double tps, double msptAverage, double mspt50, double mspt95, double mspt99, double msptMax) {
         static final Snapshot IDLE = new Snapshot(0, 0, 0, 0, 0, 0);
     }

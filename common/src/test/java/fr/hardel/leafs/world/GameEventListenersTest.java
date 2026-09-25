@@ -1,6 +1,7 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
@@ -124,12 +125,7 @@ class GameEventListenersTest {
             var outer = workers.submit(() -> visit(listener -> {
                 seen.add(listener);
                 visiting.countDown();
-                try {
-                    assertTrue(release.await(5, TimeUnit.SECONDS));
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    throw new AssertionError(exception);
-                }
+                TestThreads.await(release);
             }));
             try {
                 assertTrue(visiting.await(5, TimeUnit.SECONDS));

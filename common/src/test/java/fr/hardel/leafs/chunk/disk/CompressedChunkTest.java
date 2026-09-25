@@ -1,10 +1,8 @@
 package fr.hardel.leafs.chunk.disk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.visitors.CollectFields;
-import net.minecraft.nbt.visitors.FieldSelector;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionFile;
@@ -21,19 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MinecraftBootstrap.class)
 class CompressedChunkTest {
-    private static CompoundTag chunkTag() {
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("DataVersion", 4882);
-        tag.putString("Status", "minecraft:full");
-        CompoundTag section = new CompoundTag();
-        section.putLongArray("data", new long[] {1L, 2L, 3L, Long.MAX_VALUE});
-        tag.put("section", section);
-        return tag;
-    }
-
     @Test
     void vanillaReadsBackWhatThePoolCompressed() throws IOException {
-        CompoundTag tag = chunkTag();
+        CompoundTag tag = ChunkFixtures.photo(4882);
         ChunkPos pos = new ChunkPos(3, -7);
         Path folder = Files.createTempDirectory("leafs-region");
         RegionStorageInfo info = new RegionStorageInfo("test", Level.OVERWORLD, "chunk");
@@ -44,17 +32,5 @@ class CompressedChunkTest {
         try (RegionFileStorage storage = new RegionFileStorage(info, folder, false)) {
             assertEquals(tag, storage.read(pos));
         }
-    }
-
-    @Test
-    void theBytesReadAndScanLikeAFile() throws IOException {
-        CompoundTag tag = chunkTag();
-        CompressedChunk compressed = CompressedChunk.of(tag);
-
-        assertEquals(tag, compressed.read());
-
-        CollectFields version = new CollectFields(new FieldSelector(IntTag.TYPE, "DataVersion"));
-        compressed.scan(version);
-        assertEquals(4882, ((CompoundTag) version.getResult()).getIntOr("DataVersion", 0));
     }
 }

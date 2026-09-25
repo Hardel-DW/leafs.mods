@@ -6,7 +6,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Managed by Leafs: ScalableLux keeps its parallel light queue and never sizes a pool of its own. */
 @Mixin(value = SchedulingUtil.class, remap = false)
 public abstract class SchedulingUtilMixin {
 

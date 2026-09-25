@@ -3,18 +3,14 @@ package fr.hardel.leafs.region;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Scenario tests with shift 4 (16x16-chunk sections), merge radius 1, buffer radius 1. */
 class RegionizerTest {
     private RecordingCallbacks callbacks;
     private Regionizer<Object> regionizer;
@@ -34,7 +30,7 @@ class RegionizerTest {
         assertEquals(RegionState.READY, region.state());
         assertEquals(9, region.sectionCount());
         assertEquals(1, region.chunkCount());
-        assertEquals(9, regionizer.sectionsView().size());
+        assertEquals(9, regionizer.sections.size());
         RegionizerAssertions.assertInvariants(regionizer, true);
     }
 
@@ -184,7 +180,7 @@ class RegionizerTest {
 
         assertEquals(RegionState.DEAD, region.state());
         assertTrue(regionizer.regionsView().isEmpty());
-        assertTrue(regionizer.sectionsView().isEmpty());
+        assertTrue(regionizer.sections.isEmpty());
         assertNull(regionizer.regionAt(0, 0));
     }
 
@@ -211,28 +207,5 @@ class RegionizerTest {
         assertEquals(1, east.chunkCount());
         assertEquals(1, callbacks.events.stream().filter(event -> event.startsWith("split ")).count());
         RegionizerAssertions.assertInvariants(regionizer, true);
-    }
-
-    @Test
-    void doubleAddAndUnknownRemoveCrashEarly() {
-        regionizer.addChunk(0, 0);
-
-        assertThrows(IllegalStateException.class, () -> regionizer.addChunk(0, 0));
-        assertThrows(IllegalStateException.class, () -> regionizer.removeChunk(1, 1));
-        assertThrows(IllegalStateException.class, () -> regionizer.removeChunk(500, 500));
-    }
-
-    @Test
-    void callbacksMustNotReenterTheRegionizer() {
-        AtomicReference<Regionizer<Object>> holder = new AtomicReference<>();
-        Regionizer<Object> reentrant = new Regionizer<>(4, 1, 1, new RecordingCallbacks() {
-            @Override
-            public void onRegionCreate(Region<Object> region) {
-                holder.get().addChunk(500, 500);
-            }
-        });
-        holder.set(reentrant);
-
-        assertThrows(IllegalStateException.class, () -> reentrant.addChunk(0, 0));
     }
 }

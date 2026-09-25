@@ -31,7 +31,6 @@ class LeafsConfigTest {
         assertEquals(70, written.gameplay().mobCap(MobCategory.MONSTER));
     }
 
-    /** The file is the persisted config: a second change starts from it, not from the config the server booted with. */
     @Test
     void aSecondRewriteKeepsTheFirstChange(@TempDir Path directory) {
         Path file = directory.resolve("leafs.json");
@@ -68,7 +67,7 @@ class LeafsConfigTest {
         LeafsConfig defaults = LeafsConfig.defaults();
 
         assertEquals(8, config.effectiveRegionThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors() / 2, config.effectiveChunkThreads());
+        assertEquals(Math.max(1, Runtime.getRuntime().availableProcessors() / 2), config.effectiveChunkThreads());
         assertEquals(32, config.sectionSize());
         assertEquals(5, config.sectionShift());
         assertTrue(config.debug().perRegionLogs());
@@ -81,10 +80,9 @@ class LeafsConfigTest {
         assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().regionThreads());
         assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().chunkThreads());
         assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveRegionThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors() / 2, LeafsConfig.defaults().effectiveChunkThreads());
+        assertEquals(Math.max(1, Runtime.getRuntime().availableProcessors() / 2), LeafsConfig.defaults().effectiveChunkThreads());
     }
 
-    /** A negative threshold is one the consumers never reach; the log stays off without a branch on their side. */
     @Test
     void negativeThresholdsAreNeverReached(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");

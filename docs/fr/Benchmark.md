@@ -22,13 +22,13 @@ Plusieurs scénarios existent, seulement quelques-uns sont mentionnés ici, `wor
 | mesure | cible | run de référence |
 |---|---|---|
 | TPS minimal | 19,9 ou 20 | 20 |
-| Mspt du thread serveur | sous 1 | 0,5 |
+| Mspt du thread serveur | sous 0.5 | 0,5 |
 | Chunks/s complets | linéaire avec les workers de chunk | 383 |
 | Vitesse des bots | 36,0 | 36,0 |
 | Vue générée sur les 60 dernières secondes | 100 % | 100 % |
 | Échantillons à vue incomplète | 0 % | 0 % |
-| Cœurs consommés | sous 14 | 12,8 |
-| Heap mémoire en fin de run | Stable < 1 Go | 0,68 Go |
+| Cœurs consommés | sous 13 | 12,8 |
+| Heap mémoire en fin de run | Stable < 0.7 Go | 0,68 Go |
 | Holders en attente de démontage | 0 | 0 |
 | Pire tick d'une étape de région | sous 50 ms | tasks 37 ms |
 

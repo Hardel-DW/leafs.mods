@@ -33,7 +33,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-/** Hook only, routing in entity/RegionEntityPersistence. The maps go concurrent; arrival, unload and autosave run on the owner, saveAll on the universal owner. */
 @Mixin(PersistentEntitySectionManager.class)
 public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess> implements EntityManagerAccess {
 
@@ -94,13 +93,8 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
         this.chunksToUnload = new ConcurrentLongSet();
     }
 
-    /** Arrival leaves the global inbox: the loaded entity chunk adds its entities on the region that owns the position. */
     @WrapOperation(method = "requestChunkLoad", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenAccept(Ljava/util/function/Consumer;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$deliverOnTheOwner(CompletableFuture<ChunkEntities<T>> future, Consumer<? super ChunkEntities<T>> inboxAdd, Operation<CompletableFuture<Void>> original) {
-        if (leafs$persistence == null) {
-            return original.call(future, inboxAdd);
-        }
-
         Consumer<ChunkEntities<T>> delivery = chunk -> leafs$persistence.deliver(chunk.getPos(), () -> {
             addLegacyChunkEntities(chunk.getEntities());
             chunkLoadStatuses.put(chunk.getPos().pack(), PersistentEntitySectionManager.ChunkLoadStatus.LOADED);
@@ -109,30 +103,23 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
         return original.call(future, delivery);
     }
 
-    /** Each region unloads its own hidden chunks; the serial sweep only runs once the pool stopped. */
     @Inject(method = "processUnloads", at = @At("HEAD"), cancellable = true)
     private void leafs$unloadsOnTheOwner(CallbackInfo callbackInfo) {
-        if (leafs$persistence != null && !TickingManager.of(leafs$persistence.level().getServer()).halted()) {
+        if (!TickingManager.of(leafs$persistence.level().getServer()).halted()) {
             callbackInfo.cancel();
         }
     }
 
-    /** The epoch walk of each region stores its entity chunks; the vanilla body only survives for an empty server, whose regions consume no epoch. */
     @Inject(method = "autoSave", at = @At("HEAD"), cancellable = true)
     private void leafs$autosaveOnTheOwner(CallbackInfo callbackInfo) {
-        if (leafs$persistence != null && !leafs$persistence.level().getServer().getPlayerList().getPlayers().isEmpty()) {
+        if (!leafs$persistence.level().getServer().getPlayerList().getPlayers().isEmpty()) {
             callbackInfo.cancel();
         }
     }
 
-    /** The vanilla call drained the inbox; the routed deliveries need the universal owner to run them in line. */
+    /** The saving thread runs the routed deliveries in line, or saveAll waits on them forever. */
     @WrapOperation(method = "saveAll", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;processPendingLoads()V"))
     private void leafs$drainDeliveriesWhileSavingAll(PersistentEntitySectionManager<?> manager, Operation<Void> original) {
-        if (leafs$persistence == null) {
-            original.call(manager);
-            return;
-        }
-
         leafs$persistence.drainPendingLoadsInline();
     }
 
@@ -161,10 +148,5 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     @Override
     public LongSet leafs$chunksToUnload() {
         return chunksToUnload;
-    }
-
-    @Override
-    public boolean leafs$knows(UUID uuid) {
-        return knownUuids.contains(uuid);
     }
 }

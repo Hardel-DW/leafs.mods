@@ -18,7 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The region drain over chunk containers keeps vanilla's cross-chunk order without an index. */
 @ExtendWith(MinecraftBootstrap.class)
 class ScheduledTickDrainTest {
 
@@ -64,7 +63,6 @@ class ScheduledTickDrainTest {
         assertEquals(1, west.ticks().count());
     }
 
-    /** Vanilla's copy during a callback sees the pass in progress, run and still to run, not only the containers. */
     @Test
     void aCopyDuringACallbackSeesThePassInProgress() {
         Chunk west = chunk(0);

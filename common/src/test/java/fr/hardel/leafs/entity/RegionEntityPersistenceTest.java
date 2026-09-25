@@ -6,18 +6,15 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.Visibility;
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** A chunk whose unload keeps failing waits for a later pass, it never comes back inside the pass that is walking the set. */
 class RegionEntityPersistenceTest {
     private static final int SIDE = 7;
     private static final int CHUNKS = SIDE * SIDE;
     private static final int RUNAWAY_ATTEMPTS = CHUNKS * 4;
 
-    /** The unload never succeeds, as for a chunk whose entities are still loading. The set is the concurrent one Leafs installs, its iteration sees late additions. */
     private static final class FailingManager implements EntityManagerAccess {
         private final LongSet chunksToUnload = new ConcurrentLongSet();
         private int unloadAttempts;
@@ -49,11 +46,6 @@ class RegionEntityPersistenceTest {
         @Override
         public LongSet leafs$chunksToUnload() {
             return chunksToUnload;
-        }
-
-        @Override
-        public boolean leafs$knows(UUID uuid) {
-            return false;
         }
     }
 

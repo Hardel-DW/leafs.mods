@@ -17,7 +17,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-/** Raiders join and leave their wave from their own region; the raid itself ticks with the level, on the server thread. */
 @Mixin(Raid.class)
 public abstract class RaidMixin {
 

@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** A section is chunk content: its owner writes it while other regions search it and the save packs it. */
 @ExtendWith(MinecraftBootstrap.class)
 class PoiSectionConcurrencyTest {
     private static final int PASSES = 2_000;

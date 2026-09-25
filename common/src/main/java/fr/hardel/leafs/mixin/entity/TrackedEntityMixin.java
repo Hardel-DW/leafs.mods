@@ -17,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The watcher set is written by the tracking pass of every region that owns one of the watchers. */
 @Mixin(targets = "net.minecraft.server.level.ChunkMap$TrackedEntity")
 public abstract class TrackedEntityMixin {
 
@@ -31,7 +30,6 @@ public abstract class TrackedEntityMixin {
         this.seenBy = ConcurrentHashMap.newKeySet();
     }
 
-    /** A first watcher re-anchors the base: only then is there no delta stream the refresh could tear. */
     @WrapOperation(method = "updatePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerEntity;addPairing(Lnet/minecraft/server/level/ServerPlayer;)V"))
     private void leafs$freshBaseOnFirstPairing(ServerEntity serverEntity, ServerPlayer player, Operation<Void> original) {
         if (this.seenBy.size() == 1) {

@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The players graph as the bench drives it: five bots on a ring, one source each, moving a chunk at a time from five threads. */
 class PlayersGraphTest {
     private static final int LEVELS = 34;
     private static final int PLAYERS = 5;
@@ -59,7 +58,7 @@ class PlayersGraphTest {
         assertTrue(done.await(20, TimeUnit.SECONDS), "the bots never finished");
         assertEquals(List.of(), failures);
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-        assertTrue(millis < 5_000, "the moving bots took " + millis + " ms");
+        assertTrue(millis < 5_000, "the moving bots took %s ms".formatted(millis));
         for (int[] position : positions) {
             assertEquals(0, graph.level(ChunkPos.pack(position[0], position[1])));
             assertEquals(32, graph.level(ChunkPos.pack(position[0] + 32, position[1])));

@@ -1,20 +1,20 @@
 package fr.hardel.leafs.ticking;
 
-
+import java.util.function.BooleanSupplier;
 
 final class TestTickHandle extends TickHandle {
+    private final BooleanSupplier gate;
     private final Runnable body;
     private long ticks;
-    private final boolean crashReportFails;
 
     TestTickHandle(long id, Runnable body) {
-        this(id, body, false);
+        this(id, () -> true, body);
     }
 
-    TestTickHandle(long id, Runnable body, boolean crashReportFails) {
-        super(new RegionContext.Region(id, "test:world"), 1);
+    TestTickHandle(long id, BooleanSupplier gate, Runnable body) {
+        super(id, "test:world", 1);
+        this.gate = gate;
         this.body = body;
-        this.crashReportFails = crashReportFails;
     }
 
     @Override
@@ -23,17 +23,13 @@ final class TestTickHandle extends TickHandle {
     }
 
     @Override
-    protected void tick() {
-        ticks++;
-        body.run();
-    }
-
-    @Override
-    protected RegionCrashReport buildCrashReport() {
-        if (crashReportFails) {
-            throw new IllegalArgumentException("the level is too broken to describe");
+    protected boolean tick() {
+        if (!gate.getAsBoolean()) {
+            return false;
         }
 
-        return new RegionCrashReport(id(), dimension(), currentTick(), 0, 0);
+        ticks++;
+        body.run();
+        return true;
     }
 }

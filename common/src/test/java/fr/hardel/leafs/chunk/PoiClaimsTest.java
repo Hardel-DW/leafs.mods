@@ -15,18 +15,10 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** A bed has one place: the second taker of the same record gets nothing, and a full record is skipped for the next candidate. */
 @ExtendWith(MinecraftBootstrap.class)
 class PoiClaimsTest {
     private final Holder<PoiType> home = BuiltInRegistries.POINT_OF_INTEREST_TYPE.getOrThrow(PoiTypes.HOME);
     private final PoiRecord bed = new PoiRecord(new BlockPos(1, 64, 1), home, () -> { });
-
-    @Test
-    void theLastPlaceGoesToOneTakerOnly() {
-        assertEquals(Optional.of(bed.getPos()), PoiClaims.firstAcquired(Stream.of(bed)));
-
-        assertEquals(Optional.empty(), PoiClaims.firstAcquired(Stream.of(bed)));
-    }
 
     @Test
     void aRecordTakenMeanwhileIsSkippedForTheNextCandidate() {

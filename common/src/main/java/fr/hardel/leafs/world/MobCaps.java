@@ -6,7 +6,6 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.level.NaturalSpawner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,15 +15,15 @@ public final class MobCaps {
     private static final MobCategory[] SPAWNING = Arrays.stream(MobCategory.values()).filter(category -> category != MobCategory.MISC).toArray(MobCategory[]::new);
     private final LeafsConfig.Gameplay gameplay;
     private final LevelRegions regions;
+    private volatile MobCensus levelCensus = MobCensus.EMPTY;
 
     public MobCaps(ServerLevel level) {
         this.gameplay = LeafsConfig.get().gameplay();
         this.regions = LevelRegions.of(level);
     }
 
-    public List<MobCategory> spawnable(RegionWorldData worldData, NaturalSpawner.SpawnState state, boolean spawnEnemies, boolean spawnPersistent) {
-        worldData.publishCensus(MobCensus.of(state));
-        MobCensus census = gameplay.mobCapScope() == LeafsConfig.MobCapScope.LEVEL ? levelCensus() : worldData.census();
+    public List<MobCategory> spawnable(RegionWorldData worldData, boolean spawnEnemies, boolean spawnPersistent) {
+        MobCensus census = gameplay.mobCapScope() == LeafsConfig.MobCapScope.LEVEL ? levelCensus : worldData.census();
         List<MobCategory> categories = new ArrayList<>(SPAWNING.length);
         for (MobCategory category : SPAWNING) {
             if ((spawnEnemies || category.isFriendly()) && (spawnPersistent || !category.isPersistent()) && census.below(category, gameplay.mobCap(category))) {
@@ -35,12 +34,17 @@ public final class MobCaps {
         return categories;
     }
 
-    private MobCensus levelCensus() {
-        MobCensus total = MobCensus.EMPTY;
+    public void sumLevel() {
+        int spawnableChunks = 0;
+        int[] counts = new int[MobCategory.values().length];
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
-            total = total.plus(region.data().worldData().census());
+            MobCensus census = region.data().worldData().census();
+            spawnableChunks += census.spawnableChunks();
+            for (int index = 0; index < counts.length; index++) {
+                counts[index] += census.counts()[index];
+            }
         }
 
-        return total;
+        levelCensus = new MobCensus(spawnableChunks, counts);
     }
 }

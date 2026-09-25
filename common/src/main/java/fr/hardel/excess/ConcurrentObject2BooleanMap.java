@@ -2,6 +2,7 @@ package fr.hardel.excess;
 
 import it.unimi.dsi.fastutil.objects.AbstractObject2BooleanMap;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
+import it.unimi.dsi.fastutil.objects.Object2BooleanFunction;
 import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectIterators;
@@ -11,15 +12,15 @@ import org.jspecify.annotations.NonNull;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
-/** ConcurrentHashMap-backed Object2BooleanMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentObject2BooleanMap<K> extends AbstractObject2BooleanMap<K> {
     private final ConcurrentHashMap<K, Boolean> map = new ConcurrentHashMap<>();
 
     @Override
     public boolean getBoolean(Object key) {
-        Boolean value = map.get(key);
-        return value == null ? defaultReturnValue() : value;
+        return orDefault(map.get(key));
     }
 
     @Override
@@ -29,14 +30,66 @@ public final class ConcurrentObject2BooleanMap<K> extends AbstractObject2Boolean
 
     @Override
     public boolean put(K key, boolean value) {
-        Boolean previous = map.put(key, value);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.put(key, value));
     }
 
     @Override
     public boolean removeBoolean(Object key) {
-        Boolean previous = map.remove(key);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.remove(key));
+    }
+
+    @Override
+    public boolean putIfAbsent(K key, boolean value) {
+        return orDefault(map.putIfAbsent(key, value));
+    }
+
+    @Override
+    public boolean remove(Object key, boolean value) {
+        return map.remove(key, value);
+    }
+
+    @Override
+    public boolean replace(K key, boolean oldValue, boolean newValue) {
+        return map.replace(key, oldValue, newValue);
+    }
+
+    @Override
+    public boolean replace(K key, boolean value) {
+        return orDefault(map.replace(key, value));
+    }
+
+    @Override
+    public boolean computeIfAbsent(K key, Predicate<? super K> mapping) {
+        return orDefault(map.computeIfAbsent(key, mapping::test));
+    }
+
+    @Override
+    public boolean computeIfAbsent(K key, Object2BooleanFunction<? super K> mapping) {
+        return orDefault(map.computeIfAbsent(key, mapping::getBoolean));
+    }
+
+    @Override
+    public boolean computeBooleanIfPresent(K key, BiFunction<? super K, ? super Boolean, ? extends Boolean> remapping) {
+        return orDefault(map.computeIfPresent(key, remapping));
+    }
+
+    @Override
+    public boolean computeBoolean(K key, BiFunction<? super K, ? super Boolean, ? extends Boolean> remapping) {
+        return orDefault(map.compute(key, remapping));
+    }
+
+    @Override
+    public boolean merge(K key, boolean value, BiFunction<? super Boolean, ? super Boolean, ? extends Boolean> remapping) {
+        return orDefault(map.merge(key, value, remapping));
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super K, ? super Boolean, ? extends Boolean> function) {
+        map.replaceAll(function);
+    }
+
+    private boolean orDefault(Boolean value) {
+        return value == null ? defaultReturnValue() : value;
     }
 
     @Override

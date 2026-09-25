@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import net.minecraft.world.level.ChunkPos;
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** 2026-09-04: a region paid 30 ms of level bookkeeping at every chunk its player crossed. */
 @ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
-    private final ChunkPool pool = new ChunkPool(Thread.currentThread().getThreadGroup(), 1, 46);
+    private final ChunkPool pool = ChunkFixtures.pool(1);
     private final TicketGraphs graphs = new TicketGraphs();
     private final List<String> threads = new CopyOnWriteArrayList<>();
     private final CountDownLatch published = new CountDownLatch(1);
@@ -45,7 +46,7 @@ class TicketGraphsTest {
     @Test
     void aWriterOffThePoolHandsTheLoadingDrainOver() throws InterruptedException {
         List<String> simulation = new CopyOnWriteArrayList<>();
-        graphs.listen(loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
+        graphs.listen(() -> loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
 
         graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, false);
         graphs.simulationFeed().update(ChunkPos.pack(0, 0), 44, false);
@@ -61,7 +62,7 @@ class TicketGraphsTest {
     @Test
     void aBystanderLeavesTheSimulationMoveToItsWriter() throws InterruptedException {
         List<String> simulation = new CopyOnWriteArrayList<>();
-        graphs.listen(loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
+        graphs.listen(() -> loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
         graphs.simulationFeed().update(ChunkPos.pack(0, 0), 40, false);
         CountDownLatch drained = new CountDownLatch(1);
 
@@ -77,33 +78,22 @@ class TicketGraphsTest {
         assertTrue(simulation.stream().allMatch(Thread.currentThread().getName()::equals));
     }
 
-    /** B30: Lithium reads the holder right after runDistanceManagerUpdates without passing through vanilla's caller, so the primitive itself settles what was added. */
+    /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
     @Test
-    void aTicketAddedOffThePoolSettlesOnTheCallerAtRunDistanceManagerUpdates() {
-        graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
-
-        graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, true);
-        graphs.settleWritten(loading);
-
-        assertEquals(List.of(Thread.currentThread().getName()), threads, "the holder exists before the call returns, on this thread");
-        graphs.settleWritten(loading);
-        assertEquals(1, threads.size(), "settled once");
-    }
-
-    @Test
-    void aWorkerDrainsInLine() throws InterruptedException {
-        graphs.listen(loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
-        boolean[] changed = new boolean[1];
+    void aWorkerHandsTheLoadingDrainOver() throws InterruptedException {
+        graphs.listen(() -> loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
+        long[] publishedInLine = new long[1];
         CountDownLatch done = new CountDownLatch(1);
 
         pool.execute(() -> {
             graphs.loadingFeed().update(ChunkPos.pack(0, 0), 44, false);
-            changed[0] = graphs.drain();
+            graphs.drain();
+            publishedInLine[0] = published.getCount();
             done.countDown();
         });
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertTrue(changed[0]);
-        assertEquals(0, published.getCount());
+        assertEquals(1, publishedInLine[0]);
+        assertTrue(published.await(5, TimeUnit.SECONDS));
     }
 }

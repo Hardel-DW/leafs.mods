@@ -9,7 +9,6 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 
-/** Where the players stand: a source in the players graph and one PLAYER_SIMULATION ticket per occupied chunk, whoever stands there. */
 public final class PlayerSources {
     private final TicketStorage tickets;
     private final ChunkLevels players;

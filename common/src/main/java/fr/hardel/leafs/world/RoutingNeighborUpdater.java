@@ -16,7 +16,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/** {@code Level.neighborUpdater} swap: an update on a chunk this thread owns joins its collector, one on a chunk it does not goes to the owner's mail. A region collects in its world data, any other owner in its thread's. */
 public final class RoutingNeighborUpdater extends CollectingNeighborUpdater {
     private final ServerLevel level;
     private final Supplier<ChunkOwners> owners;

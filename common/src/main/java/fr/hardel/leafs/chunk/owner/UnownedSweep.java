@@ -1,16 +1,15 @@
 package fr.hardel.leafs.chunk.owner;
 
-import fr.hardel.leafs.chunk.ChangedChunksAccess;
-import fr.hardel.leafs.chunk.ChunkBroadcasts;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionTickData;
+import fr.hardel.leafs.world.ChangedChunksAccess;
+import fr.hardel.leafs.world.ChunkBroadcasts;
 import fr.hardel.leafs.world.ChunkSaves;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.server.level.ChunkHolder;
@@ -22,8 +21,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The loaded chunks no region covers, once per level tick: their timeouts, saves and broadcasts, each handed to the pool under its chunk. */
 public final class UnownedSweep {
+    private static final int CHUNKS_PER_TICK = 20;
+
     private final ServerLevel level;
     private final LevelRegions regions;
     private final ChunkOwners owners;
@@ -45,7 +45,6 @@ public final class UnownedSweep {
         this.saves = new ChunkSaves(level);
     }
 
-    /** One pass in flight at most; a second ask while one runs is the next tick's. */
     public void soon() {
         if (sweeping.compareAndSet(false, true)) {
             pool.execute(this::sweep);
@@ -75,15 +74,14 @@ public final class UnownedSweep {
     private void purgeTimeouts() {
         Regionizer<RegionTickData> regionizer = regions.regionizer();
         int shift = regionizer.sectionShift();
-        timeouts.purgeUnowned(section -> regionizer.regionAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) != null);
+        timeouts.purgeUnowned(section -> regionizer.regionAt(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift) != null);
     }
 
-    /** Twenty a pass, like the saves; a chunk whose entities are still loading stays for a later pass. */
     private void unloadHiddenEntities() {
         RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
         int attempts = 0;
         for (long chunkKey : persistence.pendingUnloads().toLongArray()) {
-            if (attempts == ChunkSaves.CHUNKS_PER_TICK) {
+            if (attempts == CHUNKS_PER_TICK) {
                 return;
             }
 
@@ -94,26 +92,27 @@ public final class UnownedSweep {
         }
     }
 
-    /** Vanilla's twenty attempts per tick from the head of the set; a chunk that is not ready stays for the next pass. The one walk of the whole set, so a key whose chunk left goes here. */
     private void saveEagerly() {
         ChunkMap chunkMap = level.getChunkSource().chunkMap;
         int attempts = 0;
         for (long chunkKey : chunkMap.chunksToEagerlySave.toLongArray()) {
-            if (attempts == ChunkSaves.CHUNKS_PER_TICK) {
+            if (attempts == CHUNKS_PER_TICK) {
                 return;
             }
 
             ChunkHolder holder = table.get(chunkKey);
             if (holder == null) {
                 chunkMap.chunksToEagerlySave.remove(chunkKey);
-            } else if (unowned(chunkKey)) {
+                continue;
+            }
+
+            if (unowned(chunkKey)) {
                 dispatch(chunkKey, () -> saves.saveEagerly(holder));
                 attempts++;
             }
         }
     }
 
-    /** A new epoch lists every unowned holder once; each pass takes its budget off the list. */
     private void saveBehindEpoch() {
         long epoch = regions.autosaveEpoch();
         if (epoch != epochSeen) {
@@ -127,7 +126,7 @@ public final class UnownedSweep {
             }
         }
 
-        int budget = Math.min(ChunkSaves.CHUNKS_PER_TICK, epochBacklog.size());
+        int budget = Math.min(CHUNKS_PER_TICK, epochBacklog.size());
         for (int index = 0; index < budget; index++) {
             long chunkKey = epochBacklog.popLong();
             ChunkHolder holder = table.get(chunkKey);
@@ -137,13 +136,12 @@ public final class UnownedSweep {
         }
     }
 
-    /** A changed holder leaves the set as its broadcast is handed out; a change after that puts it back. */
     private void broadcast() {
         Set<ChunkHolder> changed = ((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders();
         for (ChunkHolder holder : changed) {
             long chunkKey = holder.getPos().pack();
             if (unowned(chunkKey) && changed.remove(holder)) {
-                dispatch(chunkKey, () -> ChunkBroadcasts.changed(List.of(holder)));
+                dispatch(chunkKey, () -> ChunkBroadcasts.changed(changed, List.of(holder)));
             }
         }
     }

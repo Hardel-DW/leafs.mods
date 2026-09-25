@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"package": "fr.hardel.leafs.mixin.compat",
+	"plugin": "fr.hardel.leafs.CompatMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"CullingUpdateTrackerMixin",
+		"GraphBufferMixin",
+		"LeafDecayMixin",
+		"ListFieldMixin",
+		"MapFieldMixin",
+		"QueueFieldMixin",
+		"SetFieldMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

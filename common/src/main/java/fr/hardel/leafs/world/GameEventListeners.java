@@ -8,10 +8,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Each visit keeps its registration order and skips removed entries; additions wait until the open visits finish. */
 public final class GameEventListeners extends AbstractList<GameEventListener> {
-    private final List<Registration> listeners = new ArrayList<>();
+    private final List<Registration> listeners = new CopyOnWriteArrayList<>();
     private final List<Registration> pending = new ArrayList<>();
     private int visits;
 
@@ -27,12 +27,10 @@ public final class GameEventListeners extends AbstractList<GameEventListener> {
     }
 
     private static boolean removeFrom(List<Registration> registrations, Object listener) {
-        for (Iterator<Registration> iterator = registrations.iterator(); iterator.hasNext();) {
-            Registration registration = iterator.next();
+        for (Registration registration : registrations) {
             if (Objects.equals(registration.listener, listener)) {
                 registration.active = false;
-                iterator.remove();
-                return true;
+                return registrations.remove(registration);
             }
         }
 
@@ -61,16 +59,15 @@ public final class GameEventListeners extends AbstractList<GameEventListener> {
     }
 
     @Override
-    public synchronized Iterator<GameEventListener> iterator() {
-        List<Registration> snapshot = List.copyOf(listeners);
+    public Iterator<GameEventListener> iterator() {
+        Iterator<Registration> snapshot = listeners.iterator();
         return new Iterator<>() {
-            private int index;
             private Registration next;
 
             @Override
             public boolean hasNext() {
-                while (next == null && index < snapshot.size()) {
-                    Registration candidate = snapshot.get(index++);
+                while (next == null && snapshot.hasNext()) {
+                    Registration candidate = snapshot.next();
                     if (candidate.active) {
                         next = candidate;
                     }

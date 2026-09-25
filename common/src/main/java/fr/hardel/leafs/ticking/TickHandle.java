@@ -1,27 +1,32 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.metrics.StageTimings;
+import net.minecraft.CrashReportCategory;
 
-/** One schedulable tick unit, subclassed by the whole-level attached tick and by a real region. */
 public abstract class TickHandle {
-    private final RegionContext context;
+    private final long id;
+    private final String dimension;
     private final StageTimings stages;
     private volatile boolean cancelled;
     private volatile long scheduledStartNanos;
 
-    protected TickHandle(RegionContext context, int stageCount) {
-        this.context = context;
+    protected TickHandle(long id, String dimension, int stageCount) {
+        this.id = id;
+        this.dimension = dimension;
         this.stages = new StageTimings(stageCount);
     }
 
+    // Used by the Leafs Debug mod
     public long id() {
-        return context.id();
+        return id;
     }
 
+    // Used by the Leafs Debug mod
     public String dimension() {
-        return context.dimension();
+        return dimension;
     }
 
+    // Used by the Leafs Debug mod
     public StageTimings stages() {
         return stages;
     }
@@ -30,12 +35,9 @@ public abstract class TickHandle {
         cancelled = true;
     }
 
+    // Used by the Leafs Debug mod
     public boolean isCancelled() {
         return cancelled;
-    }
-
-    RegionContext context() {
-        return context;
     }
 
     long scheduledStartNanos() {
@@ -46,10 +48,11 @@ public abstract class TickHandle {
         this.scheduledStartNanos = scheduledStartNanos;
     }
 
-    /** The region clock, or game time for the level-serial unit. */
+    public void fillCrashReportCategory(CrashReportCategory category) {
+        category.setDetail("Id", id()).setDetail("Dimension", dimension()).setDetail("Tick", currentTick());
+    }
+
     public abstract long currentTick();
 
-    protected abstract void tick();
-
-    protected abstract RegionCrashReport buildCrashReport();
+    protected abstract boolean tick();
 }

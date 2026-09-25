@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.world.GameEventListeners;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -32,7 +33,6 @@ class GameEventRegistryTest {
         EuclideanGameEventListenerRegistry registry = new EuclideanGameEventListenerRegistry(null, 0, _ -> { });
         var field = EuclideanGameEventListenerRegistry.class.getDeclaredField("listeners");
         field.setAccessible(true);
-        // Seed the transformed list without constructing a world solely for registration debug packets.
         GameEventListeners listeners = assertInstanceOf(GameEventListeners.class, field.get(registry));
         GameEventListener first = new Listener(1);
         GameEventListener second = new Listener(2);
@@ -45,12 +45,7 @@ class GameEventRegistryTest {
             var outer = workers.submit(() -> registry.visitInRangeListeners(GameEvent.STEP, Vec3.ZERO, new GameEvent.Context(null, null), (listener, _) -> {
                 seen.add(listener);
                 visiting.countDown();
-                try {
-                    assertTrue(release.await(5, TimeUnit.SECONDS));
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    throw new AssertionError(exception);
-                }
+                TestThreads.await(release);
             }));
             try {
                 assertTrue(visiting.await(5, TimeUnit.SECONDS));

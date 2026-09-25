@@ -1,6 +1,8 @@
 package fr.hardel.leafs.chunk.level;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
@@ -143,14 +145,21 @@ class ChunkLevelsTest {
         assertTrue(reported.isEmpty());
     }
 
+    /** 2026-09-24: two threads posted the same chunk, and the expectation kept the lower source while the graph keeps the last one. */
     @Test
     void concurrentDrainsSettleLikeASerialComputation() throws InterruptedException {
         int threads = 8;
         int span = 300;
         List<long[]> sources = new ArrayList<>();
+        LongSet positions = new LongOpenHashSet();
         Random random = new Random(42);
-        for (int index = 0; index < 400; index++) {
-            sources.add(new long[] {random.nextInt(span), random.nextInt(span), 25 + random.nextInt(16)});
+        while (sources.size() < 400) {
+            int chunkX = random.nextInt(span);
+            int chunkZ = random.nextInt(span);
+            int level = 25 + random.nextInt(16);
+            if (positions.add(ChunkPos.pack(chunkX, chunkZ))) {
+                sources.add(new long[] {chunkX, chunkZ, level});
+            }
         }
 
         CountDownLatch done = new CountDownLatch(threads);
@@ -178,7 +187,7 @@ class ChunkLevelsTest {
                     expected = Math.min(expected, (int) source[2] + distance);
                 }
 
-                assertEquals(expected, level(chunkX, chunkZ), "chunk " + chunkX + "," + chunkZ);
+                assertEquals(expected, level(chunkX, chunkZ), "chunk %s,%s".formatted(chunkX, chunkZ));
             }
         }
     }

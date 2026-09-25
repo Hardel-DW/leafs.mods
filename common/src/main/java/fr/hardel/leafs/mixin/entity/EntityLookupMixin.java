@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The level's entity indexes are read and written from every region, so both maps go concurrent; a borrower takes the region of every entity handed out. */
 @Mixin(EntityLookup.class)
 public abstract class EntityLookupMixin<T extends EntityAccess> implements LevelBoundAccess {
 
@@ -64,7 +63,6 @@ public abstract class EntityLookupMixin<T extends EntityAccess> implements Level
         return leafs$borrowed(original.call(uuid));
     }
 
-    /** The whole index, what an unbounded selector walks: every region of the level. */
     @Inject(method = "getEntities", at = @At("HEAD"))
     private <U extends T> void leafs$borrowAllForTheWalk(EntityTypeTest<T, U> type, AbortableIterationConsumer<U> consumer, CallbackInfo callbackInfo) {
         RegionBorrow borrow = RegionBorrow.current();

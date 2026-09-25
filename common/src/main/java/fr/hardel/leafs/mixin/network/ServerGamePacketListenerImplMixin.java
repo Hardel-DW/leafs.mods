@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
@@ -14,6 +15,7 @@ import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.ChunkPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -24,7 +26,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.Executor;
 
-/** Carries the player's inbound queue; handler continuations route back to it, respawn replays on the respawn spot's owner. */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class ServerGamePacketListenerImplMixin implements GameListenerNetworkAccess {
 
@@ -39,6 +40,16 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return leafs$inboundQueue;
     }
 
+    @WrapMethod(method = "tickPlayer")
+    private boolean leafs$tickOnLandedChunks(Operation<Boolean> original) {
+        ChunkPos chunk = player.chunkPosition();
+        if (!RegionChunkAccess.fullAround(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
+            return false;
+        }
+
+        return original.call();
+    }
+
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/FutureChain;<init>(Ljava/util/concurrent/Executor;)V"))
     private Executor leafs$chatChainOnTheOwner(Executor server) {
         return PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this);
@@ -49,14 +60,14 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this);
     }
 
-    /** Chat state is player-scoped and runs on the owner; commands reach arbitrary chunks (/locate sync-loads) and keep the global phase. */
     @WrapOperation(method = "tryHandleChat", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;execute(Ljava/lang/Runnable;)V"))
     private void leafs$chatHandlerOnTheOwner(MinecraftServer server, Runnable chatHandler, Operation<Void> original, @Local(argsOnly = true) boolean isCommand) {
         if (isCommand) {
             original.call(server, chatHandler);
-        } else {
-            PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this).execute(chatHandler);
+            return;
         }
+
+        PacketRouting.playerTaskExecutor((ServerGamePacketListenerImpl) (Object) this).execute(chatHandler);
     }
 
     @Inject(method = "handleClientCommand", at = @At("HEAD"), cancellable = true)
@@ -66,7 +77,6 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
     }
 
-    /** Leave message, bed release and removal on the server thread, the player's region locked first. */
     @WrapMethod(method = "onDisconnect")
     private void leafs$lockThePlayerOnDisconnect(DisconnectionDetails details, Operation<Void> original) {
         RegionBorrow.atContact(player);

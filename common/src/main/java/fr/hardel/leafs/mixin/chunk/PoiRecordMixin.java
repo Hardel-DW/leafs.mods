@@ -6,7 +6,6 @@ import fr.hardel.leafs.global.SharedStateMonitor;
 import net.minecraft.world.entity.ai.village.poi.PoiRecord;
 import org.spongepowered.asm.mixin.Mixin;
 
-/** A villager claims a bed or a job from its own region, the record may sit in another: the ticket count moves under the record's monitor. */
 @Mixin(PoiRecord.class)
 public abstract class PoiRecordMixin {
 

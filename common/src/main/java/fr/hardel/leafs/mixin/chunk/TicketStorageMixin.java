@@ -16,7 +16,6 @@ import org.spongepowered.asm.mixin.Unique;
 import java.util.List;
 import java.util.function.BiConsumer;
 
-/** The ticket table takes writers from any thread under one monitor; a write drains the graphs once the monitor is released. */
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
     @Unique
@@ -30,13 +29,11 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         return leafs$graphs;
     }
 
-
     @Override
     public void leafs$bindTimeouts(TicketTimeoutIndex timeouts) {
         leafs$timeouts = timeouts;
     }
 
-    /** Vanilla's two trackers never hear a ticket again; the graphs do. */
     @WrapMethod(method = "setLoadingChunkUpdatedListener")
     private void leafs$feedTheLoadingGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
         original.call(leafs$graphs.loadingFeed());
@@ -47,19 +44,23 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         original.call(leafs$graphs.simulationFeed());
     }
 
-    /** A stored timeout ticket enters the index with its identity; a reset re-uses the instance tracked at its first add. */
     @WrapMethod(method = "addTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
-        return leafs$graphs.batch(() -> {
+        boolean added = leafs$graphs.batch(() -> {
             synchronized (this) {
-                boolean added = original.call(key, ticket);
-                if (added && ticket.getType().hasTimeout()) {
+                boolean stored = original.call(key, ticket);
+                if (stored && ticket.getType().hasTimeout()) {
                     leafs$timeouts.track(key, ticket);
                 }
 
-                return added;
+                return stored;
             }
         });
+        if (added) {
+            leafs$graphs.settle(key, ticket);
+        }
+
+        return added;
     }
 
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")
@@ -76,7 +77,6 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         });
     }
 
-    /** The predicate decides the removal, so it is where the index learns of it. */
     @WrapMethod(method = "removeTicketIf")
     private void leafs$monitoredRemoveIf(TicketStorage.TicketPredicate predicate, Long2ObjectOpenHashMap<List<Ticket>> removedTickets, Operation<Void> original) {
         leafs$graphs.batch(() -> {
@@ -118,7 +118,6 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         }
     }
 
-    /** The copy is what makes the read safe: vanilla iterates the returned list outside any monitor. */
     @WrapMethod(method = "getTickets")
     private List<Ticket> leafs$monitoredTicketsRead(long key, Operation<List<Ticket>> original) {
         synchronized (this) {

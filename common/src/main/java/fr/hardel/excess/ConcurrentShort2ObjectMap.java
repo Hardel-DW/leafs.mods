@@ -1,41 +1,93 @@
 package fr.hardel.excess;
 
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterator;
 import it.unimi.dsi.fastutil.objects.ObjectSpliterators;
 import it.unimi.dsi.fastutil.shorts.AbstractShort2ObjectMap;
+import it.unimi.dsi.fastutil.shorts.Short2ObjectFunction;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
+import java.util.function.IntFunction;
 
-/** ConcurrentHashMap-backed Short2ObjectMap: atomic point ops, weakly consistent iteration, no nulls. */
 public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<V> {
     private final ConcurrentHashMap<Short, V> map = new ConcurrentHashMap<>();
+    private final ConcurrentValues<V> values = new ConcurrentValues<>(map);
 
     @Override
     public V get(short key) {
-        V value = map.get(key);
-        return value == null ? defaultReturnValue() : value;
+        return orDefault(map.get(key));
     }
 
     @Override
     public V put(short key, V value) {
-        V previous = map.put(key, value);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.put(key, value));
     }
 
     @Override
     public V remove(short key) {
-        V previous = map.remove(key);
-        return previous == null ? defaultReturnValue() : previous;
+        return orDefault(map.remove(key));
+    }
+
+    @Override
+    public V putIfAbsent(short key, V value) {
+        return orDefault(map.putIfAbsent(key, value));
+    }
+
+    @Override
+    public boolean remove(short key, Object value) {
+        return map.remove(key, value);
+    }
+
+    @Override
+    public boolean replace(short key, V oldValue, V newValue) {
+        return map.replace(key, oldValue, newValue);
+    }
+
+    @Override
+    public V replace(short key, V value) {
+        return orDefault(map.replace(key, value));
+    }
+
+    @Override
+    public V computeIfAbsent(short key, IntFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(key, mapping::apply));
+    }
+
+    @Override
+    public V computeIfAbsent(short key, Short2ObjectFunction<? extends V> mapping) {
+        return orDefault(map.computeIfAbsent(key, boxed -> mapping.get((short) boxed)));
+    }
+
+    @Override
+    public V computeIfPresent(short key, BiFunction<? super Short, ? super V, ? extends V> remapping) {
+        return orDefault(map.computeIfPresent(key, remapping));
+    }
+
+    @Override
+    public V compute(short key, BiFunction<? super Short, ? super V, ? extends V> remapping) {
+        return orDefault(map.compute(key, remapping));
+    }
+
+    @Override
+    public V merge(short key, V value, BiFunction<? super V, ? super V, ? extends V> remapping) {
+        return orDefault(map.merge(key, value, remapping));
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super Short, ? super V, ? extends V> function) {
+        map.replaceAll(function);
+    }
+
+    private V orDefault(V value) {
+        return value == null ? defaultReturnValue() : value;
     }
 
     @Override
@@ -65,33 +117,7 @@ public final class ConcurrentShort2ObjectMap<V> extends AbstractShort2ObjectMap<
 
     @Override
     public @NonNull ObjectCollection<V> values() {
-        return new AbstractObjectCollection<>() {
-            @Override
-            public @NonNull ObjectIterator<V> iterator() {
-                return ObjectIterators.asObjectIterator(map.values().iterator());
-            }
-
-            /** A stream must not trust a size the map outgrows while it runs. */
-            @Override
-            public @NonNull ObjectSpliterator<V> spliterator() {
-                return ObjectSpliterators.asSpliteratorUnknownSize(iterator(), 0);
-            }
-
-            @Override
-            public int size() {
-                return map.size();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-                return map.containsValue(value);
-            }
-
-            @Override
-            public void clear() {
-                map.clear();
-            }
-        };
+        return values;
     }
 
     @Override

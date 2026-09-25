@@ -1,13 +1,10 @@
 package fr.hardel.leafs.region;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Structural invariant checks shared by the scenario tests, the fuzz test and the region-feed test. */
 public final class RegionizerAssertions {
 
     private RegionizerAssertions() {
@@ -17,22 +14,21 @@ public final class RegionizerAssertions {
         return !region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty();
     }
 
-    /** Every structural invariant; strict also requires no pending merge. */
     public static <R> void assertInvariants(Regionizer<R> regionizer, boolean strict) {
-        Map<Long, RegionSection<R>> sections = regionizer.sectionsView();
-        int bufferRadius = regionizer.bufferRadiusValue();
-        int mergeRadius = regionizer.mergeRadiusValue();
+        var sections = regionizer.sections;
+        int bufferRadius = regionizer.bufferRadius;
+        int mergeRadius = regionizer.mergeRadius;
 
-        for (Map.Entry<Long, RegionSection<R>> entry : sections.entrySet()) {
-            long key = entry.getKey();
+        for (var entry : sections.long2ObjectEntrySet()) {
+            long key = entry.getLongKey();
             RegionSection<R> section = entry.getValue();
             int sectionX = CoordinateKey.x(key);
             int sectionZ = CoordinateKey.z(key);
             Region<R> owner = section.region();
 
-            assertNotNull(owner, "section [" + sectionX + ", " + sectionZ + "] has no owner");
-            assertTrue(owner.sectionKeys.contains(key), "owner of section [" + sectionX + ", " + sectionZ + "] does not list it");
-            assertTrue(regionizer.regionsView().contains(owner), "owner of section [" + sectionX + ", " + sectionZ + "] is not registered");
+            assertNotNull(owner, "section [%s, %s] has no owner".formatted(sectionX, sectionZ));
+            assertTrue(owner.sectionKeys.contains(key), "owner of section [%s, %s] does not list it".formatted(sectionX, sectionZ));
+            assertTrue(regionizer.regionsView().contains(owner), "owner of section [%s, %s] is not registered".formatted(sectionX, sectionZ));
 
             int expectedNonEmptyNeighbours = 0;
             for (int dx = -bufferRadius; dx <= bufferRadius; dx++) {
@@ -46,18 +42,19 @@ public final class RegionizerAssertions {
                         expectedNonEmptyNeighbours++;
                     }
                     if (!section.isEmpty()) {
-                        assertNotNull(neighbour, "buffer section [" + (sectionX + dx) + ", " + (sectionZ + dz) + "] missing around non-empty section [" + sectionX + ", " + sectionZ + "]");
+                        assertNotNull(neighbour, "buffer section [%s, %s] missing around non-empty section [%s, %s]".formatted(sectionX + dx, sectionZ + dz, sectionX, sectionZ));
                         if (neighbour.region() != owner) {
                             boolean linked = hasPendingLinks(owner) || hasPendingLinks(neighbour.region());
-                            assertTrue(!strict && linked, "buffer section [" + (sectionX + dx) + ", " + (sectionZ + dz) + "] not owned by the region of [" + sectionX + ", " + sectionZ + "] and no merge is pending");
+                            assertTrue(!strict && linked, "buffer section [%s, %s] not owned by the region of [%s, %s] and no merge is pending".formatted(
+                                sectionX + dx, sectionZ + dz, sectionX, sectionZ));
                         }
                     }
                 }
             }
-            assertEquals(expectedNonEmptyNeighbours, section.nonEmptyNeighbours(), "wrong neighbour count for section [" + sectionX + ", " + sectionZ + "]");
+            assertEquals(expectedNonEmptyNeighbours, section.nonEmptyNeighbours(), "wrong neighbour count for section [%s, %s]".formatted(sectionX, sectionZ));
 
             boolean isolated = section.isEmpty() && section.nonEmptyNeighbours() == 0;
-            assertEquals(isolated, owner.deadSectionKeys.contains(key), "wrong dead mark for section [" + sectionX + ", " + sectionZ + "]");
+            assertEquals(isolated, owner.deadSectionKeys.contains(key), "wrong dead mark for section [%s, %s]".formatted(sectionX, sectionZ));
 
             for (int dx = -mergeRadius; dx <= mergeRadius; dx++) {
                 for (int dz = -mergeRadius; dz <= mergeRadius; dz++) {
@@ -67,22 +64,23 @@ public final class RegionizerAssertions {
                     }
 
                     Region<R> other = neighbour.region();
-                    assertTrue(hasPendingLinks(owner) || hasPendingLinks(other), "regions #" + owner.id() + " and #" + other.id() + " are within merge distance without a pending merge");
+                    assertTrue(hasPendingLinks(owner) || hasPendingLinks(other), "regions #%s and #%s are within merge distance without a pending merge".formatted(
+                        owner.id(), other.id()));
                 }
             }
         }
 
         for (Region<R> region : regionizer.regionsView()) {
-            assertTrue(region.state() != RegionState.DEAD, "dead " + region + " still registered");
+            assertTrue(region.state() != RegionState.DEAD, "dead %s still registered".formatted(region));
             for (Region<R> target : region.mergeIntoLater) {
-                assertTrue(target.expectingMergeFrom.contains(region), "one-way merge link from " + region + " to " + target);
+                assertTrue(target.expectingMergeFrom.contains(region), "one-way merge link from %s to %s".formatted(region, target));
             }
             for (Region<R> source : region.expectingMergeFrom) {
-                assertTrue(source.mergeIntoLater.contains(region), "one-way merge expectation on " + region + " from " + source);
+                assertTrue(source.mergeIntoLater.contains(region), "one-way merge expectation on %s from %s".formatted(region, source));
             }
             if (strict) {
-                assertTrue(region.mergeIntoLater.isEmpty() && region.expectingMergeFrom.isEmpty(), region + " still has pending merges in steady state");
-                assertFalse(region.state() == RegionState.TRANSIENT, region + " is transient in steady state");
+                assertTrue(region.mergeIntoLater.isEmpty() && region.expectingMergeFrom.isEmpty(), "%s still has pending merges in steady state".formatted(region));
+                assertFalse(region.state() == RegionState.TRANSIENT, "%s is transient in steady state".formatted(region));
             }
         }
     }

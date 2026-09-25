@@ -75,7 +75,7 @@ class ConcurrentOrderedLongSetStressTest {
                 } catch (Throwable throwable) {
                     failure.compareAndSet(null, throwable);
                 }
-            }, "writer-" + writer));
+            }, "writer-%s".formatted(writer)));
         }
 
         for (int r = 0; r < READERS; r++) {
@@ -110,7 +110,7 @@ class ConcurrentOrderedLongSetStressTest {
                 } catch (Throwable throwable) {
                     failure.compareAndSet(null, throwable);
                 }
-            }, "reader-" + reader));
+            }, "reader-%s".formatted(reader)));
         }
 
         threads.forEach(Thread::start);
@@ -126,7 +126,7 @@ class ConcurrentOrderedLongSetStressTest {
             assertTrue(!thread.isAlive(), "reader did not finish in time");
         }
 
-        assertNull(failure.get(), () -> "concurrent failure: " + failure.get());
+        assertNull(failure.get(), () -> "concurrent failure: %s".formatted(failure.get()));
 
         TreeSet<Long> union = new TreeSet<>();
         references.forEach(union::addAll);
