@@ -91,7 +91,7 @@ public final class RegionTickScheduler {
             Thread worker = Thread.currentThread();
             String workerName = worker.getName();
             if (regionThreadNames) {
-                worker.setName("Leafs Server R#" + handle.id() + " " + handle.dimension());
+                worker.setName("Leafs Server R#%s %s".formatted(handle.id(), handle.dimension()));
             }
 
             boolean started;
