@@ -177,13 +177,19 @@ public final class TickingManager {
     }
 
     private void drainRegionTasks() {
-        int drained;
-        do {
-            drained = 0;
-            for (ServerLevel level : server.getAllLevels()) {
-                drained += LevelRegions.of(level).drainInboxes();
-            }
-        } while (drained > 0);
+        boolean drained = true;
+        while (drained) {
+            drained = drainEveryInbox() > 0;
+        }
+    }
+
+    private int drainEveryInbox() {
+        int drained = 0;
+        for (ServerLevel level : server.getAllLevels()) {
+            drained += LevelRegions.of(level).drainInboxes();
+        }
+
+        return drained;
     }
 
     public void haltTicking() {
