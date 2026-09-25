@@ -43,7 +43,6 @@ public final class TickingManager {
     private final long slowTaskNanos;
     private volatile boolean halted;
     private volatile boolean paused;
-    private volatile boolean crashed;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
@@ -194,7 +193,7 @@ public final class TickingManager {
     }
 
     public void haltTicking() {
-        scheduler.shutdown(crashed, serverWork);
+        scheduler.shutdown(server.isRunning() || BlockableEventLoop.delayedCrash != null, serverWork);
         halted = true;
         drainRegionTasks();
         globalScheduler.drain();
@@ -209,13 +208,11 @@ public final class TickingManager {
 
     private void onChunkTaskFailure(ChunkTask task, Throwable failure) {
         Leafs.LOGGER.error("Chunk task {} failed on {} - stopping the server", task, Thread.currentThread().getName(), failure);
-        crashed = true;
         BlockableEventLoop.relayDelayCrash(CrashReport.forThrowable(failure, "Leafs chunk task %s".formatted(task)));
     }
 
     private void onRegionTickFailure(TickHandle handle, Throwable failure) {
         handle.cancel();
-        crashed = true;
         CrashReport report = failure instanceof ReportedException reported ? reported.getReport() : CrashReport.forThrowable(failure, "Ticking Leafs region");
         handle.fillCrashReportCategory(report.addCategory("Leafs region").setDetail("Thread", Thread.currentThread().getName()));
         if (!regionCrash.compareAndSet(null, report)) {
