@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Predicate;
 
 final class PriorityBuckets {
     private final List<ConcurrentLinkedQueue<ChunkTask>> buckets;
@@ -43,6 +44,17 @@ final class PriorityBuckets {
                 if (task.claimAt(bucket)) {
                     return task;
                 }
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
+    ChunkTask claimFirst(Predicate<ChunkTask> wanted) {
+        for (ChunkTask task : buckets.getFirst()) {
+            if (wanted.test(task) && task.claimAt(0)) {
+                return task;
             }
         }
 

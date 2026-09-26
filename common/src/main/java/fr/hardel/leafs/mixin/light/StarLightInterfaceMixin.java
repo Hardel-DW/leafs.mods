@@ -10,6 +10,7 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,7 +22,7 @@ public abstract class StarLightInterfaceMixin {
 
     @WrapOperation(method = "schedulePropagation0", at = @At(value = "INVOKE", target = "Lca/spottedleaf/starlight/common/thread/SchedulingUtil;scheduleTask(ILjava/lang/Runnable;III)V"))
     private void leafs$onTheChunkPool(int owner, Runnable task, int chunkX, int chunkZ, int radius, Operation<Void> original) {
-        LevelChunks.of((ServerLevel) getWorld()).placement().onPool(ChunkTask.Kind.LIGHT, chunkX, chunkZ, radius, task);
+        LevelChunks.of((ServerLevel) getWorld()).placement().onPool(ChunkTask.Kind.LIGHT, ChunkStatus.LIGHT, chunkX, chunkZ, radius, task);
     }
 
     @WrapMethod(method = "handleUpdateInternal")

@@ -7,6 +7,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.global.GlobalScheduler;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.Executor;
@@ -92,7 +93,7 @@ public final class ChunkOwners implements Router {
             return;
         }
 
-        placement.onPool(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0, () -> publishOnPool(chunkX, chunkZ, task));
+        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, chunkX, chunkZ, 0, () -> publishOnPool(chunkX, chunkZ, task));
     }
 
     public void later(int chunkX, int chunkZ, Work work, Runnable task) {
@@ -115,7 +116,7 @@ public final class ChunkOwners implements Router {
     }
 
     private void onPool(int chunkX, int chunkZ, Runnable task) {
-        placement.onPool(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0, () -> onPoolStart(chunkX, chunkZ, task));
+        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, chunkX, chunkZ, 0, () -> onPoolStart(chunkX, chunkZ, task));
     }
 
     public boolean holds(int chunkX, int chunkZ) {

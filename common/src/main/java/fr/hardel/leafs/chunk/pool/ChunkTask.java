@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.pool;
 
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.invoke.MethodHandles;
@@ -19,10 +20,9 @@ public abstract class ChunkTask {
         HOUSEKEEPING
     }
 
-    public record Place(long chunkKey, long centerKey, Urgency urgency) {
+    public record Place(long chunkKey, long centerKey, ChunkStatus status, Urgency urgency) {
         public int priority() {
-            int chunk = urgency.of(chunkX(chunkKey), chunkZ(chunkKey));
-            return chunkKey == centerKey ? chunk : Math.min(chunk, urgency.of(chunkX(centerKey), chunkZ(centerKey)));
+            return urgency.of(this);
         }
     }
 
@@ -58,6 +58,10 @@ public abstract class ChunkTask {
 
     public static long key(int owner, int chunkX, int chunkZ) {
         return ((long) owner << 44) | ((chunkX & 0x3FFFFFL) << 22) | (chunkZ & 0x3FFFFFL);
+    }
+
+    public static int owner(long key) {
+        return (int) (key >>> 44);
     }
 
     public static int chunkX(long key) {

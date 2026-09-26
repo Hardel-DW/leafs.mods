@@ -209,7 +209,7 @@ class RegionBorrowTest {
         RegionTickData data = new RegionTickData(owners::get);
         ChunkFixtures.TestRegions ticked = new ChunkFixtures.TestRegions(data.inbox());
         ticked.tickOn(Thread.currentThread());
-        owners.set(ChunkFixtures.owners(pool, ticked, (_, _, _) -> false, new GlobalScheduler(Runnable::run), (_, _) -> 0));
+        owners.set(ChunkFixtures.owners(pool, ticked, (_, _, _) -> false, new GlobalScheduler(Runnable::run), _ -> 0));
         List<String> ran = new ArrayList<>();
         data.inbox().post(0, 0, Work.CHUNK, () -> ran.add("queued before the claim"));
         AtomicReference<ChunkClaim> claim = new AtomicReference<>();

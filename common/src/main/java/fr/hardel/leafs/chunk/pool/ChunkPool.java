@@ -12,6 +12,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 
 public final class ChunkPool implements Executor {
     public static final int FIRST = 0;
@@ -85,8 +86,22 @@ public final class ChunkPool implements Executor {
         placed.forEachAt(key, task -> reprioritise(task, task.place().priority()));
     }
 
-    public void expedite(long key) {
-        placed.forEachAt(key, task -> reprioritise(task, FIRST));
+    public void expedite(long key, Predicate<ChunkTask.Place> needed) {
+        placed.forEachAt(key, task -> {
+            if (needed.test(task.place())) {
+                reprioritise(task, FIRST);
+            }
+        });
+    }
+
+    public boolean help(Predicate<ChunkTask> wanted) {
+        ChunkTask task = buckets.claimFirst(wanted);
+        if (task == null) {
+            return false;
+        }
+
+        start(task);
+        return true;
     }
 
     public int queuedAt(long key) {
@@ -142,23 +157,27 @@ public final class ChunkPool implements Executor {
                 return;
             }
 
-            if (task.withdrawn()) {
-                placed.remove(task);
-                queued.decrementAndGet();
-                continue;
-            }
+            start(task);
+        }
+    }
 
-            ChunkTask holder = reservations.acquire(task);
-            if (holder != null) {
-                blocks.count(task, holder);
-                continue;
-            }
-
+    private void start(ChunkTask task) {
+        if (task.withdrawn()) {
             placed.remove(task);
             queued.decrementAndGet();
-            active.incrementAndGet();
-            runReserved(task);
+            return;
         }
+
+        ChunkTask holder = reservations.acquire(task);
+        if (holder != null) {
+            blocks.count(task, holder);
+            return;
+        }
+
+        placed.remove(task);
+        queued.decrementAndGet();
+        active.incrementAndGet();
+        runReserved(task);
     }
 
     private void runReserved(ChunkTask task) {

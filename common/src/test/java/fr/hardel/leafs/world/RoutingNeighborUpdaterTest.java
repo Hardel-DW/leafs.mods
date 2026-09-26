@@ -31,7 +31,7 @@ class RoutingNeighborUpdaterTest {
     private final RegionInbox inbox = new RegionInbox();
     private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
     private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, (x, z, task) -> { task.run(); return true; },
-        new GlobalScheduler(Runnable::run), (_, _) -> 0);
+        new GlobalScheduler(Runnable::run), _ -> 0);
 
     private static final class RecordingUpdater extends CollectingNeighborUpdater {
         final List<String> calls = new ArrayList<>();

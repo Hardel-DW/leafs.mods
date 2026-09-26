@@ -150,8 +150,8 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     }
 
     @WrapOperation(method = "runGenerationTask", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkTaskDispatcher;submit(Ljava/lang/Runnable;JLjava/util/function/IntSupplier;)V"))
-    private void leafs$driveOnThePool(ChunkTaskDispatcher dispatcher, Runnable task, long chunkKey, IntSupplier queueLevel, Operation<Void> original) {
-        leafs$chunks.steps().run(task, chunkKey);
+    private void leafs$driveOnThePool(ChunkTaskDispatcher dispatcher, Runnable task, long chunkKey, IntSupplier queueLevel, Operation<Void> original, @Local(argsOnly = true) ChunkGenerationTask generation) {
+        leafs$chunks.steps().run(task, chunkKey, generation.targetStatus);
     }
 
     @WrapOperation(method = {"scheduleGenerationTask", "runGenerationTasks"}, at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;pendingGenerationTasks:Ljava/util/List;"))
