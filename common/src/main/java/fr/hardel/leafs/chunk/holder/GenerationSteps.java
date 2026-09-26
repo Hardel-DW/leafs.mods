@@ -32,15 +32,15 @@ public final class GenerationSteps {
         this.placement = placement;
     }
 
-    public void run(Runnable task, long chunkKey) {
+    public void run(Runnable task, long chunkKey, ChunkStatus target) {
         int chunkX = ChunkPos.getX(chunkKey);
         int chunkZ = ChunkPos.getZ(chunkKey);
-        pool.submit(ChunkTask.of(Kind.STEP, placement.place(chunkX, chunkZ, chunkX, chunkZ), ChunkTask.NO_RESERVATION, task));
+        pool.submit(ChunkTask.of(Kind.STEP, placement.place(chunkX, chunkZ, chunkX, chunkZ, target), ChunkTask.NO_RESERVATION, task));
     }
 
     public CompletableFuture<ChunkAccess> apply(ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk, Supplier<CompletableFuture<ChunkAccess>> body) {
         ChunkPos pos = chunk.getPos();
-        ChunkTask.Place place = placement.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2);
+        ChunkTask.Place place = placement.place(pos.x(), pos.z(), cache.minX + cache.sizeX / 2, cache.minZ + cache.sizeZ / 2, step.targetStatus());
         StepTask task = new StepTask(place, placement.area(Kind.STEP, pos.x(), pos.z(), step.blockStateWriteRadius()), step, chunk, body);
         queued.compute(pos.pack(), (_, slots) -> {
             StepTask[] target = slots == null ? new StepTask[STATUSES] : slots;
@@ -65,7 +65,7 @@ public final class GenerationSteps {
     }
 
     public Executor loading(ChunkPos pos) {
-        return task -> placement.onPool(Kind.STEP, pos.x(), pos.z(), 0, task);
+        return task -> placement.onPool(Kind.STEP, ChunkStatus.EMPTY, pos.x(), pos.z(), 0, task);
     }
 
     private void forget(StepTask task) {

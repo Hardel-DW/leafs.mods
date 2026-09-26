@@ -27,7 +27,7 @@ class PlayerViewTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final TicketGraphs graphs = new TicketGraphs();
     private final PlayerView view = new PlayerView(new TicketStorage(), graphs);
-    private final ChunkPlacement placement = new ChunkPlacement(pool, 0, view::urgency);
+    private final ChunkPlacement placement = new ChunkPlacement(pool, 0, place -> view.urgency(ChunkTask.chunkX(place.chunkKey()), ChunkTask.chunkZ(place.chunkKey())));
 
     @AfterEach
     void stop() {
@@ -56,11 +56,11 @@ class PlayerViewTest {
         CountDownLatch done = new CountDownLatch(2);
         CountDownLatch release = TestThreads.occupy(pool);
 
-        placement.onPool(ChunkTask.Kind.STEP, 0, 0, 0, () -> {
+        placement.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 0, 0, 0, () -> {
             ran.add("pregen step");
             done.countDown();
         });
-        placement.onPool(ChunkTask.Kind.OWNER, 50, 50, 0, () -> {
+        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, 50, 50, 0, () -> {
             ran.add("unload");
             done.countDown();
         });

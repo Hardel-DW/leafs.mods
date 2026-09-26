@@ -1,8 +1,8 @@
 package fr.hardel.leafs.chunk.pool;
 
 import fr.hardel.leafs.chunk.level.LevelListener;
-import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 public final class ChunkPlacement {
     private final ChunkPool pool;
@@ -15,12 +15,12 @@ public final class ChunkPlacement {
         this.urgency = urgency;
     }
 
-    public void onPool(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius, Runnable task) {
-        pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ), area(kind, chunkX, chunkZ, radius), task));
+    public void onPool(ChunkTask.Kind kind, ChunkStatus status, int chunkX, int chunkZ, int radius, Runnable task) {
+        pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ, status), area(kind, chunkX, chunkZ, radius), task));
     }
 
-    public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ) {
-        return new ChunkTask.Place(ChunkTask.key(level, chunkX, chunkZ), ChunkTask.key(level, centerX, centerZ), urgency);
+    public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ, ChunkStatus status) {
+        return new ChunkTask.Place(ChunkTask.key(level, chunkX, chunkZ), ChunkTask.key(level, centerX, centerZ), status, urgency);
     }
 
     public long[] area(ChunkTask.Kind kind, int chunkX, int chunkZ, int radius) {
@@ -45,13 +45,26 @@ public final class ChunkPlacement {
         return (chunkKey, _, _) -> pool.changed(ChunkTask.key(level, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)));
     }
 
-    public void expedite(int chunkX, int chunkZ) {
-        int radius = ChunkLevel.RADIUS_AROUND_FULL_CHUNK;
+    public void expedite(ChunkNeed need) {
+        int radius = need.radius();
         for (int dz = -radius; dz <= radius; dz++) {
             for (int dx = -radius; dx <= radius; dx++) {
-                pool.expedite(ChunkTask.key(level, chunkX + dx, chunkZ + dz));
+                pool.expedite(ChunkTask.key(level, need.chunkX() + dx, need.chunkZ() + dz), place -> serves(need, place));
             }
         }
+    }
+
+    public boolean help(ChunkNeed need, boolean holdsTheChunk) {
+        return pool.help(task -> switch (task.kind()) {
+            case STEP, LIGHT -> serves(need, task.place());
+            case OWNER -> holdsTheChunk && serves(need, task.place());
+            case HOUSEKEEPING -> false;
+        });
+    }
+
+    private boolean serves(ChunkNeed need, ChunkTask.Place place) {
+        long key = place.chunkKey();
+        return ChunkTask.owner(key) == level && need.covers(ChunkTask.chunkX(key), ChunkTask.chunkZ(key), place.status());
     }
 
     public int queuedAt(int chunkX, int chunkZ) {

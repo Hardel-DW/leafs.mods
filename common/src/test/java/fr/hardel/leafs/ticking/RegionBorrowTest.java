@@ -2,6 +2,12 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.ChunkFixtures;
+import fr.hardel.leafs.chunk.owner.ChunkClaim;
+import fr.hardel.leafs.chunk.owner.ChunkOwners;
+import fr.hardel.leafs.chunk.owner.Work;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.global.GlobalScheduler;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import net.minecraft.server.level.ChunkLevel;
@@ -11,14 +17,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,10 +54,12 @@ class RegionBorrowTest {
 
         assertEquals(1, borrow.size(), "the same region is taken once");
         assertEquals(RegionState.TICKING, region.state());
+        assertSame(Thread.currentThread(), regions.tickerAt(0, 0), "the borrower owns the chunks of the region, as its worker would");
         assertFalse(region.tryMarkTicking(), "a worker only tries, and fails while the region is borrowed");
 
         borrow.releaseAll();
         assertEquals(RegionState.READY, region.state());
+        assertNull(regions.tickerAt(0, 0));
         assertTrue(region.tryMarkTicking());
         region.markNotTicking();
     }
@@ -187,6 +199,28 @@ class RegionBorrowTest {
         for (Region<RegionTickData> region : regions.regionizer().regionsView()) {
             assertEquals(RegionState.TICKING, region.state());
         }
+    }
+
+    /** 2026-09-26: work queued for a chunk before the pool claimed it to publish it would run on the region beside the pool. */
+    @Test
+    void aRegionHandsTheWorkOfAChunkAnotherThreadClaimedToThatThread() throws InterruptedException {
+        ChunkPool pool = ChunkFixtures.pool(1);
+        AtomicReference<ChunkOwners> owners = new AtomicReference<>();
+        RegionTickData data = new RegionTickData(owners::get);
+        ChunkFixtures.TestRegions ticked = new ChunkFixtures.TestRegions(data.inbox());
+        ticked.tickOn(Thread.currentThread());
+        owners.set(ChunkFixtures.owners(pool, ticked, (_, _, _) -> false, new GlobalScheduler(Runnable::run), _ -> 0));
+        List<String> ran = new ArrayList<>();
+        data.inbox().post(0, 0, Work.CHUNK, () -> ran.add("queued before the claim"));
+        AtomicReference<ChunkClaim> claim = new AtomicReference<>();
+        Thread claimer = new Thread(() -> claim.set(owners.get().borrow(0, 0)), "claimer");
+        claimer.start();
+        claimer.join();
+
+        assertEquals(1, data.inbox().drain());
+        assertEquals(List.of(), ran, "the region never runs it beside the claimer");
+        assertEquals(1, claim.get().mail().size());
+        pool.shutdown();
     }
 
     private static void simulated(LevelRegions regions, int chunkX, int chunkZ) {

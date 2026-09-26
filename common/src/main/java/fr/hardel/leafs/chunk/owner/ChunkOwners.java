@@ -7,20 +7,18 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.global.GlobalScheduler;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.Executor;
-import java.util.function.BooleanSupplier;
 
 public final class ChunkOwners implements Router {
-    @FunctionalInterface
-    public interface Inboxes {
-        @Nullable RegionInbox at(int chunkX, int chunkZ);
-    }
+    public interface Regions {
+        boolean live();
 
-    @FunctionalInterface
-    public interface Ownership {
-        boolean holds(int chunkX, int chunkZ);
+        @Nullable RegionInbox inboxAt(int chunkX, int chunkZ);
+
+        @Nullable Thread tickerAt(int chunkX, int chunkZ);
     }
 
     @FunctionalInterface
@@ -30,20 +28,18 @@ public final class ChunkOwners implements Router {
 
     private final ChunkPool pool;
     private final ChunkPlacement placement;
-    private final Inboxes inboxes;
-    private final Ownership ownership;
-    private final BooleanSupplier live;
+    private final Regions regions;
+    private final Thread serverThread;
     private final Executor serial;
     private final Taker taker;
     private final GlobalScheduler server;
     private final ConcurrentLong2ObjectMap<ChunkClaim> borrowed = new ConcurrentLong2ObjectMap<>();
 
-    public ChunkOwners(ChunkPool pool, ChunkPlacement placement, Inboxes inboxes, Ownership ownership, BooleanSupplier live, Executor serial, Taker taker, GlobalScheduler server) {
+    public ChunkOwners(ChunkPool pool, ChunkPlacement placement, Regions regions, Thread serverThread, Executor serial, Taker taker, GlobalScheduler server) {
         this.pool = pool;
         this.placement = placement;
-        this.inboxes = inboxes;
-        this.ownership = ownership;
-        this.live = live;
+        this.regions = regions;
+        this.serverThread = serverThread;
         this.serial = serial;
         this.taker = taker;
         this.server = server;
@@ -55,7 +51,7 @@ public final class ChunkOwners implements Router {
             return true;
         }
 
-        if (!live.getAsBoolean()) {
+        if (!regions.live()) {
             serial.execute(task);
             return false;
         }
@@ -91,8 +87,17 @@ public final class ChunkOwners implements Router {
         submit(chunkX, chunkZ, Work.GAME, task);
     }
 
+    public void publish(int chunkX, int chunkZ, Runnable task) {
+        if (holds(chunkX, chunkZ) || !regions.live()) {
+            submit(chunkX, chunkZ, Work.CHUNK, task);
+            return;
+        }
+
+        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, chunkX, chunkZ, 0, () -> publishOnPool(chunkX, chunkZ, task));
+    }
+
     public void later(int chunkX, int chunkZ, Work work, Runnable task) {
-        if (!live.getAsBoolean()) {
+        if (!regions.live()) {
             server.run(() -> submit(chunkX, chunkZ, work, task));
             return;
         }
@@ -111,12 +116,21 @@ public final class ChunkOwners implements Router {
     }
 
     private void onPool(int chunkX, int chunkZ, Runnable task) {
-        placement.onPool(ChunkTask.Kind.OWNER, chunkX, chunkZ, 0, () -> onPoolStart(chunkX, chunkZ, task));
+        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, chunkX, chunkZ, 0, () -> onPoolStart(chunkX, chunkZ, task));
     }
 
     public boolean holds(int chunkX, int chunkZ) {
-        ChunkClaim taken = claimAt(chunkX, chunkZ);
-        return taken != null ? taken.mine() : ownership.holds(chunkX, chunkZ);
+        ChunkClaim claim = claimAt(chunkX, chunkZ);
+        if (claim != null) {
+            return claim.mine();
+        }
+
+        Thread owner = regions.live() ? regions.tickerAt(chunkX, chunkZ) : serverThread;
+        return owner == Thread.currentThread();
+    }
+
+    public boolean covered(int chunkX, int chunkZ) {
+        return regions.inboxAt(chunkX, chunkZ) != null;
     }
 
     public boolean heldElsewhere(int chunkX, int chunkZ) {
@@ -162,22 +176,43 @@ public final class ChunkOwners implements Router {
             }
 
             ChunkClaim claim = borrow(chunkX, chunkZ);
-            if (claim == null) {
-                continue;
+            if (claim != null) {
+                runClaimed(chunkX, chunkZ, claim, task);
+                return;
             }
+        }
+    }
 
-            try {
-                task.run();
-            } finally {
-                release(chunkX, chunkZ, claim);
-            }
-
+    private void publishOnPool(int chunkX, int chunkZ, Runnable task) {
+        ChunkClaim claim = claimBetweenTicks(chunkX, chunkZ);
+        if (claim == null) {
+            onPoolStart(chunkX, chunkZ, task);
             return;
+        }
+
+        runClaimed(chunkX, chunkZ, claim, task);
+    }
+
+    private @Nullable ChunkClaim claimBetweenTicks(int chunkX, int chunkZ) {
+        ChunkClaim claim = borrow(chunkX, chunkZ);
+        if (claim == null || regions.tickerAt(chunkX, chunkZ) == null) {
+            return claim;
+        }
+
+        release(chunkX, chunkZ, claim);
+        return null;
+    }
+
+    private void runClaimed(int chunkX, int chunkZ, ChunkClaim claim, Runnable task) {
+        try {
+            task.run();
+        } finally {
+            release(chunkX, chunkZ, claim);
         }
     }
 
     private @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
         ChunkClaim taken = claimAt(chunkX, chunkZ);
-        return taken != null ? taken.mail() : inboxes.at(chunkX, chunkZ);
+        return taken != null ? taken.mail() : regions.inboxAt(chunkX, chunkZ);
     }
 }
