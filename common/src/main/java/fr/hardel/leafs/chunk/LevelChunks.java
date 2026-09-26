@@ -14,10 +14,8 @@ import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.ticking.LevelRegions;
-
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
-import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.TicketStorage;
@@ -50,7 +48,7 @@ public final class LevelChunks {
         storage.leafs$bindTimeouts(timeouts);
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
         this.placement = new ChunkPlacement(pool, IDS.getAndIncrement(), this::urgency);
-        this.owners = new ChunkOwners(pool, placement, regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), regions::live, serial, taker, ticking.globalScheduler());
+        this.owners = new ChunkOwners(pool, placement, regions, level.getServer().getRunningThread(), serial, taker, ticking.globalScheduler());
         this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs);
@@ -64,19 +62,6 @@ public final class LevelChunks {
     // Used by the Leafs Debug mod
     public static LevelChunks of(ServerLevel level) {
         return ((LevelChunksAccess) level.getChunkSource().chunkMap).leafs$chunks();
-    }
-
-    private static boolean holds(ServerLevel level, LevelRegions regions, int chunkX, int chunkZ) {
-        if (WorldTickContext.ownsChunk(level, chunkX, chunkZ)) {
-            return true;
-        }
-
-        RegionBorrow borrow = RegionBorrow.current();
-        if (borrow != null && borrow.holds(regions, chunkX, chunkZ)) {
-            return true;
-        }
-
-        return !regions.live() && TickingManager.of(level.getServer()).onServerThread();
     }
 
     private static boolean take(LevelRegions regions, int chunkX, int chunkZ, Runnable task) {

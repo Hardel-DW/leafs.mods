@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,10 +45,12 @@ class RegionBorrowTest {
 
         assertEquals(1, borrow.size(), "the same region is taken once");
         assertEquals(RegionState.TICKING, region.state());
+        assertSame(Thread.currentThread(), regions.tickerAt(0, 0), "the borrower owns the chunks of the region, as its worker would");
         assertFalse(region.tryMarkTicking(), "a worker only tries, and fails while the region is borrowed");
 
         borrow.releaseAll();
         assertEquals(RegionState.READY, region.state());
+        assertNull(regions.tickerAt(0, 0));
         assertTrue(region.tryMarkTicking());
         region.markNotTicking();
     }
