@@ -52,7 +52,7 @@ class ChunkPlacementTest {
     void aWaiterRunsNeitherGameWorkNorWhatItDoesNotNeed() {
         CountDownLatch release = TestThreads.occupy(pool);
         placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, 3, 4, 0, () -> ran.add("publication"));
-        placement.onPool(ChunkTask.Kind.STEP, ChunkStatus.TERRAIN, 8, 4, 0, () -> ran.add("terrain of another chunk"));
+        placement.onPool(ChunkTask.Kind.STEP, ChunkStatus.BIOMES, 8, 4, 0, () -> ran.add("biomes of another chunk"));
 
         assertFalse(placement.help(fullAt34, false));
         assertEquals(List.of(), ran);
