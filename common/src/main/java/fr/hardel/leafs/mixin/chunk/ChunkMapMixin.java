@@ -15,7 +15,7 @@ import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
-import fr.hardel.leafs.world.WorldTickContext;
+import fr.hardel.leafs.ticking.RegionTickScheduler;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMaps;
@@ -150,8 +150,8 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     }
 
     @WrapOperation(method = "runGenerationTask", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkTaskDispatcher;submit(Ljava/lang/Runnable;JLjava/util/function/IntSupplier;)V"))
-    private void leafs$driveOnThePool(ChunkTaskDispatcher dispatcher, Runnable task, long chunkKey, IntSupplier queueLevel, Operation<Void> original) {
-        leafs$chunks.steps().run(task, chunkKey);
+    private void leafs$driveOnThePool(ChunkTaskDispatcher dispatcher, Runnable task, long chunkKey, IntSupplier queueLevel, Operation<Void> original, @Local(argsOnly = true) ChunkGenerationTask generation) {
+        leafs$chunks.steps().run(task, chunkKey, generation.targetStatus);
     }
 
     @WrapOperation(method = {"scheduleGenerationTask", "runGenerationTasks"}, at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ChunkMap;pendingGenerationTasks:Ljava/util/List;"))
@@ -248,7 +248,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @WrapMethod(method = "updateChunkTracking")
     private void leafs$viewDiffsOnTheOwner(ServerPlayer player, Operation<Void> original) {
         ChunkPos chunk = player.chunkPosition();
-        if (WorldTickContext.ownsChunk(((ChunkMap) (Object) this).level, chunk.x(), chunk.z())) {
+        if (RegionTickScheduler.onWorker() && leafs$owners().holds(chunk.x(), chunk.z())) {
             original.call(player);
         }
     }

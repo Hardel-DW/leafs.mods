@@ -28,11 +28,11 @@ class DemandsTest {
 
         demands.release(CHUNK, FULL);
         assertEquals(FULL, storage.getTicketLevelAt(CHUNK, false));
-        assertTrue(demands.near(3, 3));
+        assertTrue(demands.needs(3, 3, ChunkStatus.FULL));
 
         demands.release(CHUNK, FULL);
         assertTrue(storage.getTickets(CHUNK).isEmpty());
-        assertFalse(demands.near(3, 3));
+        assertFalse(demands.needs(3, 3, ChunkStatus.FULL));
     }
 
     @Test
@@ -43,7 +43,7 @@ class DemandsTest {
         demands.release(CHUNK, FULL);
 
         assertEquals(FULL + 1, storage.getTicketLevelAt(CHUNK, false));
-        assertTrue(demands.near(3 + ChunkLevel.RADIUS_AROUND_FULL_CHUNK, 3));
-        assertFalse(demands.near(4 + ChunkLevel.RADIUS_AROUND_FULL_CHUNK, 3));
+        assertTrue(demands.needs(4, 3, ChunkStatus.TERRAIN));
+        assertFalse(demands.needs(4, 3, ChunkStatus.FEATURES));
     }
 }

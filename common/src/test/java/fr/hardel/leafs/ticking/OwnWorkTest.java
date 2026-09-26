@@ -17,7 +17,7 @@ class OwnWorkTest {
         diverted.run(ran::incrementAndGet);
         diverted.run(ran::incrementAndGet);
 
-        work.until(() -> ran.get() == 2);
+        work.until(() -> ran.get() == 2, OwnWork.NO_HELP);
 
         assertEquals(2, ran.get());
     }
