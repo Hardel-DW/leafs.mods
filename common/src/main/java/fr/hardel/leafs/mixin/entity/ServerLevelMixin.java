@@ -89,19 +89,19 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
     @WrapMethod(method = "addPlayer")
     private void leafs$addPlayerOnTheOwner(ServerPlayer player, Operation<Void> original) {
-        if (leafs$fromAnotherLevel()) {
+        RegionBorrow.atContact(player);
+        if (!leafs$owns(player)) {
             leafs$onOwnerOf(player, () -> original.call(player));
             return;
         }
 
-        RegionBorrow.atContact(player);
         SharedStateMonitor.run(this, () -> original.call(player));
     }
 
     @WrapMethod(method = "addEntity")
     private boolean leafs$addEntityOnTheOwner(Entity entity, Operation<Boolean> original) {
-        if (!leafs$fromAnotherLevel()) {
-            RegionBorrow.atContact(entity);
+        RegionBorrow.atContact(entity);
+        if (leafs$owns(entity)) {
             return original.call(entity);
         }
 
@@ -115,7 +115,8 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
 
     @WrapMethod(method = "removePlayerImmediately")
     private void leafs$removePlayerOnTheOwner(ServerPlayer player, Entity.RemovalReason reason, Operation<Void> original) {
-        if (leafs$fromAnotherLevel()) {
+        WorldTickContext context = WorldTickContext.current();
+        if (context != null && context.level() != (Object) this) {
             leafs$onOwnerOf(player, () -> original.call(player, reason));
             return;
         }
@@ -125,9 +126,8 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
     }
 
     @Unique
-    private boolean leafs$fromAnotherLevel() {
-        WorldTickContext context = WorldTickContext.current();
-        return context != null && context.level() != (Object) this;
+    private boolean leafs$owns(Entity entity) {
+        return LevelChunks.of((ServerLevel) (Object) this).owners().holds(entity.chunkPosition().x(), entity.chunkPosition().z());
     }
 
     @Unique
