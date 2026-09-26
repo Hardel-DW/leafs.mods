@@ -27,7 +27,7 @@ import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
-public final class LevelRegions implements RegionCallbacks<RegionTickData>, LevelListener {
+public final class LevelRegions implements RegionCallbacks<RegionTickData>, LevelListener, ChunkOwners.Regions {
     private final Regionizer<RegionTickData> regionizer;
     private volatile String dimension;
     private volatile LongSupplier gameTime;
@@ -81,6 +81,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return body;
     }
 
+    @Override
     public boolean live() {
         RegionTickBody body = this.body;
         return body != null && !TickingManager.of(body.level().getServer()).halted();
@@ -94,6 +95,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return LevelChunks.of(body.level()).owners();
     }
 
+    @Override
     public @Nullable RegionInbox inboxAt(int chunkX, int chunkZ) {
         if (!live()) {
             return null;
@@ -101,6 +103,12 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
         Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
         return region == null ? null : region.data().inbox();
+    }
+
+    @Override
+    public @Nullable Thread tickerAt(int chunkX, int chunkZ) {
+        Region<RegionTickData> region = regionizer.regionAt(chunkX, chunkZ);
+        return region == null ? null : region.tickingThread();
     }
 
     public int drainInboxes() {
@@ -180,7 +188,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     @Override
     public RegionTickData createData(Region<RegionTickData> region) {
-        RegionTickData data = new RegionTickData(region, this::owners);
+        RegionTickData data = new RegionTickData(this::owners);
         if (worldDataFactory != null) {
             equipWorld(data);
         }

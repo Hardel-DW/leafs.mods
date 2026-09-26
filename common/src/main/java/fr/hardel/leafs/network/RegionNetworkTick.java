@@ -4,7 +4,6 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
-import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -82,13 +81,8 @@ public final class RegionNetworkTick {
     }
 
     private static boolean tickedByARegion(ServerPlayer player) {
-        if (player.isRemoved()) {
-            return false;
-        }
-
-        LevelRegions regions = LevelRegions.of(player.level());
         ChunkPos chunk = player.chunkPosition();
-        return regions.live() && regions.regionizer().regionAt(chunk.x(), chunk.z()) != null;
+        return !player.isRemoved() && LevelChunks.of(player.level()).owners().covered(chunk.x(), chunk.z());
     }
 
     public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {

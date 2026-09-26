@@ -1,5 +1,6 @@
 package fr.hardel.leafs.gametest;
 
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
 import fr.hardel.leafs.ticking.LevelRegions;
@@ -31,7 +32,7 @@ public final class BorrowReleaseTest {
         level.setBlock(inB, Blocks.STONE.defaultBlockState(), 3);
         Thread neighbour = new Thread(() -> DeferredWork.owner(level, DeferReason.BLOCK_WRITE, a.x(), a.z(), () -> {
             RegionBorrow borrow = RegionBorrow.current();
-            if (borrow != null && !borrow.holds(regions, b.x(), b.z()) && !borrow.tryBorrowChunk(regions, b.x(), b.z())) {
+            if (borrow != null && !LevelChunks.of(level).owners().holds(b.x(), b.z()) && !borrow.tryBorrowChunk(regions, b.x(), b.z())) {
                 waitedForItself.set(true);
                 return;
             }

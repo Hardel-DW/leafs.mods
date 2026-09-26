@@ -5,9 +5,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.entity.RegionEntityPersistence;
 import fr.hardel.leafs.entity.ServerLevelEntityAccess;
-import fr.hardel.leafs.region.Regionizer;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.world.ChangedChunksAccess;
 import fr.hardel.leafs.world.ChunkBroadcasts;
 import fr.hardel.leafs.world.ChunkSaves;
@@ -64,7 +62,7 @@ public final class UnownedSweep {
     }
 
     private boolean unowned(long chunkKey) {
-        return regions.regionizer().regionAt(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey)) == null;
+        return !owners.covered(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
     }
 
     private void dispatch(long chunkKey, Runnable task) {
@@ -72,9 +70,8 @@ public final class UnownedSweep {
     }
 
     private void purgeTimeouts() {
-        Regionizer<RegionTickData> regionizer = regions.regionizer();
-        int shift = regionizer.sectionShift();
-        timeouts.purgeUnowned(section -> regionizer.regionAt(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift) != null);
+        int shift = regions.regionizer().sectionShift();
+        timeouts.purgeUnowned(section -> owners.covered(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift));
     }
 
     private void unloadHiddenEntities() {

@@ -29,11 +29,10 @@ class ChunkOwnersTest {
     private final RegionInbox inbox = new RegionInbox();
     private final List<String> ran = new CopyOnWriteArrayList<>();
     private final List<String> taken = new CopyOnWriteArrayList<>();
-    private boolean holding;
-    private boolean covered = true;
+    private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
     private boolean chunkHeldByAnother;
     private int urgency;
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> covered ? inbox : null, (x, z) -> holding, this::take, server, (_, _) -> urgency);
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, (_, _) -> urgency);
 
     private boolean take(int chunkX, int chunkZ, Runnable task) {
         if (chunkHeldByAnother) {
@@ -52,7 +51,7 @@ class ChunkOwnersTest {
 
     @Test
     void gameWorkRunsInLineForTheOwner() {
-        holding = true;
+        regions.tickOn(Thread.currentThread());
 
         assertTrue(owners.submit(1, 1, Work.GAME, () -> ran.add("now")));
 
@@ -63,7 +62,7 @@ class ChunkOwnersTest {
     /** N01: a respawn refused by the queue of its player called itself back in line until the stack overflowed; it yields to the next pass instead. */
     @Test
     void laterNeverRunsInLineEvenForTheOwner() {
-        holding = true;
+        regions.tickOn(Thread.currentThread());
 
         owners.later(1, 1, Work.GAME, () -> ran.add("next pass"));
 
@@ -74,8 +73,7 @@ class ChunkOwnersTest {
 
     @Test
     void laterOnAnUncoveredChunkGoesThroughTheServerThread() {
-        covered = false;
-        holding = true;
+        regions.cover(null);
 
         owners.later(1, 1, Work.GAME, () -> ran.add("next tick"));
 
@@ -97,7 +95,7 @@ class ChunkOwnersTest {
     /** 2026-09-06: a gateway placed on the server thread later could not be read back by the feature that placed it, and never got its exit. */
     @Test
     void gameWorkOnAnUncoveredChunkRunsOnTheCallerWhichTakesTheChunk() {
-        covered = false;
+        regions.cover(null);
 
         assertTrue(owners.submit(1, 1, Work.GAME, () -> ran.add("now")));
 
@@ -109,7 +107,7 @@ class ChunkOwnersTest {
     @Test
     void gameWorkOnAChunkAnotherThreadHoldsIsMailForThatThread() throws InterruptedException {
         chunkHeldByAnother = true;
-        covered = false;
+        regions.cover(null);
         ChunkClaim held = takenOnAnotherThread();
 
         assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("later")));
@@ -130,7 +128,7 @@ class ChunkOwnersTest {
     /** 2026-09-05: a respawn sent to the pool waited for its spawn chunk under the reservation of that same chunk, forever. */
     @Test
     void gameWorkFromThePoolGoesToTheServerThread() throws InterruptedException {
-        covered = false;
+        regions.cover(null);
         CountDownLatch posted = new CountDownLatch(1);
 
         owners.submit(1, 1, Work.CHUNK, () -> {
@@ -148,7 +146,7 @@ class ChunkOwnersTest {
     /** N02: the pool and a taker kept two registries of the same chunk; the pool task now takes the chunk for its duration, so a taker meanwhile finds it held and its work waits for the release. */
     @Test
     void aPoolTaskHoldsItsChunkAgainstATakerUntilItEnds() throws InterruptedException {
-        covered = false;
+        regions.cover(null);
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch finish = new CountDownLatch(1);
 
@@ -176,7 +174,7 @@ class ChunkOwnersTest {
     /** B02: a pool task queued before a thread took the chunk would have run beside it; it reads the owner again when it starts. */
     @Test
     void aQueuedPoolTaskFindsTheChunkTakenWhenItStartsAndHandsItOver() throws InterruptedException {
-        covered = false;
+        regions.cover(null);
         CountDownLatch release = TestThreads.occupy(pool);
         owners.submit(1, 1, Work.CHUNK, () -> ran.add("chunk work"));
         ChunkClaim taken = owners.borrow(1, 1);
@@ -198,8 +196,8 @@ class ChunkOwnersTest {
 
     @Test
     void aChunkATakerHoldsStaysItsOnceARegionCoversIt() throws InterruptedException {
-        covered = false;
-        holding = true;
+        regions.cover(null);
+        regions.tickOn(Thread.currentThread());
         AtomicReference<ChunkClaim> taken = new AtomicReference<>();
         CountDownLatch took = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -211,7 +209,7 @@ class ChunkOwnersTest {
         });
         taker.start();
         assertTrue(took.await(5, TimeUnit.SECONDS));
-        covered = true;
+        regions.cover(inbox);
 
         assertFalse(owners.holds(1, 1), "the region does not hold a chunk another thread took");
         assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("mail")));
@@ -226,7 +224,7 @@ class ChunkOwnersTest {
     /** 2026-09-04: a status change on an uncovered chunk re-submitted itself to the pool forever, the worker not counting as its owner. */
     @Test
     void thePoolWorkerHoldsTheChunkOfTheTaskItRuns() throws InterruptedException {
-        covered = false;
+        regions.cover(null);
         CountDownLatch done = new CountDownLatch(1);
         boolean[] inLine = new boolean[1];
 
@@ -244,7 +242,7 @@ class ChunkOwnersTest {
     /** 2026-09-24: an owner task took the first priority whatever its chunk, and passed before the chunks a player waited for. */
     @Test
     void anOwnerTaskTakesTheUrgencyOfItsChunk() {
-        covered = false;
+        regions.cover(null);
         urgency = 5;
         CountDownLatch release = TestThreads.occupy(pool);
         CountDownLatch done = new CountDownLatch(2);
@@ -270,7 +268,7 @@ class ChunkOwnersTest {
         owners.submit(1, 1, Work.CHUNK, chunkWork::countDown);
         owners.submit(1, 1, Work.GAME, () -> ran.add("game"));
 
-        covered = false;
+        regions.cover(null);
         owners.resubmit(inbox);
 
         assertTrue(chunkWork.await(5, TimeUnit.SECONDS));
