@@ -261,6 +261,37 @@ class ChunkOwnersTest {
         assertEquals(List.of("step", "owner"), ran);
     }
 
+    /** 2026-09-26: a region published every chunk that turned FULL in its area, up to 1500 inbox tasks after a join. */
+    @Test
+    void aPublicationBetweenTwoRegionTicksRunsOnThePoolWhichHoldsItsChunk() {
+        CountDownLatch published = new CountDownLatch(1);
+        boolean[] held = new boolean[1];
+
+        owners.publish(1, 1, () -> {
+            held[0] = owners.holds(1, 1);
+            published.countDown();
+        });
+
+        TestThreads.await(published);
+        assertTrue(held[0], "the pool worker holds the chunk it publishes");
+        assertEquals(0, inbox.size(), "the region inbox never saw the publication");
+    }
+
+    @Test
+    void aPublicationWhileTheRegionTicksWaitsInItsInbox() throws InterruptedException {
+        regions.tickOn(new Thread(() -> { }, "region"));
+
+        owners.publish(1, 1, () -> ran.add("published"));
+        for (int attempt = 0; attempt < 500 && inbox.size() == 0; attempt++) {
+            Thread.sleep(10);
+        }
+
+        assertEquals(List.of(), ran, "the pool never publishes beside a ticking region");
+        assertEquals(1, inbox.drain());
+        assertEquals(List.of("published"), ran);
+        assertNotNull(owners.borrow(1, 1), "the pool gave the chunk back");
+    }
+
     /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. 2026-09-14: game work waits for the next pump, a release runs nothing on its thread. */
     @Test
     void aDeadRegionHandsItsTasksBackAsTheWorkTheyAre() throws InterruptedException {

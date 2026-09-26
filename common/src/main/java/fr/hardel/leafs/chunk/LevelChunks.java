@@ -113,8 +113,7 @@ public final class LevelChunks {
     }
 
     public Executor publisher(int chunkX, int chunkZ) {
-        Executor owner = owners.executor(chunkX, chunkZ);
-        return task -> owner.execute(() -> {
+        return task -> owners.publish(chunkX, chunkZ, () -> {
             task.run();
             chunksFull.increment();
         });
