@@ -1,7 +1,5 @@
 package fr.hardel.leafs.mixin.chunk;
 
-import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import org.spongepowered.asm.mixin.Final;
@@ -27,10 +25,5 @@ public abstract class StructureTemplatePaletteMixin {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$concurrentBlockCache(CallbackInfo callbackInfo) {
         this.cache = new ConcurrentHashMap<>();
-    }
-
-    @WrapMethod(method = "jigsaws")
-    private synchronized List<StructureTemplate.JigsawBlockInfo> leafs$lockedJigsawCache(Operation<List<StructureTemplate.JigsawBlockInfo>> original) {
-        return original.call();
     }
 }
