@@ -48,7 +48,7 @@ public final class StructureStartsTest {
         ChunkGenerator generator = level.getChunkSource().getGenerator();
         ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
         return structure.value().generate(structure, level.dimension(), level.registryAccess(), generator, generator.getBiomeSource(),
-                state.randomState(), level.getStructureTemplateManager(),
+                state.randomState(), level.getStructureManager(),
                 state.getLevelSeed(), pos, 0, level, _ -> true)
             .createTag(StructurePieceSerializationContext.fromLevel(level), pos);
     }
