@@ -43,7 +43,7 @@ class DemandsTest {
         demands.release(CHUNK, FULL);
 
         assertEquals(FULL + 1, storage.getTicketLevelAt(CHUNK, false));
-        assertTrue(demands.needs(4, 3, ChunkStatus.TERRAIN));
+        assertTrue(demands.needs(4, 3, ChunkStatus.BIOMES));
         assertFalse(demands.needs(4, 3, ChunkStatus.FEATURES));
     }
 }
