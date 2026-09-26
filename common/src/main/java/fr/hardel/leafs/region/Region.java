@@ -69,10 +69,6 @@ public final class Region<R> {
         return regionizer.deadSectionCountOf(this);
     }
 
-    public boolean owns(int chunkX, int chunkZ) {
-        return regionizer.regionAtUnsynchronised(chunkX, chunkZ) == this;
-    }
-
     // Used by the Leafs Debug mod
     public long[] sectionKeySnapshot() {
         return regionizer.sectionKeysOf(this);

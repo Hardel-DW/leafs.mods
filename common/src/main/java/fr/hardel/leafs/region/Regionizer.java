@@ -100,12 +100,6 @@ public final class Regionizer<R> {
         return sectionShift;
     }
 
-    public Region<R> regionAtUnsynchronised(int chunkX, int chunkZ) {
-        RegionSection<R> section = sections.get(CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift));
-
-        return section == null ? null : section.region();
-    }
-
     // Used by the Leafs Debug mod
     public Collection<Region<R>> regionsView() {
         return regionsView;

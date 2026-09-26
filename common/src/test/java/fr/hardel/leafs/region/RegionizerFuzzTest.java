@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 
 class RegionizerFuzzTest {
     private static final int OPERATIONS = 4000;
@@ -56,7 +55,6 @@ class RegionizerFuzzTest {
             int chunkZ = CoordinateKey.z(chunkKey);
             Region<Object> owner = regionizer.regionAt(chunkX, chunkZ);
             assertNotNull(owner, "chunk [%s, %s] lost its region".formatted(chunkX, chunkZ));
-            assertSame(owner, regionizer.regionAtUnsynchronised(chunkX, chunkZ));
         }
     }
 

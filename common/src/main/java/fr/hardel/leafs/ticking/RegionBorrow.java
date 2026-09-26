@@ -162,16 +162,6 @@ public final class RegionBorrow {
         }
     }
 
-    public boolean holds(LevelRegions regions, int chunkX, int chunkZ) {
-        Long2ObjectOpenHashMap<ChunkClaim> chunks = heldChunks.get(regions);
-        if (chunks != null && chunks.containsKey(ChunkPos.pack(chunkX, chunkZ))) {
-            return true;
-        }
-
-        Region<RegionTickData> region = regions.regionizer().regionAt(chunkX, chunkZ);
-        return region != null && held.contains(region);
-    }
-
     public boolean tryBorrowChunk(LevelRegions regions, int chunkX, int chunkZ) {
         if (!regions.live()) {
             return true;

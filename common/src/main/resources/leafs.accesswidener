@@ -62,3 +62,4 @@ accessible field net/minecraft/server/level/GenerationChunkHolder generationRefC
 accessible field net/minecraft/server/level/ChunkGenerationTask scheduledStatus Lnet/minecraft/world/level/chunk/status/ChunkStatus;
 accessible field net/minecraft/server/level/ChunkGenerationTask markedForCancellation Z
 accessible field net/minecraft/server/level/ChunkGenerationTask cache Lnet/minecraft/util/StaticCache2D;
+accessible field net/minecraft/server/level/ChunkGenerationTask needsGeneration Z

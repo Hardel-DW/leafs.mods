@@ -23,9 +23,9 @@ class DeferredWorkTest {
     private final RegionInbox inbox = new RegionInbox();
     private final DeferStats stats = new DeferStats();
     private final List<String> ran = new ArrayList<>();
-    private boolean holding;
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, work) -> { work.run(); return true; },
-        new GlobalScheduler(Runnable::run), (_, _) -> 0);
+    private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, (x, z, work) -> { work.run(); return true; },
+        new GlobalScheduler(Runnable::run), _ -> 0);
 
     private DeferredWork work(DeferReason reason, Runnable task) {
         return new DeferredWork(owners, stats, 0, 0, reason, () -> true, task);
@@ -38,7 +38,7 @@ class DeferredWorkTest {
 
     @Test
     void aThreadAlreadyHoldingTheDestinationRunsInline() {
-        holding = true;
+        regions.tickOn(Thread.currentThread());
 
         boolean deferred = work(DeferReason.PLAYER_TELEPORT, () -> ran.add("inline")).submit();
 

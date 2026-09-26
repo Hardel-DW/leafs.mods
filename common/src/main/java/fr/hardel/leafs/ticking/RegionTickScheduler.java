@@ -48,7 +48,7 @@ public final class RegionTickScheduler {
             workers.forEach(Thread::interrupt);
         }
 
-        wait.until(() -> workers.stream().noneMatch(Thread::isAlive));
+        wait.until(() -> workers.stream().noneMatch(Thread::isAlive), OwnWork.NO_HELP);
     }
 
     public void schedule(TickHandle handle) {

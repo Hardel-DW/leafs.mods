@@ -2,6 +2,7 @@ package fr.hardel.leafs.world;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.ChunkFixtures;
+import fr.hardel.leafs.chunk.owner.ChunkClaim;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.global.GlobalScheduler;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
@@ -28,9 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RoutingNeighborUpdaterTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final RegionInbox inbox = new RegionInbox();
-    private boolean holding;
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, (x, z) -> inbox, (x, z) -> holding, (x, z, task) -> { task.run(); return true; },
-        new GlobalScheduler(Runnable::run), (_, _) -> 0);
+    private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, (x, z, task) -> { task.run(); return true; },
+        new GlobalScheduler(Runnable::run), _ -> 0);
 
     private static final class RecordingUpdater extends CollectingNeighborUpdater {
         final List<String> calls = new ArrayList<>();
@@ -80,16 +81,21 @@ class RoutingNeighborUpdaterTest {
     /** 2026-08-29: two chunk workers promoting chunks shared the level's collector and corrupted its stack; an owner without a region collects in its own thread's. */
     @Test
     void anOwnerWithoutARegionCollectsInItsOwnThread() throws InterruptedException {
-        holding = true;
+        regions.cover(null);
         List<RecordingUpdater> created = new ArrayList<>();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> {
             RecordingUpdater updater = new RecordingUpdater();
             created.add(updater);
             return updater;
         }, () -> owners);
+        Runnable claimAndCall = () -> {
+            ChunkClaim claim = owners.borrow(0, 0);
+            callAll(router);
+            owners.release(0, 0, claim);
+        };
 
-        callAll(router);
-        Thread other = new Thread(() -> callAll(router));
+        claimAndCall.run();
+        Thread other = new Thread(claimAndCall);
         other.start();
         other.join();
 
@@ -100,7 +106,7 @@ class RoutingNeighborUpdaterTest {
 
     @Test
     void activeContextRoutesEveryEntryPointToItsCollector() {
-        holding = true;
+        regions.tickOn(Thread.currentThread());
         RecordingUpdater fallback = new RecordingUpdater();
         RecordingUpdater regional = new RecordingUpdater();
         RoutingNeighborUpdater router = new RoutingNeighborUpdater(null, () -> fallback, () -> owners);
@@ -124,7 +130,7 @@ class RoutingNeighborUpdaterTest {
         assertTrue(fallback.calls.isEmpty(), "nothing runs on the thread that does not own the chunk");
         assertEquals(4, inbox.size());
 
-        holding = true;
+        regions.tickOn(Thread.currentThread());
         assertEquals(4, inbox.drain());
         assertEquals(List.of("shape", "simple", "full", "multi"), fallback.calls);
     }

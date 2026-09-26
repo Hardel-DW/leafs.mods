@@ -45,11 +45,6 @@ public final class WorldTickContext {
         return context != null && context.level == level ? context.worldData : null;
     }
 
-    public static boolean ownsChunk(ServerLevel level, int chunkX, int chunkZ) {
-        WorldTickContext context = CURRENT.get();
-        return context != null && context.level == level && context.region.owns(chunkX, chunkZ);
-    }
-
     public ServerLevel level() {
         return level;
     }
