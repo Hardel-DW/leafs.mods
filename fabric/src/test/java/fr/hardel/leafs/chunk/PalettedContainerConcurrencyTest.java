@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk;
 
+import com.sun.management.ThreadMXBean;
 import fr.hardel.MinecraftBootstrap;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -9,12 +10,16 @@ import net.minecraft.world.level.chunk.Strategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.lang.management.ManagementFactory;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MinecraftBootstrap.class)
 class PalettedContainerConcurrencyTest {
@@ -60,6 +65,37 @@ class PalettedContainerConcurrencyTest {
         for (int index = 0; index < 4096; index++) {
             assertEquals(states.get((index + 199) & 63), container.get(index & 15, index >> 8, index >> 4 & 15));
         }
+    }
+
+    /** 2026-09-22: the monitor wrapped each write in an Operation and an argument array, 14 % of the allocations in JFR. */
+    @Test
+    void aBlockWriteAllocatesNothing() {
+        List<BlockState> states = states(16);
+        PalettedContainer<BlockState> container = new PalettedContainer<>(states.getFirst(), Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
+        ThreadMXBean threads = ManagementFactory.getPlatformMXBean(ThreadMXBean.class);
+        long allocated = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            long before = threads.getCurrentThreadAllocatedBytes();
+            for (int index = 0; index < 4096; index++) {
+                container.getAndSet(index & 15, index >> 8, index >> 4 & 15, states.get((index + pass) & 15));
+            }
+
+            allocated = threads.getCurrentThreadAllocatedBytes() - before;
+        }
+
+        assertTrue(allocated < 4096, "%s bytes for 4096 writes".formatted(allocated));
+    }
+
+    @Test
+    void aFailedWriteReleasesTheContainer() throws InterruptedException {
+        List<BlockState> states = states(2);
+        PalettedContainer<BlockState> container = new PalettedContainer<>(states.getFirst(), Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
+
+        assertThrows(IllegalArgumentException.class, () -> container.set(0, 16, 0, states.getFirst()));
+        Thread writer = Thread.ofPlatform().start(() -> container.set(0, 0, 0, states.getLast()));
+
+        assertTrue(writer.join(Duration.ofSeconds(5)));
+        assertEquals(states.getLast(), container.get(0, 0, 0));
     }
 
     /** 2026-08-19: an overflow must resize without growing the palette a reader still snapshots. */
