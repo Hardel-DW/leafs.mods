@@ -43,7 +43,7 @@ class PlacedTasksTest {
 
         distances.put(key(100, 100), 5);
         queue("far", 100, 100, ChunkStatus.FEATURES, done);
-        queue("terrain it does not need", 8, 4, ChunkStatus.TERRAIN, done);
+        queue("biomes it does not need", 8, 4, ChunkStatus.BIOMES, done);
         queue("structure starts it needs", 8, 4, ChunkStatus.STRUCTURE_STARTS, done);
         queue("itself", 3, 4, ChunkStatus.FULL, done);
 
@@ -52,7 +52,7 @@ class PlacedTasksTest {
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
         assertEquals(Set.of("itself", "structure starts it needs"), Set.copyOf(order.subList(0, 2)));
-        assertEquals(List.of("far", "terrain it does not need"), order.subList(2, 4));
+        assertEquals(List.of("far", "biomes it does not need"), order.subList(2, 4));
     }
 
     @Test
