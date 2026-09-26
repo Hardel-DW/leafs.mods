@@ -9,6 +9,7 @@ import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.UnownedSweep;
 import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.view.PlayerView;
@@ -75,8 +76,15 @@ public final class LevelChunks {
         });
     }
 
-    private int urgency(int chunkX, int chunkZ) {
-        return holders.demands().near(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
+    private int urgency(ChunkTask.Place place) {
+        int chunkX = ChunkTask.chunkX(place.chunkKey());
+        int chunkZ = ChunkTask.chunkZ(place.chunkKey());
+        if (holders.demands().needs(chunkX, chunkZ, place.status())) {
+            return ChunkPool.FIRST;
+        }
+
+        int chunk = view.urgency(chunkX, chunkZ);
+        return place.chunkKey() == place.centerKey() ? chunk : Math.min(chunk, view.urgency(ChunkTask.chunkX(place.centerKey()), ChunkTask.chunkZ(place.centerKey())));
     }
 
     public ChunkPool pool() {

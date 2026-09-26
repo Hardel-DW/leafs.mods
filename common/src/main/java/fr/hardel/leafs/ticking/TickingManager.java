@@ -125,13 +125,17 @@ public final class TickingManager {
     }
 
     public void await(BooleanSupplier done) {
+        await(done, OwnWork.NO_HELP);
+    }
+
+    public void await(BooleanSupplier done, BooleanSupplier help) {
         if (onServerThread()) {
-            serverWork.until(done);
+            serverWork.until(done, help);
             return;
         }
 
         WorldTickContext mine = WorldTickContext.current();
-        new OwnWork(() -> mine != null && mine.region().data().inbox().drainChunkWork() > 0).until(done);
+        new OwnWork(() -> mine != null && mine.region().data().inbox().drainChunkWork() > 0).until(done, help);
     }
 
     private boolean pumpServer() {

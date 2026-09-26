@@ -5,9 +5,11 @@ import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.Work;
+import fr.hardel.leafs.chunk.pool.ChunkNeed;
 import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.metrics.ServerMetrics;
+import net.minecraft.server.level.ChunkGenerationTask;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
@@ -15,11 +17,13 @@ import net.minecraft.server.level.ChunkResult;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkPyramid;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -63,7 +67,7 @@ public final class ChunkHolders {
         return new Publication();
     }
 
-    public record Demand(CompletableFuture<ChunkResult<ChunkAccess>> delivery, Runnable release) {
+    public record Demand(CompletableFuture<ChunkResult<ChunkAccess>> delivery, Runnable release, BooleanSupplier help) {
     }
 
     public Demand require(int chunkX, int chunkZ, ChunkStatus status) {
@@ -71,8 +75,12 @@ public final class ChunkHolders {
         int level = ChunkLevel.byStatus(status);
         demands.demand(key, level);
         CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
-        placement.expedite(chunkX, chunkZ);
-        return new Demand(delivery, () -> demands.release(key, level));
+        placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, chunkX, chunkZ, status));
+        return new Demand(delivery, () -> demands.release(key, level), () -> {
+            ChunkGenerationTask task = table.get(key).task.get();
+            ChunkPyramid pyramid = task != null && task.needsGeneration ? ChunkPyramid.GENERATION_PYRAMID : ChunkPyramid.LOADING_PYRAMID;
+            return placement.help(ChunkNeed.of(pyramid, chunkX, chunkZ, status), owners.holds(chunkX, chunkZ));
+        });
     }
 
     private ChunkHolder demanded(long key, ChunkStatus status) {

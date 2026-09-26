@@ -32,7 +32,7 @@ class ChunkOwnersTest {
     private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
     private boolean chunkHeldByAnother;
     private int urgency;
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, (_, _) -> urgency);
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, _ -> urgency);
 
     private boolean take(int chunkX, int chunkZ, Runnable task) {
         if (chunkHeldByAnother) {
