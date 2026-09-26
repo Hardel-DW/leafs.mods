@@ -62,6 +62,16 @@ class StructureStartConcurrencyTest {
 
     @Test
     void startsOfTwoTypesRunTogether() throws InterruptedException {
+        assertEquals(2, startsThatMeet(StructureType.STRONGHOLD, StructureType.FORTRESS));
+    }
+
+    /** 2026-09-26: one lock for every jigsaw start left up to 11 of 12 pool workers waiting, up to 524 ms. */
+    @Test
+    void twoJigsawStartsRunTogether() throws InterruptedException {
+        assertEquals(2, startsThatMeet(StructureType.JIGSAW, StructureType.JIGSAW));
+    }
+
+    private static int startsThatMeet(StructureType<?> first, StructureType<?> second) throws InterruptedException {
         CyclicBarrier both = new CyclicBarrier(2);
         AtomicInteger met = new AtomicInteger();
         Runnable body = () -> {
@@ -73,8 +83,8 @@ class StructureStartConcurrencyTest {
             }
         };
 
-        runTogether(new Probe(StructureType.STRONGHOLD, body), new Probe(StructureType.FORTRESS, body));
-        assertEquals(2, met.get());
+        runTogether(new Probe(first, body), new Probe(second, body));
+        return met.get();
     }
 
     private static void runTogether(Probe first, Probe second) throws InterruptedException {

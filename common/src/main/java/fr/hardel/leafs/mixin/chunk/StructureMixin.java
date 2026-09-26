@@ -22,6 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 @Mixin(Structure.class)
 public abstract class StructureMixin {
@@ -29,10 +30,11 @@ public abstract class StructureMixin {
     public abstract StructureType<?> type();
 
     @WrapMethod(method = "generate")
-    private StructureStart leafs$oneStartPerType(Holder<Structure> selected, ResourceKey<Level> dimension, RegistryAccess registryAccess, ChunkGenerator chunkGenerator,
+    private StructureStart leafs$oneLegacyStartPerType(Holder<Structure> selected, ResourceKey<Level> dimension, RegistryAccess registryAccess, ChunkGenerator chunkGenerator,
         BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos sourceChunkPos,
         int references, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome, Operation<StructureStart> original) {
-        return SharedStateMonitor.call(type(), () -> original.call(selected, dimension, registryAccess, chunkGenerator, biomeSource, climateSampler, randomState,
-            structureTemplateManager, seed, sourceChunkPos, references, heightAccessor, validBiome));
+        Supplier<StructureStart> start = () -> original.call(selected, dimension, registryAccess, chunkGenerator, biomeSource, climateSampler, randomState,
+            structureTemplateManager, seed, sourceChunkPos, references, heightAccessor, validBiome);
+        return type() == StructureType.JIGSAW ? start.get() : SharedStateMonitor.call(type(), start);
     }
 }
