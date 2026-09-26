@@ -20,6 +20,7 @@
 		"chunk.ServerChunkCacheMixin",
 		"chunk.ServerLevelMixin",
 		"chunk.StructureMixin",
+		"chunk.StructurePieceMixin",
 		"chunk.StructureTemplatePaletteMixin",
 		"chunk.TicketStorageMixin",
 		"entity.ChunkMapMixin",
