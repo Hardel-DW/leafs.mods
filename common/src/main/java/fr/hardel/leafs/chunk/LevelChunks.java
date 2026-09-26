@@ -9,15 +9,14 @@ import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.UnownedSweep;
 import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.metrics.MinuteCounter;
 import fr.hardel.leafs.ticking.LevelRegions;
-
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
-import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.TicketStorage;
@@ -50,7 +49,7 @@ public final class LevelChunks {
         storage.leafs$bindTimeouts(timeouts);
         ChunkOwners.Taker taker = (chunkX, chunkZ, task) -> take(regions, chunkX, chunkZ, task);
         this.placement = new ChunkPlacement(pool, IDS.getAndIncrement(), this::urgency);
-        this.owners = new ChunkOwners(pool, placement, regions::inboxAt, (chunkX, chunkZ) -> holds(level, regions, chunkX, chunkZ), regions::live, serial, taker, ticking.globalScheduler());
+        this.owners = new ChunkOwners(pool, placement, regions, level.getServer().getRunningThread(), serial, taker, ticking.globalScheduler());
         this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs);
@@ -66,19 +65,6 @@ public final class LevelChunks {
         return ((LevelChunksAccess) level.getChunkSource().chunkMap).leafs$chunks();
     }
 
-    private static boolean holds(ServerLevel level, LevelRegions regions, int chunkX, int chunkZ) {
-        if (WorldTickContext.ownsChunk(level, chunkX, chunkZ)) {
-            return true;
-        }
-
-        RegionBorrow borrow = RegionBorrow.current();
-        if (borrow != null && borrow.holds(regions, chunkX, chunkZ)) {
-            return true;
-        }
-
-        return !regions.live() && TickingManager.of(level.getServer()).onServerThread();
-    }
-
     private static boolean take(LevelRegions regions, int chunkX, int chunkZ, Runnable task) {
         return RegionBorrow.hold(borrow -> {
             if (!borrow.tryBorrowChunk(regions, chunkX, chunkZ)) {
@@ -90,8 +76,15 @@ public final class LevelChunks {
         });
     }
 
-    private int urgency(int chunkX, int chunkZ) {
-        return holders.demands().near(chunkX, chunkZ) ? ChunkPool.FIRST : view.urgency(chunkX, chunkZ);
+    private int urgency(ChunkTask.Place place) {
+        int chunkX = ChunkTask.chunkX(place.chunkKey());
+        int chunkZ = ChunkTask.chunkZ(place.chunkKey());
+        if (holders.demands().needs(chunkX, chunkZ, place.status())) {
+            return ChunkPool.FIRST;
+        }
+
+        int chunk = view.urgency(chunkX, chunkZ);
+        return place.chunkKey() == place.centerKey() ? chunk : Math.min(chunk, view.urgency(ChunkTask.chunkX(place.centerKey()), ChunkTask.chunkZ(place.centerKey())));
     }
 
     public ChunkPool pool() {
@@ -128,8 +121,7 @@ public final class LevelChunks {
     }
 
     public Executor publisher(int chunkX, int chunkZ) {
-        Executor owner = owners.executor(chunkX, chunkZ);
-        return task -> owner.execute(() -> {
+        return task -> owners.publish(chunkX, chunkZ, () -> {
             task.run();
             chunksFull.increment();
         });

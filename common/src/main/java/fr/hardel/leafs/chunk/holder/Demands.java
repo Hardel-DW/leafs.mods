@@ -1,10 +1,13 @@
 package fr.hardel.leafs.chunk.holder;
 
+import fr.hardel.leafs.chunk.pool.ChunkNeed;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
+import net.minecraft.world.level.chunk.status.ChunkPyramid;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -41,10 +44,10 @@ public final class Demands {
         });
     }
 
-    public boolean near(int chunkX, int chunkZ) {
+    public boolean needs(int chunkX, int chunkZ, ChunkStatus status) {
         for (Key key : waiters.keySet()) {
-            int distance = Math.max(Math.abs(ChunkPos.getX(key.chunkKey()) - chunkX), Math.abs(ChunkPos.getZ(key.chunkKey()) - chunkZ));
-            if (distance <= ChunkLevel.RADIUS_AROUND_FULL_CHUNK) {
+            ChunkNeed need = ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, ChunkPos.getX(key.chunkKey()), ChunkPos.getZ(key.chunkKey()), ChunkLevel.generationStatus(key.level()));
+            if (need.covers(chunkX, chunkZ, status)) {
                 return true;
             }
         }

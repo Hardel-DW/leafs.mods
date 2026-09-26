@@ -116,7 +116,7 @@ class RegionTickSchedulerTest {
         AtomicBoolean finished = new AtomicBoolean();
         stopping.schedule(new TestTickHandle(1, () -> {
             waiting.countDown();
-            new OwnWork(() -> false).until(delivered::get);
+            new OwnWork(() -> false).until(delivered::get, OwnWork.NO_HELP);
             finished.set(true);
         }));
 
@@ -136,7 +136,7 @@ class RegionTickSchedulerTest {
         CountDownLatch waiting = new CountDownLatch(1);
         stopping.schedule(new TestTickHandle(1, () -> {
             waiting.countDown();
-            new OwnWork(() -> false).until(() -> false);
+            new OwnWork(() -> false).until(() -> false, OwnWork.NO_HELP);
         }));
 
         assertTrue(waiting.await(5, TimeUnit.SECONDS));

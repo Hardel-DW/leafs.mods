@@ -55,7 +55,7 @@ public final class ChunkWait {
         long slowNanos = LeafsConfig.get().debug().slowTaskNanos();
         String found = slowNanos == Long.MAX_VALUE ? null : report.toString();
         try {
-            ticking.await(delivery::isDone);
+            ticking.await(delivery::isDone, demand.help());
         } finally {
             keep.accept(demand.release());
             long waited = System.nanoTime() - report.startedNanos();

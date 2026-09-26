@@ -4,7 +4,8 @@ import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkPyramid;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +27,7 @@ class PlacedTasksTest {
 
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final Long2IntOpenHashMap distances = new Long2IntOpenHashMap();
-    private final Urgency urgency = (chunkX, chunkZ) -> distances.getOrDefault(ChunkPos.pack(chunkX, chunkZ), FAR);
+    private final ChunkPlacement placement = new ChunkPlacement(pool, 0, place -> distances.getOrDefault(place.chunkKey(), FAR));
     private final List<String> order = new CopyOnWriteArrayList<>();
 
     @AfterEach
@@ -34,22 +35,24 @@ class PlacedTasksTest {
         pool.shutdown();
     }
 
+    /** 2026-09-26: a bot spawn put a thousand tasks around the chunks it read at the first priority, and its region waited 300 ms behind them. */
     @Test
-    void whatAThreadWaitsForMovesToTheHead() throws InterruptedException {
-        CountDownLatch done = new CountDownLatch(3);
+    void onlyWhatTheAwaitedChunkNeedsMovesToTheHead() throws InterruptedException {
+        CountDownLatch done = new CountDownLatch(4);
         CountDownLatch gate = TestThreads.occupy(pool);
 
-        distances.put(ChunkPos.pack(100, 100), 5);
-        queue("far", 100, 100, 100, 100, done);
-        queue("near", 3, 4, 3, 4, done);
-        queue("dependency of near", 40, 40, 3, 4, done);
+        distances.put(key(100, 100), 5);
+        queue("far", 100, 100, ChunkStatus.FEATURES, done);
+        queue("terrain it does not need", 8, 4, ChunkStatus.TERRAIN, done);
+        queue("structure starts it needs", 8, 4, ChunkStatus.STRUCTURE_STARTS, done);
+        queue("itself", 3, 4, ChunkStatus.FULL, done);
 
-        pool.expedite(key(3, 4));
+        placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, 3, 4, ChunkStatus.FULL));
         gate.countDown();
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertEquals(Set.of("near", "dependency of near"), Set.copyOf(order.subList(0, 2)));
-        assertEquals("far", order.get(2));
+        assertEquals(Set.of("itself", "structure starts it needs"), Set.copyOf(order.subList(0, 2)));
+        assertEquals(List.of("far", "terrain it does not need"), order.subList(2, 4));
     }
 
     @Test
@@ -57,11 +60,11 @@ class PlacedTasksTest {
         CountDownLatch done = new CountDownLatch(2);
         CountDownLatch gate = TestThreads.occupy(pool);
 
-        distances.put(ChunkPos.pack(100, 100), 5);
-        queue("behind", 100, 100, 100, 100, done);
-        queue("ahead", 3, 4, 3, 4, done);
+        distances.put(key(100, 100), 5);
+        queue("behind", 100, 100, ChunkStatus.FEATURES, done);
+        queue("ahead", 3, 4, ChunkStatus.FEATURES, done);
 
-        distances.put(ChunkPos.pack(3, 4), 1);
+        distances.put(key(3, 4), 1);
         pool.changed(key(3, 4));
         gate.countDown();
 
@@ -73,9 +76,8 @@ class PlacedTasksTest {
         return ChunkTask.key(0, chunkX, chunkZ);
     }
 
-    private void queue(String name, int chunkX, int chunkZ, int centerX, int centerZ, CountDownLatch done) {
-        ChunkTask.Place place = new ChunkTask.Place(key(chunkX, chunkZ), key(centerX, centerZ), urgency);
-        pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, place, NONE, () -> {
+    private void queue(String name, int chunkX, int chunkZ, ChunkStatus status, CountDownLatch done) {
+        pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, placement.place(chunkX, chunkZ, chunkX, chunkZ, status), NONE, () -> {
             order.add(name);
             done.countDown();
         }));
