@@ -209,7 +209,7 @@ class ChunkLevelsTest {
     @Test
     void holderWorkUnderTheLocksSeesTheSourcePostedBeforeIt() {
         graph.setSource(10, 10, 31);
-        int seen = graph.settled(10, 10, this::record, () -> level(10, 10));
+        int seen = graph.settled(this::record, () -> level(10, 10));
         assertEquals(31, seen);
         assertEquals(32, level(11, 10));
         assertEquals(31, reported.get(ChunkPos.pack(10, 10)));
@@ -227,8 +227,10 @@ class ChunkLevelsTest {
         graph.drain(this::record);
         assertEquals(31, level(10, 10));
         assertEquals(31, level(40, 10));
+        assertFalse(graph.dirty(), "a held increase asks for no drain while its tick runs");
 
         epochs.close(TickEpochs.SERVER);
+        assertTrue(graph.dirty());
         assertTrue(graph.drain(this::record));
         assertEquals(NONE, level(10, 10));
     }
@@ -239,7 +241,7 @@ class ChunkLevelsTest {
         graph.drain(this::record);
 
         graph.setSource(10, 10, NONE);
-        int seen = graph.settled(10, 10, this::record, () -> level(10, 10));
+        int seen = graph.settled(this::record, () -> level(10, 10));
 
         assertEquals(31, seen);
         assertTrue(graph.drain(this::record));

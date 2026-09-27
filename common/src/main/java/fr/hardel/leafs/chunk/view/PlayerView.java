@@ -40,7 +40,10 @@ public final class PlayerView {
     }
 
     public void viewDistance(int distance) {
-        tickets.viewDistance(distance);
+        players.settled(tickets, () -> {
+            tickets.viewDistance(distance);
+            return null;
+        });
     }
 
     public void simulationDistance(int distance) {

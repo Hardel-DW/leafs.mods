@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk.level;
 
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.LongConsumer;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.shorts.Short2LongMap;
 import it.unimi.dsi.fastutil.shorts.Short2LongOpenHashMap;
@@ -53,8 +54,8 @@ final class Section {
         }
     }
 
-    // Decreases pass at once, increases once every tick open at their write has ended; true when some stay held.
-    boolean takeVisible(long oldestOpen, Long2ByteMap changes) {
+    // Decreases pass at once, increases once every tick open at their write has ended. Returns the oldest held write, or Long.MAX_VALUE.
+    long takeVisible(long oldestOpen, Long2ByteMap changes) {
         synchronized (pending) {
             for (ObjectIterator<Short2LongMap.Entry> iterator = pending.short2LongEntrySet().fastIterator(); iterator.hasNext(); ) {
                 Short2LongMap.Entry entry = iterator.next();
@@ -66,7 +67,12 @@ final class Section {
                 }
             }
 
-            return !pending.isEmpty();
+            long oldestHeld = Long.MAX_VALUE;
+            for (LongIterator iterator = pending.values().iterator(); iterator.hasNext(); ) {
+                oldestHeld = Math.min(oldestHeld, iterator.nextLong() >> Byte.SIZE);
+            }
+
+            return oldestHeld;
         }
     }
 

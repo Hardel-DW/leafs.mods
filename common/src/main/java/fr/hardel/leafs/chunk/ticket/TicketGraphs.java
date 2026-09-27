@@ -7,6 +7,7 @@ import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -16,11 +17,7 @@ public final class TicketGraphs {
     private final ChunkLevels loading;
     private final ChunkLevels simulation;
     private final ChunkLevels players;
-    private final AtomicBoolean handed = new AtomicBoolean();
-    private volatile ChunkPool pool;
-    private volatile Supplier<LevelListener> loadingListener;
-    private volatile LevelListener simulationListener;
-    private volatile LevelListener playersListener;
+    private volatile List<Drain> drains = List.of();
 
     public TicketGraphs(TickEpochs epochs) {
         this.loading = new ChunkLevels(LEVELS, epochs);
@@ -46,26 +43,39 @@ public final class TicketGraphs {
     }
 
     public void listen(Supplier<LevelListener> loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
-        this.loadingListener = loading;
-        this.simulationListener = simulation;
-        this.playersListener = players;
-        this.pool = pool;
+        this.drains = List.of(new Drain(this.players, () -> players, pool), new Drain(this.simulation, () -> simulation, pool), new Drain(this.loading, loading, pool));
     }
 
-    public boolean drain() {
-        if (loadingListener == null) {
-            return false;
+    public void drain() {
+        for (Drain drain : drains) {
+            drain.request();
+        }
+    }
+
+    // One pool task per dirty graph; a drain that published asks again, since its listener may have written the other graphs.
+    private final class Drain {
+        private final ChunkLevels graph;
+        private final Supplier<LevelListener> listener;
+        private final ChunkPool pool;
+        private final AtomicBoolean handed = new AtomicBoolean();
+
+        private Drain(ChunkLevels graph, Supplier<LevelListener> listener, ChunkPool pool) {
+            this.graph = graph;
+            this.listener = listener;
+            this.pool = pool;
         }
 
-        players.drain(playersListener);
-        boolean changed = simulation.drain(simulationListener);
-        if (handed.compareAndSet(false, true)) {
+        private void request() {
+            if (!graph.dirty() || !handed.compareAndSet(false, true)) {
+                return;
+            }
+
             pool.execute(() -> {
                 handed.set(false);
-                loading.drain(loadingListener.get());
+                if (graph.drain(listener.get())) {
+                    drain();
+                }
             });
         }
-
-        return changed;
     }
 }
