@@ -220,7 +220,7 @@ class ChunkLevelsTest {
     void anIncreaseWaitsForTheEndOfTheTickThatWroteIt() {
         graph.setSource(10, 10, 31);
         graph.drain(this::record);
-        epochs.open(TickEpochs.SERVER);
+        epochs.openServer();
 
         graph.setSource(10, 10, NONE);
         graph.setSource(40, 10, 31);
@@ -229,7 +229,7 @@ class ChunkLevelsTest {
         assertEquals(31, level(40, 10));
         assertFalse(graph.dirty(), "a held increase asks for no drain while its tick runs");
 
-        epochs.close(TickEpochs.SERVER);
+        epochs.closeServer();
         assertTrue(graph.dirty());
         assertTrue(graph.drain(this::record));
         assertEquals(NONE, level(10, 10));

@@ -4,21 +4,19 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 public final class TickEpochs {
-    public static final int SERVER = 0;
+    private static final int SERVER = 0;
     private static final long CLOSED = Long.MAX_VALUE;
 
     private final AtomicLong clock = new AtomicLong();
     private final AtomicLongArray open;
-    private final Thread[] tickers;
-    // Each flag is only touched by the thread of its slot.
-    private final boolean[] wrote;
-    private final Runnable written;
+    private final Runnable drain;
+    private volatile Thread server;
+    // Only the server thread touches it.
+    private boolean serverWrote;
 
-    public TickEpochs(int workers, Runnable written) {
+    public TickEpochs(int workers, Runnable drain) {
         this.open = new AtomicLongArray(workers + 1);
-        this.tickers = new Thread[workers + 1];
-        this.wrote = new boolean[workers + 1];
-        this.written = written;
+        this.drain = drain;
         for (int slot = 0; slot < open.length(); slot++) {
             open.set(slot, CLOSED);
         }
@@ -28,34 +26,41 @@ public final class TickEpochs {
         return open.length() - 1;
     }
 
-    public void open(int slot) {
-        tickers[slot] = Thread.currentThread();
-        open.set(slot, clock.get());
+    public void open(int worker) {
+        open.set(worker, clock.get());
         clock.incrementAndGet();
     }
 
-    // The closing thread drains what it wrote since its last close.
-    public void close(int slot) {
-        open.set(slot, CLOSED);
-        if (!wrote[slot]) {
+    // A region worker drains what is pending at each tick end.
+    public void close(int worker) {
+        open.set(worker, CLOSED);
+        drain.run();
+    }
+
+    public void openServer() {
+        server = Thread.currentThread();
+        open(SERVER);
+    }
+
+    // The server drains only after writing, so it never drains the writes of others.
+    public void closeServer() {
+        open.set(SERVER, CLOSED);
+        if (!serverWrote) {
             return;
         }
 
-        wrote[slot] = false;
-        written.run();
+        drain.run();
+        serverWrote = false;
     }
 
-    // Marks the ticking thread that writes a level; false when none, so no tick end will drain the write.
-    public boolean mark() {
-        Thread current = Thread.currentThread();
-        for (int slot = 0; slot < tickers.length; slot++) {
-            if (tickers[slot] == current) {
-                wrote[slot] = true;
-                return true;
-            }
+    // False for a write no tick end will drain, made neither by a region worker nor by the server thread.
+    public boolean claimWrite() {
+        if (Thread.currentThread() != server) {
+            return RegionTickScheduler.onWorker();
         }
 
-        return false;
+        serverWrote = true;
+        return true;
     }
 
     public long now() {

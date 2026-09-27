@@ -35,9 +35,9 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
         leafs$ticking.throwRegionCrash();
         int tickCount = server.getTickCount();
         TickEpochs epochs = leafs$ticking.scheduler().epochs();
-        epochs.open(TickEpochs.SERVER);
+        epochs.openServer();
         RegionBorrow.hold(_ -> original.call(server, sprinting));
-        epochs.close(TickEpochs.SERVER);
+        epochs.closeServer();
         leafs$ticking.endServerTick(server.getTickCount() != tickCount);
     }
 

@@ -6,6 +6,10 @@ import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.view.PlayerView;
+import fr.hardel.leafs.ticking.LeafsWatchdog;
+import fr.hardel.leafs.ticking.OwnWork;
+import fr.hardel.leafs.ticking.RegionTickScheduler;
+import fr.hardel.leafs.ticking.TestTickHandle;
 import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -14,7 +18,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final TickEpochs epochs = new TickEpochs(1, () -> this.graphs.drainWritten());
+    private final TickEpochs epochs = new TickEpochs(1, () -> this.graphs.drainAtTickEnd());
     private final TicketGraphs graphs = new TicketGraphs(epochs);
     private final List<String> threads = new CopyOnWriteArrayList<>();
     private final CountDownLatch published = new CountDownLatch(1);
@@ -74,22 +80,30 @@ class TicketGraphsTest {
 
     /** 2026-09-27: the server thread drained the players and simulation writes of every region at each tick. */
     @Test
-    void aTickingWriterDrainsItsWritesWhenItsTickEnds() throws InterruptedException {
+    void aRegionWorkerDrainsItsWritesWhenItsTickEnds() {
         List<String> drainers = new CopyOnWriteArrayList<>();
-        graphs.listen(() -> loading, (_, _, _) -> { }, (_, _, _) -> drainers.add(Thread.currentThread().getName()), pool);
+        CountDownLatch drained = new CountDownLatch(1);
+        graphs.listen(() -> loading, (_, _, _) -> { }, (_, _, _) -> {
+            drainers.add(Thread.currentThread().getName());
+            drained.countDown();
+        }, pool);
         CountDownLatch release = TestThreads.occupy(pool);
-
-        Thread region = new Thread(() -> {
-            epochs.open(1);
+        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, () -> 50_000_000L, false,
+            new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> { }, _ -> { }), (_, _) -> { });
+        scheduler.start();
+        TestTickHandle region = new TestTickHandle(1, () -> {
             graphs.players().setSource(0, 0, 32);
             graphs.drain();
-            epochs.close(1);
-        }, "region");
-        region.start();
-        region.join();
+        });
+
+        scheduler.schedule(region);
+        TestThreads.await(drained);
+        region.cancel();
+        scheduler.shutdown(false, new OwnWork(() -> false));
         release.countDown();
 
-        assertEquals(List.of("region"), drainers);
+        assertEquals(1, drainers.size());
+        assertTrue(drainers.getFirst().startsWith("Leafs Server Region Worker"));
     }
 
     /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */

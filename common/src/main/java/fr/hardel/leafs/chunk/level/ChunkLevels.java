@@ -45,7 +45,7 @@ public final class ChunkLevels {
     public void setSource(int chunkX, int chunkZ, int level) {
         long key = Section.keyOf(chunkX, chunkZ);
         long written = epochs.now();
-        if (!epochs.mark()) {
+        if (!epochs.claimWrite()) {
             stray.set(true);
         }
 
