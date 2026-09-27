@@ -9,7 +9,7 @@ displayName = "Leafs"
 iconFile = "assets/leafs/icon.png"
 authors = "Hardel"
 description = '''
-Regionised multithreading for the dedicated server: the world is cut into independent regions, each ticking in parallel on its own thread - like Folia, redesigned for modern vanilla and NeoForge.
+Regionised multithreading for the server. The world is cut into independent regions, and each region ticks in parallel on its own thread.
 '''
 
 [[dependencies.leafs]]
