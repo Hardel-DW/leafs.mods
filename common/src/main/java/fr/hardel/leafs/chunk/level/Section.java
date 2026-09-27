@@ -1,7 +1,10 @@
 package fr.hardel.leafs.chunk.level;
 
+import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.LongConsumer;
-import it.unimi.dsi.fastutil.shorts.Short2ByteOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import it.unimi.dsi.fastutil.shorts.Short2LongMap;
+import it.unimi.dsi.fastutil.shorts.Short2LongOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 
 import java.lang.invoke.MethodHandles;
@@ -20,7 +23,7 @@ final class Section {
     private final int none;
     private final byte[] levels = new byte[SIZE * SIZE];
     private final byte[] sources = new byte[SIZE * SIZE];
-    private final Short2ByteOpenHashMap pending = new Short2ByteOpenHashMap();
+    private final Short2LongOpenHashMap pending = new Short2LongOpenHashMap();
     private int occupied;
     private boolean retired;
 
@@ -39,22 +42,31 @@ final class Section {
         return ChunkPos.pack(chunkX >> SHIFT, chunkZ >> SHIFT);
     }
 
-    boolean post(int index, int level) {
+    boolean post(int index, int level, long written) {
         synchronized (pending) {
             if (retired) {
                 return false;
             }
 
-            pending.put((short) index, (byte) level);
+            pending.put((short) index, written << Byte.SIZE | level);
             return true;
         }
     }
 
-    Short2ByteOpenHashMap takePending() {
+    // Decreases pass at once, increases once every tick open at their write has ended; true when some stay held.
+    boolean takeVisible(long oldestOpen, Long2ByteMap changes) {
         synchronized (pending) {
-            Short2ByteOpenHashMap batch = pending.clone();
-            pending.clear();
-            return batch;
+            for (ObjectIterator<Short2LongMap.Entry> iterator = pending.short2LongEntrySet().fastIterator(); iterator.hasNext(); ) {
+                Short2LongMap.Entry entry = iterator.next();
+                int index = entry.getShortKey() & 0xFFFF;
+                int level = (int) (entry.getLongValue() & 0xFF);
+                if (level <= sources[index] || entry.getLongValue() >> Byte.SIZE < oldestOpen) {
+                    changes.put(chunkKey(index), (byte) level);
+                    iterator.remove();
+                }
+            }
+
+            return !pending.isEmpty();
         }
     }
 
@@ -74,13 +86,15 @@ final class Section {
     }
 
     void forEachAtMost(int level, LongConsumer consumer) {
-        int originX = ChunkPos.getX(key) << SHIFT;
-        int originZ = ChunkPos.getZ(key) << SHIFT;
         for (int index = 0; index < levels.length; index++) {
             if (level(index) <= level) {
-                consumer.accept(ChunkPos.pack(originX + (index & MASK), originZ + (index >> SHIFT)));
+                consumer.accept(chunkKey(index));
             }
         }
+    }
+
+    private long chunkKey(int index) {
+        return ChunkPos.pack((ChunkPos.getX(key) << SHIFT) + (index & MASK), (ChunkPos.getZ(key) << SHIFT) + (index >> SHIFT));
     }
 
     void publish(int index, int level) {

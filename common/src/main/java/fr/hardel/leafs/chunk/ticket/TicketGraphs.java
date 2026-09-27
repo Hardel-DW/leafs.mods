@@ -3,11 +3,9 @@ package fr.hardel.leafs.chunk.ticket;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.Ticket;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.TicketStorage;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -15,16 +13,20 @@ import java.util.function.Supplier;
 public final class TicketGraphs {
     private static final int LEVELS = ChunkLevel.MAX_LEVEL + 2;
 
-    private final ChunkLevels loading = new ChunkLevels(LEVELS);
-    private final ChunkLevels simulation = new ChunkLevels(LEVELS);
-    private final ChunkLevels players = new ChunkLevels(ChunkMap.MAX_VIEW_DISTANCE + 2);
-    private final ThreadLocal<Boolean> batching = ThreadLocal.withInitial(() -> false);
-    private final ThreadLocal<Boolean> wroteSimulation = ThreadLocal.withInitial(() -> false);
+    private final ChunkLevels loading;
+    private final ChunkLevels simulation;
+    private final ChunkLevels players;
     private final AtomicBoolean handed = new AtomicBoolean();
     private volatile ChunkPool pool;
     private volatile Supplier<LevelListener> loadingListener;
     private volatile LevelListener simulationListener;
     private volatile LevelListener playersListener;
+
+    public TicketGraphs(TickEpochs epochs) {
+        this.loading = new ChunkLevels(LEVELS, epochs);
+        this.simulation = new ChunkLevels(LEVELS, epochs);
+        this.players = new ChunkLevels(ChunkMap.MAX_VIEW_DISTANCE + 2, epochs);
+    }
 
     public ChunkLevels loading() {
         return loading;
@@ -50,60 +52,13 @@ public final class TicketGraphs {
         this.pool = pool;
     }
 
-    public TicketStorage.ChunkUpdated loadingFeed() {
-        return (key, level, _) -> loading.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
-    }
-
-    public void settle(long key, Ticket ticket) {
-        if (loadingListener != null && !ChunkLevels.draining() && ticket.getType().doesLoad() && ticket.getTicketLevel() < loading.level(key)) {
-            loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener.get(), () -> null);
-        }
-    }
-
-    public TicketStorage.ChunkUpdated simulationFeed() {
-        return (key, level, _) -> {
-            simulation.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
-            wroteSimulation.set(true);
-        };
-    }
-
-    public void batch(Runnable writes) {
-        batch(() -> {
-            writes.run();
-            return null;
-        });
-    }
-
-    public <T> T batch(Supplier<T> writes) {
-        if (batching.get()) {
-            return writes.get();
-        }
-
-        T result;
-        batching.set(true);
-        try {
-            result = writes.get();
-        } finally {
-            batching.set(false);
-        }
-
-        drain();
-        return result;
-    }
-
     public boolean drain() {
-        if (loadingListener == null || batching.get()) {
+        if (loadingListener == null) {
             return false;
         }
 
-        batching.set(true);
-        try {
-            players.drain(playersListener);
-        } finally {
-            batching.set(false);
-        }
-
-        boolean changed = drainOwnSimulation();
+        players.drain(playersListener);
+        boolean changed = simulation.drain(simulationListener);
         if (handed.compareAndSet(false, true)) {
             pool.execute(() -> {
                 handed.set(false);
@@ -112,14 +67,5 @@ public final class TicketGraphs {
         }
 
         return changed;
-    }
-
-    private boolean drainOwnSimulation() {
-        if (!wroteSimulation.get()) {
-            return false;
-        }
-
-        wroteSimulation.set(false);
-        return simulation.drain(simulationListener);
     }
 }

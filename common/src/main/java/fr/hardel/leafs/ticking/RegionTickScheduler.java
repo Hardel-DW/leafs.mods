@@ -10,6 +10,7 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
+import java.util.stream.IntStream;
 
 public final class RegionTickScheduler {
     private static final long IDLE_POLL_NANOS = 50_000_000L;
@@ -22,6 +23,7 @@ public final class RegionTickScheduler {
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
+    private final TickEpochs epochs;
     private volatile boolean running = true;
 
     public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
@@ -31,15 +33,16 @@ public final class RegionTickScheduler {
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
         this.failurePolicy = failurePolicy;
+        this.epochs = new TickEpochs(threadCount);
     }
 
     public void start() {
-        for (int index = 1; index <= threadCount; index++) {
-            Thread worker = new Worker(serverThreads, this::workerLoop, index);
+        IntStream.rangeClosed(1, threadCount).forEach(slot -> {
+            Thread worker = new Worker(serverThreads, () -> workerLoop(slot), slot);
             worker.setDaemon(true);
             workers.add(worker);
             worker.start();
-        }
+        });
     }
 
     public void shutdown(boolean crashed, OwnWork wait) {
@@ -68,12 +71,16 @@ public final class RegionTickScheduler {
         return Thread.currentThread() instanceof Worker;
     }
 
+    public TickEpochs epochs() {
+        return epochs;
+    }
+
     // Used by the Leafs Debug mod
     public List<Thread> workerThreads() {
         return Collections.unmodifiableList(workers);
     }
 
-    private void workerLoop() {
+    private void workerLoop(int slot) {
         while (running) {
             ScheduledTick next;
             try {
@@ -96,6 +103,7 @@ public final class RegionTickScheduler {
 
             boolean started;
             watchdog.beginTick(handle);
+            epochs.open(slot);
             try {
                 started = handle.tick();
             } catch (Throwable throwable) {
@@ -105,6 +113,7 @@ public final class RegionTickScheduler {
 
                 continue;
             } finally {
+                epochs.close(slot);
                 watchdog.endTick(handle);
                 if (regionThreadNames) {
                     worker.setName(workerName);
