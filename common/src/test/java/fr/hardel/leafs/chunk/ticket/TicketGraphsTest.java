@@ -49,19 +49,28 @@ class TicketGraphsTest {
         pool.shutdown();
     }
 
+    /** 2026-09-27: the server thread drained the players and simulation graphs at every tick. */
     @Test
-    void aWriterOffThePoolHandsTheLoadingDrainOver() throws InterruptedException {
-        List<String> simulation = new CopyOnWriteArrayList<>();
-        graphs.listen(() -> loading, (key, old, now) -> simulation.add(Thread.currentThread().getName()), (key, old, now) -> {}, pool);
+    void aDrainRequestedOffThePoolRunsEveryGraphOnThePool() throws InterruptedException {
+        CountDownLatch others = new CountDownLatch(2);
+        LevelListener other = (_, _, _) -> {
+            threads.add(Thread.currentThread().getName());
+            others.countDown();
+        };
+        graphs.listen(() -> loading, other, other, pool);
+        CountDownLatch release = TestThreads.occupy(pool);
 
-        graphs.loading().setSource(0, 0, 44);
+        graphs.players().setSource(0, 0, 32);
         graphs.simulation().setSource(0, 0, 44);
-        assertTrue(graphs.drain());
-        assertEquals(List.of(Thread.currentThread().getName()), simulation);
+        graphs.loading().setSource(0, 0, 44);
+        graphs.drain();
+        assertTrue(threads.isEmpty());
 
-        assertTrue(published.await(5, TimeUnit.SECONDS));
-        assertEquals(1, threads.size());
-        assertTrue(threads.getFirst().startsWith("Leafs Chunk Worker"));
+        release.countDown();
+        TestThreads.await(published);
+        TestThreads.await(others);
+        assertEquals(3, threads.size());
+        assertTrue(threads.stream().allMatch(name -> name.startsWith("Leafs Chunk Worker")));
     }
 
     /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
@@ -91,7 +100,7 @@ class TicketGraphsTest {
         graphs.listen(() -> loading, (key, old, now) -> {}, view.tickets(), pool);
         view.viewDistance(2);
         view.enter(ChunkPos.pack(63, 0));
-        graphs.drain();
+        graphs.players().drain(view.tickets());
         List<Long> dropped = new CopyOnWriteArrayList<>();
         storage.setLoadingChunkUpdatedListener((key, level, _) -> {
             if (!ChunkLevel.isLoaded(level)) {
@@ -112,13 +121,13 @@ class TicketGraphsTest {
         });
         mover.start();
         TestThreads.await(left);
-        graphs.drain();
+        graphs.players().drain(view.tickets());
         drained.countDown();
         TestThreads.await(entered);
         assertEquals(List.of(), dropped);
 
         epochs.close(1);
-        graphs.drain();
+        graphs.players().drain(view.tickets());
         mover.join();
         assertEquals(IntStream.rangeClosed(-2, 2).mapToObj(chunkZ -> ChunkPos.pack(61, chunkZ)).sorted().toList(), dropped.stream().sorted().toList());
     }

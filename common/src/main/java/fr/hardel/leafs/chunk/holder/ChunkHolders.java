@@ -74,7 +74,7 @@ public final class ChunkHolders {
         long key = ChunkPos.pack(chunkX, chunkZ);
         int level = ChunkLevel.byStatus(status);
         demands.demand(key, level);
-        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
+        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(() -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
         placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, chunkX, chunkZ, status));
         return new Demand(delivery, () -> demands.release(key, level), () -> {
             ChunkGenerationTask task = table.get(key).task.get();
@@ -86,15 +86,15 @@ public final class ChunkHolders {
     private ChunkHolder demanded(long key, ChunkStatus status) {
         ChunkHolder holder = table.get(key);
         if (holder == null) {
-            throw new IllegalStateException("Chunk %s demanded at %s has no holder: loading level %s, awaiting teardown %s, draining %s, tickets %s".formatted(
-                ChunkPos.unpack(key), status, loading.level(key), unloading.containsKey(key), ChunkLevels.draining(), tickets.getTicketDebugString(key, false)));
+            throw new IllegalStateException("Chunk %s demanded at %s has no holder: loading level %s, awaiting teardown %s, tickets %s".formatted(
+                ChunkPos.unpack(key), status, loading.level(key), unloading.containsKey(key), tickets.getTicketDebugString(key, false)));
         }
 
         return holder;
     }
 
-    public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
-        return loading.settled(chunkX, chunkZ, publication(), body);
+    public <T> T settled(Supplier<T> body) {
+        return loading.settled(publication(), body);
     }
 
     private static void queueLevelFollows(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel) {
@@ -104,7 +104,7 @@ public final class ChunkHolders {
     private void unload(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();
         unloads.increment();
-        owners.submit(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
+        owners.later(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
     }
 
     private final class Publication implements LevelListener {
@@ -145,7 +145,7 @@ public final class ChunkHolders {
 
             for (ChunkHolder holder : holders) {
                 ChunkPos pos = holder.getPos();
-                holder.updateFutures(chunkMap, owners.executor(pos.x(), pos.z()));
+                holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
             }
 
             for (ChunkHolder holder : holders) {
