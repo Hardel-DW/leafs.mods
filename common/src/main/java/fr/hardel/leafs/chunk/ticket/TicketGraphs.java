@@ -46,8 +46,8 @@ public final class TicketGraphs {
         this.drains = List.of(new Drain(this.players, () -> players, pool, true), new Drain(this.simulation, () -> simulation, pool, true), new Drain(this.loading, loading, pool, false));
     }
 
-    // A ticking thread applies its players and simulation writes itself once its tick has ended.
-    public void drainWritten() {
+    // The thread whose tick ended applies the pending players and simulation changes itself.
+    public void drainAtTickEnd() {
         for (Drain drain : drains) {
             drain.inline();
         }

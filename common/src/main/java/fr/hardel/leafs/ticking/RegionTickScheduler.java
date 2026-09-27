@@ -101,9 +101,8 @@ public final class RegionTickScheduler {
 
             boolean started;
             watchdog.beginTick(handle);
-            epochs.open(slot);
             try {
-                started = handle.tick();
+                started = tickInEpoch(handle, slot);
             } catch (Throwable throwable) {
                 if (running) {
                     failurePolicy.accept(handle, throwable);
@@ -111,7 +110,6 @@ public final class RegionTickScheduler {
 
                 continue;
             } finally {
-                epochs.close(slot);
                 watchdog.endTick(handle);
                 if (regionThreadNames) {
                     worker.setName(workerName);
@@ -130,6 +128,16 @@ public final class RegionTickScheduler {
 
             handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos.getAsLong()));
             queue.add(next);
+        }
+    }
+
+    // The drain at the epoch close fails like the tick itself, through the failure policy.
+    private boolean tickInEpoch(TickHandle handle, int slot) {
+        epochs.open(slot);
+        try {
+            return handle.tick();
+        } finally {
+            epochs.close(slot);
         }
     }
 

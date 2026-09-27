@@ -233,4 +233,30 @@ class RegionTickSchedulerTest {
         assertEquals(1, attempts.get(), "a failed handle must not be rescheduled");
         assertEquals("boom", failures.peek().getMessage());
     }
+
+    /** 2026-09-28: a tick-end drain that threw escaped the worker loop through its finally, and the worker died without the failure policy. */
+    @Test
+    void aTickEndDrainThatThrowsGoesThroughTheFailurePolicyAndTheWorkerLivesOn() throws InterruptedException {
+        CountDownLatch failed = new CountDownLatch(1);
+        AtomicBoolean thrown = new AtomicBoolean();
+        TickEpochs epochs = new TickEpochs(1, () -> {
+            if (!thrown.getAndSet(true)) {
+                throw new IllegalStateException("drain");
+            }
+        });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> {
+            if (failure.getMessage().equals("drain")) {
+                failed.countDown();
+            }
+        });
+        scheduler.start();
+        scheduler.schedule(new TestTickHandle(1, () -> { }));
+        assertTrue(failed.await(5, TimeUnit.SECONDS));
+
+        CountDownLatch ticked = new CountDownLatch(1);
+        TestTickHandle next = new TestTickHandle(2, ticked::countDown);
+        scheduler.schedule(next);
+        assertTrue(ticked.await(5, TimeUnit.SECONDS), "the worker still ticks after the failed drain");
+        next.cancel();
+    }
 }

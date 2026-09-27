@@ -49,7 +49,7 @@ public final class TickingManager {
         long warnNanos = config.debug().watchdogWarnNanos();
         this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
         ThreadGroup serverThreads = Leafs.serverThreads();
-        this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainWritten), () -> server.tickRateManager().nanosecondsPerTick(),
+        this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainAtTickEnd), () -> server.tickRateManager().nanosecondsPerTick(),
             config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
         watchdog.start();
@@ -77,10 +77,10 @@ public final class TickingManager {
         return scheduler;
     }
 
-    // Runs on the thread whose tick just ended and wrote a level graph.
-    private void drainWritten() {
+    // A tick can write the graphs of any level, a player crossing dimensions included.
+    private void drainAtTickEnd() {
         for (ServerLevel level : levelUnits.keySet()) {
-            LevelChunks.of(level).graphs().drainWritten();
+            LevelChunks.of(level).graphs().drainAtTickEnd();
         }
     }
 
