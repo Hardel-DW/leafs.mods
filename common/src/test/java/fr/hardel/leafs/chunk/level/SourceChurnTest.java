@@ -20,7 +20,7 @@ class SourceChurnTest {
     private static final int SPAN = 120;
     private static final int OPERATIONS = 3_000;
 
-    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0));
+    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0, () -> { }));
 
     @Test
     void churnFromOneThreadSettlesLikeTheBruteForce() {

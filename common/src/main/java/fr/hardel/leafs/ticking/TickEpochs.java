@@ -9,21 +9,53 @@ public final class TickEpochs {
 
     private final AtomicLong clock = new AtomicLong();
     private final AtomicLongArray open;
+    private final Thread[] tickers;
+    // Each flag is only touched by the thread of its slot.
+    private final boolean[] wrote;
+    private final Runnable written;
 
-    public TickEpochs(int workers) {
+    public TickEpochs(int workers, Runnable written) {
         this.open = new AtomicLongArray(workers + 1);
+        this.tickers = new Thread[workers + 1];
+        this.wrote = new boolean[workers + 1];
+        this.written = written;
         for (int slot = 0; slot < open.length(); slot++) {
             open.set(slot, CLOSED);
         }
     }
 
+    public int workers() {
+        return open.length() - 1;
+    }
+
     public void open(int slot) {
+        tickers[slot] = Thread.currentThread();
         open.set(slot, clock.get());
         clock.incrementAndGet();
     }
 
+    // The closing thread drains what it wrote since its last close.
     public void close(int slot) {
         open.set(slot, CLOSED);
+        if (!wrote[slot]) {
+            return;
+        }
+
+        wrote[slot] = false;
+        written.run();
+    }
+
+    // Marks the ticking thread that writes a level; false when none, so no tick end will drain the write.
+    public boolean mark() {
+        Thread current = Thread.currentThread();
+        for (int slot = 0; slot < tickers.length; slot++) {
+            if (tickers[slot] == current) {
+                wrote[slot] = true;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public long now() {

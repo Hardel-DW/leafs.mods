@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChunkLevelsTest {
     private static final int LEVELS = 46;
     private static final int NONE = LEVELS - 1;
-    private final TickEpochs epochs = new TickEpochs(0);
+    private final TickEpochs epochs = new TickEpochs(0, () -> { });
     private final ChunkLevels graph = new ChunkLevels(LEVELS, epochs);
     private final Long2IntOpenHashMap reported = new Long2IntOpenHashMap();
     private final Long2IntOpenHashMap reportedOld = new Long2IntOpenHashMap();
@@ -209,7 +209,7 @@ class ChunkLevelsTest {
     @Test
     void holderWorkUnderTheLocksSeesTheSourcePostedBeforeIt() {
         graph.setSource(10, 10, 31);
-        int seen = graph.settled(this::record, () -> level(10, 10));
+        int seen = graph.settled(10, 10, this::record, () -> level(10, 10));
         assertEquals(31, seen);
         assertEquals(32, level(11, 10));
         assertEquals(31, reported.get(ChunkPos.pack(10, 10)));
@@ -241,7 +241,7 @@ class ChunkLevelsTest {
         graph.drain(this::record);
 
         graph.setSource(10, 10, NONE);
-        int seen = graph.settled(this::record, () -> level(10, 10));
+        int seen = graph.settled(10, 10, this::record, () -> level(10, 10));
 
         assertEquals(31, seen);
         assertTrue(graph.drain(this::record));

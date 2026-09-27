@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ViewTicketsTest {
     private static final int PLAYER_LEVELS = 34;
     private final TicketStorage tickets = new TicketStorage();
-    private final ChunkLevels players = new ChunkLevels(PLAYER_LEVELS, new TickEpochs(0));
+    private final ChunkLevels players = new ChunkLevels(PLAYER_LEVELS, new TickEpochs(0, () -> { }));
     private final ViewTickets view = new ViewTickets(tickets, players, 2);
     private final PlayerSources sources = new PlayerSources(tickets, players, 5);
 

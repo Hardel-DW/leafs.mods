@@ -74,7 +74,7 @@ public final class ChunkHolders {
         long key = ChunkPos.pack(chunkX, chunkZ);
         int level = ChunkLevel.byStatus(status);
         demands.demand(key, level);
-        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(() -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
+        CompletableFuture<ChunkResult<ChunkAccess>> delivery = settled(chunkX, chunkZ, () -> demanded(key, status).scheduleChunkGenerationTask(status, chunkMap));
         placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, chunkX, chunkZ, status));
         return new Demand(delivery, () -> demands.release(key, level), () -> {
             ChunkGenerationTask task = table.get(key).task.get();
@@ -93,8 +93,8 @@ public final class ChunkHolders {
         return holder;
     }
 
-    public <T> T settled(Supplier<T> body) {
-        return loading.settled(publication(), body);
+    public <T> T settled(int chunkX, int chunkZ, Supplier<T> body) {
+        return loading.settled(chunkX, chunkZ, publication(), body);
     }
 
     private static void queueLevelFollows(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel) {

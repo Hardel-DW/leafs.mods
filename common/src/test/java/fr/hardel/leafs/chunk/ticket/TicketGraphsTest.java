@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final TickEpochs epochs = new TickEpochs(1);
+    private final TickEpochs epochs = new TickEpochs(1, () -> this.graphs.drainWritten());
     private final TicketGraphs graphs = new TicketGraphs(epochs);
     private final List<String> threads = new CopyOnWriteArrayList<>();
     private final CountDownLatch published = new CountDownLatch(1);
@@ -49,9 +49,8 @@ class TicketGraphsTest {
         pool.shutdown();
     }
 
-    /** 2026-09-27: the server thread drained the players and simulation graphs at every tick. */
     @Test
-    void aDrainRequestedOffThePoolRunsEveryGraphOnThePool() throws InterruptedException {
+    void aWriteOutsideAnyTickIsDrainedOnThePool() {
         CountDownLatch others = new CountDownLatch(2);
         LevelListener other = (_, _, _) -> {
             threads.add(Thread.currentThread().getName());
@@ -71,6 +70,26 @@ class TicketGraphsTest {
         TestThreads.await(others);
         assertEquals(3, threads.size());
         assertTrue(threads.stream().allMatch(name -> name.startsWith("Leafs Chunk Worker")));
+    }
+
+    /** 2026-09-27: the server thread drained the players and simulation writes of every region at each tick. */
+    @Test
+    void aTickingWriterDrainsItsWritesWhenItsTickEnds() throws InterruptedException {
+        List<String> drainers = new CopyOnWriteArrayList<>();
+        graphs.listen(() -> loading, (_, _, _) -> { }, (_, _, _) -> drainers.add(Thread.currentThread().getName()), pool);
+        CountDownLatch release = TestThreads.occupy(pool);
+
+        Thread region = new Thread(() -> {
+            epochs.open(1);
+            graphs.players().setSource(0, 0, 32);
+            graphs.drain();
+            epochs.close(1);
+        }, "region");
+        region.start();
+        region.join();
+        release.countDown();
+
+        assertEquals(List.of("region"), drainers);
     }
 
     /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
@@ -110,6 +129,7 @@ class TicketGraphsTest {
         CountDownLatch left = new CountDownLatch(1);
         CountDownLatch drained = new CountDownLatch(1);
         CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch checked = new CountDownLatch(1);
 
         Thread mover = new Thread(() -> {
             epochs.open(1);
@@ -118,6 +138,8 @@ class TicketGraphsTest {
             TestThreads.await(drained);
             view.enter(ChunkPos.pack(64, 0));
             entered.countDown();
+            TestThreads.await(checked);
+            epochs.close(1);
         });
         mover.start();
         TestThreads.await(left);
@@ -126,8 +148,7 @@ class TicketGraphsTest {
         TestThreads.await(entered);
         assertEquals(List.of(), dropped);
 
-        epochs.close(1);
-        graphs.players().drain(view.tickets());
+        checked.countDown();
         mover.join();
         assertEquals(IntStream.rangeClosed(-2, 2).mapToObj(chunkZ -> ChunkPos.pack(61, chunkZ)).sorted().toList(), dropped.stream().sorted().toList());
     }

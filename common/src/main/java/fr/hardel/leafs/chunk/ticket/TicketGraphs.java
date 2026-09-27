@@ -43,30 +43,49 @@ public final class TicketGraphs {
     }
 
     public void listen(Supplier<LevelListener> loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
-        this.drains = List.of(new Drain(this.players, () -> players, pool), new Drain(this.simulation, () -> simulation, pool), new Drain(this.loading, loading, pool));
+        this.drains = List.of(new Drain(this.players, () -> players, pool, true), new Drain(this.simulation, () -> simulation, pool, true), new Drain(this.loading, loading, pool, false));
     }
 
+    // A ticking thread applies its players and simulation writes itself once its tick has ended.
+    public void drainWritten() {
+        for (Drain drain : drains) {
+            drain.inline();
+        }
+
+        drain();
+    }
+
+    // The pool takes the loading graph, and the players and simulation writes no tick end will drain.
     public void drain() {
         for (Drain drain : drains) {
             drain.request();
         }
     }
 
-    // One pool task per dirty graph; a drain that published asks again, since its listener may have written the other graphs.
+    // One pool task per graph at a time; a drain that published asks again, since its listener may have written the other graphs.
     private final class Drain {
         private final ChunkLevels graph;
         private final Supplier<LevelListener> listener;
         private final ChunkPool pool;
+        private final boolean owned;
         private final AtomicBoolean handed = new AtomicBoolean();
 
-        private Drain(ChunkLevels graph, Supplier<LevelListener> listener, ChunkPool pool) {
+        private Drain(ChunkLevels graph, Supplier<LevelListener> listener, ChunkPool pool, boolean owned) {
             this.graph = graph;
             this.listener = listener;
             this.pool = pool;
+            this.owned = owned;
+        }
+
+        private void inline() {
+            if (owned && graph.dirty()) {
+                graph.drain(listener.get());
+            }
         }
 
         private void request() {
-            if (!graph.dirty() || !handed.compareAndSet(false, true)) {
+            boolean due = owned ? graph.takeOrphaned() : graph.dirty();
+            if (!due || !handed.compareAndSet(false, true)) {
                 return;
             }
 

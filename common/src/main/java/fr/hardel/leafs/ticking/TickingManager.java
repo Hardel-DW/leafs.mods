@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
@@ -48,7 +49,7 @@ public final class TickingManager {
         long warnNanos = config.debug().watchdogWarnNanos();
         this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
         ThreadGroup serverThreads = Leafs.serverThreads();
-        this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), () -> server.tickRateManager().nanosecondsPerTick(),
+        this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainWritten), () -> server.tickRateManager().nanosecondsPerTick(),
             config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
         watchdog.start();
@@ -74,6 +75,13 @@ public final class TickingManager {
     // Used by the Leafs Debug mod
     public RegionTickScheduler scheduler() {
         return scheduler;
+    }
+
+    // Runs on the thread whose tick just ended and wrote a level graph.
+    private void drainWritten() {
+        for (ServerLevel level : levelUnits.keySet()) {
+            LevelChunks.of(level).graphs().drainWritten();
+        }
     }
 
     public LevelTickUnit unitOf(ServerLevel level) {
