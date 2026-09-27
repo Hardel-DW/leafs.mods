@@ -22,7 +22,7 @@ class TicketTimeoutIndexTest {
     void aTicketExpiresOnceItsTimeoutIsCountedDown() {
         TicketStorage storage = new TicketStorage();
         TicketTimeoutIndex timeouts = new TicketTimeoutIndex(storage, null, 1);
-        ((TicketStorageAccess) storage).leafs$bind(new TicketGraphs(new TickEpochs(0)), timeouts);
+        ((TicketStorageAccess) storage).leafs$bind(new TicketGraphs(new TickEpochs(0, () -> { })), timeouts);
         storage.addTicket(CHUNK, new Ticket(TicketType.UNKNOWN, 33));
 
         for (long countdown = 0; countdown <= TicketType.UNKNOWN.timeout(); countdown++) {

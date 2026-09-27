@@ -15,7 +15,7 @@ class MovingViewTest {
     private static final int PLAYERS = 5;
     private static final int STEPS = 200;
 
-    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0));
+    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0, () -> { }));
 
     @Test
     void aSlidingViewSettlesInMilliseconds() {

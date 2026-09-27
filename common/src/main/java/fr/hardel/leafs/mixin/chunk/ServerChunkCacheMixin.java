@@ -15,6 +15,7 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -70,29 +71,26 @@ public abstract class ServerChunkCacheMixin {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
     }
 
-    @WrapMethod(method = "runDistanceManagerUpdates")
-    private boolean leafs$settleTheDecreases(Operation<Boolean> original) {
-        LevelChunks chunks = LevelChunks.of(this.level);
-        if (!chunks.graphs().loading().dirty()) {
-            return original.call();
-        }
-
-        return chunks.holders().settled(original::call);
+    @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
+    private boolean leafs$settleTheRequestedChunk(ServerChunkCache cache, Operation<Boolean> original, @Local ChunkPos pos) {
+        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(cache));
     }
 
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
-        return LevelChunks.of(this.level).holders().settled(() -> original.call(holder, status, chunkMap));
+        ChunkPos pos = holder.getPos();
+        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(holder, status, chunkMap));
     }
 
     @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkRangeFuture(Lnet/minecraft/server/level/ChunkHolder;ILjava/util/function/IntFunction;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<List<ChunkAccess>>> leafs$radiusRequestUnderTheGraphLocks(ChunkMap chunkMap, ChunkHolder holder, int radius, IntFunction<ChunkStatus> distanceToStatus, Operation<CompletableFuture<ChunkResult<List<ChunkAccess>>>> original) {
-        return LevelChunks.of(this.level).holders().settled(() -> original.call(chunkMap, holder, radius, distanceToStatus));
+        ChunkPos pos = holder.getPos();
+        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(chunkMap, holder, radius, distanceToStatus));
     }
 
     @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getVisibleChunkIfPresent(J)Lnet/minecraft/server/level/ChunkHolder;"))
     private ChunkHolder leafs$readTheHolderUnderTheGraphLocks(ServerChunkCache cache, long key, Operation<ChunkHolder> original) {
-        return LevelChunks.of(this.level).holders().settled(() -> original.call(cache, key));
+        return LevelChunks.of(this.level).holders().settled(ChunkPos.getX(key), ChunkPos.getZ(key), () -> original.call(cache, key));
     }
 
     @Unique

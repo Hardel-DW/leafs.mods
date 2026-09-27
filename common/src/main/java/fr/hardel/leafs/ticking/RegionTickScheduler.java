@@ -18,7 +18,6 @@ public final class RegionTickScheduler {
     private final Queue<ScheduledTick> missed = new ConcurrentLinkedQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
-    private final int threadCount;
     private final LongSupplier periodNanos;
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
@@ -26,18 +25,17 @@ public final class RegionTickScheduler {
     private final TickEpochs epochs;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(ThreadGroup serverThreads, TickEpochs epochs, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.serverThreads = serverThreads;
-        this.threadCount = threadCount;
         this.periodNanos = periodNanos;
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
         this.failurePolicy = failurePolicy;
-        this.epochs = new TickEpochs(threadCount);
+        this.epochs = epochs;
     }
 
     public void start() {
-        IntStream.rangeClosed(1, threadCount).forEach(slot -> {
+        IntStream.rangeClosed(1, epochs.workers()).forEach(slot -> {
             Thread worker = new Worker(serverThreads, () -> workerLoop(slot), slot);
             worker.setDaemon(true);
             workers.add(worker);

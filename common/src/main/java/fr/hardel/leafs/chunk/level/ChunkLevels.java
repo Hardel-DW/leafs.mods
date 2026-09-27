@@ -11,27 +11,31 @@ import it.unimi.dsi.fastutil.longs.LongConsumer;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import net.minecraft.world.level.ChunkPos;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 public final class ChunkLevels {
+    private static final int STRIPES = 256;
+
     private final int none;
     private final TickEpochs epochs;
     private final ConcurrentLong2ObjectMap<Section> sections = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLinkedQueue<Section> dirty = new ConcurrentLinkedQueue<>();
-    private final List<Section> held = new ArrayList<>();
-    private final ReentrantLock lock = new ReentrantLock();
-    private volatile long oldestHeld = Long.MAX_VALUE;
+    private final ConcurrentLinkedQueue<Section> held = new ConcurrentLinkedQueue<>();
+    private final AtomicBoolean stray = new AtomicBoolean();
+    private final ReentrantLock[] stripes = new ReentrantLock[STRIPES];
 
     public ChunkLevels(int levelCount, TickEpochs epochs) {
         this.none = levelCount - 1;
         this.epochs = epochs;
+        Arrays.setAll(stripes, _ -> new ReentrantLock());
     }
 
     public int none() {
@@ -41,6 +45,10 @@ public final class ChunkLevels {
     public void setSource(int chunkX, int chunkZ, int level) {
         long key = Section.keyOf(chunkX, chunkZ);
         long written = epochs.now();
+        if (!epochs.mark()) {
+            stray.set(true);
+        }
+
         while (true) {
             Section section = sections.computeIfAbsent(key, k -> new Section(k, none));
             if (section.post(Section.index(chunkX, chunkZ), level, written)) {
@@ -71,53 +79,83 @@ public final class ChunkLevels {
         }
     }
 
-    // New writes, or held increases whose ticks have all ended.
     public boolean dirty() {
-        return !dirty.isEmpty() || oldestHeld < epochs.oldestOpen();
+        return !dirty.isEmpty() || ripe();
+    }
+
+    // Writes no tick end will drain: made outside any tick, or held increases whose ticks have all ended.
+    public boolean takeOrphaned() {
+        return stray.getAndSet(false) || ripe();
+    }
+
+    private boolean ripe() {
+        long oldestOpen = epochs.oldestOpen();
+        for (Section section : held) {
+            if (section.oldestHeld() < oldestOpen) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public boolean drain(LevelListener listener) {
-        lock.lock();
-        try {
-            Set<Section> taken = new LinkedHashSet<>(held);
-            held.clear();
-            for (Section section = dirty.poll(); section != null; section = dirty.poll()) {
-                section.queued.set(false);
-                taken.add(section);
-            }
+        Set<Section> taken = new LinkedHashSet<>();
+        for (Section section = held.poll(); section != null; section = held.poll()) {
+            taken.add(section);
+        }
 
+        for (Section section = dirty.poll(); section != null; section = dirty.poll()) {
+            section.queued.set(false);
+            taken.add(section);
+        }
+
+        if (taken.isEmpty()) {
+            return false;
+        }
+
+        boolean[] locked = lock(around(taken.stream().mapToLong(section -> section.key).toArray()));
+        try {
             long oldestOpen = epochs.oldestOpen();
-            long oldest = Long.MAX_VALUE;
             Long2ByteOpenHashMap changes = new Long2ByteOpenHashMap();
             for (Section section : taken) {
-                long waiting = section.takeVisible(oldestOpen, changes);
-                if (waiting != Long.MAX_VALUE) {
+                if (section.takeVisible(oldestOpen, changes)) {
                     held.add(section);
-                    oldest = Math.min(oldest, waiting);
                 }
             }
 
-            oldestHeld = oldest;
             return publish(taken, changes, listener);
         } finally {
-            lock.unlock();
+            unlock(locked);
         }
     }
 
-    // Applies the pending decreases, never an increase, then runs the body under the graph lock.
-    public <T> T settled(LevelListener listener, Supplier<T> body) {
-        lock.lock();
+    // Applies the pending decreases of the chunk's section, never an increase, then runs the body under its stripes.
+    public <T> T settled(int chunkX, int chunkZ, LevelListener listener, Supplier<T> body) {
+        long key = Section.keyOf(chunkX, chunkZ);
+        boolean[] locked = lock(around(key));
         try {
-            List<Section> taken = List.copyOf(dirty);
-            Long2ByteOpenHashMap changes = new Long2ByteOpenHashMap();
-            for (Section section : taken) {
-                section.takeVisible(Long.MIN_VALUE, changes);
+            Section center = sections.get(key);
+            if (center != null) {
+                Long2ByteOpenHashMap changes = new Long2ByteOpenHashMap();
+                center.takeVisible(Long.MIN_VALUE, changes);
+                publish(List.of(center), changes, listener);
             }
 
-            publish(taken, changes, listener);
             return body.get();
         } finally {
-            lock.unlock();
+            unlock(locked);
+        }
+    }
+
+    public void exclusive(Runnable body) {
+        boolean[] all = new boolean[STRIPES];
+        Arrays.fill(all, true);
+        lock(all);
+        try {
+            body.run();
+        } finally {
+            unlock(all);
         }
     }
 
@@ -140,6 +178,40 @@ public final class ChunkLevels {
                 if (section != null && section.retire()) {
                     sections.remove(key, section);
                 }
+            }
+        }
+    }
+
+    // A change reaches at most one section away, so the stripes around every center cover the whole propagation.
+    private static boolean[] around(long... centerKeys) {
+        boolean[] marked = new boolean[STRIPES];
+        for (long centerKey : centerKeys) {
+            int sectionX = ChunkPos.getX(centerKey);
+            int sectionZ = ChunkPos.getZ(centerKey);
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    marked[(int) ((ChunkPos.pack(sectionX + dx, sectionZ + dz) * 0x9E3779B97F4A7C15L) >>> 56)] = true;
+                }
+            }
+        }
+
+        return marked;
+    }
+
+    private boolean[] lock(boolean[] marked) {
+        for (int stripe = 0; stripe < STRIPES; stripe++) {
+            if (marked[stripe]) {
+                stripes[stripe].lock();
+            }
+        }
+
+        return marked;
+    }
+
+    private void unlock(boolean[] marked) {
+        for (int stripe = 0; stripe < STRIPES; stripe++) {
+            if (marked[stripe]) {
+                stripes[stripe].unlock();
             }
         }
     }
