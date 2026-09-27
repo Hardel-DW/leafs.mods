@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.level;
 
+import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ class MovingViewTest {
     private static final int PLAYERS = 5;
     private static final int STEPS = 200;
 
-    private final ChunkLevels graph = new ChunkLevels(LEVELS);
+    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0));
 
     @Test
     void aSlidingViewSettlesInMilliseconds() {
