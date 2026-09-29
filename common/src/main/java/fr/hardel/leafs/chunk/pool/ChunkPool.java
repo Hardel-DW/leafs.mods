@@ -17,6 +17,7 @@ import java.util.function.Predicate;
 public final class ChunkPool implements Executor {
     public static final int FIRST = 0;
     public static final int SECOND = 1;
+    public static final int THIRD = 2;
 
     private final PriorityBuckets buckets;
     private final PlacedTasks placed = new PlacedTasks();
