@@ -53,7 +53,7 @@ public final class PlayerView {
             return ChunkPool.SECOND;
         }
 
-        return ChunkPool.SECOND + Math.min(players.level(chunkKey), tickets.viewDistance());
+        return ChunkPool.THIRD + Math.min(players.level(chunkKey), tickets.viewDistance());
     }
 
     public TriState nearby(long chunkKey) {

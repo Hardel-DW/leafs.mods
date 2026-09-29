@@ -4,7 +4,6 @@ import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.global.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -31,8 +30,7 @@ class ChunkOwnersTest {
     private final List<String> taken = new CopyOnWriteArrayList<>();
     private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
     private boolean chunkHeldByAnother;
-    private int urgency;
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, _ -> urgency);
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, _ -> 0);
 
     private boolean take(int chunkX, int chunkZ, Runnable task) {
         if (chunkHeldByAnother) {
@@ -237,28 +235,6 @@ class ChunkOwnersTest {
         assertTrue(inLine[0]);
         assertEquals(List.of("nested"), ran);
         assertFalse(owners.holds(1, 1));
-    }
-
-    /** 2026-09-24: an owner task took the first priority whatever its chunk, and passed before the chunks a player waited for. */
-    @Test
-    void anOwnerTaskTakesTheUrgencyOfItsChunk() {
-        regions.cover(null);
-        urgency = 5;
-        CountDownLatch release = TestThreads.occupy(pool);
-        CountDownLatch done = new CountDownLatch(2);
-
-        owners.submit(1, 1, Work.CHUNK, () -> {
-            ran.add("owner");
-            done.countDown();
-        });
-        pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, 2, ChunkTask.NO_RESERVATION, () -> {
-            ran.add("step");
-            done.countDown();
-        }));
-        release.countDown();
-        TestThreads.await(done);
-
-        assertEquals(List.of("step", "owner"), ran);
     }
 
     /** 2026-09-26: a region published every chunk that turned FULL in its area, up to 1500 inbox tasks after a join. */

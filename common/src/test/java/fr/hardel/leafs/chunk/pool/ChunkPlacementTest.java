@@ -30,6 +30,28 @@ class ChunkPlacementTest {
         pool.shutdown();
     }
 
+    /** 2026-09-24: an owner task passed before the awaited chunks. 2026-09-29: a chunk done with SPAWN waited three times behind the generation of others before FULL. */
+    @Test
+    void theWorkThatFinishesAChunkPassesBeforeTheGenerationAndAfterTheAwaitedChunks() {
+        long awaited = ChunkTask.key(0, 9, 9);
+        ChunkPlacement frontier = new ChunkPlacement(pool, 0, place -> place.chunkKey() == awaited ? ChunkPool.FIRST : ChunkPool.THIRD);
+        CountDownLatch release = TestThreads.occupy(pool);
+        CountDownLatch done = new CountDownLatch(4);
+        frontier.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 8, 4, 1, () -> finish(done, "generation"));
+        frontier.onPool(ChunkTask.Kind.STEP, ChunkStatus.FULL, 3, 4, -1, () -> finish(done, "full step"));
+        frontier.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, 3, 4, 0, () -> finish(done, "publication"));
+        frontier.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 9, 9, 1, () -> finish(done, "awaited"));
+        release.countDown();
+        TestThreads.await(done);
+
+        assertEquals(List.of("awaited", "full step", "publication", "generation"), ran);
+    }
+
+    private void finish(CountDownLatch done, String task) {
+        ran.add(task);
+        done.countDown();
+    }
+
     @Test
     void lightReservesInItsOwnSpace() {
         assertEquals(placement.area(ChunkTask.Kind.STEP, 1, 1, 0)[0], placement.area(ChunkTask.Kind.OWNER, 1, 1, 0)[0], "publication and generation write the blocks");
