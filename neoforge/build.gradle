@@ -89,7 +89,7 @@ configurations {
 }
 
 dependencies {
-	mods "maven.modrinth:scalablelux:${rootProject.scalablelux_neoforge}"
+	mods "fr.hardel:firefly-neoforge-${minecraftMajor}:${rootProject.firefly_version}"
 	mods "fr.hardel:mapple-neoforge-${minecraftMajor}:${rootProject.mapple_version}"
 }
 
