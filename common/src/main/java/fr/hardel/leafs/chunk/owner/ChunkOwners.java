@@ -98,7 +98,7 @@ public final class ChunkOwners implements Router {
 
     public void later(int chunkX, int chunkZ, Work work, Runnable task) {
         if (!regions.live()) {
-            server.run(() -> submit(chunkX, chunkZ, work, task));
+            serial.execute(task);
             return;
         }
 
