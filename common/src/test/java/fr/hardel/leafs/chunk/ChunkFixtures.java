@@ -14,6 +14,7 @@ public final class ChunkFixtures {
     public static final class TestRegions implements ChunkOwners.Regions {
         private @Nullable RegionInbox inbox;
         private @Nullable Thread ticker;
+        private boolean live = true;
 
         public TestRegions(@Nullable RegionInbox inbox) {
             this.inbox = inbox;
@@ -27,9 +28,13 @@ public final class ChunkFixtures {
             this.ticker = ticker;
         }
 
+        public void live(boolean live) {
+            this.live = live;
+        }
+
         @Override
         public boolean live() {
-            return true;
+            return live;
         }
 
         @Override
