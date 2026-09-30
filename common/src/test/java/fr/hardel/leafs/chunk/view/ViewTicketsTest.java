@@ -2,12 +2,19 @@ package fr.hardel.leafs.chunk.view;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
+import fr.hardel.leafs.ticking.TickEpochs;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -17,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ViewTicketsTest {
     private static final int PLAYER_LEVELS = 34;
     private final TicketStorage tickets = new TicketStorage();
-    private final ChunkLevels players = new ChunkLevels(PLAYER_LEVELS);
+    private final ChunkLevels players = new ChunkLevels(PLAYER_LEVELS, new TickEpochs(0, () -> { }));
     private final ViewTickets view = new ViewTickets(tickets, players, 2);
     private final PlayerSources sources = new PlayerSources(tickets, players, 5);
 
@@ -81,5 +88,24 @@ class ViewTicketsTest {
         sources.simulationDistance(10);
 
         assertEquals(21, levelOf(5, 5, TicketType.PLAYER_SIMULATION));
+    }
+
+    /** 2026-09-27: a player crossing into the next graph section dropped and retook his whole view in one drain. */
+    @Test
+    void aPlayerCrossingASectionOnlyDropsTheRowHeLeaves() {
+        sources.enter(ChunkPos.pack(63, 0));
+        players.drain(view);
+        Set<Long> dropped = new HashSet<>();
+        tickets.setLoadingChunkUpdatedListener((key, level, _) -> {
+            if (!ChunkLevel.isLoaded(level)) {
+                dropped.add(key);
+            }
+        });
+
+        sources.leave(ChunkPos.pack(63, 0));
+        sources.enter(ChunkPos.pack(64, 0));
+        players.drain(view);
+
+        assertEquals(IntStream.rangeClosed(-2, 2).mapToObj(chunkZ -> ChunkPos.pack(61, chunkZ)).collect(Collectors.toSet()), dropped);
     }
 }

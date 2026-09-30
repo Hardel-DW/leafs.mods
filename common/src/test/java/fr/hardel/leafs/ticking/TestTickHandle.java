@@ -2,12 +2,12 @@ package fr.hardel.leafs.ticking;
 
 import java.util.function.BooleanSupplier;
 
-final class TestTickHandle extends TickHandle {
+public final class TestTickHandle extends TickHandle {
     private final BooleanSupplier gate;
     private final Runnable body;
     private long ticks;
 
-    TestTickHandle(long id, Runnable body) {
+    public TestTickHandle(long id, Runnable body) {
         this(id, () -> true, body);
     }
 
