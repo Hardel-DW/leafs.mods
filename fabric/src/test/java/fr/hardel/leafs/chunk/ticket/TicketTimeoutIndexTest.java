@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk.ticket;
 
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.leafs.chunk.TicketStorageAccess;
+import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
@@ -20,9 +21,8 @@ class TicketTimeoutIndexTest {
     @Test
     void aTicketExpiresOnceItsTimeoutIsCountedDown() {
         TicketStorage storage = new TicketStorage();
-        TicketStorageAccess access = (TicketStorageAccess) storage;
-        TicketTimeoutIndex timeouts = new TicketTimeoutIndex(storage, null, access.leafs$graphs(), 1);
-        access.leafs$bindTimeouts(timeouts);
+        TicketTimeoutIndex timeouts = new TicketTimeoutIndex(storage, null, 1);
+        ((TicketStorageAccess) storage).leafs$bind(new TicketGraphs(new TickEpochs(0, () -> { })), timeouts);
         storage.addTicket(CHUNK, new Ticket(TicketType.UNKNOWN, 33));
 
         for (long countdown = 0; countdown <= TicketType.UNKNOWN.timeout(); countdown++) {

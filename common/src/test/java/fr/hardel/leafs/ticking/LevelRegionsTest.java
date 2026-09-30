@@ -210,7 +210,7 @@ class LevelRegionsTest {
         LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> {
         }, _ -> {
         });
-        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> 50_000_000L, false, watchdog, (_, _) -> {
+        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> 50_000_000L, false, watchdog, (_, _) -> {
         });
         regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache()), null);
     }
