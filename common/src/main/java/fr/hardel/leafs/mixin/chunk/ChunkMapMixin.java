@@ -134,6 +134,11 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         ((DistanceManagerAccess) self.getDistanceManager()).leafs$bind(leafs$chunks);
     }
 
+    @WrapMethod(method = "move")
+    private void leafs$moveAsOneChange(ServerPlayer player, Operation<Void> original) {
+        leafs$chunks.graphs().batch(() -> original.call(player));
+    }
+
     @WrapOperation(method = "move", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;values()Lit/unimi/dsi/fastutil/objects/ObjectCollection;"))
     private ObjectCollection<ChunkMap.TrackedEntity> leafs$noLevelWidePassOnMove(Int2ObjectMap<ChunkMap.TrackedEntity> instance, Operation<ObjectCollection<ChunkMap.TrackedEntity>> original) {
         return ObjectLists.emptyList();

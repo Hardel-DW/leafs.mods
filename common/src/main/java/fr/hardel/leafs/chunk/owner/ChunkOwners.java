@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.owner;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
+import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
@@ -45,7 +46,7 @@ public final class ChunkOwners implements Router {
     }
 
     public boolean submit(int chunkX, int chunkZ, Work work, Runnable task) {
-        if (holds(chunkX, chunkZ)) {
+        if (holds(chunkX, chunkZ) && !ChunkLevels.draining()) {
             task.run();
             return true;
         }

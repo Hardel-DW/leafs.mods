@@ -4,5 +4,7 @@ import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 
 public interface TicketStorageAccess {
-    void leafs$bind(TicketGraphs graphs, TicketTimeoutIndex timeouts);
+    TicketGraphs leafs$graphs();
+
+    void leafs$bindTimeouts(TicketTimeoutIndex timeouts);
 }

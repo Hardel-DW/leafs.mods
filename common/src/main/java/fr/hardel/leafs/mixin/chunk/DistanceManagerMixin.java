@@ -44,8 +44,7 @@ public abstract class DistanceManagerMixin implements DistanceManagerAccess {
 
     @Inject(method = "runAllUpdates", at = @At("HEAD"), cancellable = true)
     private void leafs$drainTheGraphs(ChunkMap scheduler, CallbackInfoReturnable<Boolean> callbackInfo) {
-        leafs$chunks.graphs().drain();
-        callbackInfo.setReturnValue(false);
+        callbackInfo.setReturnValue(leafs$chunks.graphs().drain());
     }
 
     @Inject(method = "updatePlayerTickets", at = @At("HEAD"), cancellable = true)
