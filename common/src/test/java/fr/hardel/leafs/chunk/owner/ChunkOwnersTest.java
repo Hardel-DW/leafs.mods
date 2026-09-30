@@ -3,12 +3,14 @@ package fr.hardel.leafs.chunk.owner;
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.global.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -78,6 +80,20 @@ class ChunkOwnersTest {
         assertEquals(List.of(), ran);
         assertTrue(server.drain());
         assertEquals(List.of("next tick"), ran);
+    }
+
+    /** 2026-10-01: a singleplayer server pauses until the joining player is placed, so its spawn chunks never took their full status and their entities never loaded. */
+    @Test
+    void laterBeforeTheRegionsAreLiveWaitsInTheSerialQueueThatDrainsEvenWhileTheServerIsPaused() {
+        List<Runnable> serial = new ArrayList<>();
+        ChunkOwners paused = new ChunkOwners(pool, new ChunkPlacement(pool, 0, _ -> 0), regions, Thread.currentThread(), serial::add, this::take, server);
+        regions.live(false);
+
+        paused.later(1, 1, Work.CHUNK, () -> ran.add("full status"));
+
+        assertEquals(List.of(), ran, "later never runs in line");
+        serial.forEach(Runnable::run);
+        assertEquals(List.of("full status"), ran);
     }
 
     @Test

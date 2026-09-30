@@ -86,8 +86,8 @@ public final class ChunkHolders {
     private ChunkHolder demanded(long key, ChunkStatus status) {
         ChunkHolder holder = table.get(key);
         if (holder == null) {
-            throw new IllegalStateException("Chunk %s demanded at %s has no holder: loading level %s, awaiting teardown %s, draining %s, tickets %s".formatted(
-                ChunkPos.unpack(key), status, loading.level(key), unloading.containsKey(key), ChunkLevels.draining(), tickets.getTicketDebugString(key, false)));
+            throw new IllegalStateException("Chunk %s demanded at %s has no holder: loading level %s, awaiting teardown %s, tickets %s".formatted(
+                ChunkPos.unpack(key), status, loading.level(key), unloading.containsKey(key), tickets.getTicketDebugString(key, false)));
         }
 
         return holder;
@@ -104,7 +104,7 @@ public final class ChunkHolders {
     private void unload(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();
         unloads.increment();
-        owners.submit(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
+        owners.later(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
     }
 
     private final class Publication implements LevelListener {
@@ -145,7 +145,7 @@ public final class ChunkHolders {
 
             for (ChunkHolder holder : holders) {
                 ChunkPos pos = holder.getPos();
-                holder.updateFutures(chunkMap, owners.executor(pos.x(), pos.z()));
+                holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
             }
 
             for (ChunkHolder holder : holders) {
