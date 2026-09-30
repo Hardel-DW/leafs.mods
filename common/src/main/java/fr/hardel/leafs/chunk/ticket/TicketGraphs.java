@@ -3,27 +3,28 @@ package fr.hardel.leafs.chunk.ticket;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.Ticket;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.TicketStorage;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 public final class TicketGraphs {
     private static final int LEVELS = ChunkLevel.MAX_LEVEL + 2;
 
-    private final ChunkLevels loading;
-    private final ChunkLevels simulation;
-    private final ChunkLevels players;
-    private volatile List<Drain> drains = List.of();
-
-    public TicketGraphs(TickEpochs epochs) {
-        this.loading = new ChunkLevels(LEVELS, epochs);
-        this.simulation = new ChunkLevels(LEVELS, epochs);
-        this.players = new ChunkLevels(ChunkMap.MAX_VIEW_DISTANCE + 2, epochs);
-    }
+    private final ChunkLevels loading = new ChunkLevels(LEVELS);
+    private final ChunkLevels simulation = new ChunkLevels(LEVELS);
+    private final ChunkLevels players = new ChunkLevels(ChunkMap.MAX_VIEW_DISTANCE + 2);
+    private final ThreadLocal<Boolean> batching = ThreadLocal.withInitial(() -> false);
+    private final ThreadLocal<Boolean> wroteSimulation = ThreadLocal.withInitial(() -> false);
+    private final AtomicBoolean handed = new AtomicBoolean();
+    private volatile ChunkPool pool;
+    private volatile Supplier<LevelListener> loadingListener;
+    private volatile LevelListener simulationListener;
+    private volatile LevelListener playersListener;
 
     public ChunkLevels loading() {
         return loading;
@@ -43,58 +44,82 @@ public final class TicketGraphs {
     }
 
     public void listen(Supplier<LevelListener> loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
-        this.drains = List.of(new Drain(this.players, () -> players, pool, true), new Drain(this.simulation, () -> simulation, pool, true), new Drain(this.loading, loading, pool, false));
+        this.loadingListener = loading;
+        this.simulationListener = simulation;
+        this.playersListener = players;
+        this.pool = pool;
     }
 
-    // The thread whose tick ended applies the pending players and simulation changes itself.
-    public void drainAtTickEnd() {
-        for (Drain drain : drains) {
-            drain.inline();
+    public TicketStorage.ChunkUpdated loadingFeed() {
+        return (key, level, _) -> loading.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
+    }
+
+    public void settle(long key, Ticket ticket) {
+        if (loadingListener != null && !ChunkLevels.draining() && ticket.getType().doesLoad() && ticket.getTicketLevel() < loading.level(key)) {
+            loading.settled(ChunkPos.getX(key), ChunkPos.getZ(key), loadingListener.get(), () -> null);
+        }
+    }
+
+    public TicketStorage.ChunkUpdated simulationFeed() {
+        return (key, level, _) -> {
+            simulation.setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level);
+            wroteSimulation.set(true);
+        };
+    }
+
+    public void batch(Runnable writes) {
+        batch(() -> {
+            writes.run();
+            return null;
+        });
+    }
+
+    public <T> T batch(Supplier<T> writes) {
+        if (batching.get()) {
+            return writes.get();
+        }
+
+        T result;
+        batching.set(true);
+        try {
+            result = writes.get();
+        } finally {
+            batching.set(false);
         }
 
         drain();
+        return result;
     }
 
-    // The pool takes the loading graph, and the players and simulation writes no tick end will drain.
-    public void drain() {
-        for (Drain drain : drains) {
-            drain.request();
-        }
-    }
-
-    // One pool task per graph at a time; a drain that published asks again, since its listener may have written the other graphs.
-    private final class Drain {
-        private final ChunkLevels graph;
-        private final Supplier<LevelListener> listener;
-        private final ChunkPool pool;
-        private final boolean owned;
-        private final AtomicBoolean handed = new AtomicBoolean();
-
-        private Drain(ChunkLevels graph, Supplier<LevelListener> listener, ChunkPool pool, boolean owned) {
-            this.graph = graph;
-            this.listener = listener;
-            this.pool = pool;
-            this.owned = owned;
+    public boolean drain() {
+        if (loadingListener == null || batching.get()) {
+            return false;
         }
 
-        private void inline() {
-            if (owned && graph.dirty()) {
-                graph.drain(listener.get());
-            }
+        batching.set(true);
+        try {
+            players.drain(playersListener);
+        } finally {
+            batching.set(false);
         }
 
-        private void request() {
-            boolean due = owned ? graph.takeOrphaned() : graph.dirty();
-            if (!due || !handed.compareAndSet(false, true)) {
-                return;
-            }
-
+        boolean changed = drainOwnSimulation();
+        if (handed.compareAndSet(false, true)) {
             pool.execute(() -> {
                 handed.set(false);
-                if (graph.drain(listener.get())) {
-                    drain();
-                }
+                loading.drain(loadingListener.get());
             });
         }
+
+        return changed;
+    }
+
+    private boolean drainOwnSimulation() {
+        if (!wroteSimulation.get()) {
+            return false;
+        }
+
+        wroteSimulation.set(false);
+        return simulation.drain(simulationListener);
     }
 }
