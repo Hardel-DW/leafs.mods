@@ -13,6 +13,9 @@ import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.Work;
+import fr.hardel.leafs.network.AwaitedChunks;
+import fr.hardel.leafs.network.AwaitedChunksAccess;
+import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickScheduler;
@@ -34,6 +37,7 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskDispatcher;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.GenerationChunkHolder;
+import net.minecraft.server.level.PlayerMap;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StaticCache2D;
 import net.minecraft.util.thread.BlockableEventLoop;
@@ -94,6 +98,10 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @Shadow
     @Final
     private BlockableEventLoop<Runnable> mainThreadExecutor;
+
+    @Shadow
+    @Final
+    private PlayerMap playerMap;
 
     @Shadow
     @Final
@@ -183,6 +191,32 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @Inject(method = "onChunkReadyToSend", at = @At("HEAD"), cancellable = true)
     private void leafs$readyToSendOnTheOwner(ChunkHolder chunkHolder, LevelChunk chunk, CallbackInfo callbackInfo) {
         leafs$onTheOwner(chunk.getPos(), () -> onChunkReadyToSend(chunkHolder, chunk), callbackInfo);
+    }
+
+    @WrapOperation(method = "onChunkReadyToSend", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/chunk/LevelChunk;)V"))
+    private void leafs$announceOnceSendable(ServerPlayer player, LevelChunk chunk, Operation<Void> original) {
+    }
+
+    @Inject(method = "onChunkReadyToSend", at = @At("TAIL"))
+    private void leafs$announceToAwaitingPlayers(ChunkHolder chunkHolder, LevelChunk chunk, CallbackInfo callbackInfo) {
+        long key = chunk.getPos().pack();
+        chunkHolder.getTickingChunkFuture().thenRun(() -> {
+            for (ServerPlayer player : playerMap.getAllPlayers()) {
+                AwaitedChunks awaited = ((AwaitedChunksAccess) player.connection.chunkSender).leafs$awaited();
+                if (awaited.awaits(key)) {
+                    PacketRouting.playerTaskExecutor(player.connection).execute(() -> {
+                        if (awaited.take(key)) {
+                            player.connection.chunkSender.markChunkPendingToSend(chunk);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    @WrapOperation(method = "markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkToSend(J)Lnet/minecraft/world/level/chunk/LevelChunk;"))
+    private LevelChunk leafs$awaitWhatIsNotSendable(ChunkMap chunkMap, long key, Operation<LevelChunk> original, @Local(argsOnly = true) ServerPlayer player) {
+        return ((AwaitedChunksAccess) player.connection.chunkSender).leafs$awaited().entered(key, chunkKey -> original.call(chunkMap, chunkKey));
     }
 
     @Inject(method = "onFullChunkStatusChange", at = @At("HEAD"), cancellable = true)
