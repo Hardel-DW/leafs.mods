@@ -21,7 +21,7 @@ side = "BOTH"
 
 [[dependencies.leafs]]
 modId = "mapple"
-type = "required"
+type = "optional"
 versionRange = "*"
 ordering = "NONE"
 side = "BOTH"
