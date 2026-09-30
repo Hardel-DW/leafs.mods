@@ -33,13 +33,13 @@ class RegionTickSchedulerTest {
     }
 
     private RegionTickScheduler createScheduler(int threads) {
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), threads, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(threads, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
         return scheduler;
     }
 
     @Test
     void regionThreadNamesScopeTheWorkerDuringItsTick() throws InterruptedException {
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, true, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, true, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
         scheduler.start();
         CountDownLatch ticked = new CountDownLatch(1);
         AtomicReference<String> nameDuringTick = new AtomicReference<>();
@@ -109,7 +109,7 @@ class RegionTickSchedulerTest {
     @Test
     void aNormalShutdownLetsATickFinishTheWaitTheServerServes() throws InterruptedException {
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
+        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
         stopping.start();
         CountDownLatch waiting = new CountDownLatch(1);
         AtomicBoolean delivered = new AtomicBoolean();
@@ -131,7 +131,7 @@ class RegionTickSchedulerTest {
     @Test
     void aCrashShutdownEndsATickStuckInAWait() throws InterruptedException {
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
+        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
         stopping.start();
         CountDownLatch waiting = new CountDownLatch(1);
         stopping.schedule(new TestTickHandle(1, () -> {
@@ -215,7 +215,7 @@ class RegionTickSchedulerTest {
     void poolTickFailureInvokesThePolicyAndStopsRescheduling() throws InterruptedException {
         CountDownLatch failed = new CountDownLatch(1);
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), 1, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> {
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> {
             failures.add(throwable);
             failed.countDown();
         });
@@ -232,5 +232,31 @@ class RegionTickSchedulerTest {
         Thread.sleep(150);
         assertEquals(1, attempts.get(), "a failed handle must not be rescheduled");
         assertEquals("boom", failures.peek().getMessage());
+    }
+
+    /** 2026-09-28: a tick-end drain that threw escaped the worker loop through its finally, and the worker died without the failure policy. */
+    @Test
+    void aTickEndDrainThatThrowsGoesThroughTheFailurePolicyAndTheWorkerLivesOn() throws InterruptedException {
+        CountDownLatch failed = new CountDownLatch(1);
+        AtomicBoolean thrown = new AtomicBoolean();
+        TickEpochs epochs = new TickEpochs(1, () -> {
+            if (!thrown.getAndSet(true)) {
+                throw new IllegalStateException("drain");
+            }
+        });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> {
+            if (failure.getMessage().equals("drain")) {
+                failed.countDown();
+            }
+        });
+        scheduler.start();
+        scheduler.schedule(new TestTickHandle(1, () -> { }));
+        assertTrue(failed.await(5, TimeUnit.SECONDS));
+
+        CountDownLatch ticked = new CountDownLatch(1);
+        TestTickHandle next = new TestTickHandle(2, ticked::countDown);
+        scheduler.schedule(next);
+        assertTrue(ticked.await(5, TimeUnit.SECONDS), "the worker still ticks after the failed drain");
+        next.cancel();
     }
 }
