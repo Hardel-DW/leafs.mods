@@ -19,14 +19,12 @@ public final class TicketTimeoutIndex {
 
     private final TicketStorage storage;
     private final ChunkMap chunkMap;
-    private final TicketGraphs graphs;
     private final int sectionShift;
     private final ConcurrentLong2ObjectMap<ConcurrentLinkedQueue<TrackedTicket>> sections = new ConcurrentLong2ObjectMap<>();
 
-    public TicketTimeoutIndex(TicketStorage storage, ChunkMap chunkMap, TicketGraphs graphs, int sectionShift) {
+    public TicketTimeoutIndex(TicketStorage storage, ChunkMap chunkMap, int sectionShift) {
         this.storage = storage;
         this.chunkMap = chunkMap;
-        this.graphs = graphs;
         this.sectionShift = sectionShift;
     }
 
@@ -69,11 +67,9 @@ public final class TicketTimeoutIndex {
             return;
         }
 
-        graphs.batch(() -> {
-            synchronized (storage) {
-                countDown(queue);
-            }
-        });
+        synchronized (storage) {
+            countDown(queue);
+        }
     }
 
     private void countDown(Iterable<TrackedTicket> queue) {

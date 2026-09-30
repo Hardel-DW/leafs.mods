@@ -19,96 +19,77 @@ import java.util.function.BiConsumer;
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
     @Unique
-    private final TicketGraphs leafs$graphs = new TicketGraphs();
+    private TicketGraphs leafs$graphs;
 
     @Unique
     private TicketTimeoutIndex leafs$timeouts;
 
     @Override
-    public TicketGraphs leafs$graphs() {
-        return leafs$graphs;
-    }
-
-    @Override
-    public void leafs$bindTimeouts(TicketTimeoutIndex timeouts) {
+    public void leafs$bind(TicketGraphs graphs, TicketTimeoutIndex timeouts) {
+        leafs$graphs = graphs;
         leafs$timeouts = timeouts;
     }
 
     @WrapMethod(method = "setLoadingChunkUpdatedListener")
     private void leafs$feedTheLoadingGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        original.call(leafs$graphs.loadingFeed());
+        original.call((TicketStorage.ChunkUpdated) (key, level, _) -> leafs$graphs.loading().setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level));
     }
 
     @WrapMethod(method = "setSimulationChunkUpdatedListener")
     private void leafs$feedTheSimulationGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        original.call(leafs$graphs.simulationFeed());
+        original.call((TicketStorage.ChunkUpdated) (key, level, _) -> leafs$graphs.simulation().setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level));
     }
 
     @WrapMethod(method = "addTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
-        boolean added = leafs$graphs.batch(() -> {
-            synchronized (this) {
-                boolean stored = original.call(key, ticket);
-                if (stored && ticket.getType().hasTimeout()) {
-                    leafs$timeouts.track(key, ticket);
-                }
-
-                return stored;
+        synchronized (this) {
+            boolean added = original.call(key, ticket);
+            if (added && ticket.getType().hasTimeout()) {
+                leafs$timeouts.track(key, ticket);
             }
-        });
-        if (added) {
-            leafs$graphs.settle(key, ticket);
-        }
 
-        return added;
+            return added;
+        }
     }
 
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredRemove(long key, Ticket ticket, Operation<Boolean> original) {
-        return leafs$graphs.batch(() -> {
-            synchronized (this) {
-                boolean removed = original.call(key, ticket);
-                if (removed && ticket.getType().hasTimeout()) {
-                    leafs$timeouts.untrack(key, ticket);
-                }
-
-                return removed;
+        synchronized (this) {
+            boolean removed = original.call(key, ticket);
+            if (removed && ticket.getType().hasTimeout()) {
+                leafs$timeouts.untrack(key, ticket);
             }
-        });
+
+            return removed;
+        }
     }
 
     @WrapMethod(method = "removeTicketIf")
     private void leafs$monitoredRemoveIf(TicketStorage.TicketPredicate predicate, Long2ObjectOpenHashMap<List<Ticket>> removedTickets, Operation<Void> original) {
-        leafs$graphs.batch(() -> {
-            synchronized (this) {
-                original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
-                    boolean removed = predicate.test(ticket, chunkPos);
-                    if (removed && ticket.getType().hasTimeout()) {
-                        leafs$timeouts.untrack(chunkPos, ticket);
-                    }
+        synchronized (this) {
+            original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
+                boolean removed = predicate.test(ticket, chunkPos);
+                if (removed && ticket.getType().hasTimeout()) {
+                    leafs$timeouts.untrack(chunkPos, ticket);
+                }
 
-                    return removed;
-                }, removedTickets);
-            }
-        });
+                return removed;
+            }, removedTickets);
+        }
     }
 
     @WrapMethod(method = "replaceTicketLevelOfType")
     private void leafs$monitoredReplace(int newLevel, TicketType ticketType, Operation<Void> original) {
-        leafs$graphs.batch(() -> {
-            synchronized (this) {
-                original.call(newLevel, ticketType);
-            }
-        });
+        synchronized (this) {
+            original.call(newLevel, ticketType);
+        }
     }
 
     @WrapMethod(method = "activateAllDeactivatedTickets")
     private void leafs$monitoredActivate(Operation<Void> original) {
-        leafs$graphs.batch(() -> {
-            synchronized (this) {
-                original.call();
-            }
-        });
+        synchronized (this) {
+            original.call();
+        }
     }
 
     @WrapMethod(method = "getTicketLevelAt(JZ)I")

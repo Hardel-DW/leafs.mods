@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.level;
 
+import fr.hardel.leafs.ticking.TickEpochs;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -19,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChunkLevelsTest {
     private static final int LEVELS = 46;
     private static final int NONE = LEVELS - 1;
-    private final ChunkLevels graph = new ChunkLevels(LEVELS);
+    private final TickEpochs epochs = new TickEpochs(0, () -> { });
+    private final ChunkLevels graph = new ChunkLevels(LEVELS, epochs);
     private final Long2IntOpenHashMap reported = new Long2IntOpenHashMap();
     private final Long2IntOpenHashMap reportedOld = new Long2IntOpenHashMap();
 
@@ -212,5 +214,37 @@ class ChunkLevelsTest {
         assertEquals(32, level(11, 10));
         assertEquals(31, reported.get(ChunkPos.pack(10, 10)));
         assertFalse(graph.drain(this::record));
+    }
+
+    @Test
+    void anIncreaseWaitsForTheEndOfTheTickThatWroteIt() {
+        graph.setSource(10, 10, 31);
+        graph.drain(this::record);
+        epochs.openServer();
+
+        graph.setSource(10, 10, NONE);
+        graph.setSource(40, 10, 31);
+        graph.drain(this::record);
+        assertEquals(31, level(10, 10));
+        assertEquals(31, level(40, 10));
+        assertFalse(graph.dirty(), "a held increase asks for no drain while its tick runs");
+
+        epochs.closeServer();
+        assertTrue(graph.dirty());
+        assertTrue(graph.drain(this::record));
+        assertEquals(NONE, level(10, 10));
+    }
+
+    @Test
+    void aSettleNeverAppliesAnIncrease() {
+        graph.setSource(10, 10, 31);
+        graph.drain(this::record);
+
+        graph.setSource(10, 10, NONE);
+        int seen = graph.settled(10, 10, this::record, () -> level(10, 10));
+
+        assertEquals(31, seen);
+        assertTrue(graph.drain(this::record));
+        assertEquals(NONE, level(10, 10));
     }
 }
