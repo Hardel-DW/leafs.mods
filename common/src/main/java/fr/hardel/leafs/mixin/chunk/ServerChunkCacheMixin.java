@@ -71,23 +71,6 @@ public abstract class ServerChunkCacheMixin {
         LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
     }
 
-    // Until its regions are live, the level runs the vanilla way and its server thread applies the loading graph in place.
-    @WrapMethod(method = "runDistanceManagerUpdates")
-    private boolean leafs$vanillaUpdatesUntilLive(Operation<Boolean> original) {
-        if (LevelRegions.of(this.level).live()) {
-            return original.call();
-        }
-
-        LevelChunks chunks = LevelChunks.of(this.level);
-        chunks.graphs().loading().drain(chunks.holders().publication());
-        return original.call();
-    }
-
-    @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
-    private boolean leafs$settleTheRequestedChunk(ServerChunkCache cache, Operation<Boolean> original, @Local ChunkPos pos) {
-        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(cache));
-    }
-
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<ChunkResult<ChunkAccess>> leafs$requestUnderTheGraphLocks(ChunkHolder holder, ChunkStatus status, ChunkMap chunkMap, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
         ChunkPos pos = holder.getPos();

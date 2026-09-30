@@ -32,15 +32,15 @@ public final class PlayerView {
     }
 
     public void enter(long chunkKey) {
-        sources.enter(chunkKey);
+        graphs.batch(() -> sources.enter(chunkKey));
     }
 
     public void leave(long chunkKey) {
-        sources.leave(chunkKey);
+        graphs.batch(() -> sources.leave(chunkKey));
     }
 
     public void viewDistance(int distance) {
-        players.exclusive(() -> tickets.viewDistance(distance));
+        graphs.batch(() -> tickets.viewDistance(distance));
     }
 
     public void simulationDistance(int distance) {
