@@ -7,7 +7,6 @@ import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.ticking.LeafsServerAccess;
 import fr.hardel.leafs.ticking.RegionBorrow;
-import fr.hardel.leafs.ticking.TickEpochs;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -34,10 +33,7 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
     private void leafs$lockDuringTheTick(MinecraftServer server, boolean sprinting, Operation<Void> original) {
         leafs$ticking.throwRegionCrash();
         int tickCount = server.getTickCount();
-        TickEpochs epochs = leafs$ticking.scheduler().epochs();
-        epochs.openServer();
         RegionBorrow.hold(_ -> original.call(server, sprinting));
-        epochs.closeServer();
         leafs$ticking.endServerTick(server.getTickCount() != tickCount);
     }
 

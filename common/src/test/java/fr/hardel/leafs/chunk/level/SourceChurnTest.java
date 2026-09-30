@@ -1,6 +1,5 @@
 package fr.hardel.leafs.chunk.level;
 
-import fr.hardel.leafs.ticking.TickEpochs;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
@@ -20,7 +19,7 @@ class SourceChurnTest {
     private static final int SPAN = 120;
     private static final int OPERATIONS = 3_000;
 
-    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0, () -> { }));
+    private final ChunkLevels graph = new ChunkLevels(LEVELS);
 
     @Test
     void churnFromOneThreadSettlesLikeTheBruteForce() {
