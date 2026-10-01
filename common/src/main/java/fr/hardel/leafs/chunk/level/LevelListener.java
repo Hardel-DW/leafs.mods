@@ -3,7 +3,7 @@ package fr.hardel.leafs.chunk.level;
 public interface LevelListener {
     void changed(long chunkKey, int oldLevel, int newLevel);
 
-    default void published() {
+    default void published(Runnable pass) {
     }
 
     default LevelListener and(LevelListener other) {
@@ -16,9 +16,9 @@ public interface LevelListener {
             }
 
             @Override
-            public void published() {
-                first.published();
-                other.published();
+            public void published(Runnable pass) {
+                first.published(pass);
+                other.published(pass);
             }
         };
     }
