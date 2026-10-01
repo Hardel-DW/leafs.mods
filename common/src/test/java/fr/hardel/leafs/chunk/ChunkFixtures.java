@@ -7,7 +7,6 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.Urgency;
 import fr.hardel.leafs.global.GlobalScheduler;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import org.jspecify.annotations.Nullable;
 
 public final class ChunkFixtures {
@@ -52,7 +51,7 @@ public final class ChunkFixtures {
     }
 
     public static ChunkPool pool(int threads) {
-        return new ChunkPool(Thread.currentThread().getThreadGroup(), threads, ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, (_, _) -> { });
+        return new ChunkPool(Thread.currentThread().getThreadGroup(), threads, ChunkPool.PRIORITIES, (_, _) -> { });
     }
 
     public static ChunkOwners owners(ChunkPool pool, ChunkOwners.Regions regions, ChunkOwners.Taker taker, GlobalScheduler server, Urgency urgency) {

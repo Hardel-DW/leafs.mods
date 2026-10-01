@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.pool;
 
 import fr.hardel.leafs.Leafs;
+import net.minecraft.server.level.ChunkMap;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -18,6 +19,8 @@ public final class ChunkPool implements Executor {
     public static final int FIRST = 0;
     public static final int SECOND = 1;
     public static final int THIRD = 2;
+    public static final int BAND = ChunkMap.MAX_VIEW_DISTANCE + 1;
+    public static final int PRIORITIES = THIRD + 2 * BAND;
 
     private final PriorityBuckets buckets;
     private final PlacedTasks placed = new PlacedTasks();
