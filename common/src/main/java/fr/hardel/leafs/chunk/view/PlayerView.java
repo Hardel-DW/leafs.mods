@@ -7,6 +7,7 @@ import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
@@ -53,7 +54,9 @@ public final class PlayerView {
             return ChunkPool.SECOND;
         }
 
-        return ChunkPool.THIRD + Math.min(players.level(chunkKey), tickets.viewDistance());
+        int seen = players.level(chunkKey);
+        int depth = seen == players.none() ? graphs.loading().level(chunkKey) - ChunkLevel.byStatus(FullChunkStatus.FULL) + tickets.viewDistance() : seen;
+        return ChunkPool.THIRD + Math.clamp(depth, 0, tickets.viewDistance());
     }
 
     public TriState nearby(long chunkKey) {
