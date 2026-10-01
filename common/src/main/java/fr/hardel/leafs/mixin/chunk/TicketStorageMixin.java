@@ -12,6 +12,9 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -23,6 +26,9 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
 
     @Unique
     private TicketTimeoutIndex leafs$timeouts;
+
+    @Unique
+    private volatile int leafs$keepingActive;
 
     @Override
     public void leafs$bind(TicketGraphs graphs, TicketTimeoutIndex timeouts) {
@@ -44,8 +50,8 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
         synchronized (this) {
             boolean added = original.call(key, ticket);
-            if (added && ticket.getType().hasTimeout()) {
-                leafs$timeouts.track(key, ticket);
+            if (added) {
+                leafs$entered(key, ticket);
             }
 
             return added;
@@ -56,8 +62,8 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
     private boolean leafs$monitoredRemove(long key, Ticket ticket, Operation<Boolean> original) {
         synchronized (this) {
             boolean removed = original.call(key, ticket);
-            if (removed && ticket.getType().hasTimeout()) {
-                leafs$timeouts.untrack(key, ticket);
+            if (removed) {
+                leafs$left(key, ticket);
             }
 
             return removed;
@@ -69,8 +75,8 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         synchronized (this) {
             original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
                 boolean removed = predicate.test(ticket, chunkPos);
-                if (removed && ticket.getType().hasTimeout()) {
-                    leafs$timeouts.untrack(chunkPos, ticket);
+                if (removed) {
+                    leafs$left(chunkPos, ticket);
                 }
 
                 return removed;
@@ -113,17 +119,37 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         }
     }
 
-    @WrapMethod(method = "shouldKeepDimensionActive")
-    private boolean leafs$monitoredActivityRead(Operation<Boolean> original) {
-        synchronized (this) {
-            return original.call();
-        }
+    @Inject(method = "shouldKeepDimensionActive", at = @At("HEAD"), cancellable = true)
+    private void leafs$countedActivityRead(CallbackInfoReturnable<Boolean> callbackInfo) {
+        callbackInfo.setReturnValue(leafs$keepingActive > 0);
     }
 
     @WrapMethod(method = "hasTickets")
     private boolean leafs$monitoredEmptinessRead(Operation<Boolean> original) {
         synchronized (this) {
             return original.call();
+        }
+    }
+
+    @Unique
+    private void leafs$entered(long key, Ticket ticket) {
+        if (ticket.getType().hasTimeout()) {
+            leafs$timeouts.track(key, ticket);
+        }
+
+        if (ticket.getType().shouldKeepDimensionActive()) {
+            leafs$keepingActive++;
+        }
+    }
+
+    @Unique
+    private void leafs$left(long key, Ticket ticket) {
+        if (ticket.getType().hasTimeout()) {
+            leafs$timeouts.untrack(key, ticket);
+        }
+
+        if (ticket.getType().shouldKeepDimensionActive()) {
+            leafs$keepingActive--;
         }
     }
 }
