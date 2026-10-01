@@ -47,6 +47,22 @@ class ChunkPlacementTest {
         assertEquals(List.of("awaited", "full step", "publication", "generation"), ran);
     }
 
+    /** 2026-10-01: every chunk of a joining player's view was finishing at once, so the view filled in random pockets instead of from the player outward. */
+    @Test
+    void theNearestChunkPassesFirstInsideTheWorkThatFinishesChunksAndInsideTheGeneration() {
+        ChunkPlacement view = new ChunkPlacement(pool, 0, place -> ChunkPool.THIRD + Math.max(Math.abs(ChunkTask.chunkX(place.chunkKey())), Math.abs(ChunkTask.chunkZ(place.chunkKey()))));
+        CountDownLatch release = TestThreads.occupy(pool);
+        CountDownLatch done = new CountDownLatch(4);
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 10, 0, 1, () -> finish(done, "far generation"));
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 1, 0, 1, () -> finish(done, "near generation"));
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FULL, 20, 0, -1, () -> finish(done, "far finish"));
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FULL, 2, 0, -1, () -> finish(done, "near finish"));
+        release.countDown();
+        TestThreads.await(done);
+
+        assertEquals(List.of("near finish", "far finish", "near generation", "far generation"), ran);
+    }
+
     private void finish(CountDownLatch done, String task) {
         ran.add(task);
         done.countDown();

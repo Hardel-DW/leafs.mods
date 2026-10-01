@@ -19,6 +19,10 @@ public final class ChunkPlacement {
         pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ, status), area(kind, chunkX, chunkZ, radius), task));
     }
 
+    public int finishing(ChunkPos pos) {
+        return place(pos.x(), pos.z(), pos.x(), pos.z(), ChunkStatus.FULL).priority();
+    }
+
     public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ, ChunkStatus status) {
         return new ChunkTask.Place(ChunkTask.key(level, chunkX, chunkZ), ChunkTask.key(level, centerX, centerZ), status, urgency);
     }
