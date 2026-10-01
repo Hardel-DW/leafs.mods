@@ -44,7 +44,7 @@ class SectionCrossingUnloadTest {
             }
 
             @Override
-            public void published() {
+            public void published(Runnable pass) {
                 Thread worker = new Thread(() -> loading.drain(recorder));
                 worker.start();
                 joinQuietly(worker);

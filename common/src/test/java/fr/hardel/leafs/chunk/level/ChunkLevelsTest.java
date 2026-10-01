@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.level;
 
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.ticking.TickEpochs;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -246,5 +247,35 @@ class ChunkLevelsTest {
         assertEquals(31, seen);
         assertTrue(graph.drain(this::record));
         assertEquals(NONE, level(10, 10));
+    }
+
+    /** 2026-10-01: a region waited 186 ms on the stripes while a pool drain published the holders of a joining player's view. */
+    @Test
+    void aSettlePassesBetweenTwoHoldersOfAnotherDrain() throws InterruptedException {
+        CountDownLatch settled = new CountDownLatch(1);
+        Thread region = new Thread(() -> graph.settled(12, 10, (_, _, _) -> { }, () -> {
+            settled.countDown();
+            return level(12, 10);
+        }));
+        long[] settledDuringThePass = new long[1];
+        graph.setSource(10, 10, 31);
+        graph.drain(new LevelListener() {
+            @Override
+            public void changed(long chunkKey, int oldLevel, int newLevel) {
+            }
+
+            @Override
+            public void published(Runnable pass) {
+                graph.setSource(12, 10, 30);
+                region.start();
+                TestThreads.awaitParked(region);
+                pass.run();
+                settledDuringThePass[0] = settled.getCount();
+            }
+        });
+
+        region.join();
+        assertEquals(0, settledDuringThePass[0], "the settle waited for the whole publication of the other drain");
+        assertEquals(30, level(12, 10));
     }
 }

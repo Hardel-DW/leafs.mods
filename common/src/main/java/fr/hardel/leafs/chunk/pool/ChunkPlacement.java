@@ -4,6 +4,11 @@ import fr.hardel.leafs.chunk.level.LevelListener;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Function;
+
 public final class ChunkPlacement {
     private final ChunkPool pool;
     private final int level;
@@ -19,8 +24,20 @@ public final class ChunkPlacement {
         pool.submit(ChunkTask.of(kind, place(chunkX, chunkZ, chunkX, chunkZ, status), area(kind, chunkX, chunkZ, radius), task));
     }
 
-    public int finishing(ChunkPos pos) {
-        return place(pos.x(), pos.z(), pos.x(), pos.z(), ChunkStatus.FULL).priority();
+    public <T> List<T> finishingOrder(List<T> chunks, Function<T, ChunkPos> position) {
+        long[] ranked = new long[chunks.size()];
+        for (int index = 0; index < ranked.length; index++) {
+            ChunkPos pos = position.apply(chunks.get(index));
+            ranked[index] = (long) place(pos.x(), pos.z(), pos.x(), pos.z(), ChunkStatus.FULL).priority() << Integer.SIZE | index;
+        }
+
+        Arrays.sort(ranked);
+        List<T> sorted = new ArrayList<>(ranked.length);
+        for (long rank : ranked) {
+            sorted.add(chunks.get((int) rank));
+        }
+
+        return sorted;
     }
 
     public ChunkTask.Place place(int chunkX, int chunkZ, int centerX, int centerZ, ChunkStatus status) {

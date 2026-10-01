@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
@@ -30,12 +31,13 @@ public final class ChunkLevels {
     private final ConcurrentLinkedQueue<Section> dirty = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<Section> held = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean stray = new AtomicBoolean();
+    private final AtomicInteger settling = new AtomicInteger();
     private final ReentrantLock[] stripes = new ReentrantLock[STRIPES];
 
     public ChunkLevels(int levelCount, TickEpochs epochs) {
         this.none = levelCount - 1;
         this.epochs = epochs;
-        Arrays.setAll(stripes, _ -> new ReentrantLock());
+        Arrays.setAll(stripes, _ -> new ReentrantLock(true));
     }
 
     public int none() {
@@ -114,8 +116,8 @@ public final class ChunkLevels {
             return false;
         }
 
-        boolean[] locked = lock(around(taken.stream().mapToLong(section -> section.key).toArray()));
-        try {
+        boolean[] marked = around(taken.stream().mapToLong(section -> section.key).toArray());
+        return locked(marked, () -> {
             long oldestOpen = epochs.oldestOpen();
             Long2ByteOpenHashMap changes = new Long2ByteOpenHashMap();
             for (Section section : taken) {
@@ -124,43 +126,39 @@ public final class ChunkLevels {
                 }
             }
 
-            return publish(taken, changes, listener);
-        } finally {
-            unlock(locked);
-        }
+            return publish(taken, changes, listener, () -> pass(marked));
+        });
     }
 
     // Applies the pending decreases of the chunk's section, never an increase, then runs the body under its stripes.
     public <T> T settled(int chunkX, int chunkZ, LevelListener listener, Supplier<T> body) {
         long key = Section.keyOf(chunkX, chunkZ);
-        boolean[] locked = lock(around(key));
+        boolean[] marked = around(key);
+        settling.incrementAndGet();
+        lock(marked);
+        settling.decrementAndGet();
         try {
             Section center = sections.get(key);
             if (center != null) {
                 Long2ByteOpenHashMap changes = new Long2ByteOpenHashMap();
                 center.takeVisible(Long.MIN_VALUE, changes);
-                publish(List.of(center), changes, listener);
+                publish(List.of(center), changes, listener, () -> pass(marked));
             }
 
             return body.get();
         } finally {
-            unlock(locked);
+            unlock(marked);
         }
     }
 
     public void exclusive(Runnable body) {
         boolean[] all = new boolean[STRIPES];
         Arrays.fill(all, true);
-        lock(all);
-        try {
-            body.run();
-        } finally {
-            unlock(all);
-        }
+        locked(all, body);
     }
 
-    private boolean publish(Collection<Section> taken, Long2ByteMap changes, LevelListener listener) {
-        boolean changed = !changes.isEmpty() && new Propagation(changes).run(listener);
+    private boolean publish(Collection<Section> taken, Long2ByteMap changes, LevelListener listener, Runnable pass) {
+        boolean changed = !changes.isEmpty() && new Propagation(changes).run(listener, pass);
         for (Section center : taken) {
             retireAround(center.key);
         }
@@ -198,14 +196,39 @@ public final class ChunkLevels {
         return marked;
     }
 
-    private boolean[] lock(boolean[] marked) {
+    private void pass(boolean[] marked) {
+        if (settling.get() == 0) {
+            return;
+        }
+
+        unlock(marked);
+        lock(marked);
+    }
+
+    private void locked(boolean[] marked, Runnable body) {
+        lock(marked);
+        try {
+            body.run();
+        } finally {
+            unlock(marked);
+        }
+    }
+
+    private <T> T locked(boolean[] marked, Supplier<T> body) {
+        lock(marked);
+        try {
+            return body.get();
+        } finally {
+            unlock(marked);
+        }
+    }
+
+    private void lock(boolean[] marked) {
         for (int stripe = 0; stripe < STRIPES; stripe++) {
             if (marked[stripe]) {
                 stripes[stripe].lock();
             }
         }
-
-        return marked;
     }
 
     private void unlock(boolean[] marked) {
@@ -228,7 +251,7 @@ public final class ChunkLevels {
             overlay.defaultReturnValue((byte) -1);
         }
 
-        private boolean run(LevelListener listener) {
+        private boolean run(LevelListener listener, Runnable pass) {
             for (ObjectIterator<Long2ByteMap.Entry> iterator = changes.long2ByteEntrySet().iterator(); iterator.hasNext(); ) {
                 Long2ByteMap.Entry entry = iterator.next();
                 int chunkX = ChunkPos.getX(entry.getLongKey());
@@ -239,7 +262,7 @@ public final class ChunkLevels {
 
             lower();
             raise();
-            return publish(listener);
+            return publish(listener, pass);
         }
 
         private void changeSource(int chunkX, int chunkZ, int source) {
@@ -360,7 +383,7 @@ public final class ChunkLevels {
             return sections.computeIfAbsent(Section.keyOf(chunkX, chunkZ), key -> new Section(key, none));
         }
 
-        private boolean publish(LevelListener listener) {
+        private boolean publish(LevelListener listener, Runnable pass) {
             boolean changed = false;
             for (ObjectIterator<Long2ByteMap.Entry> iterator = overlay.long2ByteEntrySet().fastIterator(); iterator.hasNext(); ) {
                 Long2ByteMap.Entry entry = iterator.next();
@@ -379,7 +402,7 @@ public final class ChunkLevels {
             }
 
             if (changed) {
-                listener.published();
+                listener.published(pass);
             }
 
             return changed;

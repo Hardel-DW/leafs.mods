@@ -3,12 +3,14 @@ package fr.hardel.leafs.chunk.pool;
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkPyramid;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -130,5 +132,29 @@ class ChunkPlacementTest {
         release.countDown();
         TestThreads.await(done);
         assertEquals(List.of("load"), ran);
+    }
+
+    /** 2026-10-01: a drain sorted its holders by priorities other threads changed meanwhile, and the sort threw on the broken comparison contract. */
+    @Test
+    void aBatchIsOrderedByThePrioritiesReadOnceAtItsStart() {
+        int[] reads = new int[1];
+        ChunkPlacement flying = new ChunkPlacement(pool, 0, place -> ChunkPool.THIRD + Math.abs(ChunkTask.chunkX(place.chunkKey()) - reads[0]++ / 50 % 64));
+        List<ChunkPos> batch = new ArrayList<>();
+        for (int index = 0; index < 4096; index++) {
+            batch.add(new ChunkPos(index * 7919 % 64, index / 64));
+        }
+
+        List<ChunkPos> ordered = flying.finishingOrder(batch, pos -> pos);
+
+        assertEquals(batch.size(), ordered.size());
+        assertTrue(ordered.containsAll(batch));
+    }
+
+    @Test
+    void aBatchGoesFromTheNearestChunkToTheFarthest() {
+        ChunkPlacement view = new ChunkPlacement(pool, 0, place -> ChunkPool.THIRD + Math.abs(ChunkTask.chunkX(place.chunkKey())));
+        List<ChunkPos> batch = List.of(new ChunkPos(9, 0), new ChunkPos(-1, 0), new ChunkPos(4, 0), new ChunkPos(0, 0), new ChunkPos(-7, 0));
+
+        assertEquals(List.of(new ChunkPos(0, 0), new ChunkPos(-1, 0), new ChunkPos(4, 0), new ChunkPos(-7, 0), new ChunkPos(9, 0)), view.finishingOrder(batch, pos -> pos));
     }
 }

@@ -19,6 +19,14 @@ public final class TestThreads {
         }
     }
 
+    public static void awaitParked(Thread thread) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (thread.getState() != Thread.State.WAITING) {
+            assertTrue(System.nanoTime() < deadline, "the thread never parked");
+            Thread.onSpinWait();
+        }
+    }
+
     public static CountDownLatch occupy(Executor singleWorker) {
         CountDownLatch gate = new CountDownLatch(1);
         CountDownLatch started = new CountDownLatch(1);
