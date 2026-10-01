@@ -14,7 +14,6 @@ import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
-import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.thread.BlockableEventLoop;
 
@@ -51,7 +50,7 @@ public final class TickingManager {
         ThreadGroup serverThreads = Leafs.serverThreads();
         this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainAtTickEnd), () -> server.tickRateManager().nanosecondsPerTick(),
             config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
-        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
+        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkPool.PRIORITIES, this::onChunkTaskFailure);
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",

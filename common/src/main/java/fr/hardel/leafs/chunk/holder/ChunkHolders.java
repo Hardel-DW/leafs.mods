@@ -21,6 +21,7 @@ import net.minecraft.world.level.chunk.status.ChunkPyramid;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
@@ -143,6 +144,7 @@ public final class ChunkHolders {
                 steps.cancelDisallowed(holder);
             }
 
+            holders.sort(Comparator.comparingInt(holder -> placement.finishing(holder.getPos())));
             for (ChunkHolder holder : holders) {
                 ChunkPos pos = holder.getPos();
                 holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
