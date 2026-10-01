@@ -17,7 +17,7 @@ public abstract class ServerLevelMixin {
 
     @WrapOperation(method = {"lambda$updatePOIOnBlockStateChange$0", "lambda$updatePOIOnBlockStateChange$2"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;execute(Ljava/lang/Runnable;)V"))
     private void leafs$poiWriteOnTheOwner(MinecraftServer server, Runnable write, Operation<Void> original, @Local(argsOnly = true) BlockPos pos) {
-        LevelChunks.of((ServerLevel) (Object) this).owners().submit(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()), Work.GAME, write);
+        LevelChunks.of((ServerLevel) (Object) this).owners().submit(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()), Work.CHUNK, write);
     }
 
     @WrapOperation(method = "onStructureStartsAvailable", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;execute(Ljava/lang/Runnable;)V"))
