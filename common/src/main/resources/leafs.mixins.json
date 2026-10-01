@@ -50,6 +50,7 @@
 		"light.ChunkSystemHooksMixin",
 		"light.SchedulingUtilMixin",
 		"light.StarLightInterfaceMixin",
+		"network.ClientboundLevelChunkPacketDataMixin",
 		"network.ConnectionMixin",
 		"network.MinecraftServerMixin",
 		"network.PacketProcessorMixin",
