@@ -23,7 +23,7 @@ public abstract class ChunkTask {
     public record Place(long chunkKey, long centerKey, ChunkStatus status, Urgency urgency) {
         public int priority() {
             int urgent = urgency.of(this);
-            return status == ChunkStatus.FULL ? Math.min(urgent, ChunkPool.SECOND) : urgent;
+            return urgent < ChunkPool.THIRD || status == ChunkStatus.FULL ? urgent : urgent + ChunkPool.BAND;
         }
     }
 
