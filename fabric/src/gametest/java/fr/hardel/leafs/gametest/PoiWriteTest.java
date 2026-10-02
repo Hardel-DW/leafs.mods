@@ -67,9 +67,9 @@ public final class PoiWriteTest {
             Thread.onSpinWait();
         }
 
-        boolean written = pois.existsAtPosition(PoiTypes.MEETING, bell);
-        pois.flush(ChunkPos.containing(bell));
-        helper.assertTrue(written, "the poi write of a chunk no region owns waits for the server thread");
-        helper.succeed();
+        helper.assertTrue(pois.existsAtPosition(PoiTypes.MEETING, bell), "the poi write of a chunk no region owns waits for the server thread");
+        helper.startSequence()
+            .thenExecuteAfter(1, () -> pois.flush(ChunkPos.containing(bell)))
+            .thenSucceed();
     }
 }
