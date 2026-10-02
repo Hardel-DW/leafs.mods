@@ -32,6 +32,9 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     @Shadow
     public ServerPlayer player;
 
+    @Shadow
+    public abstract void resetPosition();
+
     @Unique
     private final PlayerPacketQueue leafs$inboundQueue = new PlayerPacketQueue();
 
@@ -48,6 +51,11 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         }
 
         original.call(ticked);
+    }
+
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$movesStartAtTheJoin(CallbackInfo callbackInfo) {
+        resetPosition();
     }
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/FutureChain;<init>(Ljava/util/concurrent/Executor;)V"))
