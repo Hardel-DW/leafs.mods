@@ -53,7 +53,7 @@ public final class RegionTickScheduler {
     }
 
     public void schedule(TickHandle handle) {
-        handle.setScheduledStartNanos(System.nanoTime() + periodNanos.getAsLong());
+        handle.setScheduledStartNanos(System.nanoTime() + periodNanos());
         queue.add(new ScheduledTick(handle));
     }
 
@@ -62,6 +62,10 @@ public final class RegionTickScheduler {
             tick.handle.setScheduledStartNanos(System.nanoTime());
             queue.add(tick);
         }
+    }
+
+    public long periodNanos() {
+        return periodNanos.getAsLong();
     }
 
     /** Vanilla and mods see a worker as the server thread. */
@@ -126,7 +130,7 @@ public final class RegionTickScheduler {
                 continue;
             }
 
-            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos.getAsLong()));
+            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos()));
             queue.add(next);
         }
     }
