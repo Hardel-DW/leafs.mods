@@ -20,7 +20,6 @@ import net.minecraft.world.phys.Vec3;
 import java.util.UUID;
 
 public final class PlayerTickTest {
-    private static final int RAW_CHUNK_OFFSET = 300;
     private static final double RAW_Y = 100;
     private static final double STEP_BLOCKS = 4;
     private static final int STEPS = 10;
@@ -30,7 +29,7 @@ public final class PlayerTickTest {
     public void theServerThreadNeverTicksAPlayerOnAnUnloadedChunk(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
-        ChunkPos raw = rawChunk(helper);
+        ChunkPos raw = rawChunk(helper, 300);
 
         player.setPos(onRawTerrain(raw));
         player.connection.tick();
@@ -41,11 +40,10 @@ public final class PlayerTickTest {
     }
 
     @GameTest
-    public void aPlayerJoiningOnRawTerrainIsNotSentBack(GameTestHelper helper) {
-        Vec3 spawn = onRawTerrain(rawChunk(helper));
+    public void aPlayerAnsweringItsJoinBeforeItsFirstTickIsNotSentBack(GameTestHelper helper) {
+        Vec3 spawn = onRawTerrain(rawChunk(helper, 600));
         ServerPlayer player = joined(helper, spawn);
 
-        player.connection.tick();
         accept(player, 1, spawn);
         Vec3 moved = moveOnce(player, spawn);
         helper.getLevel().getServer().getPlayerList().remove(player);
@@ -59,7 +57,7 @@ public final class PlayerTickTest {
         ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
         player.connection.tick();
         accept(player, 1, player.position());
-        Vec3 position = onRawTerrain(rawChunk(helper));
+        Vec3 position = onRawTerrain(rawChunk(helper, 900));
 
         player.connection.teleport(position.x, position.y, position.z, 0, 0);
         player.connection.resetPosition();
@@ -88,9 +86,9 @@ public final class PlayerTickTest {
         return player;
     }
 
-    private static ChunkPos rawChunk(GameTestHelper helper) {
+    private static ChunkPos rawChunk(GameTestHelper helper, int distance) {
         ChunkPos origin = ChunkPos.containing(helper.absolutePos(BlockPos.ZERO));
-        return new ChunkPos(origin.x() + RAW_CHUNK_OFFSET, origin.z());
+        return new ChunkPos(origin.x() + distance, origin.z());
     }
 
     private static Vec3 onRawTerrain(ChunkPos raw) {
