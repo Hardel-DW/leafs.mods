@@ -12,14 +12,16 @@ import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.function.LongSupplier;
+
 public final class RegionTickHandle extends TickHandle {
     private final Region<RegionTickData> region;
     private final LevelRegions regions;
     private volatile int chunkCensus;
     private volatile int entityCensus;
 
-    RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions) {
-        super(region.id(), dimension, TickStages.count(TickFamily.REGION));
+    RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions, LongSupplier periodNanos) {
+        super(region.id(), dimension, TickStages.count(TickFamily.REGION), periodNanos);
         this.region = region;
         this.regions = regions;
     }

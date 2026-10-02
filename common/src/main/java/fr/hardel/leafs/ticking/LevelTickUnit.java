@@ -15,13 +15,14 @@ public final class LevelTickUnit {
     private final String dimension;
     private final ServerLevel level;
     private final LevelRegions regions;
-    private final StageTimings stages = new StageTimings(TickStages.count(TickFamily.SERIAL));
+    private final StageTimings stages;
     private volatile int lastChunkCount;
 
     LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
         this.id = id;
         this.dimension = level.dimension().identifier().toString();
         this.level = level;
+        this.stages = new StageTimings(TickStages.count(TickFamily.SERIAL), scheduler::periodNanos);
         this.regions = LevelRegions.of(level);
         regions.activate(dimension, scheduler, level::getGameTime, time -> RegionWorldData.regional(level, time), new RegionTickBody(level));
     }
