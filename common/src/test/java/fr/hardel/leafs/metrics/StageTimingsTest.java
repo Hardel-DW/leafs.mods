@@ -12,6 +12,7 @@ class StageTimingsTest {
     private static final TickStage FIRST = stage(0, "first");
     private static final TickStage SECOND = stage(1, "second");
     private static final TickStage THIRD = stage(2, "third");
+    private static final long PERIOD = 50_000_000L;
 
     private static TickStage stage(int index, String name) {
         return new TickStage(TickFamily.REGION, index, Identifier.fromNamespaceAndPath("leafs", "region/" + name));
@@ -19,7 +20,7 @@ class StageTimingsTest {
 
     @Test
     void marksAttributeElapsedTimeToEachStageInOrder() {
-        StageTimings timings = new StageTimings(3);
+        StageTimings timings = new StageTimings(3, () -> PERIOD);
         timings.beginTick(1_000);
         timings.mark(FIRST, 3_000);
         timings.mark(SECOND, 6_000);
@@ -34,7 +35,7 @@ class StageTimingsTest {
 
     @Test
     void aStageMarkedTwiceAccumulates() {
-        StageTimings timings = new StageTimings(3);
+        StageTimings timings = new StageTimings(3, () -> PERIOD);
         timings.beginTick(0);
         timings.mark(SECOND, 100);
         timings.mark(FIRST, 300);
@@ -49,7 +50,7 @@ class StageTimingsTest {
 
     @Test
     void averagesSpanOnlyTheRequestedWindow() {
-        StageTimings timings = new StageTimings(3);
+        StageTimings timings = new StageTimings(3, () -> PERIOD);
         for (int tick = 1; tick <= 3; tick++) {
             timings.beginTick(0);
             timings.mark(FIRST, tick * 1_000L);
@@ -62,7 +63,7 @@ class StageTimingsTest {
 
     @Test
     void marksOutsideATickAreIgnoredAndAnUnpublishedRowStaysInvisible() {
-        StageTimings timings = new StageTimings(3);
+        StageTimings timings = new StageTimings(3, () -> PERIOD);
         timings.mark(FIRST, 5_000);
 
         assertArrayEquals(new long[3], timings.averageNanos(10));
@@ -75,7 +76,7 @@ class StageTimingsTest {
 
     @Test
     void sampleCountsOnlyCompletedTicksInTheWindow() {
-        StageTimings timings = new StageTimings(1);
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
         long second = 1_000_000_000L;
         for (int tick = 1; tick <= 10; tick++) {
             timings.beginTick(tick * second);
@@ -90,8 +91,43 @@ class StageTimingsTest {
     }
 
     @Test
+    void aUnitThatNeverTickedRunsAtTheTargetRate() {
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
+
+        assertEquals(20.0, timings.sample(7 * PERIOD).tps());
+    }
+
+    @Test
+    void aFirstTickInProgressForLessThanAPeriodKeepsTheTargetRate() {
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
+        timings.beginTick(0);
+
+        assertEquals(20.0, timings.sample(PERIOD / 2).tps());
+    }
+
+    @Test
+    void aFirstTickLongerThanAPeriodLowersTheRate() {
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
+        timings.beginTick(0);
+        timings.endTick(8 * PERIOD);
+
+        assertEquals(5.0, timings.sample(8 * PERIOD).tps(), 0.01, "the start of the first tick and its end over eight periods");
+    }
+
+    @Test
+    void theTargetRateFollowsTheTickRate() {
+        StageTimings timings = new StageTimings(1, () -> PERIOD / 2);
+        for (int tick = 0; tick < 40; tick++) {
+            timings.beginTick(tick * PERIOD / 2);
+            timings.endTick(tick * PERIOD / 2 + 1_000_000L);
+        }
+
+        assertEquals(40.0, timings.sample(20 * PERIOD).tps(), 0.01);
+    }
+
+    @Test
     void theRingRecyclesPastCapacity() {
-        StageTimings timings = new StageTimings(1);
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
         for (int tick = 0; tick < StageTimings.CAPACITY + 50; tick++) {
             timings.beginTick(0);
             timings.mark(FIRST, 7);
@@ -103,7 +139,7 @@ class StageTimingsTest {
 
     @Test
     void rowsSinceHandsEveryTickEndedAfterTheGivenCount() {
-        StageTimings timings = new StageTimings(3);
+        StageTimings timings = new StageTimings(3, () -> PERIOD);
         for (int tick = 1; tick <= 3; tick++) {
             timings.beginTick(0);
             timings.mark(FIRST, tick);
@@ -120,7 +156,7 @@ class StageTimingsTest {
 
     @Test
     void rowsSinceStopsAtWhatTheRingStillHolds() {
-        StageTimings timings = new StageTimings(1);
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
         for (int tick = 0; tick < StageTimings.CAPACITY + 10; tick++) {
             timings.beginTick(0);
             timings.mark(FIRST, tick);

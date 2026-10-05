@@ -24,10 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.function.LongSupplier;
 
 public final class TickingManager {
     private final MinecraftServer server;
-    private final ServerMetrics metrics = new ServerMetrics();
+    private final ServerMetrics metrics;
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkPool chunkPool;
@@ -45,10 +46,12 @@ public final class TickingManager {
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
+        LongSupplier periodNanos = () -> server.tickRateManager().nanosecondsPerTick();
+        this.metrics = new ServerMetrics(periodNanos);
         long warnNanos = config.debug().watchdogWarnNanos();
         this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
         ThreadGroup serverThreads = Leafs.serverThreads();
-        this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainAtTickEnd), () -> server.tickRateManager().nanosecondsPerTick(),
+        this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainAtTickEnd), periodNanos,
             config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
         this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkPool.PRIORITIES, this::onChunkTaskFailure);
         watchdog.start();

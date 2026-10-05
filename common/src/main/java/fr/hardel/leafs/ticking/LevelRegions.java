@@ -194,7 +194,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         if (scheduler != null) {
-            data.attachHandle(new RegionTickHandle(region, dimension, this));
+            data.attachHandle(new RegionTickHandle(region, dimension, this, scheduler::periodNanos));
         }
 
         return data;
@@ -206,7 +206,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     }
 
     private RegionTickHandle newHandle(Region<RegionTickData> region) {
-        RegionTickHandle handle = new RegionTickHandle(region, dimension, this);
+        RegionTickHandle handle = new RegionTickHandle(region, dimension, this, scheduler::periodNanos);
         region.data().attachHandle(handle);
         return handle;
     }
