@@ -9,8 +9,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.UpgradeData;
 import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureCheckResult;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
 
 import java.util.ArrayList;
@@ -44,13 +48,38 @@ public final class StructureStartsTest {
         helper.succeed();
     }
 
+    @GameTest(maxTicks = 100)
+    public void aStartReportedByAGenerationThreadReachesTheStructureCheckAtOnce(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
+        ValidStart found = level.registryAccess().lookupOrThrow(Registries.STRUCTURE).listElements()
+            .filter(structure -> !state.getPlacementsForStructure(structure).isEmpty())
+            .flatMap(structure -> IntStream.range(0, POSITIONS).mapToObj(index -> new ValidStart(structure, generated(level, structure, index))))
+            .filter(candidate -> candidate.start().isValid())
+            .findFirst()
+            .orElseThrow();
+        ProtoChunk chunk = new ProtoChunk(found.start().getChunkPos(), UpgradeData.EMPTY, level, level.palettedContainerFactory(), null);
+        chunk.setStartForStructure(found.structure().value(), found.start());
+        CompletableFuture.runAsync(() -> level.onStructureStartsAvailable(chunk)).join();
+        StructureCheckResult result = level.structureManager().checkStructurePresence(chunk.getPos(), found.structure().value(),
+            state.getPlacementsForStructure(found.structure()).getFirst(), false);
+        helper.assertTrue(result == StructureCheckResult.START_PRESENT, "the start a generation thread reports is checked without waiting for the server thread, got %s".formatted(result));
+        helper.succeed();
+    }
+
+    private record ValidStart(Holder<Structure> structure, StructureStart start) {}
+
     private static CompoundTag start(ServerLevel level, Holder<Structure> structure, int index) {
+        StructureStart start = generated(level, structure, index);
+        return start.createTag(StructurePieceSerializationContext.fromLevel(level), start.getChunkPos());
+    }
+
+    private static StructureStart generated(ServerLevel level, Holder<Structure> structure, int index) {
         ChunkPos pos = new ChunkPos(1000 + index * 37, -700 + index * 53);
         ChunkGenerator generator = level.getChunkSource().getGenerator();
         ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
         return structure.value().generate(structure, level.dimension(), level.registryAccess(), generator, generator.getBiomeSource(),
-                state.randomState().createClimateSampler(SamplerContext.builder().enableCaches().build()), state.randomState(), level.getStructureTemplateManager(),
-                state.getLevelSeed(), pos, 0, level, _ -> true)
-            .createTag(StructurePieceSerializationContext.fromLevel(level), pos);
+            state.randomState().createClimateSampler(SamplerContext.builder().enableCaches().build()), state.randomState(), level.getStructureTemplateManager(),
+            state.getLevelSeed(), pos, 0, level, _ -> true);
     }
 }
