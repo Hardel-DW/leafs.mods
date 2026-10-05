@@ -81,13 +81,13 @@ The server thread handles the arrival and departure of a player. It borrows the 
 Primitives are the methods in the Minecraft code that are the lowest and the most used, where the most traffic goes through them.
 Leafs takes a fairly simple path, modifying all the lowest primitives of Minecraft, the teleportation, network, chunk read/write functions. Portals, structures, entities...
 Mods use these functions without knowing it and are therefore automatically compatible.
-Lithium/Ferrite/Mapple are compatible. C2ME, VMP, Moonrise are incompatible.
+Lithium/Ferrite/Maple are compatible. C2ME, VMP, Moonrise are incompatible.
 
 During the development of Leafs, everything is designed so that the slightest change to an internal Mojang function used by modders, like reading/writing chunks, blocks, or teleportation, is perfectly identical in practice. So that modders get no bad surprises. Mods do not adapt to Leafs. Leafs adapts to mods. Leafs must in no case create bugs or problems. Otherwise open a ticket.
 
-# Mapple
-Leafs adds no optimization, whether `CPU`, `RAM`, `Garbage Collector` or `load-time allocations`. Any form of optimization is done in an independent mod named Mapple. This mod works with or without Leafs as a mod without config/tradeoffs, pure gain. But designed for the best possible gain for Leafs multithreading.
-On the Leafs benchmarks, an isolated idle player costs 33 MiB of RAM with Mapple instead of 52. The up-to-date numbers are in the Mapple docs.
+# Maple
+Leafs adds no optimization, whether `CPU`, `RAM`, `Garbage Collector` or `load-time allocations`. Any form of optimization is done in an independent mod named Maple. This mod works with or without Leafs as a mod without config/tradeoffs, pure gain. But designed for the best possible gain for Leafs multithreading.
+On the Leafs benchmarks, an isolated idle player costs 33 MiB of RAM with Maple instead of 52. The up-to-date numbers are in the Maple docs.
 
 # Debugging & Metrics
 Creating the metrics and collecting the values is done in Leafs. It still provides simplified commands to access this data.

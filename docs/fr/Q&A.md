@@ -20,12 +20,12 @@ Aucune entité n'est envoyée entre les threads. Une région ne "possède" pas s
 Ça fonctionne, et c'est le point le plus propre du modèle. `Forceload` ou les `chunk loaders` font charger des zones via simulation. Le modèle est basé sur les zones simulées donc cela crée une région ou étend sa région s'il en existe une.
 
 # Les datapacks/commandes fonctionnent-ils ?
-Toutes les commandes tournent sur le thread serveur, peu importe qui les lance. Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités, la garde jusqu'à la fin de la commande, puis la rend. Une commande coûte exactement son coût vanilla.
+Toutes les commandes tournent sur le thread serveur, peu importe qui les lance. Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités. Il la garde jusqu'à la fin de son tick, puis la rend. Une commande coûte exactement son coût vanilla.
 Un datapack lourd utilisant `tick.json` reste sur un seul thread, il ne profite pas du multithreading. Il ralentit le thread serveur et les régions qu'il emprunte pendant ses commandes, pas les autres.
 
 # Y a-t-il des failles que des tricheurs pourraient exploiter comme détecter la fusion/scission de régions ?
 Par nature oui, si vous changez d'une zone à 20 TPS à une zone à 15 TPS vous n'avez pas besoin de concevoir un mod pour savoir que quelque chose a changé et donc que quelque chose ici est chargé. Un joueur, une `ender pearl`, un `forceload`, un `chunk loader` ou autre.
-Le mob cap est par sois dimensions par défaut, ou par région selon la config, par exemple deux usines dans deux régions proches tournent avec un mob cap complet. Cependant certaines techniques obscures basées sur l'analyse de l'aléatoire deviennent plus complexes à utiliser comme chaque région a sa propre graine d'aléatoire.
+Le mob cap est par dimension par défaut, ou par région selon la config, par exemple deux usines dans deux régions proches tournent avec un mob cap complet. Cependant certaines techniques obscures basées sur l'analyse de l'aléatoire deviennent plus complexes à utiliser comme chaque région a sa propre graine d'aléatoire.
 
 # Des recommendations pour un gros serveur ?
 - La `locator bar` sur beaucoup de joueurs devient illisible, il est préférable de la désactiver. `/gamerule locator_bar false`. De plus leafs a une optimisations qui désactives tout les calcules proprement de la `locator bar` quand elle est désactiver.
