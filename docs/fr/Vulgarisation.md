@@ -20,7 +20,7 @@ Une région possède ses chunks, ses entités, ses joueurs, ses block entities, 
 > Le terme pool désigne un groupe de threads : le pool des régions, le pool des chunks.
 
 ## Threads de Région
-Une région ne prend pas un thread! Une région est une tâche. Les régions attendent dans une seule liste, triée par l'arrivé de leurs prochain tick. Un thread libre prend la première région, la tick. Cela permet qu'un thread qui est occupé par une grosse région ne bloque personne.
+Une région ne prend pas un thread ! Une région est une tâche. Les régions attendent dans une seule liste, triée par l'arrivée de leur prochain tick. Un thread libre prend la première région et la tick. Ainsi, un thread occupé par une grosse région ne bloque personne.
 
 Les TPS en vanilla sont globaux, sur Leafs ils sont par région. Chaque région a son propre TPS. Si une région est plus lourde cela baisse son TPS, cela n'affecte pas les autres régions qui gardent leur TPS au max.
 - L'heure de la journée reste globale. Gérée par le thread global commun. Donc la météo, le soleil se couche à la même vitesse pour tout le monde peu importe vos TPS.
@@ -30,19 +30,19 @@ Les TPS en vanilla sont globaux, sur Leafs ils sont par région. Chaque région 
 La connexion et la déconnexion passent par le thread serveur, qui emprunte la région du joueur. Le respawn part de la région du joueur vers la région de son point de réapparition, ou vers le thread serveur si aucune région ne couvre ce point.
 
 ## Threads de Chunks
-Les Threads de chunks sont parfaitement indépendants des Threads de régions. Ils génèrent, éclairent, chargent et déchargent les chunks, et préparent les octets à écrire sur le disque. Le thread disque de vanilla ne fait plus que lire et écrire ces octets.
+Les threads de chunks sont parfaitement indépendants des threads de régions. Ils génèrent, éclairent, chargent et déchargent les chunks, et préparent les octets à écrire sur le disque. Le thread disque de vanilla ne fait plus que lire et écrire ces octets.
 
-Ces Threads tournent en priorité système minimale sur le système d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
+Ces threads tournent en priorité système minimale sur le système d'exploitation. Quand la machine n'a plus assez de ressources pour tout le monde, les ticks de régions passent devant, parce qu'eux ont une échéance de 50 ms à tenir. Les chunks prennent le reste. Pour faire simple :
 - Un joueur qui explore ne fait plus laguer les autres joueurs, même de sa propre région.
 - Une zone très dense, avec un TPS bas, n'affecte pas la vitesse de génération du monde donc il peut continuer à se déplacer fluidement.
 - Quand un thread a besoin d'un chunk pas encore là, il le demande au pool, qui le fait passer devant tout le reste, et il attend. Le chunk reçu reste chargé jusqu'à la fin du tick ou de la commande comme en vanilla.
-- Le pool traite d'abord les chunks qu'un thread attend, puis les chunks presque finis, puis la génération. Toujours du plus proche du joueur au plus loin
+- Le pool traite d'abord les chunks qu'un thread attend, puis les chunks presque finis, puis la génération. Toujours du plus proche du joueur au plus loin.
 
-## Threads de Lumiére
-- Pour la lumiére si vous utilisez **Firefly**, il utilisera le pool de thread de chunks mentionner avant.
-- Dans le cas du moteur Starlight comme **ScalableLux** il déclara des nouveaux thread indépendant.
+## Threads de Lumière
+- Pour la lumière, si vous utilisez **Firefly**, il utilise le pool de threads de chunks mentionné avant.
+- Dans le cas d'un moteur Starlight comme **ScalableLux**, il déclare de nouveaux threads indépendants.
 
-Comme **Firefly** utilise les thread de chunks, il devient lui aussi automatiquement en priorités basse, les tps des régions en sont pas affecter en forte charge.
+Comme **Firefly** utilise les threads de chunks, il passe lui aussi automatiquement en priorité basse. Les TPS des régions n'en sont pas affectés en forte charge.
 
 # Lecture/Ecriture
 Minecraft est fait de `chunks` de 16x16 blocs. Une région est un groupe de chunks qui tick ensemble, chaque chunk a un propriétaire, c'est le seul qui a le droit d'écrire.
@@ -58,28 +58,28 @@ Minecraft est fait de `chunks` de 16x16 blocs. Une région est un groupe de chun
 # La sauvegarde
 - La commande `/save-all flush` et l'arrêt du serveur, le thread serveur fige toutes les régions le temps de la sauvegarde, comme vanilla fige le serveur.
 - L'autosave périodique, lui est fait par les régions.
-- `/save-all` sans `flush` lance la même sauvegarde que l'autosave par les régions
+- `/save-all` sans `flush` lance la même sauvegarde par les régions que l'autosave.
 
 # Emprunts et Courrier
 Deux concepts de Multithread de Leafs simples.
-Avant tout une régles a comprendre, Le thread serveur ne touche jamais une région sans l'emprunter, `Commandes`, `event Fabric/Neoforge`, `arrivée`, `départ`. 
+Avant tout, une règle à comprendre. Le thread serveur ne touche jamais une région sans l'emprunter, `Commandes`, `event Fabric/NeoForge`, `arrivée`, `départ`.
 
 **Courrier** : chaque région a une boîte aux lettres. Ce que les autres régions veulent faire chez elle attend dedans, elle le fait à la fin de son tick, dans l'ordre d'arrivée.
 La boîte a deux files :
 - Le travail de chunk. Publier un chunk généré, le démonter, le sauvegarder.
 - Le travail de jeu. Poser un bloc, téléporter, respawn. Ça peut avoir besoin d'un chunk pas encore chargé, donc ça peut attendre.
 
-**L'emprunt**: Ils est utile notament aux `commandes`. Le thread serveur peut créer un emprunt en visant une entités/chunks cela emprunte leurs régions. Le thread serveur fait alors le travail lui-même, dans le même ordre que vanilla, et rend tout à la fin du tick serveur.
+**L'emprunt** : Il est utile notamment aux `commandes`. Le thread serveur peut créer un emprunt en visant une entité ou un chunk, cela emprunte sa région. Le thread serveur fait alors le travail lui-même, dans le même ordre que vanilla, et rend tout à la fin du tick serveur.
 
 # Les commandes
 Toutes les commandes tournent sur le thread serveur, peu importe qui les lance.
-Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités. Il la garde jusqu'à la fin du tick serveur, puis la rend. 
+Il emprunte une région au moment où la commande touche un de ses chunks ou une de ses entités. Il la garde jusqu'à la fin du tick serveur, puis la rend.
 
 Ce que la commande touche décide de ce qu'elle emprunte :
 - Un `/say` n'emprunte rien.
 - Un `/give @a` n'emprunte rien. La liste des joueurs est globale, le thread serveur la lit sans passer par une région.
 - Un `/setblock` emprunte la région du chunk visé, et charge le chunk avant si besoin. Ce chargement bloque le thread serveur, comme en vanilla.
-Un `/kill @e[distance=..10]` emprunte seulement les régions que la zone touche.
+- Un `/kill @e[distance=..10]` emprunte seulement les régions que la zone touche.
 
 Un datapack coûte donc exactement ce qu'il coûte en vanilla.
 
@@ -106,11 +106,11 @@ La création des metrics, la récupération des valeurs se fait dans Leafs. Il f
 Le serveur fait dans l'ordre :
 1. Lance le `tick.json` pour les commandes.
 2. Puis met à jour l'heure du monde.
-3. La dimension gére l'heure, la météo, la bordure, les tickets et la vue des joueurs, les déchargements, les spawn (phantoms, marchand...), puis demande en une ligne aux Threads de chunks leur passe sur les chunks sans région. Les raids et le combat du dragon tickent sur le thread serveur.
+3. La dimension gére l'heure, la météo, la bordure, les tickets et la vue des joueurs, les déchargements, les spawn (phantoms, marchand...), puis demande en une ligne aux threads de chunks leur passe sur les chunks sans région. Les raids et le combat du dragon tickent sur le thread serveur.
 4. Tout ce qui est redirigé vers le thread global. Comme les `command blocks`, `respawn`, `commande du chat`.
 5. Les requêtes réseau de chaque connexion de joueur. Le transport seulement, le tick du joueur tourne sur sa région.
 6. La liste des joueurs.
-7. L'horloge et le déclenchement de l'autosave, ce sont les régions et les Threads de chunks qui font ensuite les sauvegardes.
+7. L'horloge et le déclenchement de l'autosave, ce sont les régions et les threads de chunks qui font ensuite les sauvegardes.
 8. Debug, Monitor. l'envoi des chunks aux joueurs
 
 ### Les coûts du thread serveur.
