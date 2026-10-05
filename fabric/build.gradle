@@ -18,7 +18,7 @@ dependencies {
 	implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
 	mods "maven.modrinth:scalablelux:${rootProject.scalablelux_fabric}"
-	mods "fr.hardel:mapple-fabric-${minecraftMajor}:${rootProject.mapple_version}"
+	mods "fr.hardel:maple-fabric-${minecraftMajor}:${rootProject.maple_version}"
 
 	testImplementation platform("org.junit:junit-bom:5.12.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"

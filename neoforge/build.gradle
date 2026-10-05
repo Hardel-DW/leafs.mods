@@ -90,7 +90,7 @@ configurations {
 
 dependencies {
 	mods "maven.modrinth:scalablelux:${rootProject.scalablelux_neoforge}"
-	mods "fr.hardel:mapple-neoforge-${minecraftMajor}:${rootProject.mapple_version}"
+	mods "fr.hardel:maple-neoforge-${minecraftMajor}:${rootProject.maple_version}"
 }
 
 tasks.named('compileJava') {

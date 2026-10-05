@@ -27,7 +27,7 @@
 		"vmp": "*"
 	},
 	"recommends": {
-		"mapple": "*"
+		"maple": "*"
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
