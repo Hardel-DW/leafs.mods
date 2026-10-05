@@ -1,17 +1,17 @@
 # Layout
-A folder is a responsibility. An independent building block. The code lives in `src/main/java/fr/hardel/leafs/`. The `excess` folder in hardel lives next to the mod. It provides utility classes unrelated to Minecraft.
+A folder is a responsibility. An independent building block. The code lives in `src/main/java/fr/hardel/leafs/`. The `excess` folder in hardel lives next to the mod. It provides thread-safe collections unrelated to Minecraft.
+The code shared by Fabric and NeoForge lives in `common`.
 
 - `debug/` - The `/leafs` command
 - `entity/` - The snapshot of the entities a region ticks, teleportations and entity persistence.
-- `global/` - The command engine, the state monitor, borrowing during the Fabric API tick events, the locator bar, randomness.
-- `metrics/` - Telemetry, server measurement. And the `leafs:tick_stage` registry.
-- `mixin/` - Patches of Minecraft, of the Fabric API (`compat/`) and of ScalableLux (`light/`)
-- `network/` - Handles the per-player packet queues, routing, the per-region network tick, disconnection and connection preparation.
+- `global/` - The command engine, the global scheduler, the state monitor, the locator bar, randomness.
+- `metrics/` - Telemetry, server measurement, and the list of the stages of a tick.
+- `mixin/` - Patches of Minecraft, one subfolder per building block. `compat/` fixes the mods that share a collection between threads.
+- `network/` - Handles the per-player packet queues, routing, the per-region network tick, disconnection, connection preparation and the list of the chunks a player waits for.
 - `region/` - Splits the world into sections and regions with merging and splitting, without any Minecraft dependency.
-- `scheduler/` - Exposes the global scheduler whose destination is the owner of a chunk, region, pool or borrower
-- `ticking/` - The region scheduler, the region clock, borrowing, the per-region crash report, the watchdog.
+- `ticking/` - The region scheduler, the region clock, borrowing, the per-region crash report, the watchdog, the tick epochs.
 - `world/` - Region tick, what a chunk ticks by itself, scheduled ticks, block events, block entities, and the little a region keeps, clock, randomness, neighbor updates, snapshots of its chunks and its entities, autosave by epoch.
-- `chunk/` - The chunk engine.
+- `chunk/` - The chunk engine, and the plugging of Firefly into the pool.
 
 # Chunks Folder
 - `pool/` - The chunk thread pool.

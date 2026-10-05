@@ -1,12 +1,12 @@
 # Benchmark
 A blank server starts on a blank world with an identical `seed`, Leafs uses the Overstress mod which simulates players as authentic as real players, with scenarios. The bots therefore do the same actions in the same order, without randomness in the game.
 This benchmark runs in a private `repository` with 12 cores / 24 threads on a Ryzen 5900X, with 12 chunk threads and 12 region threads.
-Several scenarios exist, only a few are mentioned here, `worldgen` and `ramp`.
+Several scenarios exist, `worldgen`, `flight`, `generate`, `ramp`, `solo` and `roam`. Only `worldgen` and `ramp` are detailed here.
 
 ## Leafs aims for
 - A player alone in their region holds 20 TPS, whatever the world generation around them.
 - The loading/unloading of the `worldgen`, as well as connection/disconnection, must not impact the TPS of a region.
-- The server thread must have a fixed cost, under 1 ms, without depending on the number of chunks, entities or players.
+- The server thread must have a fixed cost, under 0.5 ms, without depending on the number of chunks, entities or players.
 - The serial part per dimension stays under 0.5 ms.
 - Chunk generation must follow the number of chunk threads linearly.
 - The number of players and regions must scale linearly with the threads and the RAM.

@@ -19,8 +19,8 @@ A region owns its chunks, its entities, its players, its block entities, the net
 **The vanilla server thread still exists.** Regions tick at the same time as it does. Once per tick it does what is global by nature, the world time, the weather, the border, the player list and the autosave trigger. It also runs every command. Its cost is fixed and minimal, without depending on the number of chunks or entities. Only the player list grows with them, and its cost per player is tiny.
 > The term pool refers to a group of threads: the region pool, the chunk pool.
 
-## Region workers
-A region is not a thread! A region is a task. Regions wait in a single list, sorted by the time of their next tick. A free worker takes the first one and ticks it. A worker busy with a big region blocks nobody, the others take over.
+## Region threads
+A region does not take a thread! A region is a task. Regions wait in a single list, sorted by the arrival of their next tick. A free thread takes the first region and ticks it. This way, a thread busy with a big region blocks nobody.
 
 TPS in vanilla is global, in Leafs it is per region. Each region has its own TPS. If a region is heavier its TPS drops, this does not affect the other regions which keep their TPS at max.
 - The time of day stays global. Handled by the shared global thread. So the weather and the sunset go at the same speed for everyone whatever your TPS.
@@ -29,13 +29,20 @@ TPS in vanilla is global, in Leafs it is per region. Each region has its own TPS
 
 Connection and disconnection go through the server thread, which borrows the player's region. The respawn goes from the player's region to the region of their respawn point, or to the server thread if no region covers that point.
 
-## Chunk workers
-Chunk workers are completely independent from region workers. They generate, light, load and unload chunks, and prepare the bytes to write to disk. The vanilla disk thread now only reads and writes those bytes.
+## Chunk threads
+Chunk threads are completely independent from region threads. They generate, light, load and unload chunks, and prepare the bytes to write to disk. The vanilla disk thread now only reads and writes those bytes.
 
-These workers run at the lowest system priority on the operating system. When the machine no longer has enough resources for everyone, region ticks go first, because they have a 50 ms deadline to meet. Chunks take the rest. To keep it simple:
+These threads run at the lowest system priority on the operating system. When the machine no longer has enough resources for everyone, region ticks go first, because they have a 50 ms deadline to meet. Chunks take the rest. To keep it simple:
 - A player who explores no longer lags the other players, even those of their own region.
 - A very dense area, with a low TPS, does not affect the world generation speed, so they can keep moving smoothly.
 - When a thread needs a chunk that is not there yet, it asks the pool, which puts it ahead of everything else, and it waits. The received chunk stays loaded until the end of the tick or of the command, like in vanilla.
+- The pool first handles the chunks a thread waits for, then the chunks almost finished, then the generation. Always from the closest to the player to the farthest.
+
+## Light threads
+- For the light, if you use **Firefly**, it uses the pool of chunk threads mentioned before.
+- With a Starlight engine like **ScalableLux**, it declares new independent threads.
+
+Since **Firefly** uses the chunk threads, it also automatically runs at low priority. The TPS of the regions is not affected under heavy load.
 
 # Reading/Writing
 Minecraft is made of `chunks` of 16x16 blocks. A region is a group of chunks that tick together, each chunk has an owner, the only one allowed to write.
@@ -51,27 +58,29 @@ Minecraft is made of `chunks` of 16x16 blocks. A region is a group of chunks tha
 # Saving
 - The `/save-all flush` command and the server shutdown, the server thread freezes every region for the duration of the save, like vanilla freezes the server.
 - The periodic autosave is done by the regions.
+- `/save-all` without `flush` starts the same save by the regions as the autosave.
 
 # Borrows and Mail
 Two simple multithreading concepts of Leafs.
-First of all a rule to understand, the server thread never touches a region without borrowing it, `commands`, `Fabric events`, `arrival`, `departure`.
+First of all a rule to understand, the server thread never touches a region without borrowing it, `commands`, `Fabric/NeoForge events`, `arrival`, `departure`.
 
 **Mail**: each region has a mailbox. What the other regions want to do at its place waits in there, it does it at the end of its tick, in order of arrival.
 The mailbox has two queues:
 - Chunk work. Publishing a generated chunk, tearing it down, saving it.
 - Game work. Placing a block, teleporting, respawning. It may need a chunk not yet loaded, so it may wait.
 
-**Borrowing**: It is useful in particular to `commands`. The server thread can create a borrow by targeting entities/chunks, which borrows their regions. The server thread then does the work itself, in the same order as vanilla, and gives everything back at the end.
+**Borrowing**: It is useful in particular to `commands`. The server thread can create a borrow by targeting entities/chunks, which borrows their regions. The server thread then does the work itself, in the same order as vanilla, and gives everything back at the end of the server tick.
 
 # Commands
 Every command runs on the server thread, whoever launches it.
-It borrows a region the moment the command touches one of its chunks or one of its entities, keeps it until the end of the command, then gives it back.
+It borrows a region the moment the command touches one of its chunks or one of its entities. It keeps it until the end of the server tick, then gives it back.
 
 What the command touches decides what it borrows:
 - A `/say` borrows nothing.
-- A `/give @a` borrows the regions where there are players.
+- A `/give @a` borrows nothing. The player list is global, the server thread reads it without going through a region.
 - A `/setblock` borrows the region of the targeted chunk, and loads the chunk first if needed. This load blocks the server thread, like in vanilla.
-- A `/kill @e` borrows every region, because that is what the command means.
+- A `/kill @e[distance=..10]` only borrows the regions the area touches.
+
 A datapack therefore costs exactly what it costs in vanilla.
 
 # Connection and disconnection
@@ -81,13 +90,13 @@ The server thread handles the arrival and departure of a player. It borrows the 
 Primitives are the methods in the Minecraft code that are the lowest and the most used, where the most traffic goes through them.
 Leafs takes a fairly simple path, modifying all the lowest primitives of Minecraft, the teleportation, network, chunk read/write functions. Portals, structures, entities...
 Mods use these functions without knowing it and are therefore automatically compatible.
+
 Lithium/Ferrite/Maple are compatible. C2ME, VMP, Moonrise are incompatible.
 
 During the development of Leafs, everything is designed so that the slightest change to an internal Mojang function used by modders, like reading/writing chunks, blocks, or teleportation, is perfectly identical in practice. So that modders get no bad surprises. Mods do not adapt to Leafs. Leafs adapts to mods. Leafs must in no case create bugs or problems. Otherwise open a ticket.
 
 # Maple
 Leafs adds no optimization, whether `CPU`, `RAM`, `Garbage Collector` or `load-time allocations`. Any form of optimization is done in an independent mod named Maple. This mod works with or without Leafs as a mod without config/tradeoffs, pure gain. But designed for the best possible gain for Leafs multithreading.
-On the Leafs benchmarks, an isolated idle player costs 33 MiB of RAM with Maple instead of 52. The up-to-date numbers are in the Maple docs.
 
 # Debugging & Metrics
 Creating the metrics and collecting the values is done in Leafs. It still provides simplified commands to access this data.
@@ -97,18 +106,18 @@ Creating the metrics and collecting the values is done in Leafs. It still provid
 The server does, in order:
 1. Runs the `tick.json` for the commands.
 2. Then updates the world time.
-3. The dimension handles the time, the weather, the border, the tickets and the view of the players, unloads, spawns (phantoms, trader...), then asks the chunk workers in one line for their pass over the chunks without a region. Raids and the dragon fight tick on the region that owns their center.
+3. The dimension handles the time, the weather, the border, the tickets and the view of the players, unloads, spawns (phantoms, trader...), then asks the chunk threads in one line for their pass over the chunks without a region. Raids and the dragon fight tick on the server thread.
 4. Everything redirected to the global thread. Such as `command blocks`, `respawn`, `chat commands`.
 5. The network requests of each player connection. Transport only, the player tick runs on their region.
 6. The player list.
-7. The clock and the autosave trigger, the regions and the chunk workers then do the saves.
+7. The clock and the autosave trigger, the regions and the chunk threads then do the saves.
 8. Debug, Monitor, sending chunks to players.
 
 ### The costs of the server thread.
 - Points `2. World time, 7. Autosave and 8. Debug` are purely fixed costs, always identical whatever the server and the number of players.
 - Points `5. Connection network, 6. Player list` are costs that vary with the number of players, so tiny that from one server to another the cost is practically identical.
 - Points `1. Tick.json, 4. Command blocks` are tied to commands, so avoidable costs.
-- Point `3. Dimensions` has about fifteen stages, a good part at zero because moved to the regions, the rest at a fixed cost.
+- Point `3. Dimensions` has 9 stages, a good part at zero because moved to the regions, the rest at a fixed cost.
 
 # Philosophy
 The mod focuses a lot on Amdahl's and Gustafson's laws, the goal of Leafs is to scale players linearly with the threads/RAM available on the infrastructure. Of course this requires players to be spread across the world to benefit from the gains. And it is also recommended not to use commands, even though the support exists and its cost is the same as vanilla.

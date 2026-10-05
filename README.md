@@ -1,16 +1,16 @@
-# Leafs - Multi thread on Fabric
-Leafs is a server-side mod for Fabric/NeoForge. It splits the world into independent regions and runs each region on a thread, with its own TPS.
+# Leafs - Multi thread for Fabric/NeoForge
+Leafs is a server-side mod for Fabric/NeoForge, which also works in singleplayer. It splits the world into independent regions and runs each region on a thread, with its own TPS.
+On a vanilla server, a single thread does everything. The game works in such a way that any player impacts all the others, and so the player limit is reached quickly.
 
-On a vanilla server, a single thread does everything, moreover the whole game works in such a way that any player impacts all the others, and so the player limit is reached quickly.
+Leafs adds multithreading and nothing else. No gameplay feature, no API, no hidden optimization. Mods, datapacks and command blocks work like in vanilla.
+All the information is on the website, with interactive simulations: [leafs.hardel.io](https://leafs.hardel.io).
 
-Leafs adds multithreading and nothing else. No gameplay feature, no API, no hidden optimization. Your mods, datapacks and command blocks work like in vanilla.
-
-More information on the website. The interactive simulations and the full explanation are on [leafs.hardel.io](https://leafs.hardel.io).
+> Leafs requires Fabric API, as well as ScalableLux or Firefly.
 
 ## Features:
-- One or several regions are on a thread. A heavy farm only slows down its own players.
-- A player alone in their region holds 20 TPS, whatever the world generation around them.
-- Chunk generation runs on its own thread pool and scales with your cores, a different architecture from C2ME but in practice the same gains as it.
+- Each region has its own 20 TPS. A giant farm only slows down the players of that region.
+- The `worldgen` does not impact the TPS of the regions.
+- The `worldgen` is multithreaded and scales with your cores.
 - Works with your favorite content mods, datapacks like AE2.
 - Server-side only. Players have no mod to install on their client.
 - Available for Fabric and NeoForge, from Minecraft 26.1.
@@ -20,18 +20,17 @@ More information on the website. The interactive simulations and the full explan
 # Why it scales
 Leafs was designed so that the gain is infinite and linear, the more cores and RAM you allocate, the more players you have.
 
-It was designed with Amdahl's and Gustafson's laws in mind. Leafs keeps the common thread part deterministic and minimal < 1ms, and puts the rest in the region/chunk threads. Whatever the number of players or regions or the world generation, the common thread will be constant.
+It was designed with Amdahl's and Gustafson's laws in mind. Leafs keeps the common thread part deterministic and minimal < 1ms, and puts the rest in the region and chunk threads. Whatever the number of players, of regions or the world generation, the common thread will be constant.
 
-Measured on a Ryzen 5900X, 12 cores/20 GB RAM, Leafs holds **208 players each with a unique region at 20 TPS** on an ungenerated world. The gains are multiplicative in the following cases:
+Measured on a Ryzen 5900X - 12 cores - 20 GB of RAM, on a world not yet generated with the seed `0` and without randomness to get stable numbers between two benches, Leafs holds **308 players each with a unique region at 20 TPS**. The gains are multiplicative in the following cases:
 - When several players are in the same region.
 - When the world is pre-generated.
-- When the world is a skyblock.
+- When the world has few blocks and entities, for example a skyblock.
 
 ![Delimeter](https://cdn.modrinth.com/data/cached_images/c57c204c55df0ce5357df6501f616f2c7b7c6df1.png)
 
 # How regions work
 The simulated chunks around a player form a region. Two players getting closer see their regions merge into one. A region that stretches until it splits in two becomes two regions.
-
 This does not only apply to players but to any gameplay element that creates simulated chunks: **chunk loader**, the **/forceload** command, **enderpearls**...
 
 Each region owns its chunks, its players and its own random generator.
@@ -40,17 +39,20 @@ Around each region, a ring of chunks absorbs what spills over: a piston, a proje
 ![Delimeter](https://cdn.modrinth.com/data/cached_images/c57c204c55df0ce5357df6501f616f2c7b7c6df1.png)
 
 # Mod compatibility
-Mods do not adapt to Leafs. Leafs adapts to mods.
-Leafs only touches Minecraft's base methods: reading a block, loading a chunk, teleporting an entity.
+Mods do not adapt to Leafs. Leafs adapts to mods. Leafs only touches Minecraft's base methods: reading a block, loading a chunk, teleporting an entity.
 Mods use these methods without knowing it, so they work. If a mod breaks with Leafs, it is a Leafs bug: open a ticket.
 
 More information on [leafs.hardel.io/docs/mod-compatibility](https://leafs.hardel.io/docs/mod-compatibility).
 
 ![Delimeter](https://cdn.modrinth.com/data/cached_images/c57c204c55df0ce5357df6501f616f2c7b7c6df1.png)
 
-# Maple
-Leafs optimizes neither the CPU, nor the RAM, nor the garbage collector. These optimizations live in **[Maple](https://modrinth.com/mod/maple)**, a separate mod that works with or without Leafs, with no config and no compromise.
-Maple is designed for optimizations that scale, so that they consume less with a high rate of players, chunks or entities.
+# The ecosystem
+These mods are part of the Leafs ecosystem, because Leafs optimizes neither the CPU, nor the RAM, nor the GC, only the multithreaded architecture and the region architecture.
+- **Maple** - Designed for optimizations that scale, with no config, and that have no consequence on the game and the players.
+- **Firefly** - A mod that multithreads the light. Experimental.
+- **Prune** - Unlike Maple, it makes major optimizations that change the game and the gameplay, like the plugin loaders. Each option is a gamerule.
+- **Overstress** - A mod that simulates the cost of real players with `pvp/elytra/mining/movement/dimension` scenarios, for benches and in-game tests.
+- **Leafs - Debug and Metrics** - A client-side mod that shows a map of the regions and advanced F3 options, to debug and measure Leafs.
 
 ![Delimeter](https://cdn.modrinth.com/data/cached_images/c57c204c55df0ce5357df6501f616f2c7b7c6df1.png)
 
