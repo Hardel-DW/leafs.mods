@@ -3,6 +3,7 @@ package fr.hardel.leafs.ticking;
 import java.util.function.BooleanSupplier;
 
 public final class TestTickHandle extends TickHandle {
+    private static final long PERIOD_NANOS = 50_000_000L;
     private final BooleanSupplier gate;
     private final Runnable body;
     private long ticks;
@@ -12,7 +13,7 @@ public final class TestTickHandle extends TickHandle {
     }
 
     TestTickHandle(long id, BooleanSupplier gate, Runnable body) {
-        super(id, "test:world", 1);
+        super(id, "test:world", 1, () -> PERIOD_NANOS);
         this.gate = gate;
         this.body = body;
     }
