@@ -21,7 +21,6 @@ import net.minecraft.world.level.chunk.status.ChunkPyramid;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
@@ -102,8 +101,14 @@ public final class ChunkHolders {
         setQueueLevel.accept(newLevel);
     }
 
-    private void unload(ChunkHolder holder) {
+    private void follow(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();
+        holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
+        if (ChunkLevel.isLoaded(holder.getTicketLevel()) || !table.remove(pos.pack(), holder)) {
+            return;
+        }
+
+        unloading.put(pos.pack(), holder);
         unloads.increment();
         owners.later(pos.x(), pos.z(), Work.CHUNK, () -> chunkMap.scheduleUnload(pos.pack(), holder));
     }
@@ -129,31 +134,19 @@ public final class ChunkHolders {
             }
 
             holder.setTicketLevel(newLevel);
-            if (!ChunkLevel.isLoaded(newLevel)) {
-                table.remove(chunkKey);
-                unloading.put(chunkKey, holder);
-            }
-
             holders.add(holder);
         }
 
         @Override
-        public void published() {
+        public void published(Runnable pass) {
             for (ChunkHolder holder : holders) {
                 holder.updateHighestAllowedStatus(chunkMap);
                 steps.cancelDisallowed(holder);
             }
 
-            holders.sort(Comparator.comparingInt(holder -> placement.finishing(holder.getPos())));
-            for (ChunkHolder holder : holders) {
-                ChunkPos pos = holder.getPos();
-                holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
-            }
-
-            for (ChunkHolder holder : holders) {
-                if (!ChunkLevel.isLoaded(holder.getTicketLevel())) {
-                    unload(holder);
-                }
+            for (ChunkHolder holder : placement.finishingOrder(holders, ChunkHolder::getPos)) {
+                follow(holder);
+                pass.run();
             }
 
             holders.clear();

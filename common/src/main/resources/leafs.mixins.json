@@ -47,6 +47,7 @@
 		"global.ScoreboardMixin",
 		"global.ServerBossEventMixin",
 		"global.ServerScoreboardMixin",
+		"network.ClientboundLevelChunkPacketDataMixin",
 		"network.ConnectionMixin",
 		"network.MinecraftServerMixin",
 		"network.PacketProcessorMixin",

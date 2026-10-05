@@ -66,6 +66,16 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     }
 
     @Override
+    public boolean remove(long key, Object value) {
+        if (!holders.remove(key, value)) {
+            return false;
+        }
+
+        unindex(key);
+        return true;
+    }
+
+    @Override
     public boolean containsKey(long key) {
         return holders.containsKey(key);
     }

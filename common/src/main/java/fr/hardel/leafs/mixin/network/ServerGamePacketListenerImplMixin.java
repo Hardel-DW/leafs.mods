@@ -32,6 +32,9 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     @Shadow
     public ServerPlayer player;
 
+    @Shadow
+    public abstract void resetPosition();
+
     @Unique
     private final PlayerPacketQueue leafs$inboundQueue = new PlayerPacketQueue();
 
@@ -40,14 +43,19 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return leafs$inboundQueue;
     }
 
-    @WrapMethod(method = "tickPlayer")
-    private boolean leafs$tickOnLandedChunks(Operation<Boolean> original) {
-        ChunkPos chunk = player.chunkPosition();
-        if (!RegionChunkAccess.fullAround(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
-            return false;
+    @WrapOperation(method = "tickPlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerPlayer;doTick()V"))
+    private void leafs$tickOnLandedChunks(ServerPlayer ticked, Operation<Void> original) {
+        ChunkPos chunk = ticked.chunkPosition();
+        if (!RegionChunkAccess.fullAround(ticked.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
+            return;
         }
 
-        return original.call();
+        original.call(ticked);
+    }
+
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$movesStartAtTheJoin(CallbackInfo callbackInfo) {
+        resetPosition();
     }
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/FutureChain;<init>(Ljava/util/concurrent/Executor;)V"))

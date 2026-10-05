@@ -90,7 +90,7 @@ configurations {
 
 dependencies {
 	mods "fr.hardel:firefly-neoforge-${minecraftMajor}:${rootProject.firefly_version}"
-	mods "fr.hardel:mapple-neoforge-${minecraftMajor}:${rootProject.mapple_version}"
+	mods "fr.hardel:maple-neoforge-${minecraftMajor}:${rootProject.maple_version}"
 }
 
 tasks.named('compileJava') {

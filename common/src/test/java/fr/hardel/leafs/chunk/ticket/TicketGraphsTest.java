@@ -45,7 +45,7 @@ class TicketGraphsTest {
         }
 
         @Override
-        public void published() {
+        public void published(Runnable pass) {
             published.countDown();
         }
     };
