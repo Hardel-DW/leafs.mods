@@ -48,9 +48,9 @@ More information on [leafs.hardel.io/docs/mod-compatibility](https://leafs.harde
 
 ![Delimeter](https://cdn.modrinth.com/data/cached_images/c57c204c55df0ce5357df6501f616f2c7b7c6df1.png)
 
-# Mapple
-Leafs optimizes neither the CPU, nor the RAM, nor the garbage collector. These optimizations live in **[Mapple](https://modrinth.com/mod/mapple)**, a separate mod that works with or without Leafs, with no config and no compromise.
-Mapple is designed for optimizations that scale, so that they consume less with a high rate of players, chunks or entities.
+# Maple
+Leafs optimizes neither the CPU, nor the RAM, nor the garbage collector. These optimizations live in **[Maple](https://modrinth.com/mod/maple)**, a separate mod that works with or without Leafs, with no config and no compromise.
+Maple is designed for optimizations that scale, so that they consume less with a high rate of players, chunks or entities.
 
 ![Delimeter](https://cdn.modrinth.com/data/cached_images/c57c204c55df0ce5357df6501f616f2c7b7c6df1.png)
 
