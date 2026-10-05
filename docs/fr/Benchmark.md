@@ -1,8 +1,8 @@
 # Benchmark
 Un serveur vierge démarre sur un monde vierge avec une `seed` identique, Leafs utilise le mod Overstress qui simule des joueurs aussi authentiques que de vrais joueurs, avec des scénarios. Les bots font donc les mêmes actions dans le même ordre, sans aléatoire dans le jeu.
 Ce benchmark s'opère dans un `repository` privé avec 12 cœurs / 24 threads sur un Ryzen 5900X, avec 12 threads de chunk et 12 threads de région.
- Plusieurs scénarios existent, `worldgen`, `flight`, `generate`, `ramp`, `solo` et `roam`. Seuls `worldgen` et `ramp` sont détaillés ici.
- 
+Plusieurs scénarios existent, `worldgen`, `flight`, `generate`, `ramp`, `solo` et `roam`. Seuls `worldgen` et `ramp` sont détaillés ici.
+
 ## Leafs vise
 - Un joueur seul dans sa région tient 20 TPS, quelle que soit la génération du monde autour de lui.
 - Le chargement/déchargement de la `worldgen`, ainsi que la connexion/déconnexion ne doivent pas impacter le TPS d'une région.

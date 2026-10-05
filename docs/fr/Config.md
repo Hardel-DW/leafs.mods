@@ -9,12 +9,12 @@ Leafs crée un fichier de configuration au démarrage, `config/leafs.json`, Au p
 
 # Gameplay
 - `gameplay.mob_cap_scope` : `level` par défaut, le mob cap se calcule sur toute la dimension comme en vanilla. Avec `region`, chaque région a son propre mob cap.
-- `gameplay.mob_cap` : Valeurs vanilla par défaut, le nombre d'entités qui peuvent apparaitre min 0 à max 100 000 pour chaque catégorie. (`monster`, `creature`, `ambient`...)
+- `gameplay.mob_cap` : Valeurs vanilla par défaut, le nombre d'entités qui peuvent apparaître, de 0 à 100 000 pour chaque catégorie. (`monster`, `creature`, `ambient`...)
 
 # Debug
 - `debug.watchdog_warn_seconds` : Désactivé par défaut (`-1`). Au-delà de ce délai, un tick bloqué est loggé avec la pile de son thread.
--  `debug.slow_task_warn_millis` : Désactivé par défaut (`-1`). Au-delà de ce délai en ms, un thread qui a dû attendre un chunk pas encore généré est loggé. Une tâche de région anormalement longue est aussi loggée avec sa classe.
-- `debug.per_region_logs` : Par défaut a (`false`). Chaque worker prend le nom de sa région (R#id dimension) pendant son tick, donc chaque ligne de log dit quelle région l'a écrite.
+- `debug.slow_task_warn_millis` : Désactivé par défaut (`-1`). Au-delà de ce délai en ms, un thread qui a dû attendre un chunk pas encore généré est loggé. Une tâche de région anormalement longue est aussi loggée avec sa classe.
+- `debug.per_region_logs` : `false` par défaut. Chaque worker prend le nom de sa région (R#id dimension) pendant son tick, donc chaque ligne de log dit quelle région l'a écrite.
 - L'arrêt forcé suit `max-tick-time` de `server.properties`, comme en vanilla. Au-delà de ce délai sur une région, Leafs écrit un crash report avec tous les threads puis tue la JVM. `-1` désactive, et en solo il n'y a pas d'arrêt forcé.
 
 # Commandes
@@ -25,7 +25,7 @@ La commande `/leafs` est réservée aux opérateurs.
 - `/leafs config [clé] [valeur]` :  Si aucunes valeur est préciser, affiche la valeur de la clé, Sinon cela met a jour la config, qui prend effet au prochain démarrage.
 - `/leafs crash <dimension> <region>` : permet de faire crasher une région.
 - `/leafs ram` : Affiche la ram utiliser par le serveur, le "heap" ainsi que des infos techniques sur le GC/JVM, et par dimension le nombre de holders et de sections des graphes
-- `/leafs chunk [position]` : Affiche l'état d'un chunk. Sans préciser la position, il regarde le chunks ou vous êtes.
+- `/leafs chunk [position]` : Affiche l'état d'un chunk. Sans position, il regarde le chunk où vous êtes.
 
 La commande `/leafs timings` affiche coût de chaque étape d'un tick, moyenné sur 5 secondes. Si aucun argument, ça affiche le thread serveur.
 `/leafs timings`: Pour consulter le thread serveur.
