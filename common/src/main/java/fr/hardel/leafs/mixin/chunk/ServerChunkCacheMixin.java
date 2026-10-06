@@ -14,6 +14,7 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -115,6 +116,13 @@ public abstract class ServerChunkCacheMixin {
     @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getVisibleChunkIfPresent(J)Lnet/minecraft/server/level/ChunkHolder;"))
     private ChunkHolder leafs$readTheHolderUnderTheGraphLocks(ServerChunkCache cache, long key, Operation<ChunkHolder> original) {
         return LevelChunks.of(this.level).holders().settled(ChunkPos.getX(key), ChunkPos.getZ(key), () -> original.call(cache, key));
+    }
+
+    @WrapMethod(method = "addTicketAndLoadWithRadius")
+    private CompletableFuture<?> leafs$anAwaitedLoadIsUrgent(TicketType type, ChunkPos pos, int radius, Operation<CompletableFuture<?>> original) {
+        CompletableFuture<?> loaded = original.call(type, pos, radius);
+        LevelChunks.of(this.level).holders().expedite(pos, radius, loaded);
+        return loaded;
     }
 
     @Unique
