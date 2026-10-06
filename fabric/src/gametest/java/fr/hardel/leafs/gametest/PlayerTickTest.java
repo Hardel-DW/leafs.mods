@@ -1,6 +1,8 @@
 package fr.hardel.leafs.gametest;
 
 import com.mojang.authlib.GameProfile;
+import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.pool.ChunkPool;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -18,11 +20,16 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 public final class PlayerTickTest {
     private static final double RAW_Y = 100;
     private static final double STEP_BLOCKS = 4;
     private static final int STEPS = 10;
+    private static final int WAITED_TICKS = 40;
+    private static final long BUSY_NANOS = TimeUnit.SECONDS.toNanos(3);
 
     /** 2026-09-24: a player teleported to raw terrain was ticked by the server thread, which waited for the whole generation of the chunk. */
     @GameTest
@@ -71,6 +78,37 @@ public final class PlayerTickTest {
         helper.getLevel().getServer().getPlayerList().remove(player);
         helper.assertValueEqual(player.position(), position, "the position the player flew to");
         helper.succeed();
+    }
+
+    /** 2026-10-06: a bot flying ahead of the generation stood where its region listed no chunk yet, and the region left it out of its ticks. */
+    @GameTest(maxTicks = 200)
+    public void aPlayerAheadOfTheGenerationIsTicked(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ChunkPool pool = LevelChunks.of(level).pool();
+        ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
+        Vec3 landed = onRawTerrain(rawChunk(helper, 1200));
+        AtomicInteger ticksBefore = new AtomicInteger();
+
+        helper.startSequence()
+            .thenExecute(() -> {
+                player.connection.tick();
+                accept(player, 1, player.position());
+                for (int worker = 0; worker < pool.threads(); worker++) {
+                    pool.execute(() -> LockSupport.parkNanos(BUSY_NANOS));
+                }
+
+                player.connection.teleport(landed.x, landed.y, landed.z, 0, 0);
+                player.connection.resetPosition();
+                accept(player, 2, landed);
+                ticksBefore.set(player.tickCount);
+            })
+            .thenIdle(WAITED_TICKS)
+            .thenExecute(() -> {
+                int ticked = player.tickCount - ticksBefore.get();
+                level.getServer().getPlayerList().remove(player);
+                helper.assertTrue(ticked >= WAITED_TICKS / 2, "the player was ticked %s times in %s ticks".formatted(ticked, WAITED_TICKS));
+            })
+            .thenSucceed();
     }
 
     private static ServerPlayer joined(GameTestHelper helper, Vec3 position) {

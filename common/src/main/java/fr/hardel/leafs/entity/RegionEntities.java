@@ -1,8 +1,10 @@
 package fr.hardel.leafs.entity;
 
+import fr.hardel.leafs.ticking.LevelRegions;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
@@ -34,6 +36,15 @@ public final class RegionEntities {
                 if (section != null) {
                     collect(section);
                 }
+            }
+        }
+
+        // A player is ticked wherever it stands: its chunk may still be generating, and then it is not among the holders.
+        LevelRegions regions = LevelRegions.of(level);
+        for (ServerPlayer player : level.players()) {
+            ChunkPos pos = player.chunkPosition();
+            if (!player.isRemoved() && regions.tickerAt(pos.x(), pos.z()) == Thread.currentThread() && ids.add(player.getId())) {
+                entities.add(player);
             }
         }
     }
