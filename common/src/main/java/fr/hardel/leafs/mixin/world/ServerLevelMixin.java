@@ -83,6 +83,14 @@ public abstract class ServerLevelMixin {
         leafs$fluidTicks.schedule(pos, type, delay, TickPriority.NORMAL);
     }
 
+    @Inject(method = "unload", at = @At("HEAD"))
+    private void leafs$forgetTheChunksOfTheTick(LevelChunk levelChunk, CallbackInfo callbackInfo) {
+        WorldTickContext tick = WorldTickContext.current();
+        if (tick != null) {
+            tick.forgetChunks();
+        }
+    }
+
     @Inject(method = "blockEvent", at = @At("HEAD"), cancellable = true)
     private void leafs$blockEventOnTheChunk(BlockPos pos, Block block, int b0, int b1, CallbackInfo callbackInfo) {
         if (ChunkBlockEvents.post(self(), new BlockEventData(pos.immutable(), block, b0, b1), leafs$blockEventSequence.getAndIncrement())) {

@@ -8,6 +8,7 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
@@ -42,16 +43,29 @@ public abstract class ServerChunkCacheMixin {
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
         if (Thread.currentThread() != this.mainThread) {
-            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z));
+            WorldTickContext tick = WorldTickContext.current();
+            LevelChunk last = tick == null ? null : tick.lastChunk(this.level, x, z);
+            callbackInfo.setReturnValue(last == null ? RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z) : last);
         }
     }
 
     @WrapMethod(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;")
     private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
+        WorldTickContext tick = WorldTickContext.current();
+        LevelChunk last = tick == null || targetStatus != ChunkStatus.FULL ? null : tick.lastChunk(this.level, x, z);
+        if (last != null) {
+            return last;
+        }
+
         LevelRegions regions = LevelRegions.of(this.level);
         ChunkAccess chunk = regions.live() ? RegionChunkAccess.contractedChunk(leafs$chunkMap(), x, z, targetStatus, loadOrGenerate) : original.call(x, z, targetStatus, loadOrGenerate);
         if (chunk != null) {
             RegionBorrow.atContact(regions, x, z);
+        }
+
+        // Only a chunk of its own region is remembered: the thread holds it for the whole tick, so reading it again asks nobody.
+        if (tick != null && targetStatus == ChunkStatus.FULL && chunk instanceof LevelChunk full && regions.regionizer().regionAt(x, z) == tick.region()) {
+            tick.remember(full);
         }
 
         return chunk;
