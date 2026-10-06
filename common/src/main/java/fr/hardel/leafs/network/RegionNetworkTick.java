@@ -29,7 +29,7 @@ public final class RegionNetworkTick {
         countIfHeld(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
     }
 
-    public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server) {
+    public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server, long sendDeadlineNanos) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
         countIfHeld(server, PacketRouting.queueOf(listener).handleAs(() -> {
@@ -37,7 +37,10 @@ public final class RegionNetworkTick {
                 tickListener(listener, connection, server);
             }
 
-            listener.chunkSender.sendNextChunks(player);
+            if (System.nanoTime() < sendDeadlineNanos) {
+                listener.chunkSender.sendNextChunks(player);
+            }
+
             connection.flushChannel();
         }));
     }
