@@ -6,10 +6,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
-import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
-import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
@@ -67,8 +65,8 @@ public abstract class ServerChunkCacheMixin {
     }
 
     @WrapOperation(method = "onLightUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache$MainThreadExecutor;execute(Ljava/lang/Runnable;)V"))
-    private void leafs$lightChangeOnTheOwner(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original, @Local(argsOnly = true) SectionPos pos) {
-        LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
+    private void leafs$lightChangeInPlace(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original) {
+        mark.run();
     }
 
     // Until its regions are live, the level runs the vanilla way and its server thread applies the loading graph in place.
