@@ -58,6 +58,7 @@
 		"network.PlayerListMixin",
 		"network.PrepareSpawnTaskPreparingMixin",
 		"network.ServerCommonPacketListenerImplMixin",
+		"network.ServerConnectionListenerMixin",
 		"network.ServerGamePacketListenerImplMixin",
 		"ticking.BlockableEventLoopMixin",
 		"ticking.ChunkMainThreadExecutorMixin",

@@ -72,6 +72,7 @@ public final class RegionNetworkTick {
             return;
         }
 
+        // A region may have taken the player since the server thread looked at its connection.
         if (tickedByARegion(game.player)) {
             return;
         }
@@ -81,6 +82,11 @@ public final class RegionNetworkTick {
             PacketRouting.queueOf(game).drain(() -> !tickedByARegion(game.player));
             original.run();
         }));
+    }
+
+    /** The region of a player ticks its connection whole: its listener, its chunks, its flush. */
+    public static boolean tickedByARegion(Connection connection) {
+        return connection.getPacketListener() instanceof ServerGamePacketListenerImpl game && tickedByARegion(game.player);
     }
 
     private static boolean tickedByARegion(ServerPlayer player) {
