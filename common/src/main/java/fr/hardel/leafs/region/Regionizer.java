@@ -304,6 +304,7 @@ public final class Regionizer<R> {
             section.forEachChunkKey(movedChunks::add);
             section.setRegion(into);
             into.sectionKeys.add(key);
+            callbacks.assigned(key);
         }
 
         into.deadSectionKeys.addAll(from.deadSectionKeys);
@@ -374,6 +375,7 @@ public final class Regionizer<R> {
             long key = iterator.nextLong();
             sections.remove(key).clearRegion();
             region.sectionKeys.remove(key);
+            callbacks.released(region, key);
         }
         region.deadSectionKeys.clear();
     }
@@ -468,6 +470,7 @@ public final class Regionizer<R> {
     private void adopt(Region<R> region, RegionSection<R> section) {
         section.setRegion(region);
         region.sectionKeys.add(section.key());
+        callbacks.assigned(section.key());
     }
 
     private void linkDeferredMerge(Region<R> from, Region<R> into) {

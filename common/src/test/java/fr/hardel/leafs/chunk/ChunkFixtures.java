@@ -27,6 +27,10 @@ public final class ChunkFixtures {
             this.ticker = ticker;
         }
 
+        @Override
+        public void chunkChanged(int chunkX, int chunkZ) {
+        }
+
         public void live(boolean live) {
             this.live = live;
         }

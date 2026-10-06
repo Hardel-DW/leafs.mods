@@ -11,7 +11,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 
 import it.unimi.dsi.fastutil.longs.LongSet;
 
-import java.util.List;
+import java.util.Collection;
 
 public final class ChunkSaves {
     private final ServerLevel level;
@@ -21,7 +21,7 @@ public final class ChunkSaves {
     }
 
     public void autosave(RegionWorldData worldData, long epoch, long deadlineNanos) {
-        List<ChunkHolder> holders = worldData.chunks().holders();
+        Collection<ChunkHolder> holders = worldData.chunks().holders();
         LongSet dirty = level.getChunkSource().chunkMap.chunksToEagerlySave;
         for (ChunkHolder holder : holders) {
             if (dirty.contains(holder.getPos().pack()) && saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {

@@ -137,7 +137,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         this.chunksToEagerlySave = new ConcurrentLongSet();
         this.nextChunkSaveTime = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
-        HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift());
+        HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift(), leafs$regions().changes());
         this.updatingChunkMap = table;
         this.visibleChunkMap = table;
         leafs$unloading = new PendingUnloads();
@@ -190,7 +190,9 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @WrapOperation(method = "prepareTickingChunk", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<?> leafs$tickingPromotionOnTheOwner(CompletableFuture<?> future, Function<?, ?> body, Executor pump, Operation<CompletableFuture<?>> original, @Local(argsOnly = true) ChunkHolder chunk) {
         ChunkPos pos = chunk.getPos();
-        return original.call(future, body, leafs$owners().executor(pos.x(), pos.z()));
+        CompletableFuture<?> ticking = original.call(future, body, leafs$owners().executor(pos.x(), pos.z()));
+        ticking.thenRun(() -> leafs$regions().chunkChanged(pos.x(), pos.z()));
+        return ticking;
     }
 
     @Inject(method = "onChunkReadyToSend", at = @At("HEAD"), cancellable = true)

@@ -19,5 +19,11 @@ public interface RegionCallbacks<R> {
 
     void merge(Region<R> from, Region<R> into, LongList movedChunks);
 
+    /** A section joined a region: at its creation, by a merge or by a split. */
+    void assigned(long sectionKey);
+
+    /** A dead section left a region that lives on. */
+    void released(Region<R> region, long sectionKey);
+
     void split(Region<R> parent, Long2ObjectMap<Region<R>> sectionToChild, List<Region<R>> children);
 }
