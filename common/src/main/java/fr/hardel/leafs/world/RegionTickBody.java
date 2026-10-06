@@ -77,9 +77,9 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionPackets);
         if (runs && !level.isDebug()) {
             long currentTick = clock.currentTick();
-            worldData.blockTicks().drain(owned.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickBlock);
+            worldData.blockTicks().drain(owned.simulated(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickBlock);
             stages.mark(TickStages.regionBlockTicks);
-            worldData.fluidTicks().drain(owned.ticking(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickFluid);
+            worldData.fluidTicks().drain(owned.simulated(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickFluid);
             stages.mark(TickStages.regionFluidTicks);
             tickChunks(owned, worldData, chunks.view(), stages);
             stages.mark(TickStages.regionChunkTick);
@@ -176,12 +176,9 @@ public final class RegionTickBody {
     }
 
     private void runBlockEvents(RegionChunks chunks) {
-        ServerChunkCache chunkSource = level.getChunkSource();
         List<ChunkBlockEvents> sets = new ArrayList<>();
-        for (LevelChunk chunk : chunks.ticking()) {
-            if (chunkSource.isPositionTicking(chunk.getPos().pack())) {
-                sets.add(((ChunkTickAccess) chunk).leafs$blockEvents());
-            }
+        for (LevelChunk chunk : chunks.simulated()) {
+            sets.add(((ChunkTickAccess) chunk).leafs$blockEvents());
         }
 
         ChunkBlockEvents.runAll(sets, this::runBlockEvent);
@@ -235,11 +232,8 @@ public final class RegionTickBody {
     }
 
     private void tickBlockEntities(boolean runsNormally, RegionChunks chunks) {
-        ServerChunkCache chunkSource = level.getChunkSource();
-        for (LevelChunk chunk : chunks.ticking()) {
-            if (chunkSource.isPositionTicking(chunk.getPos().pack())) {
-                ((ChunkTickAccess) chunk).leafs$tickers().tickAll(runsNormally);
-            }
+        for (LevelChunk chunk : chunks.simulated()) {
+            ((ChunkTickAccess) chunk).leafs$tickers().tickAll(runsNormally);
         }
     }
 }

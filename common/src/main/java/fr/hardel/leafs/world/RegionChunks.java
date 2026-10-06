@@ -8,6 +8,7 @@ import fr.hardel.leafs.region.Region;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 
@@ -17,6 +18,7 @@ import java.util.List;
 public final class RegionChunks {
     private final List<ChunkHolder> holders = new ArrayList<>();
     private final List<LevelChunk> ticking = new ArrayList<>();
+    private final List<LevelChunk> simulated = new ArrayList<>();
     private int minX;
     private int minZ;
     private int maxX;
@@ -25,6 +27,7 @@ public final class RegionChunks {
     public void refresh(Region<?> region, ChunkMap chunkMap) {
         holders.clear();
         ticking.clear();
+        simulated.clear();
         minX = Integer.MAX_VALUE;
         minZ = Integer.MAX_VALUE;
         maxX = Integer.MIN_VALUE;
@@ -33,11 +36,11 @@ public final class RegionChunks {
         HolderTable table = chunks.holders().table();
         ChunkOwners owners = chunks.owners();
         for (long section : region.sectionKeySnapshot()) {
-            table.forEachHolderIn(section, holder -> collect(holder, owners));
+            table.forEachHolderIn(section, holder -> collect(holder, owners, chunkMap.level));
         }
     }
 
-    private void collect(ChunkHolder holder, ChunkOwners owners) {
+    private void collect(ChunkHolder holder, ChunkOwners owners, ServerLevel level) {
         ChunkPos pos = holder.getPos();
         if (owners.heldElsewhere(pos.x(), pos.z()) || RegionChunkAccess.fullChunkOrNull(holder) == null) {
             return;
@@ -53,8 +56,13 @@ public final class RegionChunks {
         }
 
         LevelChunk chunk = holder.getTickingChunk();
-        if (chunk != null) {
-            ticking.add(chunk);
+        if (chunk == null) {
+            return;
+        }
+
+        ticking.add(chunk);
+        if (level.shouldTickBlocksAt(pos.pack())) {
+            simulated.add(chunk);
         }
     }
 
@@ -64,6 +72,11 @@ public final class RegionChunks {
 
     public List<LevelChunk> ticking() {
         return ticking;
+    }
+
+    /** The ticking chunks inside the simulation distance of a player or of a forced ticket: the ones whose blocks tick. */
+    public List<LevelChunk> simulated() {
+        return simulated;
     }
 
     public boolean within(ChunkPos chunk, int margin) {
