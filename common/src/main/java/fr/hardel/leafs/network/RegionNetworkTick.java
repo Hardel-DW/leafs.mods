@@ -97,7 +97,7 @@ public final class RegionNetworkTick {
         return !player.isRemoved() && LevelChunks.of(player.level()).owners().covered(chunk.x(), chunk.z());
     }
 
-    /** A join, a leave or a disconnection works on the chunks of the player: its region does it, the server thread never waits for one. Before the regions run and once they stop, the server thread owns everything and does it at once. */
+    /** A leave or a disconnection works on the chunks of the player: its region does it, the server thread never waits for one. Before the regions run and once they stop, the server thread owns everything and does it at once. */
     public static void onTheOwner(ServerPlayer player, DeferReason reason, BooleanSupplier stillWanted, Runnable work) {
         ServerLevel level = player.level();
         if (!LevelRegions.of(level).live()) {
