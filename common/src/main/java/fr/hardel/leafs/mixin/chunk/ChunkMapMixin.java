@@ -137,7 +137,7 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         this.chunksToEagerlySave = new ConcurrentLongSet();
         this.nextChunkSaveTime = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
-        HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift(), leafs$regions().changes());
+        HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift(), leafs$regions().regionizer()::markSection);
         this.updatingChunkMap = table;
         this.visibleChunkMap = table;
         leafs$unloading = new PendingUnloads();

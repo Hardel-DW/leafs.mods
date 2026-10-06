@@ -2,7 +2,6 @@ package fr.hardel.leafs.chunk.holder;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.region.CoordinateKey;
-import fr.hardel.leafs.region.SectionChanges;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
@@ -14,17 +13,18 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
 public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
     private final ConcurrentLong2ObjectMap<ChunkHolder> holders = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLong2ObjectMap<AtomicReferenceArray<ChunkHolder>> sections = new ConcurrentLong2ObjectMap<>();
     private final int sectionShift;
-    private final SectionChanges changes;
+    private final LongConsumer changed;
 
-    public HolderTable(int sectionShift, SectionChanges changes) {
+    public HolderTable(int sectionShift, LongConsumer changed) {
         super(0);
         this.sectionShift = sectionShift;
-        this.changes = changes;
+        this.changed = changed;
     }
 
     public void forEachHolderIn(long sectionKey, Consumer<ChunkHolder> action) {
@@ -110,7 +110,7 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
             target.set(slotOf(key), holder);
             return target;
         });
-        changes.markSection(sectionOf(key));
+        changed.accept(sectionOf(key));
     }
 
     private void unindex(long key) {
@@ -118,7 +118,7 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
             slots.set(slotOf(key), null);
             return holdsAny(slots) ? slots : null;
         });
-        changes.markSection(sectionOf(key));
+        changed.accept(sectionOf(key));
     }
 
     private static boolean holdsAny(AtomicReferenceArray<ChunkHolder> slots) {

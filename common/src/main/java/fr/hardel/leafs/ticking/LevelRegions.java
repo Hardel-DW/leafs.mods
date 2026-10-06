@@ -5,12 +5,10 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.level.LevelListener;
 import fr.hardel.leafs.chunk.owner.RegionInbox;
-import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
-import fr.hardel.leafs.region.SectionChanges;
 import fr.hardel.leafs.world.ChunkScheduledTicks;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
@@ -31,7 +29,6 @@ import java.util.function.ToIntFunction;
 
 public final class LevelRegions implements RegionCallbacks<RegionTickData>, LevelListener, ChunkOwners.Regions {
     private final Regionizer<RegionTickData> regionizer;
-    private final SectionChanges changes;
     private volatile String dimension;
     private volatile LongSupplier gameTime;
     private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
@@ -44,18 +41,12 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     private volatile long split;
 
     public LevelRegions(LeafsConfig config) {
-        int shift = config.sectionShift();
-        this.regionizer = new Regionizer<>(shift, config.regionMergeDistance(), config.regionBufferDistance(), this);
-        this.changes = new SectionChanges(shift, section -> regionizer.regionAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) != null);
-    }
-
-    public SectionChanges changes() {
-        return changes;
+        this.regionizer = new Regionizer<>(config.sectionShift(), config.regionMergeDistance(), config.regionBufferDistance(), this);
     }
 
     @Override
     public void chunkChanged(int chunkX, int chunkZ) {
-        changes.mark(chunkX, chunkZ);
+        regionizer.markChanged(chunkX, chunkZ);
     }
 
     // Used by the Leafs Debug mod
@@ -167,7 +158,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
             regionizer.removeChunk(chunkX, chunkZ);
         }
 
-        changes.mark(chunkX, chunkZ);
+        regionizer.markChanged(chunkX, chunkZ);
     }
 
     public void retire() {
@@ -285,13 +276,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     }
 
     @Override
-    public void assigned(long sectionKey) {
-        changes.assigned(sectionKey);
-    }
-
-    @Override
     public void released(Region<RegionTickData> region, long sectionKey) {
-        changes.released(sectionKey);
         RegionWorldData worldData = region.data().worldData();
         if (worldData != null) {
             worldData.chunks().forget(sectionKey);

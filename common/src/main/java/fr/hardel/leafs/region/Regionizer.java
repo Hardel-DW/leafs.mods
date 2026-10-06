@@ -75,6 +75,34 @@ public final class Regionizer<R> {
         }
     }
 
+    /** A chunk changed, and the change is visible: its region reads the section again. A section no region owns is not marked, the region that takes it reads it whole. */
+    public void markChanged(int chunkX, int chunkZ) {
+        markSection(CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift));
+    }
+
+    public void markSection(long sectionKey) {
+        RegionSection<R> section = sections.get(sectionKey);
+        if (section == null || !section.markChanged()) {
+            return;
+        }
+
+        // Read after the mark: a merge that moved the section meanwhile queued it for its new region itself.
+        Region<R> region = section.region();
+        if (region == null) {
+            section.readAgain();
+            return;
+        }
+
+        region.changed.add(section);
+    }
+
+    private void assign(RegionSection<R> section, Region<R> region) {
+        section.setRegion(region);
+        region.sectionKeys.add(section.key());
+        section.markChanged();
+        region.changed.add(section);
+    }
+
     // Used by the Leafs Debug mod
     public Region<R> regionAt(int chunkX, int chunkZ) {
         long key = CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift);
@@ -201,7 +229,7 @@ public final class Regionizer<R> {
         }
 
         for (RegionSection<R> freshSection : created) {
-            adopt(target, freshSection);
+            assign(freshSection, target);
         }
         for (Region<R> other : nearby) {
             if (other != target) {
@@ -302,9 +330,7 @@ public final class Regionizer<R> {
             long key = iterator.nextLong();
             RegionSection<R> section = sections.get(key);
             section.forEachChunkKey(movedChunks::add);
-            section.setRegion(into);
-            into.sectionKeys.add(key);
-            callbacks.assigned(key);
+            assign(section, into);
         }
 
         into.deadSectionKeys.addAll(from.deadSectionKeys);
@@ -348,7 +374,7 @@ public final class Regionizer<R> {
             callbacks.onRegionCreate(child);
             for (LongIterator iterator = component.iterator(); iterator.hasNext(); ) {
                 long key = iterator.nextLong();
-                adopt(child, sections.get(key));
+                assign(sections.get(key), child);
                 sectionToChild.put(key, child);
             }
             children.add(child);
@@ -467,11 +493,6 @@ public final class Regionizer<R> {
         return region;
     }
 
-    private void adopt(Region<R> region, RegionSection<R> section) {
-        section.setRegion(region);
-        region.sectionKeys.add(section.key());
-        callbacks.assigned(section.key());
-    }
 
     private void linkDeferredMerge(Region<R> from, Region<R> into) {
         if (from.mergeIntoLater.add(into)) {

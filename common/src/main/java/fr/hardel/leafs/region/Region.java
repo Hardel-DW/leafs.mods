@@ -3,7 +3,10 @@ package fr.hardel.leafs.region;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.LinkedHashSet;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.LongConsumer;
 
 public final class Region<R> {
     private final long id;
@@ -14,6 +17,7 @@ public final class Region<R> {
     final LongOpenHashSet deadSectionKeys = new LongOpenHashSet();
     final Set<Region<R>> mergeIntoLater = new LinkedHashSet<>();
     final Set<Region<R>> expectingMergeFrom = new LinkedHashSet<>();
+    final Queue<RegionSection<R>> changed = new ConcurrentLinkedQueue<>();
 
     private volatile RegionState state = RegionState.READY;
     private volatile Thread tickingThread;
@@ -54,6 +58,16 @@ public final class Region<R> {
 
     public void markNotTicking() {
         regionizer.markNotTicking(this);
+    }
+
+    /** Hands over the sections whose chunks changed since the region last read them. A change that lands meanwhile marks its section again. */
+    public void takeChanged(LongConsumer section) {
+        for (RegionSection<R> next = changed.poll(); next != null; next = changed.poll()) {
+            next.readAgain();
+            if (next.region() == this) {
+                section.accept(next.key());
+            }
+        }
     }
 
     public int sectionCount() {
