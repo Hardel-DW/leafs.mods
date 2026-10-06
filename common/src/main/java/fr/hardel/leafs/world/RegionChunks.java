@@ -1,6 +1,7 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.region.Region;
@@ -38,7 +39,7 @@ public final class RegionChunks {
 
     private void collect(ChunkHolder holder, ChunkOwners owners) {
         ChunkPos pos = holder.getPos();
-        if (owners.heldElsewhere(pos.x(), pos.z())) {
+        if (owners.heldElsewhere(pos.x(), pos.z()) || RegionChunkAccess.fullChunkOrNull(holder) == null) {
             return;
         }
 

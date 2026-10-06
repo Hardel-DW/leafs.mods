@@ -253,35 +253,47 @@ class ChunkOwnersTest {
         assertFalse(owners.holds(1, 1));
     }
 
-    /** 2026-09-26: a region published every chunk that turned FULL in its area, up to 1500 inbox tasks after a join. */
-    @Test
-    void aPublicationBetweenTwoRegionTicksRunsOnThePoolWhichHoldsItsChunk() {
-        CountDownLatch published = new CountDownLatch(1);
-        boolean[] held = new boolean[1];
 
-        owners.publish(1, 1, () -> {
+    /** 2026-09-26: a region published every chunk that turned FULL in its area, up to 1500 inbox tasks after a join. 2026-10-06: a join kept its region ticking without a gap, and the chunks waited at SPAWN in its inbox. */
+    @Test
+    void aChunkIsBuiltAndPublishedOnThePoolBesideATickingRegion() {
+        regions.tickOn(new Thread(() -> { }, "region"));
+        CountDownLatch published = new CountDownLatch(1);
+        boolean[] held = new boolean[2];
+
+        owners.build(1, 1, () -> {
             held[0] = owners.holds(1, 1);
-            published.countDown();
+            return () -> {
+                held[1] = owners.holds(1, 1);
+                published.countDown();
+            };
         });
 
         TestThreads.await(published);
-        assertTrue(held[0], "the pool worker holds the chunk it publishes");
-        assertEquals(0, inbox.size(), "the region inbox never saw the publication");
+        assertTrue(held[0], "the pool worker holds the chunk it builds");
+        assertFalse(held[1], "nobody stands on the chunk when it is published");
+        assertEquals(0, inbox.size(), "the region inbox never saw the chunk");
+        assertNotNull(owners.borrow(1, 1), "the pool gave the chunk back");
     }
 
     @Test
-    void aPublicationWhileTheRegionTicksWaitsInItsInbox() throws InterruptedException {
-        regions.tickOn(new Thread(() -> { }, "region"));
+    void aBuildOnAChunkAnotherThreadHoldsWaitsForItsRelease() throws InterruptedException {
+        AtomicReference<ChunkClaim> other = new AtomicReference<>();
+        Thread holder = new Thread(() -> other.set(owners.borrow(1, 1)), "holder");
+        holder.start();
+        holder.join();
+        ChunkClaim claim = other.get();
+        CountDownLatch published = new CountDownLatch(1);
 
-        owners.publish(1, 1, () -> ran.add("published"));
-        for (int attempt = 0; attempt < 500 && inbox.size() == 0; attempt++) {
+        owners.build(1, 1, () -> published::countDown);
+        for (int attempt = 0; attempt < 500 && claim.mail().size() == 0; attempt++) {
             Thread.sleep(10);
         }
 
-        assertEquals(List.of(), ran, "the pool never publishes beside a ticking region");
-        assertEquals(1, inbox.drain());
-        assertEquals(List.of("published"), ran);
-        assertNotNull(owners.borrow(1, 1), "the pool gave the chunk back");
+        assertEquals(1, published.getCount(), "the build waits in the mail of the thread that holds the chunk");
+        owners.release(1, 1, claim);
+        assertEquals(1, inbox.drain(), "the released build comes back through the region that covers the chunk");
+        TestThreads.await(published);
     }
 
     /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. 2026-09-14: game work waits for the next pump, a release runs nothing on its thread. */

@@ -10,6 +10,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 
 public final class ChunkOwners implements Router {
     public interface Regions {
@@ -86,14 +87,16 @@ public final class ChunkOwners implements Router {
         submit(chunkX, chunkZ, Work.GAME, task);
     }
 
-    public void publish(int chunkX, int chunkZ, Runnable task) {
+    /** A chunk below FULL is in no tick: a pool worker builds it under its own claim whatever its region does. What the build hands back runs once the chunk is released, with no thread standing on it. */
+    public void build(int chunkX, int chunkZ, Supplier<Runnable> building) {
         if (holds(chunkX, chunkZ) || !regions.live()) {
-            submit(chunkX, chunkZ, Work.CHUNK, task);
+            submit(chunkX, chunkZ, Work.CHUNK, () -> building.get().run());
             return;
         }
 
-        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, chunkX, chunkZ, 0, () -> publishOnPool(chunkX, chunkZ, task));
+        placement.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, chunkX, chunkZ, 0, () -> buildOnPool(chunkX, chunkZ, building));
     }
+
 
     public void later(int chunkX, int chunkZ, Work work, Runnable task) {
         if (!regions.live()) {
@@ -182,24 +185,21 @@ public final class ChunkOwners implements Router {
         }
     }
 
-    private void publishOnPool(int chunkX, int chunkZ, Runnable task) {
-        ChunkClaim claim = claimBetweenTicks(chunkX, chunkZ);
+    private void buildOnPool(int chunkX, int chunkZ, Supplier<Runnable> building) {
+        ChunkClaim claim = borrow(chunkX, chunkZ);
         if (claim == null) {
-            onPoolStart(chunkX, chunkZ, task);
+            later(chunkX, chunkZ, Work.CHUNK, () -> build(chunkX, chunkZ, building));
             return;
         }
 
-        runClaimed(chunkX, chunkZ, claim, task);
-    }
-
-    private @Nullable ChunkClaim claimBetweenTicks(int chunkX, int chunkZ) {
-        ChunkClaim claim = borrow(chunkX, chunkZ);
-        if (claim == null || regions.tickerAt(chunkX, chunkZ) == null) {
-            return claim;
+        Runnable publication;
+        try {
+            publication = building.get();
+        } finally {
+            release(chunkX, chunkZ, claim);
         }
 
-        release(chunkX, chunkZ, claim);
-        return null;
+        publication.run();
     }
 
     private void runClaimed(int chunkX, int chunkZ, ChunkClaim claim, Runnable task) {

@@ -18,10 +18,14 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.TicketStorage;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LevelChunks {
@@ -119,11 +123,23 @@ public final class LevelChunks {
         return steps;
     }
 
-    public Executor publisher(int chunkX, int chunkZ) {
-        return task -> owners.publish(chunkX, chunkZ, () -> {
-            task.run();
-            chunksFull.increment();
-        });
+    /** The FULL step: the chunk is built beside its region and turns FULL once released. Whatever follows reaches its owner through the executors of the holder. */
+    public CompletableFuture<ChunkAccess> promote(ChunkPos pos, Supplier<ChunkAccess> build) {
+        CompletableFuture<ChunkAccess> full = new CompletableFuture<>();
+        owners.build(pos.x(), pos.z(), () -> built(build, full));
+        return full;
+    }
+
+    private Runnable built(Supplier<ChunkAccess> build, CompletableFuture<ChunkAccess> full) {
+        try {
+            ChunkAccess chunk = build.get();
+            return () -> {
+                full.complete(chunk);
+                chunksFull.increment();
+            };
+        } catch (Throwable failure) {
+            return () -> full.completeExceptionally(failure);
+        }
     }
 
     public UnownedSweep sweep() {
