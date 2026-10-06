@@ -64,8 +64,10 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionTickets);
         RegionEntities entities = worldData.entities();
         entities.refresh(level, owned.holders());
+        List<ServerPlayer> players = new ArrayList<>();
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
+                players.add(player);
                 RegionNetworkTick.drainOnRegion(player, level);
             }
         });
@@ -97,19 +99,25 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionBlockEntities);
         }
 
-        entities.forEach(entity -> {
-            if (entity instanceof ServerPlayer player) {
-                RegionNetworkTick.tickPlayerOnRegion(player, level.getServer());
-            }
-        });
+        // The intake shares the time left of the tick: chunk sends, a player after the other so that none is left behind, then saves, then the inbox.
+        long intakeDeadlineNanos = Math.max(tickDeadlineNanos, System.nanoTime() + level.tickRateManager().nanosecondsPerTick() / 10);
+        long sendDeadlineNanos = shareOf(intakeDeadlineNanos, 3);
+        for (int index = 0; index < players.size(); index++) {
+            RegionNetworkTick.tickPlayerOnRegion(players.get(Math.floorMod(clock.currentTick() + index, players.size())), level.getServer(), sendDeadlineNanos);
+        }
 
         stages.mark(TickStages.regionPlayers);
-        long slice = level.tickRateManager().nanosecondsPerTick() / 10;
-        saves.autosave(worldData, regions.autosaveEpoch(), System.nanoTime() + slice);
+        saves.autosave(worldData, regions.autosaveEpoch(), shareOf(intakeDeadlineNanos, 2));
         stages.mark(TickStages.regionAutosave);
         RegionInbox inbox = region.data().inbox();
-        inbox.drain(Math.max(tickDeadlineNanos, System.nanoTime() + slice));
+        inbox.drain(shareOf(intakeDeadlineNanos, 1));
         stages.mark(TickStages.regionTasks);
+    }
+
+    /** The deadline of an intake job: its even share of the time left for the jobs still to run, never under a hundredth of a tick. */
+    private long shareOf(long intakeDeadlineNanos, int jobsLeft) {
+        long now = System.nanoTime();
+        return now + Math.max((intakeDeadlineNanos - now) / jobsLeft, level.tickRateManager().nanosecondsPerTick() / 100);
     }
 
     public void tickSerial(boolean spawnEnemies) {
