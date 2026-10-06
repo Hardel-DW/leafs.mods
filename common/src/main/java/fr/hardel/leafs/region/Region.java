@@ -6,6 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongConsumer;
 
 public final class Region<R> {
@@ -20,6 +21,7 @@ public final class Region<R> {
     final Queue<RegionSection<R>> changed = new ConcurrentLinkedQueue<>();
     // Out of the schedule until its merge into a ticking region: a thread may still hold it meanwhile.
     boolean waitsForMerge;
+    final AtomicInteger holdsAsked = new AtomicInteger();
 
     private volatile RegionState state = RegionState.READY;
     private volatile Thread tickingThread;
@@ -56,6 +58,15 @@ public final class Region<R> {
 
     public boolean tryHold() {
         return regionizer.tryMarkTicking(this, true);
+    }
+
+    /** A thread that waits to hold the region goes before its next tick: an overloaded region leaves no gap between two ticks to slip in. */
+    public void askHold() {
+        holdsAsked.incrementAndGet();
+    }
+
+    public void holdAnswered() {
+        holdsAsked.decrementAndGet();
     }
 
     public void markNotTicking() {
