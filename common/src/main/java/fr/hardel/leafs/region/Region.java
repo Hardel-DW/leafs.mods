@@ -18,6 +18,8 @@ public final class Region<R> {
     final Set<Region<R>> mergeIntoLater = new LinkedHashSet<>();
     final Set<Region<R>> expectingMergeFrom = new LinkedHashSet<>();
     final Queue<RegionSection<R>> changed = new ConcurrentLinkedQueue<>();
+    // Out of the schedule until its merge into a ticking region: a thread may still hold it meanwhile.
+    boolean waitsForMerge;
 
     private volatile RegionState state = RegionState.READY;
     private volatile Thread tickingThread;
