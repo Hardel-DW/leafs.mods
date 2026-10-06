@@ -2,14 +2,12 @@ package fr.hardel.leafs.entity;
 
 import fr.hardel.leafs.ticking.LevelRegions;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.EntitySection;
-import net.minecraft.world.level.entity.EntitySectionStorage;
 import net.minecraft.world.level.entity.Visibility;
 
 import java.util.ArrayList;
@@ -24,21 +22,12 @@ public final class RegionEntities {
     private ServerLevel level;
     private long lastTrackingNanos;
 
-    public void refresh(ServerLevel level, Collection<ChunkHolder> holders) {
+    public void refresh(ServerLevel level, Collection<EntitySection<Entity>> sections) {
         this.level = level;
         entities.clear();
         accessible.clear();
         ids.clear();
-        EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
-        for (ChunkHolder holder : holders) {
-            ChunkPos pos = holder.getPos();
-            for (long key : storage.getChunkSections(pos.x(), pos.z())) {
-                EntitySection<Entity> section = storage.sections.get(key);
-                if (section != null) {
-                    collect(section);
-                }
-            }
-        }
+        sections.forEach(this::collect);
 
         // A player is ticked wherever it stands: its chunk may still be generating, and then it is not among the holders.
         LevelRegions regions = LevelRegions.of(level);

@@ -67,7 +67,7 @@ public final class RegionTickBody {
         owned.refresh(regions.changes(), mine, level);
         stages.mark(TickStages.regionTickets);
         RegionEntities entities = worldData.entities();
-        entities.refresh(level, owned.holders());
+        entities.refresh(level, owned.entitySections());
         List<ServerPlayer> players = new ArrayList<>();
         entities.forEach(entity -> {
             if (entity instanceof ServerPlayer player) {
