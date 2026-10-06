@@ -9,7 +9,7 @@ import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
-import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.metrics.DeferReason;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
@@ -86,8 +86,7 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     }
 
     @WrapMethod(method = "onDisconnect")
-    private void leafs$lockThePlayerOnDisconnect(DisconnectionDetails details, Operation<Void> original) {
-        RegionBorrow.atContact(player);
-        original.call(details);
+    private void leafs$disconnectOnTheOwner(DisconnectionDetails details, Operation<Void> original) {
+        RegionNetworkTick.onTheOwner(player, DeferReason.LEAVE, () -> true, () -> original.call(details));
     }
 }

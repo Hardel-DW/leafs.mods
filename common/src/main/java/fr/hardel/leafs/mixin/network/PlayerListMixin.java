@@ -2,7 +2,8 @@ package fr.hardel.leafs.mixin.network;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.network.RegionNetworkTick;
 import net.minecraft.network.Connection;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerAdvancements;
@@ -59,14 +60,12 @@ public abstract class PlayerListMixin {
     }
 
     @WrapMethod(method = "placeNewPlayer")
-    private void leafs$lockThePlayerOnJoin(Connection connection, ServerPlayer player, CommonListenerCookie cookie, Operation<Void> original) {
-        RegionBorrow.atContact(player);
-        original.call(connection, player, cookie);
+    private void leafs$joinOnTheOwner(Connection connection, ServerPlayer player, CommonListenerCookie cookie, Operation<Void> original) {
+        RegionNetworkTick.onTheOwner(player, DeferReason.JOIN, connection::isConnected, () -> original.call(connection, player, cookie));
     }
 
     @WrapMethod(method = "remove")
-    private void leafs$lockThePlayerOnLeave(ServerPlayer player, Operation<Void> original) {
-        RegionBorrow.atContact(player);
-        original.call(player);
+    private void leafs$leaveOnTheOwner(ServerPlayer player, Operation<Void> original) {
+        RegionNetworkTick.onTheOwner(player, DeferReason.LEAVE, () -> true, () -> original.call(player));
     }
 }

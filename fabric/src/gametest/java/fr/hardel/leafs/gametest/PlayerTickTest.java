@@ -3,6 +3,7 @@ package fr.hardel.leafs.gametest;
 import com.mojang.authlib.GameProfile;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
+import fr.hardel.leafs.ticking.TickingManager;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -122,6 +123,7 @@ public final class PlayerTickTest {
         new EmbeddedChannel(connection);
         player.setPos(position);
         level.getServer().getPlayerList().placeNewPlayer(connection, player, cookie);
+        TickingManager.of(level.getServer()).await(() -> player.connection != null);
         player.connection.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
 
         return player;
