@@ -30,6 +30,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LevelChunks {
     private static final AtomicInteger IDS = new AtomicInteger();
+    // The chunks of the players' views that may load at once, per worker: enough to keep every worker fed, few enough to bound the memory of unfinished chunks.
+    private static final int VIEW_LOADS_PER_WORKER = 16;
     private final ChunkPool pool;
     private final ChunkPlacement placement;
     private final TicketGraphs graphs;
@@ -55,7 +57,7 @@ public final class LevelChunks {
         this.owners = new ChunkOwners(pool, placement, regions, level.getServer().getRunningThread(), serial, taker, ticking.globalScheduler());
         this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
-        this.view = new PlayerView(tickets, graphs);
+        this.view = new PlayerView(tickets, graphs, chunkKey -> RegionChunkAccess.fullChunkOrNull(table.get(chunkKey)) != null, pool.threads() * VIEW_LOADS_PER_WORKER);
         this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, placement, tickets, steps, ticking.metrics());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
@@ -136,6 +138,7 @@ public final class LevelChunks {
             return () -> {
                 full.complete(chunk);
                 chunksFull.increment();
+                view.arrived(chunk.getPos().pack());
             };
         } catch (Throwable failure) {
             return () -> full.completeExceptionally(failure);

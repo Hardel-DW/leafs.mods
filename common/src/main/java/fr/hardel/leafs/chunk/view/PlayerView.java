@@ -13,6 +13,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.TicketStorage;
 
+import java.util.function.LongPredicate;
+
 public final class PlayerView {
     private static final int SPAWN_RADIUS = 8;
     private static final int DEFAULT_SIMULATION_DISTANCE = 10;
@@ -21,11 +23,11 @@ public final class PlayerView {
     private final PlayerSources sources;
     private final ViewTickets tickets;
 
-    public PlayerView(TicketStorage storage, TicketGraphs graphs) {
+    public PlayerView(TicketStorage storage, TicketGraphs graphs, LongPredicate full, int loads) {
         this.graphs = graphs;
         this.players = graphs.players();
         this.sources = new PlayerSources(storage, players, DEFAULT_SIMULATION_DISTANCE);
-        this.tickets = new ViewTickets(storage, players, 0);
+        this.tickets = new ViewTickets(storage, players, 0, full, loads);
     }
 
     public LevelListener tickets() {
@@ -38,6 +40,10 @@ public final class PlayerView {
 
     public void leave(long chunkKey) {
         sources.leave(chunkKey);
+    }
+
+    public void arrived(long chunkKey) {
+        tickets.arrived(chunkKey);
     }
 
     public void viewDistance(int distance) {
