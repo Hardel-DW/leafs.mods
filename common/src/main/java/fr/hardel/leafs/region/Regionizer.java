@@ -266,7 +266,11 @@ public final class Regionizer<R> {
 
         if (!region.mergeIntoLater.isEmpty()) {
             region.setState(RegionState.TRANSIENT);
-            callbacks.onRegionInactive(region);
+            if (!region.waitsForMerge) {
+                region.waitsForMerge = true;
+                callbacks.onRegionInactive(region);
+            }
+
             return;
         }
 
@@ -316,11 +320,23 @@ public final class Regionizer<R> {
             }
         }
 
+        resume(region);
         return region;
     }
 
+    // A region that waited took its target in, or was held while its merges settled: nothing else puts it back in the schedule.
+    private void resume(Region<R> region) {
+        if (!region.waitsForMerge || !region.mergeIntoLater.isEmpty() || region.state() == RegionState.DEAD || region.state() == RegionState.TICKING) {
+            return;
+        }
+
+        region.waitsForMerge = false;
+        region.setState(RegionState.READY);
+        callbacks.onRegionActive(region);
+    }
+
     private void killAndMergeInto(Region<R> from, Region<R> into) {
-        boolean fromWasSchedulable = from.state() == RegionState.READY;
+        boolean fromWasSchedulable = !from.waitsForMerge;
         from.setState(RegionState.DEAD);
         from.mergeIntoLater.remove(into);
         into.expectingMergeFrom.remove(from);

@@ -4,10 +4,13 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongList;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 class RecordingCallbacks implements RegionCallbacks<Object> {
     final List<String> events = new ArrayList<>();
+    final Set<Long> scheduled = new HashSet<>();
 
     @Override
     public Object createData(Region<Object> region) {
@@ -24,16 +27,19 @@ class RecordingCallbacks implements RegionCallbacks<Object> {
     @Override
     public void onRegionDestroy(Region<Object> region) {
         events.add("destroy #%s".formatted(region.id()));
+        scheduled.remove(region.id());
     }
 
     @Override
     public void onRegionActive(Region<Object> region) {
         events.add("active #%s".formatted(region.id()));
+        scheduled.add(region.id());
     }
 
     @Override
     public void onRegionInactive(Region<Object> region) {
         events.add("inactive #%s".formatted(region.id()));
+        scheduled.remove(region.id());
     }
 
     @Override

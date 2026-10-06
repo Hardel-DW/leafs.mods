@@ -236,7 +236,8 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     public void onRegionActive(Region<RegionTickData> region) {
         RegionTickHandle handle = region.data().handle();
         if (handle != null) {
-            scheduler.schedule(handle);
+            // A region that waited for a merge had its handle cancelled, for good: it comes back with a new one.
+            scheduler.schedule(handle.isCancelled() ? newHandle(region) : handle);
         }
     }
 
