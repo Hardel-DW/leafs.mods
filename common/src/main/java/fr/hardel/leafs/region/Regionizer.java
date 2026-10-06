@@ -141,7 +141,7 @@ public final class Regionizer<R> {
                 return false;
             }
 
-            if (!despiteMerges && (!region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty())) {
+            if (!despiteMerges && (!region.mergeIntoLater.isEmpty() || !region.expectingMergeFrom.isEmpty() || region.holdsAsked.get() > 0)) {
                 return false;
             }
 

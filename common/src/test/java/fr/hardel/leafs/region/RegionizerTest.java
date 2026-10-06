@@ -263,6 +263,24 @@ class RegionizerTest {
         assertTrue(changedOf(survivor).containsAll(survivor == left ? ofRight : ofLeft), "the survivor reads every section it took from the other region");
     }
 
+    /** 2026-10-06: the server thread waited six seconds to hold an overloaded region, whose worker took each next tick within microseconds. */
+    @Test
+    void aThreadThatAsksToHoldARegionGoesBeforeItsNextTick() {
+        regionizer.addChunk(0, 0);
+        Region<Object> region = regionizer.regionAt(0, 0);
+        assertTrue(region.tryMarkTicking());
+
+        region.askHold();
+        region.markNotTicking();
+
+        assertFalse(region.tryMarkTicking(), "the next tick waits for the thread that asked");
+        assertTrue(region.tryHold());
+        region.holdAnswered();
+        region.markNotTicking();
+        assertTrue(region.tryMarkTicking(), "the region ticks again once held and released");
+        region.markNotTicking();
+    }
+
     private static List<Long> changedOf(Region<Object> region) {
         List<Long> sections = new ArrayList<>();
         region.takeChanged(sections::add);

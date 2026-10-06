@@ -136,16 +136,26 @@ public final class RegionBorrow {
     }
 
     private boolean take(LevelRegions regions, Region<RegionTickData> region) {
-        while (region.state() != RegionState.DEAD) {
-            if (held.contains(region) || region.tryHold()) {
-                held.add(region);
-                return true;
-            }
-
-            awaitTick(regions, region);
+        if (held.contains(region)) {
+            return true;
         }
 
-        return false;
+        region.askHold();
+        try {
+            // A task this thread runs while it waits may take the region for it.
+            while (region.state() != RegionState.DEAD) {
+                if (held.contains(region) || region.tryHold()) {
+                    held.add(region);
+                    return true;
+                }
+
+                awaitTick(regions, region);
+            }
+
+            return false;
+        } finally {
+            region.holdAnswered();
+        }
     }
 
     private void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
