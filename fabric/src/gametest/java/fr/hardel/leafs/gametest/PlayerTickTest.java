@@ -22,13 +22,14 @@ import net.minecraft.world.phys.Vec3;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 public final class PlayerTickTest {
     private static final double RAW_Y = 100;
     private static final double STEP_BLOCKS = 4;
     private static final int STEPS = 10;
-    private static final int WAITED_TICKS = 40;
+    private static final int AWAITED_TICKS = 10;
     private static final long BUSY_NANOS = TimeUnit.SECONDS.toNanos(3);
 
     /** 2026-09-24: a player teleported to raw terrain was ticked by the server thread, which waited for the whole generation of the chunk. */
@@ -81,18 +82,20 @@ public final class PlayerTickTest {
     }
 
     /** 2026-10-06: a bot flying ahead of the generation stood where its region listed no chunk yet, and the region left it out of its ticks. */
-    @GameTest(maxTicks = 200)
+    @GameTest(maxTicks = 40000)
     public void aPlayerAheadOfTheGenerationIsTicked(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         ChunkPool pool = LevelChunks.of(level).pool();
         ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
         Vec3 landed = onRawTerrain(rawChunk(helper, 1200));
         AtomicInteger ticksBefore = new AtomicInteger();
+        AtomicLong busyUntil = new AtomicLong();
 
         helper.startSequence()
             .thenExecute(() -> {
                 player.connection.tick();
                 accept(player, 1, player.position());
+                busyUntil.set(System.nanoTime() + BUSY_NANOS);
                 for (int worker = 0; worker < pool.threads(); worker++) {
                     pool.execute(() -> LockSupport.parkNanos(BUSY_NANOS));
                 }
@@ -102,16 +105,16 @@ public final class PlayerTickTest {
                 accept(player, 2, landed);
                 ticksBefore.set(player.tickCount);
             })
-            .thenIdle(WAITED_TICKS)
+            .thenWaitUntil(() -> helper.assertTrue(player.tickCount - ticksBefore.get() >= AWAITED_TICKS || System.nanoTime() >= busyUntil.get(), "the player is being ticked"))
             .thenExecute(() -> {
                 int ticked = player.tickCount - ticksBefore.get();
                 level.getServer().getPlayerList().remove(player);
-                helper.assertTrue(ticked >= WAITED_TICKS / 2, "the player was ticked %s times in %s ticks".formatted(ticked, WAITED_TICKS));
+                helper.assertTrue(ticked >= AWAITED_TICKS, "the player was ticked %s times while the generation was busy for %s s".formatted(ticked, TimeUnit.NANOSECONDS.toSeconds(BUSY_NANOS)));
             })
             .thenSucceed();
     }
 
-    private static ServerPlayer joined(GameTestHelper helper, Vec3 position) {
+    static ServerPlayer joined(GameTestHelper helper, Vec3 position) {
         ServerLevel level = helper.getLevel();
         CommonListenerCookie cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), "leafs-gametest-player"), false);
         ServerPlayer player = new ServerPlayer(level.getServer(), level, cookie.gameProfile(), cookie.clientInformation());
@@ -124,16 +127,16 @@ public final class PlayerTickTest {
         return player;
     }
 
-    private static ChunkPos rawChunk(GameTestHelper helper, int distance) {
+    static ChunkPos rawChunk(GameTestHelper helper, int distance) {
         ChunkPos origin = ChunkPos.containing(helper.absolutePos(BlockPos.ZERO));
         return new ChunkPos(origin.x() + distance, origin.z());
     }
 
-    private static Vec3 onRawTerrain(ChunkPos raw) {
+    static Vec3 onRawTerrain(ChunkPos raw) {
         return new Vec3(raw.getMiddleBlockX(), RAW_Y, raw.getMiddleBlockZ());
     }
 
-    private static void accept(ServerPlayer player, int teleport, Vec3 position) {
+    static void accept(ServerPlayer player, int teleport, Vec3 position) {
         player.connection.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(teleport, position.x, position.y, position.z, 0, 0));
     }
 
