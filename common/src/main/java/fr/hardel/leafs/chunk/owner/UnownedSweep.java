@@ -70,7 +70,7 @@ public final class UnownedSweep {
 
     private void purgeTimeouts() {
         int shift = regions.regionizer().sectionShift();
-        timeouts.purgeUnowned(section -> owners.covered(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift));
+        timeouts.purge(section -> !owners.covered(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift));
     }
 
     private void unloadHiddenEntities() {
