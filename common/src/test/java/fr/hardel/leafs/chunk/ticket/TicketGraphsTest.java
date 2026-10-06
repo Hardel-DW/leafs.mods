@@ -129,7 +129,7 @@ class TicketGraphsTest {
     @Test
     void aBystanderLeavesThePlayerMoveToItsWriter() throws InterruptedException {
         TicketStorage storage = new TicketStorage();
-        PlayerView view = new PlayerView(storage, graphs);
+        PlayerView view = new PlayerView(storage, graphs, _ -> false, Integer.MAX_VALUE);
         graphs.listen(() -> loading, (key, old, now) -> {}, view.tickets(), pool);
         view.viewDistance(2);
         view.enter(ChunkPos.pack(63, 0));

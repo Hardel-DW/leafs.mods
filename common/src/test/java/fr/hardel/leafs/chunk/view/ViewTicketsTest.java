@@ -25,7 +25,7 @@ class ViewTicketsTest {
     private static final int PLAYER_LEVELS = 34;
     private final TicketStorage tickets = new TicketStorage();
     private final ChunkLevels players = new ChunkLevels(PLAYER_LEVELS, new TickEpochs(0, () -> { }));
-    private final ViewTickets view = new ViewTickets(tickets, players, 2);
+    private final ViewTickets view = new ViewTickets(tickets, players, 2, _ -> false, Integer.MAX_VALUE);
     private final PlayerSources sources = new PlayerSources(tickets, players, 5);
 
     private boolean holds(int chunkX, int chunkZ, TicketType type) {
@@ -79,6 +79,58 @@ class ViewTicketsTest {
         assertFalse(holds(8, 5, TicketType.PLAYER_LOADING));
         assertFalse(holds(7, 7, TicketType.PLAYER_LOADING));
         assertTrue(holds(6, 6, TicketType.PLAYER_LOADING));
+    }
+
+    private long ticketedAround(int chunkX, int chunkZ, int radius) {
+        return IntStream.rangeClosed(-radius, radius).mapToLong(dx -> IntStream.rangeClosed(-radius, radius).filter(dz -> holds(chunkX + dx, chunkZ + dz, TicketType.PLAYER_LOADING)).count()).sum();
+    }
+
+    /** 2026-10-06: forty flying players ticketed 169 000 chunks at once; the half-generated ones filled the heap and stalled the regions. */
+    @Test
+    void onlySoManyChunksLoadAtOnceTheNearestFirst() {
+        ViewTickets bounded = new ViewTickets(tickets, players, 2, _ -> false, 9);
+        sources.enter(ChunkPos.pack(5, 5));
+        players.drain(bounded);
+
+        assertEquals(9, ticketedAround(5, 5, 1), "the ring next to the player loads first");
+        assertEquals(9, ticketedAround(5, 5, 2), "the outer ring waits without a ticket");
+    }
+
+    @Test
+    void aChunkThatArrivesGivesItsPlaceToTheNextNearest() {
+        ViewTickets bounded = new ViewTickets(tickets, players, 2, _ -> false, 9);
+        sources.enter(ChunkPos.pack(5, 5));
+        players.drain(bounded);
+
+        bounded.arrived(ChunkPos.pack(5, 5));
+        bounded.arrived(ChunkPos.pack(5, 5));
+
+        assertEquals(10, ticketedAround(5, 5, 2), "one arrival admits one chunk, and counts once");
+    }
+
+    @Test
+    void aChunkAlreadyFullTakesNoPlace() {
+        ViewTickets bounded = new ViewTickets(tickets, players, 2, _ -> true, 1);
+        sources.enter(ChunkPos.pack(5, 5));
+        players.drain(bounded);
+
+        assertEquals(25, ticketedAround(5, 5, 2));
+    }
+
+    @Test
+    void aWaitingChunkThePlayerLeavesNeverGetsATicket() {
+        ViewTickets bounded = new ViewTickets(tickets, players, 2, _ -> false, 9);
+        sources.enter(ChunkPos.pack(5, 5));
+        players.drain(bounded);
+        sources.leave(ChunkPos.pack(5, 5));
+        players.drain(bounded);
+
+        assertEquals(0, ticketedAround(5, 5, 2));
+        for (int dx = -1; dx <= 1; dx++) {
+            bounded.arrived(ChunkPos.pack(5 + dx, 5));
+        }
+
+        assertEquals(0, ticketedAround(5, 5, 2), "nothing waits once the player is gone");
     }
 
     @Test
