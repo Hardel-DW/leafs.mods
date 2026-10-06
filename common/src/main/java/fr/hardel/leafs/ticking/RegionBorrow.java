@@ -198,19 +198,19 @@ public final class RegionBorrow {
         heldChunks.clear();
     }
 
-    public int drainInboxes() {
-        int drained = 0;
+    public boolean pollInboxes() {
+        boolean worked = false;
         for (Region<RegionTickData> region : List.copyOf(held)) {
-            drained += region.data().inbox().drainChunkWork();
+            worked |= region.data().inbox().pollChunkWork();
         }
 
         for (Long2ObjectOpenHashMap<ChunkClaim> chunks : List.copyOf(heldChunks.values())) {
             for (ChunkClaim claim : List.copyOf(chunks.values())) {
-                drained += claim.mail().drainChunkWork();
+                worked |= claim.mail().pollChunkWork();
             }
         }
 
-        return drained;
+        return worked;
     }
 
     public int size() {

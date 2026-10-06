@@ -40,17 +40,18 @@ public final class RegionInbox {
     }
 
     public int drain(long deadlineNanos) {
-        return drain(chunkWork, deadlineNanos) + drain(gameWork, deadlineNanos);
+        return drain(chunkWork, deadlineNanos, Integer.MAX_VALUE) + drain(gameWork, deadlineNanos, Integer.MAX_VALUE);
     }
 
-    public int drainChunkWork() {
-        return drain(chunkWork, Long.MAX_VALUE);
+    /** The pump of a wait: one task, so that the wait ends as soon as what it waits for has arrived. */
+    public boolean pollChunkWork() {
+        return drain(chunkWork, Long.MAX_VALUE, 1) > 0;
     }
 
-    private int drain(ArrayDeque<Posted> queue, long deadlineNanos) {
+    private int drain(ArrayDeque<Posted> queue, long deadlineNanos, int limit) {
         int planned;
         synchronized (this) {
-            planned = queue.size();
+            planned = Math.min(queue.size(), limit);
         }
 
         int ran = 0;

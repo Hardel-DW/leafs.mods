@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionInboxTest {
     private final RegionInbox inbox = new RegionInbox();
@@ -66,18 +67,28 @@ class RegionInboxTest {
     void gameWorkWaitsItsTurnWhileChunkWorkRunsInsideAWait() {
         inbox.post(0, 0, Work.GAME, () -> {
             ran.add("write air");
-            inbox.drainChunkWork();
+            inbox.pollChunkWork();
             ran.add("air written");
         });
         inbox.post(0, 0, Work.CHUNK, () -> ran.add("publication"));
         inbox.post(0, 0, Work.GAME, () -> ran.add("write portal"));
 
-        assertEquals(1, inbox.drainChunkWork());
+        assertTrue(inbox.pollChunkWork());
         assertEquals(List.of("publication"), ran);
         assertEquals(2, inbox.size());
 
         assertEquals(2, inbox.drain());
         assertEquals(List.of("publication", "write air", "air written", "write portal"), ran);
+    }
+
+    /** 2026-10-06: a mob waited for one chunk and its region ran the 16 000 tasks of its inbox, then 2 500 fresh chunks ticked their blocks at once. */
+    @Test
+    void aWaitRunsOneTaskAtATime() {
+        inbox.post(0, 0, Work.CHUNK, () -> ran.add("first"));
+        inbox.post(0, 0, Work.CHUNK, () -> ran.add("second"));
+
+        assertTrue(inbox.pollChunkWork());
+        assertEquals(List.of("first"), ran);
     }
 
     @Test
@@ -95,7 +106,7 @@ class RegionInboxTest {
     void aTaskThatDrainsWhileRunningReachesWhatWasPostedAfterIt() {
         inbox.post(0, 0, Work.CHUNK, () -> {
             ran.add("first");
-            inbox.drainChunkWork();
+            inbox.pollChunkWork();
             ran.add("first done");
         });
         inbox.post(0, 0, Work.CHUNK, () -> ran.add("second"));

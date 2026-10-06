@@ -145,7 +145,7 @@ public final class TickingManager {
         }
 
         WorldTickContext mine = WorldTickContext.current();
-        new OwnWork(() -> mine != null && mine.region().data().inbox().drainChunkWork() > 0).until(done, help);
+        new OwnWork(() -> mine != null && mine.region().data().inbox().pollChunkWork()).until(done, help);
     }
 
     private boolean pumpServer() {
