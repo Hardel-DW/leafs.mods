@@ -13,6 +13,7 @@ import net.minecraft.world.level.entity.EntitySectionStorage;
 import net.minecraft.world.level.entity.Visibility;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -23,7 +24,7 @@ public final class RegionEntities {
     private ServerLevel level;
     private long lastTrackingNanos;
 
-    public void refresh(ServerLevel level, List<ChunkHolder> holders) {
+    public void refresh(ServerLevel level, Collection<ChunkHolder> holders) {
         this.level = level;
         entities.clear();
         accessible.clear();

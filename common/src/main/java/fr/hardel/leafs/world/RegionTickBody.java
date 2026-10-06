@@ -8,6 +8,7 @@ import fr.hardel.leafs.entity.RegionEntities;
 import fr.hardel.leafs.metrics.StageTimings;
 import fr.hardel.leafs.metrics.TickStages;
 import fr.hardel.leafs.network.RegionNetworkTick;
+import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionClock;
@@ -23,7 +24,6 @@ import net.minecraft.util.Util;
 import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.LocalMobCapCalculator;
@@ -32,6 +32,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongPredicate;
 
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
@@ -60,9 +61,10 @@ public final class RegionTickBody {
 
         LevelChunks chunks = LevelChunks.of(level);
         int shift = regions.regionizer().sectionShift();
-        chunks.timeouts().purge(section -> regions.tickerAt(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift) == Thread.currentThread());
+        LongPredicate mine = section -> regions.tickerAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) == Thread.currentThread();
+        chunks.timeouts().purge(mine);
         RegionChunks owned = worldData.chunks();
-        owned.refresh(region, level.getChunkSource().chunkMap);
+        owned.refresh(regions.changes(), mine, level);
         stages.mark(TickStages.regionTickets);
         RegionEntities entities = worldData.entities();
         entities.refresh(level, owned.holders());

@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.holder;
 
+import fr.hardel.leafs.region.SectionChanges;
 import fr.hardel.leafs.chunk.LeafsTicketTypes;
 import fr.hardel.leafs.chunk.level.ChunkLevels;
 import fr.hardel.leafs.chunk.level.LevelListener;
@@ -40,8 +41,9 @@ public final class ChunkHolders {
     private final Demands demands;
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
+    private final SectionChanges changes;
 
-    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, ChunkPlacement placement, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
+    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, ChunkPlacement placement, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics, SectionChanges changes) {
         this.chunkMap = chunkMap;
         this.loading = loading;
         this.table = table;
@@ -53,6 +55,7 @@ public final class ChunkHolders {
         this.steps = steps;
         this.loads = metrics.chunkLoads();
         this.unloads = metrics.chunkUnloads();
+        this.changes = changes;
     }
 
     public HolderTable table() {
@@ -104,6 +107,7 @@ public final class ChunkHolders {
     private void follow(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();
         holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
+        changes.mark(pos.x(), pos.z());
         if (ChunkLevel.isLoaded(holder.getTicketLevel()) || !table.remove(pos.pack(), holder)) {
             return;
         }

@@ -42,6 +42,14 @@ class RecordingCallbacks implements RegionCallbacks<Object> {
     }
 
     @Override
+    public void assigned(long sectionKey) {
+    }
+
+    @Override
+    public void released(Region<Object> region, long sectionKey) {
+    }
+
+    @Override
     public void split(Region<Object> parent, Long2ObjectMap<Region<Object>> sectionToChild, List<Region<Object>> children) {
         List<Long> childIds = children.stream().map(Region::id).sorted().toList();
         events.add("split #%s->%s".formatted(parent.id(), childIds));

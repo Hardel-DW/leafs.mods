@@ -14,6 +14,7 @@ import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
 import fr.hardel.leafs.chunk.view.PlayerView;
 import fr.hardel.leafs.metrics.MinuteCounter;
+import fr.hardel.leafs.region.SectionChanges;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -43,12 +44,14 @@ public final class LevelChunks {
     private final MinuteCounter chunksFull;
     private final UnownedSweep sweep;
     private final ChunkWrites writes;
+    private final SectionChanges changes;
 
     public LevelChunks(ChunkMap chunkMap, TicketStorage tickets, HolderTable table, PendingUnloads unloading, Executor serial) {
         ServerLevel level = chunkMap.level;
         LevelRegions regions = LevelRegions.of(level);
         TickingManager ticking = TickingManager.of(level.getServer());
         this.pool = ticking.chunkPool();
+        this.changes = regions.changes();
         this.graphs = new TicketGraphs(ticking.scheduler().epochs());
         this.timeouts = new TicketTimeoutIndex(tickets, chunkMap, regions.regionizer().sectionShift());
         ((TicketStorageAccess) tickets).leafs$bind(graphs, timeouts);
@@ -58,7 +61,7 @@ public final class LevelChunks {
         this.steps = new GenerationSteps(pool, placement);
         this.chunksFull = ticking.metrics().chunksFull();
         this.view = new PlayerView(tickets, graphs, chunkKey -> RegionChunkAccess.fullChunkOrNull(table.get(chunkKey)) != null, pool.threads() * VIEW_LOADS_PER_WORKER);
-        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, placement, tickets, steps, ticking.metrics());
+        this.holders = new ChunkHolders(chunkMap, graphs.loading(), table, unloading, owners, placement, tickets, steps, ticking.metrics(), regions.changes());
         this.sweep = new UnownedSweep(level, regions, owners, pool, timeouts, table);
         this.writes = new ChunkWrites(pool, chunkMap.worker);
         ((ChunkWritesAccess) chunkMap.worker).leafs$bind(writes);
@@ -138,6 +141,7 @@ public final class LevelChunks {
             return () -> {
                 full.complete(chunk);
                 chunksFull.increment();
+                changes.mark(chunk.getPos().x(), chunk.getPos().z());
                 view.arrived(chunk.getPos().pack());
             };
         } catch (Throwable failure) {

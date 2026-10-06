@@ -19,6 +19,8 @@ public final class ChunkOwners implements Router {
         @Nullable RegionInbox inboxAt(int chunkX, int chunkZ);
 
         @Nullable Thread tickerAt(int chunkX, int chunkZ);
+
+        void chunkChanged(int chunkX, int chunkZ);
     }
 
     @FunctionalInterface
@@ -150,11 +152,17 @@ public final class ChunkOwners implements Router {
 
     public @Nullable ChunkClaim borrow(int chunkX, int chunkZ) {
         ChunkClaim claim = new ChunkClaim(Thread.currentThread(), new RegionInbox());
-        return borrowed.putIfAbsent(ChunkPos.pack(chunkX, chunkZ), claim) == null ? claim : null;
+        if (borrowed.putIfAbsent(ChunkPos.pack(chunkX, chunkZ), claim) != null) {
+            return null;
+        }
+
+        regions.chunkChanged(chunkX, chunkZ);
+        return claim;
     }
 
     public void release(int chunkX, int chunkZ, ChunkClaim claim) {
         borrowed.remove(ChunkPos.pack(chunkX, chunkZ), claim);
+        regions.chunkChanged(chunkX, chunkZ);
         resubmit(claim.mail());
     }
 
