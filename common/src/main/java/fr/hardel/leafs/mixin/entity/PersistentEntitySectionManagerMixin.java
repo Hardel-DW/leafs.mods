@@ -1,6 +1,7 @@
 package fr.hardel.leafs.mixin.entity;
 
 import net.minecraft.world.level.entity.EntityLookup;
+import net.minecraft.world.level.ChunkPos;
 import fr.hardel.leafs.entity.LevelBoundAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -101,6 +102,11 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
         });
 
         return original.call(future, delivery);
+    }
+
+    @Inject(method = "updateChunkStatus(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/entity/Visibility;)V", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;add(J)Z", shift = At.Shift.AFTER))
+    private void leafs$handTheUnloadToTheOwner(ChunkPos pos, Visibility chunkStatus, CallbackInfo callbackInfo) {
+        leafs$persistence.unloadHiddenLater(pos.pack());
     }
 
     @Inject(method = "processUnloads", at = @At("HEAD"), cancellable = true)

@@ -3,8 +3,6 @@ package fr.hardel.leafs.chunk.owner;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.ticket.TicketTimeoutIndex;
-import fr.hardel.leafs.entity.RegionEntityPersistence;
-import fr.hardel.leafs.entity.ServerLevelEntityAccess;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.world.ChangedChunksAccess;
 import fr.hardel.leafs.world.ChunkBroadcasts;
@@ -51,7 +49,6 @@ public final class UnownedSweep {
     private void sweep() {
         try {
             purgeTimeouts();
-            unloadHiddenEntities();
             saveEagerly();
             saveBehindEpoch();
             broadcast();
@@ -71,21 +68,6 @@ public final class UnownedSweep {
     private void purgeTimeouts() {
         int shift = regions.regionizer().sectionShift();
         timeouts.purge(section -> !owners.covered(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift));
-    }
-
-    private void unloadHiddenEntities() {
-        RegionEntityPersistence persistence = ((ServerLevelEntityAccess) level).leafs$entityPersistence();
-        int attempts = 0;
-        for (long chunkKey : persistence.pendingUnloads().toLongArray()) {
-            if (attempts == CHUNKS_PER_TICK) {
-                return;
-            }
-
-            if (unowned(chunkKey)) {
-                dispatch(chunkKey, () -> persistence.unloadHidden(chunkKey));
-                attempts++;
-            }
-        }
     }
 
     private void saveEagerly() {
