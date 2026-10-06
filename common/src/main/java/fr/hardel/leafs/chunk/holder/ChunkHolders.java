@@ -85,6 +85,18 @@ public final class ChunkHolders {
         });
     }
 
+    /** A load someone awaits through a future, the square of a player who joins for one, is as urgent as the chunk a thread waits for. */
+    public void expedite(ChunkPos center, int radius, CompletableFuture<?> loaded) {
+        int level = ChunkLevel.byStatus(ChunkStatus.FULL);
+        List<ChunkPos> square = ChunkPos.rangeClosed(center, radius).toList();
+        for (ChunkPos chunk : square) {
+            demands.demand(chunk.pack(), level);
+            placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, chunk.x(), chunk.z(), ChunkStatus.FULL));
+        }
+
+        loaded.whenComplete((_, _) -> square.forEach(chunk -> demands.release(chunk.pack(), level)));
+    }
+
     private ChunkHolder demanded(long key, ChunkStatus status) {
         ChunkHolder holder = table.get(key);
         if (holder == null) {
