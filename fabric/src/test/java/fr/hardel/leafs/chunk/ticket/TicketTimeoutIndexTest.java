@@ -27,7 +27,7 @@ class TicketTimeoutIndexTest {
 
         for (long countdown = 0; countdown <= TicketType.UNKNOWN.timeout(); countdown++) {
             assertEquals(1, storage.getTickets(CHUNK).size());
-            timeouts.purgeSections(new long[]{SECTION});
+            timeouts.purge(section -> section == SECTION);
         }
 
         assertTrue(storage.getTickets(CHUNK).isEmpty());

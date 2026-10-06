@@ -47,15 +47,10 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    public void purgeSections(long[] sectionKeys) {
-        for (long key : sectionKeys) {
-            purgeSection(key);
-        }
-    }
-
-    public void purgeUnowned(LongPredicate sectionOwned) {
+    /** Counts down the tickets of the sections the caller answers for: few sections hold a ticket that times out. */
+    public void purge(LongPredicate mine) {
         for (long key : sections.keySet()) {
-            if (!sectionOwned.test(key)) {
+            if (mine.test(key)) {
                 purgeSection(key);
             }
         }

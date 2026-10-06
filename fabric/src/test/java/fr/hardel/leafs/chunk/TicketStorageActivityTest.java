@@ -63,8 +63,8 @@ class TicketStorageActivityTest {
         assertFalse(storage.shouldKeepDimensionActive(), "a ticket added twice counts twice");
         storage.addTicket(TIMED_CHUNK, timed());
         assertTrue(storage.shouldKeepDimensionActive(), "a timed ticket that keeps the dimension active does not count");
-        timeouts.purgeSections(new long[] {sectionOf(TIMED_CHUNK)});
-        timeouts.purgeSections(new long[] {sectionOf(TIMED_CHUNK)});
+        timeouts.purge(section -> section == sectionOf(TIMED_CHUNK));
+        timeouts.purge(section -> section == sectionOf(TIMED_CHUNK));
         assertFalse(storage.shouldKeepDimensionActive(), "a ticket timed out by its section still counts");
         storage.addTicket(TIMED_CHUNK, timed());
         storage.purgeStaleTickets(null);

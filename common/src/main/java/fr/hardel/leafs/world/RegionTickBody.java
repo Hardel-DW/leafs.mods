@@ -23,6 +23,7 @@ import net.minecraft.util.Util;
 import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.LocalMobCapCalculator;
@@ -58,7 +59,8 @@ public final class RegionTickBody {
         }
 
         LevelChunks chunks = LevelChunks.of(level);
-        chunks.timeouts().purgeSections(region.sectionKeySnapshot());
+        int shift = regions.regionizer().sectionShift();
+        chunks.timeouts().purge(section -> regions.tickerAt(ChunkPos.getX(section) << shift, ChunkPos.getZ(section) << shift) == Thread.currentThread());
         RegionChunks owned = worldData.chunks();
         owned.refresh(region, level.getChunkSource().chunkMap);
         stages.mark(TickStages.regionTickets);
