@@ -10,8 +10,11 @@ import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.entity.EntitySection;
+import net.minecraft.world.level.entity.EntitySectionStorage;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -21,13 +24,14 @@ import java.util.function.LongPredicate;
 
 /** The chunks of a region, kept section by section: a tick reads again only the sections that changed. */
 public final class RegionChunks {
-    private record Read(ChunkHolder holder, @Nullable LevelChunk ticking, boolean simulated) {
+    private record Read(ChunkHolder holder, @Nullable LevelChunk ticking, boolean simulated, List<EntitySection<Entity>> entities) {
     }
 
     private final Long2ObjectOpenHashMap<List<Read>> sections = new Long2ObjectOpenHashMap<>();
     private final ReferenceLinkedOpenHashSet<ChunkHolder> holders = new ReferenceLinkedOpenHashSet<>();
     private final ReferenceLinkedOpenHashSet<LevelChunk> ticking = new ReferenceLinkedOpenHashSet<>();
     private final ReferenceLinkedOpenHashSet<LevelChunk> simulated = new ReferenceLinkedOpenHashSet<>();
+    private final ReferenceLinkedOpenHashSet<EntitySection<Entity>> entitySections = new ReferenceLinkedOpenHashSet<>();
     private boolean unbound = true;
     private int minX;
     private int minZ;
@@ -67,12 +71,24 @@ public final class RegionChunks {
             if (read.simulated()) {
                 simulated.add(read.ticking());
             }
+
+            entitySections.addAll(read.entities());
         }
     }
 
     private static Read read(ChunkHolder holder, ServerLevel level) {
+        ChunkPos pos = holder.getPos();
         LevelChunk chunk = ChunkLevel.isBlockTicking(holder.getTicketLevel()) ? holder.getTickingChunk() : null;
-        return new Read(holder, chunk, chunk != null && level.shouldTickBlocksAt(holder.getPos().pack()));
+        EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
+        List<EntitySection<Entity>> entities = new ArrayList<>();
+        for (long key : storage.getChunkSections(pos.x(), pos.z())) {
+            EntitySection<Entity> section = storage.sections.get(key);
+            if (section != null) {
+                entities.add(section);
+            }
+        }
+
+        return new Read(holder, chunk, chunk != null && level.shouldTickBlocksAt(pos.pack()), entities);
     }
 
     /** A section that left the region takes its chunks with it. */
@@ -87,6 +103,7 @@ public final class RegionChunks {
             holders.remove(read.holder());
             ticking.remove(read.ticking());
             simulated.remove(read.ticking());
+            entitySections.removeAll(read.entities());
         }
     }
 
@@ -116,6 +133,10 @@ public final class RegionChunks {
     /** The ticking chunks inside the simulation distance of a player or of a forced ticket: the ones whose blocks tick. */
     public Collection<LevelChunk> simulated() {
         return simulated;
+    }
+
+    public Collection<EntitySection<Entity>> entitySections() {
+        return entitySections;
     }
 
     public boolean within(ChunkPos chunk, int margin) {

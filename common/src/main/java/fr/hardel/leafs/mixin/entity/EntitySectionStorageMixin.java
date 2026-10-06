@@ -1,5 +1,7 @@
 package fr.hardel.leafs.mixin.entity;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import org.spongepowered.asm.mixin.Unique;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.util.AbortableIterationConsumer;
@@ -62,6 +64,30 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
     @Override
     public void leafs$bindLevel(ServerLevel level) {
         leafs$level = level;
+    }
+
+    @WrapMethod(method = "getOrCreateSection")
+    private EntitySection<T> leafs$markTheNewSection(long key, Operation<EntitySection<T>> original) {
+        boolean fresh = !this.sections.containsKey(key);
+        EntitySection<T> section = original.call(key);
+        if (fresh) {
+            leafs$sectionChanged(key);
+        }
+
+        return section;
+    }
+
+    @Inject(method = "remove", at = @At("TAIL"))
+    private void leafs$markTheRemovedSection(long sectionKey, CallbackInfo callbackInfo) {
+        leafs$sectionChanged(sectionKey);
+    }
+
+    // The region of the chunk lists its entity sections: one more or one less is a change of that chunk.
+    @Unique
+    private void leafs$sectionChanged(long sectionKey) {
+        if (leafs$level != null) {
+            LevelRegions.of(leafs$level).chunkChanged(SectionPos.x(sectionKey), SectionPos.z(sectionKey));
+        }
     }
 
     @Inject(method = "forEachAccessibleNonEmptySection", at = @At("HEAD"))

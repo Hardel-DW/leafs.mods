@@ -18,8 +18,11 @@ import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.entity.EntitySection;
+import net.minecraft.world.level.entity.EntitySectionStorage;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Collection;
@@ -148,6 +151,8 @@ public final class RegionChunksTest {
             Set<ChunkHolder> holders = Collections.newSetFromMap(new IdentityHashMap<>());
             Set<LevelChunk> ticking = Collections.newSetFromMap(new IdentityHashMap<>());
             Set<LevelChunk> simulates = Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<EntitySection<Entity>> entities = Collections.newSetFromMap(new IdentityHashMap<>());
+            EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
             for (long section : region.sectionKeySnapshot()) {
                 table.forEachHolderIn(section, holder -> {
                     ChunkPos pos = holder.getPos();
@@ -156,6 +161,13 @@ public final class RegionChunksTest {
                     }
 
                     holders.add(holder);
+                    for (long key : storage.getChunkSections(pos.x(), pos.z())) {
+                        EntitySection<Entity> entitySection = storage.sections.get(key);
+                        if (entitySection != null) {
+                            entities.add(entitySection);
+                        }
+                    }
+
                     LevelChunk chunk = ChunkLevel.isBlockTicking(holder.getTicketLevel()) ? holder.getTickingChunk() : null;
                     if (chunk == null) {
                         return;
@@ -172,6 +184,7 @@ public final class RegionChunksTest {
             compare(region, "holders", holders, kept.holders());
             compare(region, "ticking chunks", ticking, kept.ticking());
             compare(region, "simulated chunks", simulates, kept.simulated());
+            compare(region, "entity sections", entities, kept.entitySections());
             simulated.addAndGet(kept.simulated().size());
         }
 
