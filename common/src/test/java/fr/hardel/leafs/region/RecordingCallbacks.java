@@ -42,10 +42,6 @@ class RecordingCallbacks implements RegionCallbacks<Object> {
     }
 
     @Override
-    public void assigned(long sectionKey) {
-    }
-
-    @Override
     public void released(Region<Object> region, long sectionKey) {
     }
 

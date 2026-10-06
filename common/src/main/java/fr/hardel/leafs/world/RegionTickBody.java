@@ -64,7 +64,7 @@ public final class RegionTickBody {
         LongPredicate mine = section -> regions.tickerAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) == Thread.currentThread();
         chunks.timeouts().purge(mine);
         RegionChunks owned = worldData.chunks();
-        owned.refresh(regions.changes(), mine, level);
+        owned.refresh(region, level);
         stages.mark(TickStages.regionTickets);
         RegionEntities entities = worldData.entities();
         entities.refresh(level, owned.entitySections());

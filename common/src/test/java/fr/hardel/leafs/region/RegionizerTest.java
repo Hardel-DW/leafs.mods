@@ -3,6 +3,12 @@ package fr.hardel.leafs.region;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -207,5 +213,59 @@ class RegionizerTest {
         assertEquals(1, east.chunkCount());
         assertEquals(1, callbacks.events.stream().filter(event -> event.startsWith("split ")).count());
         RegionizerAssertions.assertInvariants(regionizer, true);
+    }
+
+    @Test
+    void aRegionReadsTheSectionsItTakes() {
+        regionizer.addChunk(0, 0);
+
+        assertEquals(9, changedOf(regionizer.regionAt(0, 0)).size());
+        assertTrue(changedOf(regionizer.regionAt(0, 0)).isEmpty(), "a section read once is not handed over again");
+    }
+
+    @Test
+    void aChangedSectionWaitsOnceForItsRegion() {
+        regionizer.addChunk(0, 0);
+        Region<Object> region = regionizer.regionAt(0, 0);
+        changedOf(region);
+
+        regionizer.markChanged(3, 3);
+        regionizer.markChanged(5, 9);
+
+        assertEquals(List.of(CoordinateKey.pack(0, 0)), changedOf(region));
+    }
+
+    @Test
+    void aChangeWhereNoRegionStandsIsNotKept() {
+        regionizer.markChanged(800, 800);
+        regionizer.addChunk(0, 0);
+        changedOf(regionizer.regionAt(0, 0));
+
+        regionizer.markChanged(800, 800);
+
+        assertTrue(changedOf(regionizer.regionAt(0, 0)).isEmpty());
+    }
+
+    @Test
+    void theRegionThatTakesASectionByAMergeReadsIt() {
+        regionizer.addChunk(0, 0);
+        regionizer.addChunk(80, 0);
+        Region<Object> left = regionizer.regionAt(0, 0);
+        Region<Object> right = regionizer.regionAt(80, 0);
+        Set<Long> ofLeft = LongStream.of(left.sectionKeySnapshot()).boxed().collect(Collectors.toSet());
+        Set<Long> ofRight = LongStream.of(right.sectionKeySnapshot()).boxed().collect(Collectors.toSet());
+        changedOf(left);
+        changedOf(right);
+
+        regionizer.addChunk(40, 0);
+        Region<Object> survivor = regionizer.regionAt(40, 0);
+
+        assertTrue(changedOf(survivor).containsAll(survivor == left ? ofRight : ofLeft), "the survivor reads every section it took from the other region");
+    }
+
+    private static List<Long> changedOf(Region<Object> region) {
+        List<Long> sections = new ArrayList<>();
+        region.takeChanged(sections::add);
+        return sections;
     }
 }

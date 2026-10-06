@@ -4,7 +4,7 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
-import fr.hardel.leafs.region.SectionChanges;
+import fr.hardel.leafs.region.Region;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
 import net.minecraft.server.level.ChunkHolder;
@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.LongPredicate;
 
 /** The chunks of a region, kept section by section: a tick reads again only the sections that changed. */
 public final class RegionChunks {
@@ -38,9 +37,9 @@ public final class RegionChunks {
     private int maxX;
     private int maxZ;
 
-    public void refresh(SectionChanges changes, LongPredicate mine, ServerLevel level) {
+    public void refresh(Region<?> region, ServerLevel level) {
         LevelChunks chunks = LevelChunks.of(level);
-        changes.take(mine, section -> read(section, chunks.holders().table(), chunks.owners(), level));
+        region.takeChanged(section -> read(section, chunks.holders().table(), chunks.owners(), level));
         if (unbound) {
             bound();
         }
