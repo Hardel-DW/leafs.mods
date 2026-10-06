@@ -19,6 +19,7 @@ import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickScheduler;
+import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMaps;
@@ -61,6 +62,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -122,6 +124,9 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @Unique
     private LevelChunks leafs$chunks;
 
+    @Unique
+    private PendingUnloads leafs$unloading;
+
     @Override
     public LevelChunks leafs$chunks() {
         return leafs$chunks;
@@ -135,10 +140,10 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift());
         this.updatingChunkMap = table;
         this.visibleChunkMap = table;
-        PendingUnloads unloading = new PendingUnloads();
-        this.pendingUnloads = unloading;
+        leafs$unloading = new PendingUnloads();
+        this.pendingUnloads = leafs$unloading;
         ChunkMap self = (ChunkMap) (Object) this;
-        leafs$chunks = new LevelChunks(self, this.ticketStorage, table, unloading, this.mainThreadExecutor);
+        leafs$chunks = new LevelChunks(self, this.ticketStorage, table, leafs$unloading, this.mainThreadExecutor);
         ((DistanceManagerAccess) self.getDistanceManager()).leafs$bind(leafs$chunks);
     }
 
@@ -241,7 +246,13 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
 
     @WrapOperation(method = "scheduleUnload", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenRunAsync(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$teardownOnTheOwner(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original, @Local(argsOnly = true) long pos) {
-        return original.call(future, body, leafs$owners().executor(ChunkPos.getX(pos), ChunkPos.getZ(pos)));
+        return original.call(future, leafs$unloading.counted(body), leafs$owners().executor(ChunkPos.getX(pos), ChunkPos.getZ(pos)));
+    }
+
+    // Vanilla runs its queue of unloads here: a flushing save returns with every unloading chunk handed to the disk.
+    @WrapOperation(method = "saveAllChunks", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;processUnloads(Ljava/util/function/BooleanSupplier;)V"))
+    private void leafs$finishTheTeardowns(ChunkMap self, BooleanSupplier haveTime, Operation<Void> original) {
+        TickingManager.of(self.level.getServer()).await(leafs$unloading::settled);
     }
 
     @Inject(method = "promoteChunkMap", at = @At("HEAD"), cancellable = true)
