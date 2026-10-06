@@ -82,7 +82,7 @@ public final class TickingManager {
     // A tick can write the graphs of any level, a player crossing dimensions included.
     private void drainAtTickEnd() {
         for (ServerLevel level : levelUnits.keySet()) {
-            LevelChunks.of(level).graphs().drainAtTickEnd();
+            LevelChunks.of(level).graphs().drain();
         }
     }
 

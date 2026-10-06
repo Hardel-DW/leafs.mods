@@ -43,19 +43,10 @@ public final class TicketGraphs {
     }
 
     public void listen(Supplier<LevelListener> loading, LevelListener simulation, LevelListener players, ChunkPool pool) {
-        this.drains = List.of(new Drain(this.players, () -> players, pool, true), new Drain(this.simulation, () -> simulation, pool, true), new Drain(this.loading, loading, pool, false));
+        this.drains = List.of(new Drain(this.players, () -> players, pool), new Drain(this.simulation, () -> simulation, pool), new Drain(this.loading, loading, pool));
     }
 
-    // The thread whose tick ended applies the pending players and simulation changes itself.
-    public void drainAtTickEnd() {
-        for (Drain drain : drains) {
-            drain.inline();
-        }
-
-        drain();
-    }
-
-    // The pool takes the loading graph, and the players and simulation writes no tick end will drain.
+    // A tick end and every writer outside a tick ask the pool: no region spends its tick on the graphs.
     public void drain() {
         for (Drain drain : drains) {
             drain.request();
@@ -67,25 +58,16 @@ public final class TicketGraphs {
         private final ChunkLevels graph;
         private final Supplier<LevelListener> listener;
         private final ChunkPool pool;
-        private final boolean owned;
         private final AtomicBoolean handed = new AtomicBoolean();
 
-        private Drain(ChunkLevels graph, Supplier<LevelListener> listener, ChunkPool pool, boolean owned) {
+        private Drain(ChunkLevels graph, Supplier<LevelListener> listener, ChunkPool pool) {
             this.graph = graph;
             this.listener = listener;
             this.pool = pool;
-            this.owned = owned;
-        }
-
-        private void inline() {
-            if (owned && graph.dirty()) {
-                graph.drain(listener.get());
-            }
         }
 
         private void request() {
-            boolean due = owned ? graph.takeOrphaned() : graph.dirty();
-            if (!due || !handed.compareAndSet(false, true)) {
+            if (!graph.dirty() || !handed.compareAndSet(false, true)) {
                 return;
             }
 

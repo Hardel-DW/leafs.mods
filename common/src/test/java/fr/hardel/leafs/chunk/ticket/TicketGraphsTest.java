@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class TicketGraphsTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final TickEpochs epochs = new TickEpochs(1, () -> this.graphs.drainAtTickEnd());
+    private final TickEpochs epochs = new TickEpochs(1, () -> this.graphs.drain());
     private final TicketGraphs graphs = new TicketGraphs(epochs);
     private final List<String> threads = new CopyOnWriteArrayList<>();
     private final CountDownLatch published = new CountDownLatch(1);
@@ -78,16 +78,15 @@ class TicketGraphsTest {
         assertTrue(threads.stream().allMatch(name -> name.startsWith("Leafs Chunk Worker")));
     }
 
-    /** 2026-09-27: the server thread drained the players and simulation writes of every region at each tick. */
+    /** 2026-09-27: the server thread drained the players and simulation writes of every region at each tick. 2026-10-06: a region of forty players spent a fifth of its tick draining them itself. */
     @Test
-    void aRegionWorkerDrainsItsWritesWhenItsTickEnds() {
+    void aTickEndHandsItsWritesToThePool() {
         List<String> drainers = new CopyOnWriteArrayList<>();
         CountDownLatch drained = new CountDownLatch(1);
         graphs.listen(() -> loading, (_, _, _) -> { }, (_, _, _) -> {
             drainers.add(Thread.currentThread().getName());
             drained.countDown();
         }, pool);
-        CountDownLatch release = TestThreads.occupy(pool);
         RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, () -> 50_000_000L, false,
             new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> { }, _ -> { }), (_, _) -> { });
         scheduler.start();
@@ -100,10 +99,9 @@ class TicketGraphsTest {
         TestThreads.await(drained);
         region.cancel();
         scheduler.shutdown(false, new OwnWork(() -> false));
-        release.countDown();
 
         assertEquals(1, drainers.size());
-        assertTrue(drainers.getFirst().startsWith("Leafs Server Region Worker"));
+        assertTrue(drainers.getFirst().startsWith("Leafs Chunk Worker"));
     }
 
     /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
@@ -164,6 +162,10 @@ class TicketGraphsTest {
 
         checked.countDown();
         mover.join();
+        for (int attempt = 0; attempt < 500 && dropped.size() < 5; attempt++) {
+            Thread.sleep(10);
+        }
+
         assertEquals(IntStream.rangeClosed(-2, 2).mapToObj(chunkZ -> ChunkPos.pack(61, chunkZ)).sorted().toList(), dropped.stream().sorted().toList());
     }
 }

@@ -10,9 +10,6 @@ public final class TickEpochs {
     private final AtomicLong clock = new AtomicLong();
     private final AtomicLongArray open;
     private final Runnable drain;
-    private volatile Thread server;
-    // Only the server thread touches it.
-    private boolean serverWrote;
 
     public TickEpochs(int workers, Runnable drain) {
         this.open = new AtomicLongArray(workers + 1);
@@ -31,36 +28,18 @@ public final class TickEpochs {
         clock.incrementAndGet();
     }
 
-    // A region worker drains what is pending at each tick end.
+    // Each tick end asks for a drain of what is pending.
     public void close(int worker) {
         open.set(worker, CLOSED);
         drain.run();
     }
 
     public void openServer() {
-        server = Thread.currentThread();
         open(SERVER);
     }
 
-    // The server drains only after writing, so it never drains the writes of others.
     public void closeServer() {
-        open.set(SERVER, CLOSED);
-        if (!serverWrote) {
-            return;
-        }
-
-        drain.run();
-        serverWrote = false;
-    }
-
-    // False for a write no tick end will drain, made neither by a region worker nor by the server thread.
-    public boolean claimWrite() {
-        if (Thread.currentThread() != server) {
-            return RegionTickScheduler.onWorker();
-        }
-
-        serverWrote = true;
-        return true;
+        close(SERVER);
     }
 
     public long now() {
