@@ -83,7 +83,7 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionChunkTick);
         }
 
-        ChunkBroadcasts.changed(((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders(), owned.holders());
+        ChunkBroadcasts.held(((ChangedChunksAccess) level.getChunkSource()).leafs$changedHolders(), chunks.owners());
         stages.mark(TickStages.regionBroadcast);
         RegionEntityTracking.tickRegion(level, owned, entities);
         stages.mark(TickStages.regionTracking);
