@@ -15,7 +15,6 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -138,7 +137,7 @@ public final class UnownedSweep {
         for (ChunkHolder holder : changed) {
             long chunkKey = holder.getPos().pack();
             if (unowned(chunkKey) && changed.remove(holder)) {
-                dispatch(chunkKey, () -> ChunkBroadcasts.changed(changed, List.of(holder)));
+                dispatch(chunkKey, () -> ChunkBroadcasts.broadcast(holder));
             }
         }
     }
