@@ -111,7 +111,7 @@ public final class RegionTickBody {
         }
 
         stages.mark(TickStages.regionPlayers);
-        saves.autosave(worldData, regions.autosaveEpoch(), shareOf(intakeDeadlineNanos, 2));
+        saves.autosave(worldData, players, regions.autosaveEpoch(), shareOf(intakeDeadlineNanos, 2));
         stages.mark(TickStages.regionAutosave);
         RegionInbox inbox = region.data().inbox();
         inbox.drain(shareOf(intakeDeadlineNanos, 1));
