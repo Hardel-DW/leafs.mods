@@ -12,6 +12,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import it.unimi.dsi.fastutil.longs.LongSet;
 
 import java.util.Collection;
+import java.util.List;
 
 public final class ChunkSaves {
     private final ServerLevel level;
@@ -20,21 +21,26 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    public void autosave(RegionWorldData worldData, long epoch, long deadlineNanos) {
+    /** Every save of the tick, the players first, within the deadline: an autosave epoch spreads over the ticks that follow it, it never takes one. */
+    public void autosave(RegionWorldData worldData, List<ServerPlayer> players, long epoch, long deadlineNanos) {
         Collection<ChunkHolder> holders = worldData.chunks().holders();
-        LongSet dirty = level.getChunkSource().chunkMap.chunksToEagerlySave;
-        for (ChunkHolder holder : holders) {
-            if (dirty.contains(holder.getPos().pack()) && saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {
-                break;
+        for (ServerPlayer player : players) {
+            SavedEpochAccess saved = (SavedEpochAccess) player;
+            if (saved.leafs$savedEpoch() < epoch) {
+                level.getServer().getPlayerList().save(player);
+                saved.leafs$markSaved(epoch);
+                if (System.nanoTime() >= deadlineNanos) {
+                    return;
+                }
             }
         }
 
-        worldData.entities().forEach(entity -> {
-            if (entity instanceof ServerPlayer player && ((SavedEpochAccess) player).leafs$savedEpoch() < epoch) {
-                level.getServer().getPlayerList().save(player);
-                ((SavedEpochAccess) player).leafs$markSaved(epoch);
+        LongSet dirty = level.getChunkSource().chunkMap.chunksToEagerlySave;
+        for (ChunkHolder holder : holders) {
+            if (dirty.contains(holder.getPos().pack()) && saveEagerly(holder) && System.nanoTime() >= deadlineNanos) {
+                return;
             }
-        });
+        }
 
         if (worldData.savedEpoch() == epoch) {
             return;
