@@ -18,7 +18,6 @@ public final class WorldTickContext {
     private final Region<RegionTickData> region;
     private final RegionWorldData worldData;
     private final List<Runnable> releases = new ArrayList<>();
-    // The chunks of the region this tick last read, four by four: a block and its neighbours never evict each other.
     private final LevelChunk[] lastChunks = new LevelChunk[SIDE * SIDE];
 
     private WorldTickContext(ServerLevel level, Region<RegionTickData> region, RegionWorldData worldData) {

@@ -21,7 +21,6 @@ public final class ChunkSaves {
         this.level = level;
     }
 
-    /** Every save of the tick, the players first, within the deadline: an autosave epoch spreads over the ticks that follow it, it never takes one. */
     public void autosave(RegionWorldData worldData, List<ServerPlayer> players, long epoch, long deadlineNanos) {
         Collection<ChunkHolder> holders = worldData.chunks().holders();
         for (ServerPlayer player : players) {

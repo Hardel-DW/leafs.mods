@@ -43,7 +43,6 @@ public final class RegionInbox {
         return drain(chunkWork, deadlineNanos, Integer.MAX_VALUE) + drain(gameWork, deadlineNanos, Integer.MAX_VALUE);
     }
 
-    /** The pump of a wait: one task, so that the wait ends as soon as what it waits for has arrived. */
     public boolean pollChunkWork() {
         return drain(chunkWork, Long.MAX_VALUE, 1) > 0;
     }

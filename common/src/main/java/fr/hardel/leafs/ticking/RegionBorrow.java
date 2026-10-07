@@ -142,7 +142,6 @@ public final class RegionBorrow {
 
         region.askHold();
         try {
-            // A task this thread runs while it waits may take the region for it.
             while (region.state() != RegionState.DEAD) {
                 if (held.contains(region) || region.tryHold()) {
                     held.add(region);

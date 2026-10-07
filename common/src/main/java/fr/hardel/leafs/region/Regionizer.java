@@ -75,7 +75,6 @@ public final class Regionizer<R> {
         }
     }
 
-    /** A chunk changed, and the change is visible: its region reads the section again. A section no region owns is not marked, the region that takes it reads it whole. */
     public void markChanged(int chunkX, int chunkZ) {
         markSection(CoordinateKey.pack(chunkX >> sectionShift, chunkZ >> sectionShift));
     }
@@ -86,7 +85,6 @@ public final class Regionizer<R> {
             return;
         }
 
-        // Read after the mark: a merge that moved the section meanwhile queued it for its new region itself.
         Region<R> region = section.region();
         if (region == null) {
             section.readAgain();

@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LevelChunks {
     private static final AtomicInteger IDS = new AtomicInteger();
-    // The chunks of the players' views that may load at once, per worker: enough to keep every worker fed, few enough to bound the memory of unfinished chunks.
     private static final int VIEW_LOADS_PER_WORKER = 16;
     private final ChunkPool pool;
     private final ChunkPlacement placement;
