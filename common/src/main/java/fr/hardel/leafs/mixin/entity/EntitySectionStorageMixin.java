@@ -82,7 +82,6 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
         leafs$sectionChanged(sectionKey);
     }
 
-    // The region of the chunk lists its entity sections: one more or one less is a change of that chunk.
     @Unique
     private void leafs$sectionChanged(long sectionKey) {
         if (leafs$level != null) {

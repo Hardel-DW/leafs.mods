@@ -47,7 +47,6 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    /** Counts down the tickets of the sections the caller answers for: few sections hold a ticket that times out. */
     public void purge(LongPredicate mine) {
         for (long key : sections.keySet()) {
             if (mine.test(key)) {

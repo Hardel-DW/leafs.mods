@@ -9,7 +9,6 @@ import net.minecraft.world.level.entity.Visibility;
 
 
 public final class RegionEntityPersistence {
-    /** Runs a task on the owner of a chunk, after its current tick. */
     public interface Later {
         void run(long chunkKey, Runnable task);
     }
@@ -34,7 +33,6 @@ public final class RegionEntityPersistence {
         LevelChunks.of(level).owners().submit(pos.x(), pos.z(), Work.CHUNK, delivery);
     }
 
-    /** A chunk whose entities turned hidden hands their unload to its owner, who tries again next tick while the chunk still waits. */
     public void unloadHiddenLater(long chunkKey) {
         later.run(chunkKey, () -> {
             LongSet waiting = manager.leafs$chunksToUnload();

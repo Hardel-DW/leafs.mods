@@ -29,7 +29,6 @@ public final class RegionEntities {
         ids.clear();
         sections.forEach(this::collect);
 
-        // A player is ticked wherever it stands: its chunk may still be generating, and then it is not among the holders.
         LevelRegions regions = LevelRegions.of(level);
         for (ServerPlayer player : level.players()) {
             ChunkPos pos = player.chunkPosition();

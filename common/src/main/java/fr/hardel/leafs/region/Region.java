@@ -19,7 +19,6 @@ public final class Region<R> {
     final Set<Region<R>> mergeIntoLater = new LinkedHashSet<>();
     final Set<Region<R>> expectingMergeFrom = new LinkedHashSet<>();
     final Queue<RegionSection<R>> changed = new ConcurrentLinkedQueue<>();
-    // Out of the schedule until its merge into a ticking region: a thread may still hold it meanwhile.
     boolean waitsForMerge;
     final AtomicInteger holdsAsked = new AtomicInteger();
 
@@ -60,7 +59,6 @@ public final class Region<R> {
         return regionizer.tryMarkTicking(this, true);
     }
 
-    /** A thread that waits to hold the region goes before its next tick: an overloaded region leaves no gap between two ticks to slip in. */
     public void askHold() {
         holdsAsked.incrementAndGet();
     }
@@ -73,7 +71,6 @@ public final class Region<R> {
         regionizer.markNotTicking(this);
     }
 
-    /** Hands over the sections whose chunks changed since the region last read them. A change that lands meanwhile marks its section again. */
     public void takeChanged(LongConsumer section) {
         for (RegionSection<R> next = changed.poll(); next != null; next = changed.poll()) {
             next.readAgain();

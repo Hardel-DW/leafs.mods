@@ -46,7 +46,6 @@ public final class TicketGraphs {
         this.drains = List.of(new Drain(this.players, () -> players, pool), new Drain(this.simulation, () -> simulation, pool), new Drain(this.loading, loading, pool));
     }
 
-    // A tick end and every writer outside a tick ask the pool: no region spends its tick on the graphs.
     public void drain() {
         for (Drain drain : drains) {
             drain.request();

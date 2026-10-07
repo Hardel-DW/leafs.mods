@@ -21,11 +21,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-/** The chunks of a region, kept section by section: a tick reads again only the sections that changed. */
 public final class RegionChunks {
-    private record Read(ChunkHolder holder, @Nullable LevelChunk ticking, boolean simulated, List<EntitySection<Entity>> entities) {
-    }
-
+    private record Read(ChunkHolder holder, @Nullable LevelChunk ticking, boolean simulated, List<EntitySection<Entity>> entities) {}
     private final Long2ObjectOpenHashMap<List<Read>> sections = new Long2ObjectOpenHashMap<>();
     private final ReferenceLinkedOpenHashSet<ChunkHolder> holders = new ReferenceLinkedOpenHashSet<>();
     private final ReferenceLinkedOpenHashSet<LevelChunk> ticking = new ReferenceLinkedOpenHashSet<>();
@@ -129,7 +126,6 @@ public final class RegionChunks {
         return ticking;
     }
 
-    /** The ticking chunks inside the simulation distance of a player or of a forced ticket: the ones whose blocks tick. */
     public Collection<LevelChunk> simulated() {
         return simulated;
     }
