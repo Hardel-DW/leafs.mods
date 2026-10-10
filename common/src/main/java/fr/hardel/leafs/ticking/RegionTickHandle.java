@@ -15,6 +15,7 @@ public final class RegionTickHandle extends TickHandle {
     private final LevelRegions regions;
     private volatile int chunkCensus;
     private volatile int entityCensus;
+    private long lastEndNanos = System.nanoTime();
 
     RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions, LongSupplier nanosPerTick) {
         super(region.id(), dimension, TickStages.count(TickFamily.REGION), nanosPerTick);
@@ -72,11 +73,13 @@ public final class RegionTickHandle extends TickHandle {
             long startNanos = System.nanoTime();
             stages.recordLag(startNanos - scheduledStartNanos());
             stages.beginTick(startNanos);
-            body.tick(region, worldData, stages, regions, startNanos + body.level().tickRateManager().nanosecondsPerTick());
+            long tasksDeadlineNanos = startNanos + scheduledStartNanos() - lastEndNanos;
+            body.tick(region, worldData, stages, regions, tasksDeadlineNanos, startNanos + body.level().tickRateManager().nanosecondsPerTick());
             chunkCensus = region.chunkCount();
             entityCensus = worldData.entities().size();
             stages.endTick(System.nanoTime());
         } finally {
+            lastEndNanos = System.nanoTime();
             context.exit();
         }
     }

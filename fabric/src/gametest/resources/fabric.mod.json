@@ -16,7 +16,8 @@
 			"fr.hardel.leafs.gametest.StructureStartsTest",
 			"fr.hardel.leafs.gametest.ChunkPacketTest",
 			"fr.hardel.leafs.gametest.FlushingSaveTest",
-			"fr.hardel.leafs.gametest.RegionChunksTest"
+			"fr.hardel.leafs.gametest.RegionChunksTest",
+			"fr.hardel.leafs.gametest.TickOrderTest"
 		]
 	},
 	"depends": {
