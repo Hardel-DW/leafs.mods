@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionTickSchedulerTest {
-    private static final long TICK_PERIOD_NANOS = 50_000_000L;
 
     private RegionTickScheduler scheduler;
 
@@ -33,13 +32,13 @@ class RegionTickSchedulerTest {
     }
 
     private RegionTickScheduler createScheduler(int threads) {
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(threads, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(threads, () -> { }), false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
         return scheduler;
     }
 
     @Test
     void regionThreadNamesScopeTheWorkerDuringItsTick() throws InterruptedException {
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, true, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), true, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> { });
         scheduler.start();
         CountDownLatch ticked = new CountDownLatch(1);
         AtomicReference<String> nameDuringTick = new AtomicReference<>();
@@ -109,7 +108,7 @@ class RegionTickSchedulerTest {
     @Test
     void aNormalShutdownLetsATickFinishTheWaitTheServerServes() throws InterruptedException {
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
+        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
         stopping.start();
         CountDownLatch waiting = new CountDownLatch(1);
         AtomicBoolean delivered = new AtomicBoolean();
@@ -131,7 +130,7 @@ class RegionTickSchedulerTest {
     @Test
     void aCrashShutdownEndsATickStuckInAWait() throws InterruptedException {
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
+        RegionTickScheduler stopping = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> failures.add(failure));
         stopping.start();
         CountDownLatch waiting = new CountDownLatch(1);
         stopping.schedule(new TestTickHandle(1, () -> {
@@ -180,6 +179,21 @@ class RegionTickSchedulerTest {
         assertEquals(after, ticks.get(), "a cancelled handle must stop ticking");
     }
 
+    @Test
+    void aHandleWithoutStartDelayTicksBackToBack() throws InterruptedException {
+        RegionTickScheduler pool = createScheduler(1);
+        pool.start();
+        AtomicLong ticks = new AtomicLong();
+        TestTickHandle handle = new TestTickHandle(1, ticks::incrementAndGet);
+        handle.startDelayNanos(0L);
+
+        pool.schedule(handle);
+        Thread.sleep(200);
+        handle.cancel();
+
+        assertTrue(ticks.get() > 20, "a sprint runs its ticks back to back, %d ticks in 200 ms".formatted(ticks.get()));
+    }
+
     /** 2026-09-23: a start missed behind the server thread retried one period later, in phase with the next server tick, so the region never ticked again. */
     @Test
     void aMissedStartWaitsTheServerTickEndThenRuns() throws InterruptedException {
@@ -215,7 +229,7 @@ class RegionTickSchedulerTest {
     void poolTickFailureInvokesThePolicyAndStopsRescheduling() throws InterruptedException {
         CountDownLatch failed = new CountDownLatch(1);
         ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> {
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (handle, throwable) -> {
             failures.add(throwable);
             failed.countDown();
         });
@@ -244,7 +258,7 @@ class RegionTickSchedulerTest {
                 throw new IllegalStateException("drain");
             }
         });
-        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, () -> TICK_PERIOD_NANOS, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> {
+        scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, false, new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), message -> { }, stall -> { }), (_, failure) -> {
             if (failure.getMessage().equals("drain")) {
                 failed.countDown();
             }

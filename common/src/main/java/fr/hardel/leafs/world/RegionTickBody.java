@@ -11,9 +11,11 @@ import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
-import fr.hardel.leafs.ticking.RegionClock;
 import fr.hardel.leafs.ticking.RegionTickData;
+import fr.hardel.leafs.ticking.RegionTime;
+import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerChunkCache;
@@ -32,11 +34,13 @@ import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.LongPredicate;
 
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
+    private static final long TIME_SYNC_TICKS = 20L;
 
     private final ServerLevel level;
     private final ChunkSaves saves;
@@ -52,19 +56,14 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<RegionTickData> region, RegionClock clock, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tickDeadlineNanos) {
-        TickRateManager tickRateManager = level.tickRateManager();
-        boolean runs = tickRateManager.runsNormally();
-        if (runs) {
-            clock.advance();
-        }
-
+    public void tick(Region<RegionTickData> region, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tickDeadlineNanos) {
         LevelChunks chunks = LevelChunks.of(level);
         int shift = regions.regionizer().sectionShift();
         LongPredicate mine = section -> regions.tickerAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) == Thread.currentThread();
         chunks.timeouts().purge(mine);
+        RegionTime time = worldData.time();
         RegionChunks owned = worldData.chunks();
-        owned.refresh(region, level);
+        owned.refresh(region, level, time);
         stages.mark(TickStages.regionTickets);
         RegionEntities entities = worldData.entities();
         entities.refresh(level, owned.entitySections());
@@ -77,8 +76,11 @@ public final class RegionTickBody {
         });
 
         stages.mark(TickStages.regionPackets);
+        time.beginTick(TickingManager.of(level.getServer()).state());
+        TickRateManager tickRateManager = time.rate();
+        boolean runs = tickRateManager.runsNormally();
         if (runs && !level.isDebug()) {
-            long currentTick = clock.currentTick();
+            long currentTick = time.currentTick();
             worldData.blockTicks().drain(owned.simulated(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickBlock);
             stages.mark(TickStages.regionBlockTicks);
             worldData.fluidTicks().drain(owned.simulated(), level::isPositionTickingWithEntitiesLoaded, currentTick, level::tickFluid);
@@ -103,11 +105,15 @@ public final class RegionTickBody {
             stages.mark(TickStages.regionBlockEntities);
         }
 
-        // The intake shares the time left of the tick: chunk sends, a player after the other so that none is left behind, then saves, then the inbox.
         long intakeDeadlineNanos = Math.max(tickDeadlineNanos, System.nanoTime() + level.tickRateManager().nanosecondsPerTick() / 10);
         long sendDeadlineNanos = shareOf(intakeDeadlineNanos, 3);
         for (int index = 0; index < players.size(); index++) {
-            RegionNetworkTick.tickPlayerOnRegion(players.get(Math.floorMod(clock.currentTick() + index, players.size())), level.getServer(), sendDeadlineNanos);
+            RegionNetworkTick.tickPlayerOnRegion(players.get(Math.floorMod(time.currentTick() + index, players.size())), level.getServer(), sendDeadlineNanos);
+        }
+
+        if (runs && time.currentTick() % TIME_SYNC_TICKS == 0) {
+            ClientboundSetTimePacket timeSync = new ClientboundSetTimePacket(time.currentTick(), Map.of());
+            players.forEach(player -> player.connection.send(timeSync));
         }
 
         stages.mark(TickStages.regionPlayers);
@@ -116,6 +122,7 @@ public final class RegionTickBody {
         RegionInbox inbox = region.data().inbox();
         inbox.drain(shareOf(intakeDeadlineNanos, 1));
         stages.mark(TickStages.regionTasks);
+        time.endTick();
     }
 
     /** The deadline of an intake job: its even share of the time left for the jobs still to run, never under a hundredth of a tick. */

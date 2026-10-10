@@ -23,6 +23,10 @@ public abstract class MinecraftServerMixin {
         return List.of();
     }
 
+    @WrapOperation(method = "tickChildren", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;forceGameTimeSynchronization()V"))
+    private void leafs$regionsSyncTheirTime(MinecraftServer server, Operation<Void> original) {
+    }
+
     @WrapOperation(method = "saveEverything", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;saveAll()V"))
     private void leafs$savePlayersOnTheirRegions(PlayerList playerList, Operation<Void> original, @Local(argsOnly = true, ordinal = 1) boolean flush) {
         MinecraftServer server = (MinecraftServer) (Object) this;

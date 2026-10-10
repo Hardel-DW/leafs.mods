@@ -63,3 +63,4 @@ accessible field net/minecraft/server/level/ChunkGenerationTask scheduledStatus 
 accessible field net/minecraft/server/level/ChunkGenerationTask markedForCancellation Z
 accessible field net/minecraft/server/level/ChunkGenerationTask cache Lnet/minecraft/util/StaticCache2D;
 accessible field net/minecraft/server/level/ChunkGenerationTask needsGeneration Z
+accessible field net/minecraft/world/TickRateManager isFrozen Z

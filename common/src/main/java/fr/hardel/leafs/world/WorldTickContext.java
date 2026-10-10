@@ -3,6 +3,7 @@ package fr.hardel.leafs.world;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.RegionTickData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.jspecify.annotations.Nullable;
 
@@ -45,7 +46,7 @@ public final class WorldTickContext {
         return CURRENT.get();
     }
 
-    public static RegionWorldData activeFor(ServerLevel level) {
+    public static RegionWorldData activeFor(Level level) {
         WorldTickContext context = CURRENT.get();
         return context != null && context.level == level ? context.worldData : null;
     }

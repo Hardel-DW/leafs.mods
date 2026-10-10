@@ -9,29 +9,26 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionCallbacks;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.Regionizer;
-import fr.hardel.leafs.world.ChunkScheduledTicks;
 import fr.hardel.leafs.world.RegionTickBody;
 import fr.hardel.leafs.world.RegionWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongList;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
-import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.LevelChunk;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 public final class LevelRegions implements RegionCallbacks<RegionTickData>, LevelListener, ChunkOwners.Regions {
     private final Regionizer<RegionTickData> regionizer;
     private volatile String dimension;
-    private volatile LongSupplier gameTime;
-    private volatile Function<LongSupplier, RegionWorldData> worldDataFactory;
+    private volatile LongSupplier nanosPerTick;
+    private volatile Supplier<RegionWorldData> worldDataFactory;
     private volatile RegionTickBody body;
     private volatile RegionTickScheduler scheduler;
     private volatile long autosaveEpoch;
@@ -59,13 +56,13 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return regionizer;
     }
 
-    public void activate(String dimension, RegionTickScheduler scheduler, LongSupplier gameTime, Function<LongSupplier, RegionWorldData> worldDataFactory, RegionTickBody body) {
+    public void activate(String dimension, RegionTickScheduler scheduler, LongSupplier nanosPerTick, Supplier<RegionWorldData> worldDataFactory, RegionTickBody body) {
         if (this.scheduler != null) {
             return;
         }
 
         this.dimension = dimension;
-        this.gameTime = gameTime;
+        this.nanosPerTick = nanosPerTick;
         this.worldDataFactory = worldDataFactory;
         this.body = body;
         for (Region<RegionTickData> region : regionizer.regionsView()) {
@@ -130,11 +127,6 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         return region == null ? null : region.data().worldData();
     }
 
-    public long timeAt(int chunkX, int chunkZ, long gameTime) {
-        RegionWorldData data = worldDataAt(chunkX, chunkZ);
-        return data == null ? gameTime : data.currentTick();
-    }
-
     public void bumpAutosaveEpoch() {
         autosaveEpoch++;
     }
@@ -170,6 +162,17 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
     }
 
+    public boolean all(Predicate<RegionTime> test) {
+        for (Region<RegionTickData> region : regionizer.regionsView()) {
+            RegionWorldData worldData = region.data().worldData();
+            if (worldData != null && !test.test(worldData.time())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public int sections() {
         return sumOverRegions(Region::sectionCount);
     }
@@ -202,19 +205,18 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
         }
 
         if (scheduler != null) {
-            data.attachHandle(new RegionTickHandle(region, dimension, this, scheduler::periodNanos));
+            data.attachHandle(new RegionTickHandle(region, dimension, this, nanosPerTick));
         }
 
         return data;
     }
 
     private void equipWorld(RegionTickData data) {
-        RegionClock clock = new RegionClock(gameTime.getAsLong());
-        data.equipWorld(clock, worldDataFactory.apply(clock::currentTick));
+        data.equipWorld(worldDataFactory.get());
     }
 
     private RegionTickHandle newHandle(Region<RegionTickData> region) {
-        RegionTickHandle handle = new RegionTickHandle(region, dimension, this, scheduler::periodNanos);
+        RegionTickHandle handle = new RegionTickHandle(region, dimension, this, nanosPerTick);
         region.data().attachHandle(handle);
         return handle;
     }
@@ -250,29 +252,13 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
 
     @Override
     public void merge(Region<RegionTickData> from, Region<RegionTickData> into, LongList movedChunks) {
-        RegionTickBody body = this.body;
         if (body != null) {
-            rebaseTicks(body.level(), movedChunks, into.data().clock().currentTick() - from.data().clock().currentTick());
             into.data().worldData().forgetEpoch();
         }
 
         RegionInbox survivor = into.data().inbox();
         from.data().inbox().close(posted -> survivor.post(posted.chunkX(), posted.chunkZ(), posted.work(), posted.task()));
         merged++;
-    }
-
-    private static void rebaseTicks(ServerLevel level, LongList chunks, long tickOffset) {
-        if (tickOffset == 0) {
-            return;
-        }
-
-        ChunkMap chunkMap = level.getChunkSource().chunkMap;
-        for (int index = 0; index < chunks.size(); index++) {
-            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunks.getLong(index));
-            if (holder != null && holder.getLatestChunk() instanceof LevelChunk chunk) {
-                ChunkScheduledTicks.rebase(chunk, tickOffset);
-            }
-        }
     }
 
     @Override
@@ -287,7 +273,7 @@ public final class LevelRegions implements RegionCallbacks<RegionTickData>, Leve
     public void split(Region<RegionTickData> parent, Long2ObjectMap<Region<RegionTickData>> sectionToChild, List<Region<RegionTickData>> children) {
         if (worldDataFactory != null) {
             for (Region<RegionTickData> child : children) {
-                child.data().clock().resetTo(parent.data().clock().currentTick());
+                child.data().worldData().time().inherit(parent.data().worldData().time());
             }
         }
 

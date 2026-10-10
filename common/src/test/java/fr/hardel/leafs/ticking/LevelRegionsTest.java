@@ -178,41 +178,46 @@ class LevelRegionsTest {
     }
 
     @Test
-    void mergeKeepsTheSurvivorClockAndSplitChildrenStartOnTheParentClock() {
+    void mergeKeepsTheSurvivorTimeAndSplitChildrenStartOnTheParentTime() {
         activateRegions();
         simulated(regions, 0, 0);
         simulated(regions, 96, 0);
         settle();
         assertEquals(2, regionCount());
-        RegionClock west = regions.regionizer().regionAt(0, 0).data().clock();
-        RegionClock east = regions.regionizer().regionAt(96, 0).data().clock();
-        west.advance();
-        west.advance();
-        east.advance();
+        RegionTime west = timeAt(0);
+        RegionTime east = timeAt(96);
+        west.beginTick(TickState.INITIAL);
+        west.beginTick(TickState.INITIAL);
+        east.beginTick(TickState.INITIAL);
 
         simulated(regions, 32, 0);
         simulated(regions, 64, 0);
         settle();
         assertEquals(1, regionCount());
-        RegionClock survivor = regions.regionizer().regionAt(0, 0).data().clock();
-        assertTrue(survivor == west || survivor == east, "the survivor keeps one of the two clocks untouched");
+        RegionTime survivor = timeAt(0);
+        assertTrue(survivor == west || survivor == east, "the survivor keeps one of the two times untouched");
 
-        survivor.advance();
+        survivor.beginTick(TickState.INITIAL);
         unsimulated(regions, 32, 0);
         unsimulated(regions, 64, 0);
         settle();
         assertEquals(2, regionCount());
-        assertEquals(survivor.currentTick(), regions.regionizer().regionAt(0, 0).data().clock().currentTick());
-        assertEquals(survivor.currentTick(), regions.regionizer().regionAt(96, 0).data().clock().currentTick());
+        assertEquals(survivor.currentTick(), timeAt(0).currentTick());
+        assertEquals(survivor.currentTick(), timeAt(96).currentTick());
+    }
+
+    private RegionTime timeAt(int chunkX) {
+        return regions.regionizer().regionAt(chunkX, 0).data().worldData().time();
     }
 
     private void activateRegions() {
         LeafsWatchdog watchdog = new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> {
         }, _ -> {
         });
-        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), () -> 50_000_000L, false, watchdog, (_, _) -> {
+        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), false, watchdog, (_, _) -> {
         });
-        regions.activate("leafs:test", scheduler, () -> 0L, time -> new RegionWorldData(time, RandomSource.create(), null, new PathTypeCache()), null);
+        regions.activate("leafs:test", scheduler, () -> 50_000_000L, () -> new RegionWorldData(new RegionTime(0L, TickState.INITIAL), RandomSource.create(), null, new PathTypeCache()),
+            null);
     }
 
     private void settle() {

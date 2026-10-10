@@ -9,7 +9,6 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
-import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 
 public final class RegionTickScheduler {
@@ -18,16 +17,14 @@ public final class RegionTickScheduler {
     private final Queue<ScheduledTick> missed = new ConcurrentLinkedQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
-    private final LongSupplier periodNanos;
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
     private final TickEpochs epochs;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(ThreadGroup serverThreads, TickEpochs epochs, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(ThreadGroup serverThreads, TickEpochs epochs, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.serverThreads = serverThreads;
-        this.periodNanos = periodNanos;
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
         this.failurePolicy = failurePolicy;
@@ -53,7 +50,7 @@ public final class RegionTickScheduler {
     }
 
     public void schedule(TickHandle handle) {
-        handle.setScheduledStartNanos(System.nanoTime() + periodNanos());
+        handle.setScheduledStartNanos(System.nanoTime() + handle.nextStartDelayNanos());
         queue.add(new ScheduledTick(handle));
     }
 
@@ -62,10 +59,6 @@ public final class RegionTickScheduler {
             tick.handle.setScheduledStartNanos(System.nanoTime());
             queue.add(tick);
         }
-    }
-
-    public long periodNanos() {
-        return periodNanos.getAsLong();
     }
 
     /** Vanilla and mods see a worker as the server thread. */
@@ -130,7 +123,7 @@ public final class RegionTickScheduler {
                 continue;
             }
 
-            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos()));
+            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + handle.nextStartDelayNanos()));
             queue.add(next);
         }
     }

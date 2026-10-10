@@ -1,5 +1,7 @@
 package fr.hardel.leafs.world;
 
+import fr.hardel.leafs.ticking.RegionTime;
+import fr.hardel.leafs.ticking.TickState;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
@@ -10,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class RoutingRandomSourceTest {
     private final RandomSource unitRandom = fixed(2);
     private final RoutingRandomSource routing = new RoutingRandomSource(null);
-    private final RegionWorldData worldData = new RegionWorldData(() -> 0L, unitRandom, null, new PathTypeCache());
+    private final RegionWorldData worldData = new RegionWorldData(new RegionTime(0L, TickState.INITIAL), unitRandom, null, new PathTypeCache());
 
     @Test
     void contextForTheLevelResolvesTheRegionRandom() {

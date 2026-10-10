@@ -16,8 +16,8 @@ public final class RegionTickHandle extends TickHandle {
     private volatile int chunkCensus;
     private volatile int entityCensus;
 
-    RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions, LongSupplier periodNanos) {
-        super(region.id(), dimension, TickStages.count(TickFamily.REGION), periodNanos);
+    RegionTickHandle(Region<RegionTickData> region, String dimension, LevelRegions regions, LongSupplier nanosPerTick) {
+        super(region.id(), dimension, TickStages.count(TickFamily.REGION), nanosPerTick);
         this.region = region;
         this.regions = regions;
     }
@@ -34,7 +34,12 @@ public final class RegionTickHandle extends TickHandle {
 
     @Override
     public long currentTick() {
-        return region.data().clock().currentTick();
+        return region.data().worldData().time().currentTick();
+    }
+
+    @Override
+    protected long nextStartDelayNanos() {
+        return region.data().worldData().time().nextStartDelayNanos();
     }
 
     @Override
@@ -58,7 +63,7 @@ public final class RegionTickHandle extends TickHandle {
         RegionTickBody body = regions.body();
         WorldTickContext context = WorldTickContext.enter(body.level(), region, worldData);
         try {
-            if (TickingManager.of(body.level().getServer()).paused()) {
+            if (TickingManager.of(body.level().getServer()).state().paused()) {
                 data.inbox().drain();
                 return;
             }
@@ -67,7 +72,7 @@ public final class RegionTickHandle extends TickHandle {
             long startNanos = System.nanoTime();
             stages.recordLag(startNanos - scheduledStartNanos());
             stages.beginTick(startNanos);
-            body.tick(region, data.clock(), worldData, stages, regions, startNanos + body.level().tickRateManager().nanosecondsPerTick());
+            body.tick(region, worldData, stages, regions, startNanos + body.level().tickRateManager().nanosecondsPerTick());
             chunkCensus = region.chunkCount();
             entityCensus = worldData.entities().size();
             stages.endTick(System.nanoTime());

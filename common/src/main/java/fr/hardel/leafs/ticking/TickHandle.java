@@ -12,10 +12,10 @@ public abstract class TickHandle {
     private volatile boolean cancelled;
     private volatile long scheduledStartNanos;
 
-    protected TickHandle(long id, String dimension, int stageCount, LongSupplier periodNanos) {
+    protected TickHandle(long id, String dimension, int stageCount, LongSupplier nanosPerTick) {
         this.id = id;
         this.dimension = dimension;
-        this.stages = new StageTimings(stageCount, periodNanos);
+        this.stages = new StageTimings(stageCount, nanosPerTick);
     }
 
     // Used by the Leafs Debug mod
@@ -55,6 +55,8 @@ public abstract class TickHandle {
     }
 
     public abstract long currentTick();
+
+    protected abstract long nextStartDelayNanos();
 
     protected abstract boolean tick();
 }

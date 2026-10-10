@@ -5,6 +5,7 @@ import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.region.Region;
+import fr.hardel.leafs.ticking.RegionTime;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
 import net.minecraft.server.level.ChunkHolder;
@@ -34,20 +35,22 @@ public final class RegionChunks {
     private int maxX;
     private int maxZ;
 
-    public void refresh(Region<?> region, ServerLevel level) {
+    public void refresh(Region<?> region, ServerLevel level, RegionTime time) {
         LevelChunks chunks = LevelChunks.of(level);
-        region.takeChanged(section -> read(section, chunks.holders().table(), chunks.owners(), level));
+        region.takeChanged(section -> read(section, chunks.holders().table(), chunks.owners(), level, time));
         if (unbound) {
             bound();
         }
     }
 
-    private void read(long section, HolderTable table, ChunkOwners owners, ServerLevel level) {
+    private void read(long section, HolderTable table, ChunkOwners owners, ServerLevel level, RegionTime time) {
         forget(section);
         List<Read> reads = new ArrayList<>();
         table.forEachHolderIn(section, holder -> {
             ChunkPos pos = holder.getPos();
-            if (!owners.heldElsewhere(pos.x(), pos.z()) && RegionChunkAccess.fullChunkOrNull(holder) != null) {
+            LevelChunk full = RegionChunkAccess.fullChunkOrNull(holder);
+            if (!owners.heldElsewhere(pos.x(), pos.z()) && full != null) {
+                time.adopt(full);
                 reads.add(read(holder, level));
             }
         });
