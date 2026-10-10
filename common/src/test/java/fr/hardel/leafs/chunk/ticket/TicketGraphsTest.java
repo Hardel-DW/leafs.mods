@@ -87,7 +87,7 @@ class TicketGraphsTest {
             drainers.add(Thread.currentThread().getName());
             drained.countDown();
         }, pool);
-        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, () -> 50_000_000L, false,
+        RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), epochs, false,
             new LeafsWatchdog(Duration.ofSeconds(60).toNanos(), () -> 0L, _ -> Map.of(), _ -> { }, _ -> { }), (_, _) -> { });
         scheduler.start();
         TestTickHandle region = new TestTickHandle(1, () -> {

@@ -1,6 +1,8 @@
 package fr.hardel.leafs.world;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.leafs.ticking.RegionTime;
+import fr.hardel.leafs.ticking.TickState;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.owner.ChunkClaim;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
@@ -67,7 +69,7 @@ class RoutingNeighborUpdaterTest {
     }
 
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
-        return new RegionWorldData(() -> 0L, RandomSource.create(), updater, new PathTypeCache());
+        return new RegionWorldData(new RegionTime(0L, TickState.INITIAL), RandomSource.create(), updater, new PathTypeCache());
     }
 
     private static void callAll(RoutingNeighborUpdater router) {

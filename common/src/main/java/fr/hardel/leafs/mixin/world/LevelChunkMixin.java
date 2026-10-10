@@ -1,10 +1,16 @@
 package fr.hardel.leafs.mixin.world;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import fr.hardel.excess.ConcurrentInt2ObjectMap;
+import fr.hardel.leafs.ticking.RegionTime;
 import fr.hardel.leafs.world.ChunkBlockEvents;
 import fr.hardel.leafs.world.ChunkTickAccess;
 import fr.hardel.leafs.world.ChunkTickers;
+import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.gameevent.GameEventListenerRegistry;
 import org.spongepowered.asm.mixin.Final;
@@ -36,6 +42,21 @@ public abstract class LevelChunkMixin implements ChunkTickAccess {
     @Inject(method = "removeGameEventListenerRegistry", at = @At("HEAD"), cancellable = true)
     private void leafs$keepListenerRegistry(CallbackInfo callbackInfo) {
         callbackInfo.cancel();
+    }
+
+    @WrapMethod(method = "getTicksForSerialization")
+    private ChunkAccess.PackedTicks leafs$packInTheTicksTime(long currentTick, Operation<ChunkAccess.PackedTicks> original) {
+        LevelChunk chunk = (LevelChunk) (Object) this;
+        return original.call(RegionTime.now(chunk.blockTicks, chunk.getLevel()));
+    }
+
+    @Inject(method = "unpackTicks", at = @At("HEAD"))
+    private void leafs$unpackInTheCallerTime(long currentTick, CallbackInfo callbackInfo) {
+        LevelChunk chunk = (LevelChunk) (Object) this;
+        RegionWorldData ticking = WorldTickContext.activeFor(chunk.getLevel());
+        RegionTime time = ticking == null ? null : ticking.time();
+        RegionTime.retime(chunk.blockTicks, chunk.getLevel(), time);
+        RegionTime.retime(chunk.fluidTicks, chunk.getLevel(), time);
     }
 
     @Unique

@@ -1,19 +1,15 @@
 package fr.hardel.leafs.mixin.world;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.Router;
-import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.world.ChunkBlockEvents;
 import fr.hardel.leafs.world.ChunkScheduledTicks;
 import fr.hardel.leafs.world.LevelBlockUpdates;
 import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.TickRateManager;
 import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,8 +18,6 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.pathfinder.PathTypeCache;
 import net.minecraft.world.ticks.LevelTicks;
-import net.minecraft.world.ticks.ScheduledTick;
-import net.minecraft.world.ticks.TickPriority;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -52,35 +46,24 @@ public abstract class ServerLevelMixin {
     @Unique
     private final AtomicLong leafs$blockEventSequence = new AtomicLong();
 
-    @Unique
-    private ChunkScheduledTicks<Block> leafs$blockTicks;
-
-    @Unique
-    private ChunkScheduledTicks<Fluid> leafs$fluidTicks;
-
     @Inject(method = "<init>", at = @At("TAIL"))
     private void leafs$chunkKeyedTicks(CallbackInfo callbackInfo) {
         Router owners = LevelChunks.of(self()).owners();
-        leafs$blockTicks = new ChunkScheduledTicks<>(self(), self(), RegionWorldData::blockTicks, owners);
-        leafs$fluidTicks = new ChunkScheduledTicks<>(self(), self(), RegionWorldData::fluidTicks, owners);
-        this.blockTicks = leafs$blockTicks;
-        this.fluidTicks = leafs$fluidTicks;
+        this.blockTicks = new ChunkScheduledTicks<>(self(), self()::getGameTime, RegionWorldData::blockTicks, owners);
+        this.fluidTicks = new ChunkScheduledTicks<>(self(), self()::getGameTime, RegionWorldData::fluidTicks, owners);
     }
 
-    public void scheduleTick(BlockPos pos, Block type, int delay, TickPriority priority) {
-        leafs$blockTicks.schedule(pos, type, delay, priority);
+    public long getGameTime() {
+        RegionWorldData ticking = WorldTickContext.activeFor(self());
+        return ticking == null ? self().getLevelData().getGameTime() : ticking.time().currentTick();
     }
 
-    public void scheduleTick(BlockPos pos, Block type, int delay) {
-        leafs$blockTicks.schedule(pos, type, delay, TickPriority.NORMAL);
-    }
-
-    public void scheduleTick(BlockPos pos, Fluid type, int delay, TickPriority priority) {
-        leafs$fluidTicks.schedule(pos, type, delay, priority);
-    }
-
-    public void scheduleTick(BlockPos pos, Fluid type, int delay) {
-        leafs$fluidTicks.schedule(pos, type, delay, TickPriority.NORMAL);
+    @Inject(method = "tickRateManager", at = @At("HEAD"), cancellable = true)
+    private void leafs$regionTickRate(CallbackInfoReturnable<TickRateManager> callbackInfo) {
+        RegionWorldData ticking = WorldTickContext.activeFor(self());
+        if (ticking != null) {
+            callbackInfo.setReturnValue(ticking.time().rate());
+        }
     }
 
     @Inject(method = "unload", at = @At("HEAD"))
@@ -118,30 +101,10 @@ public abstract class ServerLevelMixin {
         }
     }
 
-    @WrapOperation(method = "startTickingChunk", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerLevel;getGameTime()J"))
-    private long leafs$unpackAtOwnerClock(ServerLevel instance, Operation<Long> original, @Local(argsOnly = true) LevelChunk chunk) {
-        return LevelRegions.of(instance).timeAt(chunk.getPos().x(), chunk.getPos().z(), original.call(instance));
-    }
-
     @Inject(method = "sendBlockUpdated", at = @At("HEAD"), cancellable = true)
     private void leafs$positionKeyedBlockUpdate(BlockPos pos, BlockState old, BlockState current, int updateFlags, CallbackInfo callbackInfo) {
         LevelBlockUpdates.onBlockUpdated(self(), pos, old, current);
         callbackInfo.cancel();
-    }
-
-    public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay, TickPriority priority) {
-        RegionWorldData owner = leafs$ownerOf(pos);
-        return owner == null ? new ScheduledTick<>(type, pos, self().getGameTime() + delay, priority, self().nextSubTickCount()) : owner.createTick(pos, type, delay, priority);
-    }
-
-    public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int delay) {
-        RegionWorldData owner = leafs$ownerOf(pos);
-        return owner == null ? new ScheduledTick<>(type, pos, self().getGameTime() + delay, self().nextSubTickCount()) : owner.createTick(pos, type, delay);
-    }
-
-    @Unique
-    private RegionWorldData leafs$ownerOf(BlockPos pos) {
-        return LevelRegions.of(self()).worldDataAt(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
     }
 
     @Unique
