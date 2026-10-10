@@ -32,8 +32,8 @@ public final class RegionEntities {
         LevelRegions regions = LevelRegions.of(level);
         for (ServerPlayer player : level.players()) {
             ChunkPos pos = player.chunkPosition();
-            if (!player.isRemoved() && regions.tickerAt(pos.x(), pos.z()) == Thread.currentThread() && ids.add(player.getId())) {
-                entities.add(player);
+            if (!player.isRemoved() && regions.tickerAt(pos.x(), pos.z()) == Thread.currentThread()) {
+                add(player);
             }
         }
     }
@@ -48,14 +48,20 @@ public final class RegionEntities {
             }
 
             if (!entity.isRemoved() && (ticking || entity.isAlwaysTicking())) {
-                entities.add(entity);
-                ids.add(entity.getId());
+                add(entity);
             }
         });
     }
 
+    public void add(Entity entity) {
+        if (ids.add(entity.getId())) {
+            entities.add(entity);
+        }
+    }
+
     public void forEach(Consumer<Entity> action) {
-        for (Entity entity : entities) {
+        for (int index = 0, size = entities.size(); index < size; index++) {
+            Entity entity = entities.get(index);
             if (entity.level() == level) {
                 action.accept(entity);
             }
