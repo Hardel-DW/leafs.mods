@@ -53,7 +53,10 @@ public final class RegionTickBody {
         return level;
     }
 
-    public void tick(Region<RegionTickData> region, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tickDeadlineNanos) {
+    public void tick(Region<RegionTickData> region, RegionWorldData worldData, StageTimings stages, LevelRegions regions, long tasksDeadlineNanos, long tickDeadlineNanos) {
+        RegionInbox inbox = region.data().inbox();
+        inbox.drain(shareOf(tasksDeadlineNanos, 1));
+        stages.mark(TickStages.regionTasks);
         LevelChunks chunks = LevelChunks.of(level);
         int shift = regions.regionizer().sectionShift();
         LongPredicate mine = section -> regions.tickerAt(CoordinateKey.x(section) << shift, CoordinateKey.z(section) << shift) == Thread.currentThread();
@@ -111,13 +114,11 @@ public final class RegionTickBody {
         stages.mark(TickStages.regionPlayers);
         saves.autosave(worldData, players, regions.autosaveEpoch(), shareOf(intakeDeadlineNanos, 2));
         stages.mark(TickStages.regionAutosave);
-        RegionInbox inbox = region.data().inbox();
         inbox.drain(shareOf(intakeDeadlineNanos, 1));
         stages.mark(TickStages.regionTasks);
         time.endTick();
     }
 
-    /** The deadline of an intake job: its even share of the time left for the jobs still to run, never under a hundredth of a tick. */
     private long shareOf(long intakeDeadlineNanos, int jobsLeft) {
         long now = System.nanoTime();
         return now + Math.max((intakeDeadlineNanos - now) / jobsLeft, level.tickRateManager().nanosecondsPerTick() / 100);

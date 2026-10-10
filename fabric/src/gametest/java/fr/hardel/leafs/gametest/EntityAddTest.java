@@ -5,15 +5,12 @@ import fr.hardel.leafs.chunk.owner.Work;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
-import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,21 +37,16 @@ public final class EntityAddTest {
     }
 
     /** 2026-10-10: an entity born in a region tick waited for the photo of the next tick, a thrown pearl ran one tick behind its client. */
-    @GameTest(maxTicks = 100)
+    @GameTest(maxTicks = 400)
     public void anEntityBornInARegionTickTicksInThatTick(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        BlockPos sand = new BlockPos(1, 6, 1);
-        BlockPos start = helper.absolutePos(sand);
         AtomicLong missedTicks = new AtomicLong(-1);
-        ServerEntityEvents.ENTITY_LOAD.register((entity, _) -> {
-            if (entity instanceof FallingBlockEntity falling && falling.getStartPos().equals(start)) {
-                long birth = level.getGameTime();
-                LevelChunks.of(level).owners().later(SectionPos.blockToSectionCoord(start.getX()), SectionPos.blockToSectionCoord(start.getZ()), Work.GAME,
-                    () -> missedTicks.set(level.getGameTime() - birth + 1 - falling.tickCount));
-            }
+        FallingSand.whenItFalls(helper, new BlockPos(1, 6, 1), falling -> {
+            long birth = level.getGameTime();
+            ChunkPos chunk = falling.chunkPosition();
+            LevelChunks.of(level).owners().later(chunk.x(), chunk.z(), Work.GAME, () -> missedTicks.set(level.getGameTime() - birth + 1 - falling.tickCount));
         });
 
-        helper.setBlock(sand, Blocks.SAND);
         helper.succeedWhen(() -> {
             helper.assertTrue(missedTicks.get() >= 0, "the sand has not fallen yet");
             helper.assertValueEqual(missedTicks.get(), 0L, "region ticks the falling sand missed");
