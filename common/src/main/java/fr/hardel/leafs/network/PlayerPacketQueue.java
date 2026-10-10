@@ -1,6 +1,5 @@
 package fr.hardel.leafs.network;
 
-import fr.hardel.leafs.Leafs;
 import net.minecraft.network.PacketProcessor;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -9,9 +8,8 @@ import java.util.function.BooleanSupplier;
 
 public final class PlayerPacketQueue {
     private static final ThreadLocal<PlayerPacketQueue> DRAINING = new ThreadLocal<>();
-    private static final long QUEUE_AGE_WARN_NANOS = 250_000_000L;
 
-    private final ConcurrentLinkedDeque<Entry> packets = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Runnable> packets = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean claimed = new AtomicBoolean();
     private volatile boolean handedOver;
 
@@ -20,11 +18,11 @@ public final class PlayerPacketQueue {
     }
 
     public void add(PacketProcessor.ListenerAndPacket<?> entry) {
-        packets.add(new Entry(entry::handle, entry.packet().getClass().getSimpleName(), System.nanoTime()));
+        packets.add(entry::handle);
     }
 
     public void addTask(Runnable task) {
-        packets.add(new Entry(task, "Handler continuation", System.nanoTime()));
+        packets.add(task);
     }
 
     public boolean handledByCurrentThread() {
@@ -86,24 +84,9 @@ public final class PlayerPacketQueue {
 
     private void drainLoop(BooleanSupplier ownerHolds) {
         handedOver = false;
-        long slowestAge = 0;
-        String slowestEntry = null;
-        Entry next;
+        Runnable next;
         while (!handedOver && ownerHolds.getAsBoolean() && (next = packets.poll()) != null) {
-            long age = System.nanoTime() - next.enqueuedNanos();
-            if (age > slowestAge) {
-                slowestAge = age;
-                slowestEntry = next.name();
-            }
-
-            next.work().run();
+            next.run();
         }
-
-        if (slowestAge > QUEUE_AGE_WARN_NANOS) {
-            Leafs.LOGGER.warn("{} waited {} ms in a player's packet queue before handling", slowestEntry, slowestAge / 1_000_000L);
-        }
-    }
-
-    private record Entry(Runnable work, String name, long enqueuedNanos) {
     }
 }
