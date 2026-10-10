@@ -28,9 +28,17 @@ public final class StructureStartsTest {
     private static final int POSITIONS = 16;
     private static final int COPIES = 4;
 
-    @GameTest(maxTicks = 100)
+    @GameTest(maxTicks = 1200)
     public void everyStructureStartsAlikeAloneAndInParallel(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
+        CompletableFuture<List<String>> differing = CompletableFuture.supplyAsync(() -> differing(level));
+        helper.succeedWhen(() -> {
+            helper.assertTrue(differing.isDone(), "the starts are still generating");
+            helper.assertTrue(differing.join().isEmpty(), "starts generated in parallel match the ones generated alone, except %s".formatted(differing.join()));
+        });
+    }
+
+    private static List<String> differing(ServerLevel level) {
         List<String> differing = new ArrayList<>();
         try (ExecutorService pool = Executors.newFixedThreadPool(12)) {
             level.registryAccess().lookupOrThrow(Registries.STRUCTURE).listElements().forEach(structure -> {
@@ -44,8 +52,7 @@ public final class StructureStartsTest {
             });
         }
 
-        helper.assertTrue(differing.isEmpty(), "starts generated in parallel match the ones generated alone, except %s".formatted(differing));
-        helper.succeed();
+        return differing;
     }
 
     @GameTest(maxTicks = 100)

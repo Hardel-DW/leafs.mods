@@ -9,7 +9,6 @@ import net.neoforged.neoforge.capabilities.ICapabilityInvalidationListener;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 public final class CapabilityListenerTest {
@@ -24,13 +23,11 @@ public final class CapabilityListenerTest {
                 .mapToObj(offset -> CompletableFuture.supplyAsync(() -> register(holder, offset), DAEMONS))
                 .toList();
                 
-        long missed = threads.stream()
-                .flatMap(thread -> thread.orTimeout(30, TimeUnit.SECONDS).join().stream())
-                .filter(invalidation -> !invalidation.received)
-                .count();
-                
-        helper.assertTrue(missed == 0, "%s of %s listeners missed their invalidation".formatted(missed, THREADS * CHUNKS));
-        helper.succeed();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(threads.stream().allMatch(CompletableFuture::isDone), "the threads are still registering");
+            long missed = threads.stream().flatMap(thread -> thread.join().stream()).filter(invalidation -> !invalidation.received).count();
+            helper.assertTrue(missed == 0, "%s of %s listeners missed their invalidation".formatted(missed, THREADS * CHUNKS));
+        });
     }
 
     private static List<Invalidation> register(CapabilityListenerHolder holder, int offset) {

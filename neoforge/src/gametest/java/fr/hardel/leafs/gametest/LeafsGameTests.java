@@ -23,7 +23,7 @@ public final class LeafsGameTests {
             new Test("the_test_chunk_is_owned_by_a_region", 20, RegionOwnershipTest::theTestChunkIsOwnedByARegion),
             new Test("mod_work_runs_on_the_player_queue", 40, PayloadWorkTest::modWorkRunsOnThePlayerQueue),
             new Test("a_cancelled_placement_primes_no_tnt", 20, CancelledPlacementTest::aCancelledPlacementPrimesNoTnt),
-            new Test("every_listener_hears_its_invalidation", 20, CapabilityListenerTest::everyListenerHearsItsInvalidation)
+            new Test("every_listener_hears_its_invalidation", 200, CapabilityListenerTest::everyListenerHearsItsInvalidation)
     );
 
     public LeafsGameTests(IEventBus modBus) {
