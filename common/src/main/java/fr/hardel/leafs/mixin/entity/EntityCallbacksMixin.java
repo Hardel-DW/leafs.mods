@@ -2,7 +2,8 @@ package fr.hardel.leafs.mixin.entity;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.minecraft.server.level.ServerLevel;
+import fr.hardel.leafs.world.RegionWorldData;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.entity.EntityTickList;
@@ -15,7 +16,11 @@ import java.util.Set;
 public abstract class EntityCallbacksMixin {
 
     @WrapOperation(method = "onTickingStart(Lnet/minecraft/world/entity/Entity;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/EntityTickList;add(Lnet/minecraft/world/entity/Entity;)V"))
-    private void leafs$noLevelTickList(EntityTickList instance, Entity entity, Operation<Void> original) {
+    private void leafs$intoTheRegionList(EntityTickList instance, Entity entity, Operation<Void> original) {
+        RegionWorldData ticking = WorldTickContext.activeFor(entity.level());
+        if (ticking != null) {
+            ticking.entities().add(entity);
+        }
     }
 
     @WrapOperation(method = "onTickingEnd(Lnet/minecraft/world/entity/Entity;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/EntityTickList;remove(Lnet/minecraft/world/entity/Entity;)V"))
