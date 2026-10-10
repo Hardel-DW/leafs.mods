@@ -90,6 +90,26 @@ class StageTimingsTest {
         assertEquals(1.0, snapshot.tps(), 0.01, "five completed ticks over the last five seconds, the open tick counts for nothing");
     }
 
+    /** 2026-10-06: N tick ends span only N-1 intervals, so a region at 19.8 TPS showed 20. */
+    @Test
+    void aSteadyRateUnderTheTargetShowsAsItIsWhenEverTheSampleFalls() {
+        StageTimings timings = new StageTimings(1, () -> PERIOD);
+        long interval = 10_000_000_000L / 198;
+        for (int tick = 0; tick < 200; tick++) {
+            timings.beginTick(tick * interval);
+            timings.endTick(tick * interval + 1_000_000L);
+        }
+
+        long lastEnd = 199 * interval + 1_000_000L;
+        int samples = 20;
+        double sum = 0;
+        for (int phase = 0; phase < samples; phase++) {
+            sum += timings.sample(lastEnd + phase * interval / samples).tps();
+        }
+
+        assertEquals(19.8, sum / samples, 0.03);
+    }
+
     @Test
     void aUnitThatNeverTickedRunsAtTheTargetRate() {
         StageTimings timings = new StageTimings(1, () -> PERIOD);
@@ -111,7 +131,7 @@ class StageTimingsTest {
         timings.beginTick(0);
         timings.endTick(8 * PERIOD);
 
-        assertEquals(5.0, timings.sample(8 * PERIOD).tps(), 0.01, "the start of the first tick and its end over eight periods");
+        assertEquals(2.5, timings.sample(8 * PERIOD).tps(), 0.01, "one tick over eight periods");
     }
 
     @Test

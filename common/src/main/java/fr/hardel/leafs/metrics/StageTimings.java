@@ -128,16 +128,14 @@ public final class StageTimings {
         long[] window = new long[CAPACITY];
         int ticks = 0;
         long total = 0;
-        long oldestEnd = nowNanos;
         for (int index = 0; index < CAPACITY; index++) {
             if (endNanos[index] >= cutoff && durationNanos[index] > 0) {
                 window[ticks++] = durationNanos[index];
                 total += durationNanos[index];
-                oldestEnd = Math.min(oldestEnd, endNanos[index]);
             }
         }
 
-        double tps = tps(nowNanos, cutoff, ticks, oldestEnd);
+        double tps = tps(nowNanos, ticks);
         if (ticks == 0) {
             return new Snapshot(tps, 0, 0, 0, 0, 0);
         }
@@ -146,17 +144,15 @@ public final class StageTimings {
         return new Snapshot(tps, total / (double) ticks / NANOS_PER_MILLI, percentile(window, ticks, 0.50), percentile(window, ticks, 0.95), percentile(window, ticks, 0.99), window[ticks - 1] / NANOS_PER_MILLI);
     }
 
-    private double tps(long nowNanos, long cutoff, int ticks, long oldestEnd) {
+    private double tps(long nowNanos, int ticks) {
         long period = periodNanos.getAsLong();
         double target = NANOS_PER_SECOND / period;
-        if (!begun) {
+        if (cursor == 0) {
             return target;
         }
 
-        boolean young = firstBeginNanos >= cutoff;
-        int events = young ? ticks + 1 : ticks;
-        long since = young ? firstBeginNanos : oldestEnd;
-        return Math.min(events * NANOS_PER_SECOND / Math.max(nowNanos - since, period), target);
+        long span = Math.min(nowNanos - firstBeginNanos, WINDOW_NANOS);
+        return Math.min(ticks * NANOS_PER_SECOND / Math.max(span, period), target);
     }
 
     private static double percentile(long[] sorted, int count, double fraction) {
