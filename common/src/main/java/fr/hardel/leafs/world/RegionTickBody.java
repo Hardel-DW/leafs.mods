@@ -15,7 +15,6 @@ import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.ticking.RegionTime;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
-import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerChunkCache;
@@ -34,13 +33,11 @@ import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.LongPredicate;
 
 public final class RegionTickBody {
     private static final int EMPTY_LEVEL_ENTITY_SKIP_TICKS = 300;
     private static final long PERSISTENT_SPAWN_PERIOD = 400L;
-    private static final long TIME_SYNC_TICKS = 20L;
 
     private final ServerLevel level;
     private final ChunkSaves saves;
@@ -109,11 +106,6 @@ public final class RegionTickBody {
         long sendDeadlineNanos = shareOf(intakeDeadlineNanos, 3);
         for (int index = 0; index < players.size(); index++) {
             RegionNetworkTick.tickPlayerOnRegion(players.get(Math.floorMod(time.currentTick() + index, players.size())), level.getServer(), sendDeadlineNanos);
-        }
-
-        if (runs && time.currentTick() % TIME_SYNC_TICKS == 0) {
-            ClientboundSetTimePacket timeSync = new ClientboundSetTimePacket(time.currentTick(), Map.of());
-            players.forEach(player -> player.connection.send(timeSync));
         }
 
         stages.mark(TickStages.regionPlayers);
