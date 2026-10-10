@@ -20,17 +20,16 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
 
 public final class PlayerTickTest {
     private static final double RAW_Y = 100;
     private static final double STEP_BLOCKS = 4;
     private static final int STEPS = 10;
     private static final int AWAITED_TICKS = 10;
-    private static final long BUSY_NANOS = TimeUnit.SECONDS.toNanos(3);
+    private static final int AHEAD_MAX_TICKS = 200;
 
     /** 2026-09-24: a player teleported to raw terrain was ticked by the server thread, which waited for the whole generation of the chunk. */
     @GameTest
@@ -82,36 +81,45 @@ public final class PlayerTickTest {
     }
 
     /** 2026-10-06: a bot flying ahead of the generation stood where its region listed no chunk yet, and the region left it out of its ticks. */
-    @GameTest(maxTicks = 40000)
+    @GameTest(maxTicks = AHEAD_MAX_TICKS)
     public void aPlayerAheadOfTheGenerationIsTicked(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         ChunkPool pool = LevelChunks.of(level).pool();
         ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
         Vec3 landed = onRawTerrain(rawChunk(helper, 1200));
+        CountDownLatch held = new CountDownLatch(pool.threads());
+        CountDownLatch released = new CountDownLatch(1);
         AtomicInteger ticksBefore = new AtomicInteger();
-        AtomicLong busyUntil = new AtomicLong();
 
         helper.startSequence()
             .thenExecute(() -> {
                 player.connection.tick();
                 accept(player, 1, player.position());
-                busyUntil.set(System.nanoTime() + BUSY_NANOS);
                 for (int worker = 0; worker < pool.threads(); worker++) {
-                    pool.execute(() -> LockSupport.parkNanos(BUSY_NANOS));
+                    pool.execute(() -> holdUntil(held, released));
                 }
-
+            })
+            .thenWaitUntil(() -> helper.assertTrue(held.getCount() == 0, "every generation thread is held"))
+            .thenExecute(() -> {
                 player.connection.teleport(landed.x, landed.y, landed.z, 0, 0);
-                player.connection.resetPosition();
-                accept(player, 2, landed);
                 ticksBefore.set(player.tickCount);
             })
-            .thenWaitUntil(() -> helper.assertTrue(player.tickCount - ticksBefore.get() >= AWAITED_TICKS || System.nanoTime() >= busyUntil.get(), "the player is being ticked"))
+            .thenWaitUntil(() -> helper.assertTrue(player.tickCount - ticksBefore.get() >= AWAITED_TICKS, "the region ticks its player on raw terrain"))
             .thenExecute(() -> {
-                int ticked = player.tickCount - ticksBefore.get();
+                released.countDown();
                 level.getServer().getPlayerList().remove(player);
-                helper.assertTrue(ticked >= AWAITED_TICKS, "the player was ticked %s times while the generation was busy for %s s".formatted(ticked, TimeUnit.NANOSECONDS.toSeconds(BUSY_NANOS)));
             })
             .thenSucceed();
+    }
+
+    /** Holds a generation thread until the test releases it, at most as long as the test may run. */
+    private static void holdUntil(CountDownLatch held, CountDownLatch released) {
+        held.countDown();
+        try {
+            released.await(AHEAD_MAX_TICKS * 50L, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     static ServerPlayer joined(GameTestHelper helper, Vec3 position) {
