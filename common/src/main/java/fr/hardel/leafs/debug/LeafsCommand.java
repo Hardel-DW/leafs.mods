@@ -17,6 +17,7 @@ public final class LeafsCommand {
             .then(MetricsCommand.tree())
             .then(RamCommand.tree())
             .then(ConfigCommand.tree())
-            .then(CrashCommand.tree());
+            .then(CrashCommand.tree())
+            .then(LagCommand.tree());
     }
 }
