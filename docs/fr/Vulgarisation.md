@@ -19,6 +19,8 @@ Une région possède ses chunks, ses entités, ses joueurs, ses block entities, 
 **Le thread serveur vanilla existe toujours.** Les régions tickent en même temps que lui. Il fait une fois par tick ce qui est global par nature, l'heure du monde, la météo, la bordure, la liste des joueurs et le déclencheur d'autosave. Il exécute aussi toutes les commandes. Son coût est fixe et minime, sans dépendre du nombre de chunks ou d'entités. Seule la liste des joueurs grandit avec eux, et son coût par joueur est infime. 
 > Le terme pool désigne un groupe de threads : le pool des régions, le pool des chunks.
 
+Quand plusieurs threads partagent une donnée, un verrou la protège. Un thread qui tient un verrou fait seulement des lectures et des écritures en mémoire. Il ne lit pas le disque, n'attend pas un autre thread, et n'appelle ni le code d'un mod ni une autre partie de Leafs. Un verrou est donc toujours rendu très vite, et personne n'attend longtemps derrière.
+
 ## Threads de Région
 Une région ne prend pas un thread ! Une région est une tâche. Les régions attendent dans une seule liste, triée par l'arrivée de leur prochain tick. Un thread libre prend la première région et la tick. Ainsi, un thread occupé par une grosse région ne bloque personne.
 
@@ -37,6 +39,8 @@ Ces threads tournent en priorité système minimale sur le système d'exploitati
 - Une zone très dense, avec un TPS bas, n'affecte pas la vitesse de génération du monde donc il peut continuer à se déplacer fluidement.
 - Quand un thread a besoin d'un chunk pas encore là, il le demande au pool, qui le fait passer devant tout le reste, et il attend. Le chunk reçu reste chargé jusqu'à la fin du tick ou de la commande comme en vanilla.
 - Le pool traite d'abord les chunks qu'un thread attend, puis les chunks presque finis, puis la génération. Toujours du plus proche du joueur au plus loin.
+
+Un chunk reste chargé tant qu'un ticket le demande, comme en vanilla. Un joueur, un `forceload` ou un portail pose des tickets. Poser ou retirer un ticket note seulement la demande, puis rend la main. Ce sont les threads de chunks qui calculent ensuite quels chunks charger ou décharger. Un thread qui a besoin d'un chunk tout de suite applique lui-même les demandes qui chargent ce chunk, jamais celles qui le déchargent.
 
 ## Threads de Lumière
 - Pour la lumière, si vous utilisez **Firefly**, il utilise le pool de threads de chunks mentionné avant.

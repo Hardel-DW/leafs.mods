@@ -17,6 +17,9 @@ On pense long terme : pas de fix rapide qui devient une dette, pas de cas par ca
 ## Tester
 - Les tests unitaires, `gradlew :common:test`, tournent avec le vrai Minecraft bootstrappé quand il le faut.
 - Les gametests, `gradlew :fabric:runGameTest` et `gradlew :neoforge:runGameTest`, tournent sur un vrai serveur.
+- Un test existe seulement s'il prouve un vrai bug.
+- Après une correction, on lance toute la suite.
+- Un gametest se lance plusieurs fois avant d'être validé.
 - La validation en jeu suit : connexion, déconnexion, casser et poser, coffres, four, chat, commande, mort et respawn, portail aller retour. La charge se teste avec les bots overstress en montée progressive, et spark en `--thread *` sans quoi on ne voit que le thread serveur.
 
 # Compatibilité des mods.
