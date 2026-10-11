@@ -8,7 +8,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 public final class PoolLightExecutor implements LightExecutor {
     @Override
-    public void execute(LightChunkGetter level, int chunkX, int chunkZ, int radius, Runnable task) {
-        LevelChunks.of((ServerLevel) level.getLevel()).placement().onPool(ChunkTask.Kind.LIGHT, ChunkStatus.LIGHT, chunkX, chunkZ, radius, task);
+    public void execute(LightChunkGetter level, int chunkX, int chunkZ, Runnable task) {
+        LevelChunks.of((ServerLevel) level.getLevel()).placement().onPool(ChunkTask.Kind.LIGHT, ChunkStatus.LIGHT, chunkX, chunkZ, RADIUS, task);
     }
 }
