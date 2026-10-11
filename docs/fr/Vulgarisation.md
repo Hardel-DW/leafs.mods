@@ -29,7 +29,7 @@ Les TPS en vanilla sont globaux, sur Leafs ils sont par région. Chaque région 
 - Tout ce qui mesure une durée relative, la cuisson d'un four, les entités, la redstone, est géré par l'horloge de la région. Un four ne cuira pas à la même vitesse dans deux régions. Tout dépend du TPS.
 - Une région n'attend jamais un autre thread. Elle attend seulement le pool pour un chunk, parce que le pool n'attend jamais rien en retour. Un joueur, ou une entité, est tenu par un seul thread à la fois. Une région qui trouve un joueur tenu par un autre thread le saute et le reprend au tick suivant.
 
-La connexion et la déconnexion passent par le thread serveur, qui emprunte la région du joueur. Le respawn part de la région du joueur vers la région de son point de réapparition, ou vers le thread serveur si aucune région ne couvre ce point.
+La connexion passe par le thread serveur, qui emprunte la région du joueur. La déconnexion se fait sur la région du joueur. Le respawn part de la région du joueur vers la région de son point de réapparition, ou vers le thread serveur si aucune région ne couvre ce point.
 
 ## Threads de Chunks
 Les threads de chunks sont parfaitement indépendants des threads de régions. Ils génèrent, éclairent, chargent et déchargent les chunks, et préparent les octets à écrire sur le disque. Le thread disque de vanilla ne fait plus que lire et écrire ces octets.
@@ -66,9 +66,9 @@ Minecraft est fait de `chunks` de 16x16 blocs. Une région est un groupe de chun
 
 # Emprunts et Courrier
 Deux concepts de Multithread de Leafs simples.
-Avant tout, une règle à comprendre. Le thread serveur ne touche jamais une région sans l'emprunter, `Commandes`, `event Fabric/NeoForge`, `arrivée`, `départ`.
+Avant tout, une règle à comprendre. Le thread serveur ne touche jamais une région sans l'emprunter, `Commandes`, `event Fabric/NeoForge`, `arrivée`.
 
-**Courrier** : chaque région a une boîte aux lettres. Ce que les autres régions veulent faire chez elle attend dedans, elle le fait à la fin de son tick, dans l'ordre d'arrivée.
+**Courrier** : chaque région a une boîte aux lettres. Ce que les autres régions veulent faire chez elle attend dedans, elle le fait au début et à la fin de son tick, dans l'ordre d'arrivée.
 La boîte a deux files :
 - Le travail de chunk. Publier un chunk généré, le démonter, le sauvegarder.
 - Le travail de jeu. Poser un bloc, téléporter, respawn. Ça peut avoir besoin d'un chunk pas encore chargé, donc ça peut attendre.
@@ -88,7 +88,7 @@ Ce que la commande touche décide de ce qu'elle emprunte :
 Un datapack coûte donc exactement ce qu'il coûte en vanilla.
 
 # Connexion et déconnexion
-Le thread serveur gère l'arrivée et le départ d'un joueur. il emprunte la région du joueur le temps de l'opération, c'est moins d'une milliseconde. Les autres régions ne voient rien, aucun joueur ne ressent de différence, même sur une vague de 100 connexions.
+Le thread serveur gère l'arrivée d'un joueur. Il emprunte la région du joueur le temps de l'opération, c'est moins d'une milliseconde. Le départ se fait sur la région du joueur. Les autres régions ne voient rien, aucun joueur ne ressent de différence, même sur une vague de 100 connexions.
 
 # Compatibilité des mods.
 Les primitives sont les méthodes dans le code de Minecraft qui sont les plus basses et les plus utilisées, où le plus de trafic passe par elles.
