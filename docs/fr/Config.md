@@ -25,6 +25,7 @@ La commande `/leafs` est réservée aux opérateurs.
 - `/leafs config [clé] [valeur]` :  Si aucunes valeur est préciser, affiche la valeur de la clé, Sinon cela met a jour la config, qui prend effet au prochain démarrage.
 - `/leafs crash <dimension> <region>` : permet de faire crasher une région.
 - `/leafs ram` : Affiche la ram utiliser par le serveur, le "heap" ainsi que des infos techniques sur le GC/JVM, et par dimension le nombre de holders et de sections des graphes
+- `/leafs lag <ms> [position]` : Simule du lag dans une région, ajoute un faux block entity qui occupe à chaque tick du processeur pendant `ms`, dans la région qui tient la position. `/leafs lag clear` les retire.
 - `/leafs chunk [position]` : Affiche l'état d'un chunk. Sans position, il regarde le chunk où vous êtes.
 
 La commande `/leafs timings` affiche coût de chaque étape d'un tick, moyenné sur 5 secondes. Si aucun argument, ça affiche le thread serveur.
