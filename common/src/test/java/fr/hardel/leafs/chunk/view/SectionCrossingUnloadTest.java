@@ -22,7 +22,7 @@ class SectionCrossingUnloadTest {
     private final TicketStorage tickets = new TicketStorage();
     private final ChunkLevels players = new ChunkLevels(34, new TickEpochs(0, () -> { }));
     private final ChunkLevels loading = new ChunkLevels(ChunkLevel.MAX_LEVEL + 2, new TickEpochs(0, () -> { }));
-    private final ViewTickets view = new ViewTickets(tickets, players, VIEW);
+    private final ViewTickets view = new ViewTickets(tickets, players, VIEW, _ -> false, Integer.MAX_VALUE);
     private final PlayerSources sources = new PlayerSources(tickets, players, 5);
 
     @Test

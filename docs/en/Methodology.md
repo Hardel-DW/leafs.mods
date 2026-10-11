@@ -15,7 +15,8 @@ Comments: one sentence, two at most when there is a bug trace to keep. A comment
 We think long term: no quick fix that becomes debt, no case by case when a single choke point handles the whole class of the problem. If a clean fix requires rethinking a piece of architecture, we do it.
 
 ## Testing
-- Unit tests, `gradlew test`, run with the real Minecraft bootstrapped when needed.
+- Unit tests, `gradlew :common:test`, run with the real Minecraft bootstrapped when needed.
+- Gametests, `gradlew :fabric:runGameTest` and `gradlew :neoforge:runGameTest`, run on a real server.
 - In-game validation follows: connect, disconnect, break and place, chests, furnace, chat, command, death and respawn, portal round trip. Load is tested with the overstress bots in a gradual ramp-up, and spark with `--thread *`, otherwise we only see the server thread.
 
 # Mod compatibility.

@@ -1,6 +1,7 @@
 package fr.hardel.leafs.metrics;
 
 public enum DeferReason {
+    LEAVE,
     RESPAWN,
     PORTAL,
     TELEPORT,

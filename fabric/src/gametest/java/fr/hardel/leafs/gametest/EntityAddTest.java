@@ -1,8 +1,10 @@
 package fr.hardel.leafs.gametest;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.owner.Work;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -12,6 +14,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class EntityAddTest {
 
@@ -31,5 +34,22 @@ public final class EntityAddTest {
 
         new Thread(() -> level.addFreshEntity(pig), "leafs-gametest-mod").start();
         helper.succeedWhen(() -> helper.assertTrue(addedByTheOwner.get(), "the owner of %s adds the pig of a mod thread".formatted(chunk)));
+    }
+
+    /** 2026-10-10: an entity born in a region tick waited for the photo of the next tick, a thrown pearl ran one tick behind its client. */
+    @GameTest(maxTicks = 400)
+    public void anEntityBornInARegionTickTicksInThatTick(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        AtomicLong missedTicks = new AtomicLong(-1);
+        FallingSand.whenItFalls(helper, new BlockPos(1, 6, 1), falling -> {
+            long birth = level.getGameTime();
+            ChunkPos chunk = falling.chunkPosition();
+            LevelChunks.of(level).owners().later(chunk.x(), chunk.z(), Work.GAME, () -> missedTicks.set(level.getGameTime() - birth + 1 - falling.tickCount));
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(missedTicks.get() >= 0, "the sand has not fallen yet");
+            helper.assertValueEqual(missedTicks.get(), 0L, "region ticks the falling sand missed");
+        });
     }
 }

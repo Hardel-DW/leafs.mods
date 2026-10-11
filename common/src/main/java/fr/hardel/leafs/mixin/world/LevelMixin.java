@@ -10,8 +10,10 @@ import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
 import fr.hardel.leafs.world.ChunkTickAccess;
+import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.RoutingNeighborUpdater;
 import fr.hardel.leafs.world.RoutingRandomSource;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -82,6 +84,14 @@ public abstract class LevelMixin {
         LevelChunk chunk = level.getChunkAt(pos);
         boolean owner = LevelChunks.of(level).owners().holds(chunk.getPos().x(), chunk.getPos().z());
         callbackInfo.setReturnValue(owner ? chunk.getBlockEntity(pos, LevelChunk.EntityCreationType.IMMEDIATE) : chunk.getBlockEntities().get(pos));
+    }
+
+    @Inject(method = "nextSubTickCount", at = @At("HEAD"), cancellable = true)
+    private void leafs$regionSubTickCount(CallbackInfoReturnable<Long> callbackInfo) {
+        RegionWorldData ticking = WorldTickContext.activeFor((Level) (Object) this);
+        if (ticking != null) {
+            callbackInfo.setReturnValue(ticking.nextSubTickCount());
+        }
     }
 
     @Inject(method = "addBlockEntityTicker", at = @At("HEAD"), cancellable = true)

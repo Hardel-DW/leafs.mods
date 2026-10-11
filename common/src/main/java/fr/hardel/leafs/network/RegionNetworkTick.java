@@ -4,6 +4,7 @@ import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.TickingManager;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -20,6 +21,8 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelData;
 
+import java.util.function.BooleanSupplier;
+
 public final class RegionNetworkTick {
     private RegionNetworkTick() {
     }
@@ -29,7 +32,7 @@ public final class RegionNetworkTick {
         countIfHeld(level.getServer(), PacketRouting.queueOf(listener).drain(() -> listener.player.level() == level));
     }
 
-    public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server) {
+    public static void tickPlayerOnRegion(ServerPlayer player, MinecraftServer server, long sendDeadlineNanos) {
         ServerGamePacketListenerImpl listener = player.connection;
         Connection connection = listener.connection;
         countIfHeld(server, PacketRouting.queueOf(listener).handleAs(() -> {
@@ -37,7 +40,10 @@ public final class RegionNetworkTick {
                 tickListener(listener, connection, server);
             }
 
-            listener.chunkSender.sendNextChunks(player);
+            if (System.nanoTime() < sendDeadlineNanos) {
+                listener.chunkSender.sendNextChunks(player);
+            }
+
             connection.flushChannel();
         }));
     }
@@ -69,6 +75,7 @@ public final class RegionNetworkTick {
             return;
         }
 
+        // A region may have taken the player since the server thread looked at its connection.
         if (tickedByARegion(game.player)) {
             return;
         }
@@ -80,9 +87,26 @@ public final class RegionNetworkTick {
         }));
     }
 
+    /** The region of a player ticks its connection whole: its listener, its chunks, its flush. */
+    public static boolean tickedByARegion(Connection connection) {
+        return connection.getPacketListener() instanceof ServerGamePacketListenerImpl game && tickedByARegion(game.player);
+    }
+
     private static boolean tickedByARegion(ServerPlayer player) {
         ChunkPos chunk = player.chunkPosition();
         return !player.isRemoved() && LevelChunks.of(player.level()).owners().covered(chunk.x(), chunk.z());
+    }
+
+    /** A leave or a disconnection works on the chunks of the player: its region does it, the server thread never waits for one. Before the regions run and once they stop, the server thread owns everything and does it at once. */
+    public static void onTheOwner(ServerPlayer player, DeferReason reason, BooleanSupplier stillWanted, Runnable work) {
+        ServerLevel level = player.level();
+        if (!LevelRegions.of(level).live()) {
+            work.run();
+            return;
+        }
+
+        ChunkPos chunk = player.chunkPosition();
+        DeferredWork.owner(level, reason, chunk.x(), chunk.z(), work).validIf(stillWanted).submit();
     }
 
     public static boolean divertRespawn(ServerGamePacketListenerImpl listener, ServerboundClientCommandPacket packet) {

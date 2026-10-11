@@ -70,7 +70,7 @@ public abstract class MinecraftServerMixin implements LeafsServerAccess {
 
     @Inject(method = "processPacketsAndTick", at = @At("HEAD"))
     private void leafs$drainPlayerQueuesWhilePaused(boolean sprinting, CallbackInfo callbackInfo) {
-        if (leafs$ticking.paused()) {
+        if (leafs$ticking.state().paused()) {
             leafs$ticking.tickPausedNetwork();
         }
     }

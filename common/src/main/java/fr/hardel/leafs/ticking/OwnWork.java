@@ -23,7 +23,7 @@ public final class OwnWork {
             }
 
             boolean pumped = pump.getAsBoolean();
-            boolean drained = borrow != null && borrow.drainInboxes() > 0;
+            boolean drained = borrow != null && borrow.pollInboxes();
             if (!pumped && !drained && !help.getAsBoolean()) {
                 LockSupport.parkNanos(PARK_NANOS);
             }

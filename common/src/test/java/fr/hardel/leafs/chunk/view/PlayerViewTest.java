@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayerViewTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
     private final TicketGraphs graphs = new TicketGraphs(new TickEpochs(0, () -> { }));
-    private final PlayerView view = new PlayerView(new TicketStorage(), graphs);
+    private final PlayerView view = new PlayerView(new TicketStorage(), graphs, _ -> false, Integer.MAX_VALUE);
     private final ChunkPlacement placement = new ChunkPlacement(pool, 0, place -> view.urgency(ChunkTask.chunkX(place.chunkKey()), ChunkTask.chunkZ(place.chunkKey())));
 
     @AfterEach

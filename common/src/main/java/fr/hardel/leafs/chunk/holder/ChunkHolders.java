@@ -40,8 +40,9 @@ public final class ChunkHolders {
     private final Demands demands;
     private final MinuteCounter loads;
     private final MinuteCounter unloads;
+    private final ChunkOwners.Regions regions;
 
-    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, ChunkPlacement placement, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics) {
+    public ChunkHolders(ChunkMap chunkMap, ChunkLevels loading, HolderTable table, PendingUnloads unloading, ChunkOwners owners, ChunkPlacement placement, TicketStorage tickets, GenerationSteps steps, ServerMetrics metrics, ChunkOwners.Regions regions) {
         this.chunkMap = chunkMap;
         this.loading = loading;
         this.table = table;
@@ -53,6 +54,7 @@ public final class ChunkHolders {
         this.steps = steps;
         this.loads = metrics.chunkLoads();
         this.unloads = metrics.chunkUnloads();
+        this.regions = regions;
     }
 
     public HolderTable table() {
@@ -83,6 +85,18 @@ public final class ChunkHolders {
         });
     }
 
+    /** A load someone awaits through a future, the square of a player who joins for one, is as urgent as the chunk a thread waits for. */
+    public void expedite(ChunkPos center, int radius, CompletableFuture<?> loaded) {
+        int level = ChunkLevel.byStatus(ChunkStatus.FULL);
+        List<ChunkPos> square = ChunkPos.rangeClosed(center, radius).toList();
+        for (ChunkPos chunk : square) {
+            demands.demand(chunk.pack(), level);
+            placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, chunk.x(), chunk.z(), ChunkStatus.FULL));
+        }
+
+        loaded.whenComplete((_, _) -> square.forEach(chunk -> demands.release(chunk.pack(), level)));
+    }
+
     private ChunkHolder demanded(long key, ChunkStatus status) {
         ChunkHolder holder = table.get(key);
         if (holder == null) {
@@ -104,6 +118,7 @@ public final class ChunkHolders {
     private void follow(ChunkHolder holder) {
         ChunkPos pos = holder.getPos();
         holder.updateFutures(chunkMap, task -> owners.later(pos.x(), pos.z(), Work.CHUNK, task));
+        regions.chunkChanged(pos.x(), pos.z());
         if (ChunkLevel.isLoaded(holder.getTicketLevel()) || !table.remove(pos.pack(), holder)) {
             return;
         }

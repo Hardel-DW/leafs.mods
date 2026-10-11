@@ -20,7 +20,7 @@ No entity is sent between threads. A region does not "own" its entities. At the 
 It works, and it is the cleanest point of the model. `Forceload` or `chunk loaders` load areas through simulation. The model is based on simulated areas, so this creates a region or extends its region if one already exists.
 
 # Do datapacks/commands work?
-Every command runs on the server thread, whoever launches it. It borrows a region the moment the command touches one of its chunks or one of its entities, keeps it until the end of the command, then gives it back. A command costs exactly its vanilla cost.
+Every command runs on the server thread, whoever launches it. It borrows a region the moment the command touches one of its chunks or one of its entities. It keeps it until the end of its tick, then gives it back. A command costs exactly its vanilla cost.
 A heavy datapack using `tick.json` stays on a single thread, it does not benefit from multithreading. It slows down the server thread and the regions it borrows during its commands, not the others.
 
 # Are there flaws cheaters could exploit, like detecting region merges/splits?

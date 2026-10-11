@@ -47,15 +47,9 @@ public final class TicketTimeoutIndex {
         });
     }
 
-    public void purgeSections(long[] sectionKeys) {
-        for (long key : sectionKeys) {
-            purgeSection(key);
-        }
-    }
-
-    public void purgeUnowned(LongPredicate sectionOwned) {
+    public void purge(LongPredicate mine) {
         for (long key : sections.keySet()) {
-            if (!sectionOwned.test(key)) {
+            if (mine.test(key)) {
                 purgeSection(key);
             }
         }

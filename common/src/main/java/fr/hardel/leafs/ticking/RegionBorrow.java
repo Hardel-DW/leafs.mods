@@ -136,16 +136,25 @@ public final class RegionBorrow {
     }
 
     private boolean take(LevelRegions regions, Region<RegionTickData> region) {
-        while (region.state() != RegionState.DEAD) {
-            if (held.contains(region) || region.tryHold()) {
-                held.add(region);
-                return true;
-            }
-
-            awaitTick(regions, region);
+        if (held.contains(region)) {
+            return true;
         }
 
-        return false;
+        region.askHold();
+        try {
+            while (region.state() != RegionState.DEAD) {
+                if (held.contains(region) || region.tryHold()) {
+                    held.add(region);
+                    return true;
+                }
+
+                awaitTick(regions, region);
+            }
+
+            return false;
+        } finally {
+            region.holdAnswered();
+        }
     }
 
     private void awaitTick(LevelRegions regions, Region<RegionTickData> region) {
@@ -198,19 +207,19 @@ public final class RegionBorrow {
         heldChunks.clear();
     }
 
-    public int drainInboxes() {
-        int drained = 0;
+    public boolean pollInboxes() {
+        boolean worked = false;
         for (Region<RegionTickData> region : List.copyOf(held)) {
-            drained += region.data().inbox().drainChunkWork();
+            worked |= region.data().inbox().pollChunkWork();
         }
 
         for (Long2ObjectOpenHashMap<ChunkClaim> chunks : List.copyOf(heldChunks.values())) {
             for (ChunkClaim claim : List.copyOf(chunks.values())) {
-                drained += claim.mail().drainChunkWork();
+                worked |= claim.mail().pollChunkWork();
             }
         }
 
-        return drained;
+        return worked;
     }
 
     public int size() {

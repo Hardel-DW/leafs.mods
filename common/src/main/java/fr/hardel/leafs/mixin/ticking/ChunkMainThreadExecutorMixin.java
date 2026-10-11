@@ -31,6 +31,6 @@ public abstract class ChunkMainThreadExecutorMixin implements ChunkPumpAccess {
         }
 
         RegionBorrow borrow = RegionBorrow.current();
-        return borrow != null && borrow.drainInboxes() > 0;
+        return borrow != null && borrow.pollInboxes();
     }
 }

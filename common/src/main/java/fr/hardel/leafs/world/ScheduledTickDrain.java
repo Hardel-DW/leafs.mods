@@ -8,6 +8,7 @@ import net.minecraft.world.ticks.ScheduledTick;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -35,7 +36,7 @@ public final class ScheduledTickDrain<C, T> {
         this.keyOf = keyOf;
     }
 
-    public void drain(List<C> chunks, LongPredicate tickCheck, long currentTick, BiConsumer<BlockPos, T> output) {
+    public void drain(Collection<C> chunks, LongPredicate tickCheck, long currentTick, BiConsumer<BlockPos, T> output) {
         collect(chunks, tickCheck, currentTick);
         while (!toRunThisTick.isEmpty()) {
             ScheduledTick<T> tick = toRunThisTick.poll();
@@ -71,7 +72,7 @@ public final class ScheduledTickDrain<C, T> {
         toRunThisTickSet.clear();
     }
 
-    private void collect(List<C> chunks, LongPredicate tickCheck, long currentTick) {
+    private void collect(Collection<C> chunks, LongPredicate tickCheck, long currentTick) {
         for (C chunk : chunks) {
             LevelChunkTicks<T> container = containerOf.apply(chunk);
             ScheduledTick<T> next = container.peek();

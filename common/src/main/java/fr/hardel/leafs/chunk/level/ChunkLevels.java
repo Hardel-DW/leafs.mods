@@ -30,7 +30,6 @@ public final class ChunkLevels {
     private final ConcurrentLong2ObjectMap<Section> sections = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLinkedQueue<Section> dirty = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<Section> held = new ConcurrentLinkedQueue<>();
-    private final AtomicBoolean stray = new AtomicBoolean();
     private final AtomicInteger settling = new AtomicInteger();
     private final ReentrantLock[] stripes = new ReentrantLock[STRIPES];
 
@@ -47,10 +46,6 @@ public final class ChunkLevels {
     public void setSource(int chunkX, int chunkZ, int level) {
         long key = Section.keyOf(chunkX, chunkZ);
         long written = epochs.now();
-        if (!epochs.claimWrite()) {
-            stray.set(true);
-        }
-
         while (true) {
             Section section = sections.computeIfAbsent(key, k -> new Section(k, none));
             if (section.post(Section.index(chunkX, chunkZ), level, written)) {
@@ -85,10 +80,6 @@ public final class ChunkLevels {
         return !dirty.isEmpty() || ripe();
     }
 
-    // Writes no tick end will drain: made outside any tick, or held increases whose ticks have all ended.
-    public boolean takeOrphaned() {
-        return stray.getAndSet(false) || ripe();
-    }
 
     private boolean ripe() {
         long oldestOpen = epochs.oldestOpen();
