@@ -47,10 +47,6 @@ public final class PlayerPacketQueue {
         return asDrainer(handler);
     }
 
-    public boolean drain() {
-        return drain(() -> true);
-    }
-
     public boolean drain(BooleanSupplier ownerHolds) {
         if (handledByCurrentThread()) {
             drainLoop(ownerHolds);
