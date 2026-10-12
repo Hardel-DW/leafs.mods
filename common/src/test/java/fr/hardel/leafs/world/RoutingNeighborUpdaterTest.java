@@ -69,7 +69,7 @@ class RoutingNeighborUpdaterTest {
     }
 
     private static RegionWorldData dataWith(CollectingNeighborUpdater updater) {
-        return new RegionWorldData(new RegionTime(0L, TickState.INITIAL), RandomSource.create(), updater, new PathTypeCache());
+        return new RegionWorldData(new RegionTime(0L, TickState.INITIAL), RandomSource.create(0L), updater, new PathTypeCache());
     }
 
     private static void callAll(RoutingNeighborUpdater router) {

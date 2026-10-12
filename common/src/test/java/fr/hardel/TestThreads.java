@@ -2,29 +2,34 @@ package fr.hardel;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
+/** A test waits for a state, never for a duration: a bug that blocks shows as a hang, never as a timeout that a slow machine could also reach. */
 public final class TestThreads {
     private TestThreads() {
     }
 
     public static void await(CountDownLatch latch) {
         try {
-            assertTrue(latch.await(5, TimeUnit.SECONDS), "the latch never opened");
+            latch.await();
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new AssertionError(exception);
         }
     }
 
-    public static void awaitParked(Thread thread) {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (thread.getState() != Thread.State.WAITING) {
-            assertTrue(System.nanoTime() < deadline, "the thread never parked");
+    public static void until(BooleanSupplier state) {
+        while (!state.getAsBoolean()) {
             Thread.onSpinWait();
         }
+    }
+
+    /** The thread waits on what the test holds, or it ended without waiting. */
+    public static void awaitParked(Thread thread) {
+        until(() -> switch (thread.getState()) {
+            case BLOCKED, WAITING, TIMED_WAITING, TERMINATED -> true;
+            case NEW, RUNNABLE -> false;
+        });
     }
 
     public static CountDownLatch occupy(Executor singleWorker) {

@@ -2,12 +2,10 @@ package fr.hardel.leafs.network;
 
 import fr.hardel.TestThreads;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Timeout(10)
 class PlayerPacketQueueTest {
     private final PlayerPacketQueue queue = new PlayerPacketQueue();
     private final List<String> handled = new ArrayList<>();
@@ -26,7 +23,7 @@ class PlayerPacketQueueTest {
         queue.addTask(recording("first"));
         queue.addTask(recording("second"));
 
-        queue.drain();
+        queue.drain(() -> true);
 
         assertEquals(List.of("first", "second"), handled);
     }
@@ -38,7 +35,7 @@ class PlayerPacketQueueTest {
             queue.addTask(recording("late"));
         });
 
-        queue.drain();
+        queue.drain(() -> true);
 
         assertEquals(List.of("first", "late"), handled);
     }
@@ -50,12 +47,12 @@ class PlayerPacketQueueTest {
         });
         queue.addTask(recording("survivor"));
 
-        assertThrows(IllegalStateException.class, queue::drain);
+        assertThrows(IllegalStateException.class, () -> queue.drain(() -> true));
 
         assertEquals(List.of(), handled);
         assertFalse(PlayerPacketQueue.handlingPackets(), "the handling scope must not leak past a failing drain");
 
-        queue.drain();
+        queue.drain(() -> true);
         assertEquals(List.of("survivor"), handled);
     }
 
@@ -68,7 +65,7 @@ class PlayerPacketQueueTest {
         });
         queue.addTask(() -> owned.add(queue.handledByCurrentThread()));
 
-        queue.drain();
+        queue.drain(() -> true);
 
         assertEquals("respawned in another level", level);
         assertEquals(List.of(true, true), owned);
@@ -100,16 +97,16 @@ class PlayerPacketQueueTest {
             TestThreads.await(release);
         });
 
-        Thread regionDrainer = new Thread(() -> queue.drain());
+        Thread regionDrainer = new Thread(() -> queue.drain(() -> true));
         regionDrainer.start();
-        assertTrue(insideDrain.await(5, TimeUnit.SECONDS));
+        TestThreads.await(insideDrain);
 
-        assertFalse(queue.drain(), "a held player is refused, not waited for");
+        assertFalse(queue.drain(() -> true), "a held player is refused, not waited for");
         assertFalse(PlayerPacketQueue.handlingPackets(), "a refusal leaves no handling scope behind");
 
         release.countDown();
         regionDrainer.join();
-        assertTrue(queue.drain(), "a released player is handled again");
+        assertTrue(queue.drain(() -> true), "a released player is handled again");
     }
 
     /** 2026-08-31: the player's own pass ran outside this exclusion, so the new owner's drain wrote his movement list while the old owner read it. */
@@ -128,19 +125,19 @@ class PlayerPacketQueueTest {
             insidePass.set(false);
         }));
         previousOwner.start();
-        assertTrue(passStarted.await(5, TimeUnit.SECONDS));
+        TestThreads.await(passStarted);
 
-        assertFalse(queue.drain(), "the new owner is refused while the pass runs, the packet stays queued");
+        assertFalse(queue.drain(() -> true), "the new owner is refused while the pass runs, the packet stays queued");
         assertEquals(1, queue.pending());
 
         release.countDown();
         previousOwner.join();
-        assertTrue(queue.drain());
+        assertTrue(queue.drain(() -> true));
         assertFalse(overlapped.get(), "no packet may be handled while the player's pass runs");
     }
 
     @Test
-    void concurrentSubmissionsKeepPerThreadOrder() throws InterruptedException {
+    void concurrentSubmissionsKeepPerThreadOrder() {
         int threads = 4;
         int perThread = 250;
         CountDownLatch done = new CountDownLatch(threads);
@@ -154,9 +151,9 @@ class PlayerPacketQueueTest {
             });
             submitter.start();
         }
-        assertTrue(done.await(5, TimeUnit.SECONDS));
+        TestThreads.await(done);
 
-        queue.drain();
+        queue.drain(() -> true);
 
         assertEquals(threads * perThread, handled.size());
         for (int thread = 0; thread < threads; thread++) {

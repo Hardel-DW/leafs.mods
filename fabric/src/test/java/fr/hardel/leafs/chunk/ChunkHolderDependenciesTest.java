@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 
@@ -23,8 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MinecraftBootstrap.class)
 class ChunkHolderDependenciesTest {
-    private static final long PATIENCE_SECONDS = 5;
-
     /** 2026-09-16: the light of two chunks of one send radius is registered by two owners; the barrier kept one, the sender shipped a dark chunk. */
     @Test
     void twoLightsAddedAtOnceBothHoldTheSendBarrier() throws InterruptedException {
@@ -37,10 +34,10 @@ class ChunkHolderDependenciesTest {
         Thread firstOwner = Thread.ofPlatform().daemon().start(() -> holder.addSendDependency(firstLight));
         TestThreads.await(barrier.composing);
         Thread secondOwner = Thread.ofPlatform().daemon().start(() -> holder.addSendDependency(secondLight));
-        awaitDoneOrWaiting(secondOwner);
+        TestThreads.awaitParked(secondOwner);
         barrier.resumed.countDown();
-        firstOwner.join(TimeUnit.SECONDS.toMillis(PATIENCE_SECONDS));
-        secondOwner.join(TimeUnit.SECONDS.toMillis(PATIENCE_SECONDS));
+        firstOwner.join();
+        secondOwner.join();
 
         barrier.complete(null);
         firstLight.complete(null);
@@ -51,21 +48,6 @@ class ChunkHolderDependenciesTest {
 
     private static ChunkHolder holder() {
         return new ChunkHolder(new ChunkPos(0, 0), ChunkLevel.byStatus(ChunkStatus.FULL), LevelHeightAccessor.create(-64, 384), null, (_, _, _, _) -> { }, (_, _) -> List.of());
-    }
-
-    private static void awaitDoneOrWaiting(Thread owner) {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(PATIENCE_SECONDS);
-        while (owner.isAlive() && !parked(owner)) {
-            assertTrue(System.nanoTime() < deadline, "the second owner neither finished nor waited for the first");
-            Thread.onSpinWait();
-        }
-    }
-
-    private static boolean parked(Thread thread) {
-        return switch (thread.getState()) {
-            case BLOCKED, WAITING, TIMED_WAITING -> true;
-            default -> false;
-        };
     }
 
     private static final class PausedBarrier extends CompletableFuture<Void> {

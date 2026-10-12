@@ -56,6 +56,11 @@ fabricApi {
 	}
 }
 
+sourceSets.gametest {
+	java.srcDir(project(':common').file('src/gametest/java'))
+	resources.srcDir(project(':common').file('src/gametest/resources'))
+}
+
 tasks.named('compileJava') {
 	source(project(':common').sourceSets.main.allJava)
 }

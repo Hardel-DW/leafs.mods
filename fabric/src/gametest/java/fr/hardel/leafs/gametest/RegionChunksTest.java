@@ -8,6 +8,7 @@ import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.region.CoordinateKey;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickData;
 import fr.hardel.leafs.world.RegionChunks;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -40,7 +41,7 @@ public final class RegionChunksTest {
     private static final int AROUND = 1;
 
     /** A region keeps its chunks section by section: its lists must stay what a full read of the table gives, through arrivals, a merge and dying sections. */
-    @GameTest(maxTicks = 200000)
+    @GameTest(maxTicks = HangGuard.TICKS)
     public void theChunksOfARegionAreTheOnesOfItsTable(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         Vec3 spawn = Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO));
@@ -53,12 +54,12 @@ public final class RegionChunksTest {
             .thenExecute(() -> {
                 arrive(first);
                 arrive(second);
-                land(first, 2, far);
+                land(first, far);
             })
             .thenWaitUntil(() -> audit.settled(helper, far))
-            .thenExecute(() -> land(second, 2, new ChunkPos(far.x() + BESIDE, far.z())))
+            .thenExecute(() -> land(second, new ChunkPos(far.x() + BESIDE, far.z())))
             .thenWaitUntil(() -> audit.settled(helper, new ChunkPos(far.x() + BESIDE, far.z())))
-            .thenExecute(() -> land(second, 3, new ChunkPos(far.x() + AWAY, far.z())))
+            .thenExecute(() -> land(second, new ChunkPos(far.x() + AWAY, far.z())))
             .thenWaitUntil(() -> audit.settled(helper, new ChunkPos(far.x() + AWAY, far.z())))
             .thenExecute(() -> {
                 level.getServer().getPlayerList().remove(first);
@@ -67,16 +68,19 @@ public final class RegionChunksTest {
             .thenSucceed();
     }
 
+    // A step holds the region of its player first, so it never acts on the player beside the region tick.
     private static void arrive(ServerPlayer player) {
+        RegionBorrow.atContact(player);
         player.connection.tick();
         PlayerTickTest.accept(player, 1);
     }
 
-    private static void land(ServerPlayer player, int teleport, ChunkPos chunk) {
-        Vec3 position = PlayerTickTest.onRawTerrain(chunk);
-        player.connection.teleport(position.x, position.y, position.z, 0, 0);
+    /** Moves the player and its view at once, like a teleport the client has not answered yet: nothing waits for the raw chunk. */
+    private static void land(ServerPlayer player, ChunkPos chunk) {
+        RegionBorrow.atContact(player);
+        player.setPos(PlayerTickTest.onRawTerrain(chunk));
         player.connection.resetPosition();
-        PlayerTickTest.accept(player, teleport);
+        player.level().getChunkSource().move(player);
     }
 
     /** Reads the table of every region on its own thread and compares it with the lists the region keeps. */

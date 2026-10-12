@@ -101,7 +101,7 @@ class ConcurrentLong2ObjectMapTest {
         threads.forEach(Thread::start);
         start.countDown();
         for (Thread thread : threads) {
-            thread.join(10_000);
+            thread.join();
         }
 
         assertEquals(1, invocations.get());

@@ -56,7 +56,7 @@ class RegionInboxTest {
         inbox.post(0, 0, Work.CHUNK, () -> ran.add("first"));
         inbox.post(0, 0, Work.CHUNK, () -> ran.add("second"));
 
-        assertEquals(0, inbox.drain(System.nanoTime() - 1));
+        assertEquals(0, inbox.drain(Long.MIN_VALUE));
         assertEquals(2, inbox.size());
         assertEquals(2, inbox.drain(Long.MAX_VALUE));
         assertEquals(List.of("first", "second"), ran);

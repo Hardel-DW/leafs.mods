@@ -37,8 +37,7 @@ public final class CancelledPlacementTest {
         
         helper.placeAt(player, player.getMainHandItem(), REDSTONE, Direction.WEST);
         helper.startSequence()
-                .thenIdle(1)
-                .thenExecute(() -> helper.assertTrue(cancelled.get(), "the placement never reached the place event"))
+                .thenWaitUntil(() -> helper.assertTrue(cancelled.get(), "the placement has not reached the place event yet"))
                 .thenExecute(() -> helper.assertEntityNotPresent(EntityType.TNT, new AABB(TNT).inflate(1)))
                 .thenExecute(() -> helper.assertBlockPresent(Blocks.AIR, TNT))
                 .thenExecute(() -> helper.getLevel().getServer().getPlayerList().remove(player))

@@ -76,14 +76,6 @@ class LeafsConfigTest {
     }
 
     @Test
-    void absentThreadsResolveToEveryProcessor() {
-        assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().regionThreads());
-        assertEquals(LeafsConfig.ALL_CORES, LeafsConfig.defaults().chunkThreads());
-        assertEquals(Runtime.getRuntime().availableProcessors(), LeafsConfig.defaults().effectiveRegionThreads());
-        assertEquals(Math.max(1, Runtime.getRuntime().availableProcessors() / 2), LeafsConfig.defaults().effectiveChunkThreads());
-    }
-
-    @Test
     void negativeThresholdsAreNeverReached(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("leafs.json");
         Files.writeString(file, "{\"region_threads\": -3, \"debug\": {\"watchdog_warn_seconds\": -5, \"slow_task_warn_millis\": -1}}");

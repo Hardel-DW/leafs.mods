@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -104,9 +103,9 @@ class TicketGraphsTest {
         assertTrue(drainers.getFirst().startsWith("Leafs Chunk Worker"));
     }
 
-    /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
+    /** 2026-09-25: a light task drained the whole loading graph, and a region waited 71 ms on it. */
     @Test
-    void aWorkerHandsTheLoadingDrainOver() throws InterruptedException {
+    void aWorkerHandsTheLoadingDrainOver() {
         graphs.listen(() -> loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);
         long[] publishedInLine = new long[1];
         CountDownLatch done = new CountDownLatch(1);
@@ -118,9 +117,9 @@ class TicketGraphsTest {
             done.countDown();
         });
 
-        assertTrue(done.await(5, TimeUnit.SECONDS));
+        TestThreads.await(done);
         assertEquals(1, publishedInLine[0]);
-        assertTrue(published.await(5, TimeUnit.SECONDS));
+        TestThreads.await(published);
     }
 
     /** 2026-09-27: a bystander drained a player's move between its leave and its enter, and his whole view lost its tickets. */
@@ -133,9 +132,11 @@ class TicketGraphsTest {
         view.enter(ChunkPos.pack(63, 0));
         graphs.players().drain(view.tickets());
         List<Long> dropped = new CopyOnWriteArrayList<>();
+        CountDownLatch rowDropped = new CountDownLatch(5);
         storage.setLoadingChunkUpdatedListener((key, level, _) -> {
             if (!ChunkLevel.isLoaded(level)) {
                 dropped.add(key);
+                rowDropped.countDown();
             }
         });
         CountDownLatch left = new CountDownLatch(1);
@@ -162,9 +163,7 @@ class TicketGraphsTest {
 
         checked.countDown();
         mover.join();
-        for (int attempt = 0; attempt < 500 && dropped.size() < 5; attempt++) {
-            Thread.sleep(10);
-        }
+        TestThreads.await(rowDropped);
 
         assertEquals(IntStream.rangeClosed(-2, 2).mapToObj(chunkZ -> ChunkPos.pack(61, chunkZ)).sorted().toList(), dropped.stream().sorted().toList());
     }

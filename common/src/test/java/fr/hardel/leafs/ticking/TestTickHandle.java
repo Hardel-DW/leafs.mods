@@ -7,7 +7,6 @@ public final class TestTickHandle extends TickHandle {
     private final BooleanSupplier gate;
     private final Runnable body;
     private long ticks;
-    private volatile long startDelayNanos = PERIOD_NANOS;
 
     public TestTickHandle(long id, Runnable body) {
         this(id, () -> true, body);
@@ -24,13 +23,9 @@ public final class TestTickHandle extends TickHandle {
         return ticks;
     }
 
-    void startDelayNanos(long startDelayNanos) {
-        this.startDelayNanos = startDelayNanos;
-    }
-
     @Override
     protected long nextStartDelayNanos() {
-        return startDelayNanos;
+        return PERIOD_NANOS;
     }
 
     @Override

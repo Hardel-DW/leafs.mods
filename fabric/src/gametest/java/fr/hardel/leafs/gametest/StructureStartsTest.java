@@ -27,7 +27,7 @@ public final class StructureStartsTest {
     private static final int POSITIONS = 16;
     private static final int COPIES = 4;
 
-    @GameTest(maxTicks = 1200)
+    @GameTest(maxTicks = HangGuard.TICKS)
     public void everyStructureStartsAlikeAloneAndInParallel(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         CompletableFuture<List<String>> differing = CompletableFuture.supplyAsync(() -> differing(level));
@@ -54,7 +54,7 @@ public final class StructureStartsTest {
         return differing;
     }
 
-    @GameTest(maxTicks = 100)
+    @GameTest
     public void aStartReportedByAGenerationThreadReachesTheStructureCheckAtOnce(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
