@@ -2,17 +2,19 @@ package fr.hardel.leafs.ticking;
 
 import java.util.function.BooleanSupplier;
 
-final class TestTickHandle extends TickHandle {
+public final class TestTickHandle extends TickHandle {
+    private static final long PERIOD_NANOS = 50_000_000L;
     private final BooleanSupplier gate;
     private final Runnable body;
     private long ticks;
+    private volatile long startDelayNanos = PERIOD_NANOS;
 
-    TestTickHandle(long id, Runnable body) {
+    public TestTickHandle(long id, Runnable body) {
         this(id, () -> true, body);
     }
 
     TestTickHandle(long id, BooleanSupplier gate, Runnable body) {
-        super(id, "test:world", 1);
+        super(id, "test:world", 1, () -> PERIOD_NANOS);
         this.gate = gate;
         this.body = body;
     }
@@ -20,6 +22,15 @@ final class TestTickHandle extends TickHandle {
     @Override
     public long currentTick() {
         return ticks;
+    }
+
+    void startDelayNanos(long startDelayNanos) {
+        this.startDelayNanos = startDelayNanos;
+    }
+
+    @Override
+    protected long nextStartDelayNanos() {
+        return startDelayNanos;
     }
 
     @Override

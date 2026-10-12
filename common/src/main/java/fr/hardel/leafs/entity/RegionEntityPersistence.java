@@ -7,17 +7,22 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.Visibility;
 
-import java.util.function.LongPredicate;
 
 public final class RegionEntityPersistence {
+    public interface Later {
+        void run(long chunkKey, Runnable task);
+    }
+
     private final ServerLevel level;
     private final EntityManagerAccess manager;
     private final Runnable inboxDrain;
+    private final Later later;
 
-    public RegionEntityPersistence(ServerLevel level, EntityManagerAccess manager, Runnable inboxDrain) {
+    public RegionEntityPersistence(ServerLevel level, EntityManagerAccess manager, Runnable inboxDrain, Later later) {
         this.level = level;
         this.manager = manager;
         this.inboxDrain = inboxDrain;
+        this.later = later;
     }
 
     public ServerLevel level() {
@@ -28,18 +33,16 @@ public final class RegionEntityPersistence {
         LevelChunks.of(level).owners().submit(pos.x(), pos.z(), Work.CHUNK, delivery);
     }
 
-    public LongSet pendingUnloads() {
-        return manager.leafs$chunksToUnload();
-    }
+    public void unloadHiddenLater(long chunkKey) {
+        later.run(chunkKey, () -> {
+            LongSet waiting = manager.leafs$chunksToUnload();
+            if (waiting.contains(chunkKey) && !unload(chunkKey)) {
+                unloadHiddenLater(chunkKey);
+                return;
+            }
 
-    public void unloadHidden(LongPredicate owned) {
-        manager.leafs$chunksToUnload().removeIf((long chunkKey) -> owned.test(chunkKey) && unload(chunkKey));
-    }
-
-    public void unloadHidden(long chunkKey) {
-        if (unload(chunkKey)) {
-            manager.leafs$chunksToUnload().remove(chunkKey);
-        }
+            waiting.remove(chunkKey);
+        });
     }
 
     public void saveChunkOnOwner(long chunkKey) {

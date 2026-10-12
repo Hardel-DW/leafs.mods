@@ -6,15 +6,15 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
-import fr.hardel.leafs.chunk.owner.Work;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
-import net.minecraft.core.SectionPos;
+import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -44,16 +44,29 @@ public abstract class ServerChunkCacheMixin {
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
         if (Thread.currentThread() != this.mainThread) {
-            callbackInfo.setReturnValue(RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z));
+            WorldTickContext tick = WorldTickContext.current();
+            LevelChunk last = tick == null ? null : tick.lastChunk(this.level, x, z);
+            callbackInfo.setReturnValue(last == null ? RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z) : last);
         }
     }
 
     @WrapMethod(method = "getChunk(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;")
     private ChunkAccess leafs$contractedGetChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate, Operation<ChunkAccess> original) {
+        WorldTickContext tick = WorldTickContext.current();
+        LevelChunk last = tick == null || targetStatus != ChunkStatus.FULL ? null : tick.lastChunk(this.level, x, z);
+        if (last != null) {
+            return last;
+        }
+
         LevelRegions regions = LevelRegions.of(this.level);
         ChunkAccess chunk = regions.live() ? RegionChunkAccess.contractedChunk(leafs$chunkMap(), x, z, targetStatus, loadOrGenerate) : original.call(x, z, targetStatus, loadOrGenerate);
         if (chunk != null) {
             RegionBorrow.atContact(regions, x, z);
+        }
+
+        // Only a chunk of its own region is remembered: the thread holds it for the whole tick, so reading it again asks nobody.
+        if (tick != null && targetStatus == ChunkStatus.FULL && chunk instanceof LevelChunk full && regions.regionizer().regionAt(x, z) == tick.region()) {
+            tick.remember(full);
         }
 
         return chunk;
@@ -67,8 +80,25 @@ public abstract class ServerChunkCacheMixin {
     }
 
     @WrapOperation(method = "onLightUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache$MainThreadExecutor;execute(Ljava/lang/Runnable;)V"))
-    private void leafs$lightChangeOnTheOwner(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original, @Local(argsOnly = true) SectionPos pos) {
-        LevelChunks.of(this.level).owners().submit(pos.x(), pos.z(), Work.CHUNK, mark);
+    private void leafs$lightChangeInPlace(ServerChunkCache.MainThreadExecutor pump, Runnable mark, Operation<Void> original) {
+        mark.run();
+    }
+
+    // Until its regions are live, the level runs the vanilla way and its server thread applies the loading graph in place.
+    @WrapMethod(method = "runDistanceManagerUpdates")
+    private boolean leafs$vanillaUpdatesUntilLive(Operation<Boolean> original) {
+        if (LevelRegions.of(this.level).live()) {
+            return original.call();
+        }
+
+        LevelChunks chunks = LevelChunks.of(this.level);
+        chunks.graphs().loading().drain(chunks.holders().publication());
+        return original.call();
+    }
+
+    @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;runDistanceManagerUpdates()Z"))
+    private boolean leafs$settleTheRequestedChunk(ServerChunkCache cache, Operation<Boolean> original, @Local ChunkPos pos) {
+        return LevelChunks.of(this.level).holders().settled(pos.x(), pos.z(), () -> original.call(cache));
     }
 
     @WrapOperation(method = "getChunkFutureMainThread", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkHolder;scheduleChunkGenerationTask(Lnet/minecraft/world/level/chunk/status/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"))
@@ -86,6 +116,13 @@ public abstract class ServerChunkCacheMixin {
     @WrapOperation(method = "addTicketAndLoadWithRadius", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getVisibleChunkIfPresent(J)Lnet/minecraft/server/level/ChunkHolder;"))
     private ChunkHolder leafs$readTheHolderUnderTheGraphLocks(ServerChunkCache cache, long key, Operation<ChunkHolder> original) {
         return LevelChunks.of(this.level).holders().settled(ChunkPos.getX(key), ChunkPos.getZ(key), () -> original.call(cache, key));
+    }
+
+    @WrapMethod(method = "addTicketAndLoadWithRadius")
+    private CompletableFuture<?> leafs$anAwaitedLoadIsUrgent(TicketType type, ChunkPos pos, int radius, Operation<CompletableFuture<?>> original) {
+        CompletableFuture<?> loaded = original.call(type, pos, radius);
+        LevelChunks.of(this.level).holders().expedite(pos, radius, loaded);
+        return loaded;
     }
 
     @Unique

@@ -13,15 +13,18 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
 public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
     private final ConcurrentLong2ObjectMap<ChunkHolder> holders = new ConcurrentLong2ObjectMap<>();
     private final ConcurrentLong2ObjectMap<AtomicReferenceArray<ChunkHolder>> sections = new ConcurrentLong2ObjectMap<>();
     private final int sectionShift;
+    private final LongConsumer changed;
 
-    public HolderTable(int sectionShift) {
+    public HolderTable(int sectionShift, LongConsumer changed) {
         super(0);
         this.sectionShift = sectionShift;
+        this.changed = changed;
     }
 
     public void forEachHolderIn(long sectionKey, Consumer<ChunkHolder> action) {
@@ -66,6 +69,16 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
     }
 
     @Override
+    public boolean remove(long key, Object value) {
+        if (!holders.remove(key, value)) {
+            return false;
+        }
+
+        unindex(key);
+        return true;
+    }
+
+    @Override
     public boolean containsKey(long key) {
         return holders.containsKey(key);
     }
@@ -97,6 +110,7 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
             target.set(slotOf(key), holder);
             return target;
         });
+        changed.accept(sectionOf(key));
     }
 
     private void unindex(long key) {
@@ -104,6 +118,7 @@ public final class HolderTable extends Long2ObjectLinkedOpenHashMap<ChunkHolder>
             slots.set(slotOf(key), null);
             return holdsAny(slots) ? slots : null;
         });
+        changed.accept(sectionOf(key));
     }
 
     private static boolean holdsAny(AtomicReferenceArray<ChunkHolder> slots) {

@@ -13,9 +13,13 @@ import fr.hardel.leafs.chunk.holder.HolderTable;
 import fr.hardel.leafs.chunk.holder.PendingUnloads;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.chunk.owner.Work;
+import fr.hardel.leafs.network.AwaitedChunks;
+import fr.hardel.leafs.network.AwaitedChunksAccess;
+import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.RegionTickScheduler;
+import fr.hardel.leafs.ticking.TickingManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMaps;
@@ -34,6 +38,7 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskDispatcher;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.GenerationChunkHolder;
+import net.minecraft.server.level.PlayerMap;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StaticCache2D;
 import net.minecraft.util.thread.BlockableEventLoop;
@@ -57,6 +62,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -97,6 +103,10 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
 
     @Shadow
     @Final
+    private PlayerMap playerMap;
+
+    @Shadow
+    @Final
     private TicketStorage ticketStorage;
 
     @Shadow
@@ -114,6 +124,9 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @Unique
     private LevelChunks leafs$chunks;
 
+    @Unique
+    private PendingUnloads leafs$unloading;
+
     @Override
     public LevelChunks leafs$chunks() {
         return leafs$chunks;
@@ -124,19 +137,14 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
         this.chunksToEagerlySave = new ConcurrentLongSet();
         this.nextChunkSaveTime = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
         this.chunkTypeCache = Long2ByteMaps.synchronize(new Long2ByteOpenHashMap());
-        HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift());
+        HolderTable table = new HolderTable(leafs$regions().regionizer().sectionShift(), leafs$regions().regionizer()::markSection);
         this.updatingChunkMap = table;
         this.visibleChunkMap = table;
-        PendingUnloads unloading = new PendingUnloads();
-        this.pendingUnloads = unloading;
+        leafs$unloading = new PendingUnloads();
+        this.pendingUnloads = leafs$unloading;
         ChunkMap self = (ChunkMap) (Object) this;
-        leafs$chunks = new LevelChunks(self, this.ticketStorage, table, unloading, this.mainThreadExecutor);
+        leafs$chunks = new LevelChunks(self, this.ticketStorage, table, leafs$unloading, this.mainThreadExecutor);
         ((DistanceManagerAccess) self.getDistanceManager()).leafs$bind(leafs$chunks);
-    }
-
-    @WrapMethod(method = "move")
-    private void leafs$moveAsOneChange(ServerPlayer player, Operation<Void> original) {
-        leafs$chunks.graphs().batch(() -> original.call(player));
     }
 
     @WrapOperation(method = "move", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;values()Lit/unimi/dsi/fastutil/objects/ObjectCollection;"))
@@ -182,12 +190,40 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
     @WrapOperation(method = "prepareTickingChunk", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<?> leafs$tickingPromotionOnTheOwner(CompletableFuture<?> future, Function<?, ?> body, Executor pump, Operation<CompletableFuture<?>> original, @Local(argsOnly = true) ChunkHolder chunk) {
         ChunkPos pos = chunk.getPos();
-        return original.call(future, body, leafs$owners().executor(pos.x(), pos.z()));
+        CompletableFuture<?> ticking = original.call(future, body, leafs$owners().executor(pos.x(), pos.z()));
+        ticking.thenRun(() -> leafs$regions().chunkChanged(pos.x(), pos.z()));
+        return ticking;
     }
 
     @Inject(method = "onChunkReadyToSend", at = @At("HEAD"), cancellable = true)
     private void leafs$readyToSendOnTheOwner(ChunkHolder chunkHolder, LevelChunk chunk, CallbackInfo callbackInfo) {
         leafs$onTheOwner(chunk.getPos(), () -> onChunkReadyToSend(chunkHolder, chunk), callbackInfo);
+    }
+
+    @WrapOperation(method = "onChunkReadyToSend", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/chunk/LevelChunk;)V"))
+    private void leafs$announceOnceSendable(ServerPlayer player, LevelChunk chunk, Operation<Void> original) {
+    }
+
+    @Inject(method = "onChunkReadyToSend", at = @At("TAIL"))
+    private void leafs$announceToAwaitingPlayers(ChunkHolder chunkHolder, LevelChunk chunk, CallbackInfo callbackInfo) {
+        long key = chunk.getPos().pack();
+        chunkHolder.getTickingChunkFuture().thenRun(() -> {
+            for (ServerPlayer player : playerMap.getAllPlayers()) {
+                AwaitedChunks awaited = ((AwaitedChunksAccess) player.connection.chunkSender).leafs$awaited();
+                if (awaited.awaits(key)) {
+                    PacketRouting.playerTaskExecutor(player.connection).execute(() -> {
+                        if (awaited.take(key)) {
+                            player.connection.chunkSender.markChunkPendingToSend(chunk);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    @WrapOperation(method = "markChunkPendingToSend(Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/world/level/ChunkPos;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getChunkToSend(J)Lnet/minecraft/world/level/chunk/LevelChunk;"))
+    private LevelChunk leafs$awaitWhatIsNotSendable(ChunkMap chunkMap, long key, Operation<LevelChunk> original, @Local(argsOnly = true) ServerPlayer player) {
+        return ((AwaitedChunksAccess) player.connection.chunkSender).leafs$awaited().entered(key, chunkKey -> original.call(chunkMap, chunkKey));
     }
 
     @Inject(method = "onFullChunkStatusChange", at = @At("HEAD"), cancellable = true)
@@ -212,7 +248,13 @@ public abstract class ChunkMapMixin implements LevelChunksAccess {
 
     @WrapOperation(method = "scheduleUnload", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenRunAsync(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<Void> leafs$teardownOnTheOwner(CompletableFuture<?> future, Runnable body, Executor serialQueue, Operation<CompletableFuture<Void>> original, @Local(argsOnly = true) long pos) {
-        return original.call(future, body, leafs$owners().executor(ChunkPos.getX(pos), ChunkPos.getZ(pos)));
+        return original.call(future, leafs$unloading.counted(body), leafs$owners().executor(ChunkPos.getX(pos), ChunkPos.getZ(pos)));
+    }
+
+    // Vanilla runs its queue of unloads here: a flushing save returns with every unloading chunk handed to the disk.
+    @WrapOperation(method = "saveAllChunks", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;processUnloads(Ljava/util/function/BooleanSupplier;)V"))
+    private void leafs$finishTheTeardowns(ChunkMap self, BooleanSupplier haveTime, Operation<Void> original) {
+        TickingManager.of(self.level.getServer()).await(leafs$unloading::settled);
     }
 
     @Inject(method = "promoteChunkMap", at = @At("HEAD"), cancellable = true)

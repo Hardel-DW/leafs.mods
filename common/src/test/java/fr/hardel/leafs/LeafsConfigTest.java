@@ -99,32 +99,41 @@ class LeafsConfigTest {
     }
 
     @Test
-    void invalidFilesFailTheBootNamingFileAndCause(@TempDir Path directory) throws IOException {
-        record Invalid(String json, String cause) {
+    void anInvalidEntryTakesItsDefaultAndKeepsTheOthers(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        Files.writeString(file, """
+            {"region_threads": 0, "chunk_threads": "lots", "section_size": 20, "region_merge_distance": 3, "unknown": 1,
+             "debug": {"watchdog_warn_seconds": 601, "per_region_logs": true}, "gameplay": {"mob_cap_scope": "nowhere"}}
+            """);
+
+        LeafsConfig config = LeafsConfig.load(file);
+        LeafsConfig defaults = LeafsConfig.defaults();
+
+        assertEquals(defaults.regionThreads(), config.regionThreads());
+        assertEquals(defaults.chunkThreads(), config.chunkThreads());
+        assertEquals(defaults.sectionSize(), config.sectionSize());
+        assertEquals(3, config.regionMergeDistance());
+        assertEquals(defaults.debug().watchdogWarnSeconds(), config.debug().watchdogWarnSeconds());
+        assertTrue(config.debug().perRegionLogs());
+        assertEquals(defaults.gameplay().mobCapScope(), config.gameplay().mobCapScope());
+    }
+
+    @Test
+    void aBrokenFileTakesTheDefaultsAndStaysUntouched(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("leafs.json");
+        for (String broken : List.of("{oops", "", "[1, 2]")) {
+            Files.writeString(file, broken);
+            assertEquals(LeafsConfig.defaults(), LeafsConfig.load(file), broken);
+            assertEquals(broken, Files.readString(file));
         }
+    }
 
-        List<Invalid> cases = List.of(
-            new Invalid("{\"region_threads\": 0}", "region_threads"),
-            new Invalid("{\"chunk_threads\": 0}", "chunk_threads"),
-            new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 0}}", null),
-            new Invalid("{\"debug\": {\"watchdog_warn_seconds\": 601}}", "watchdog_warn_seconds"),
-            new Invalid("{\"debug\": {\"slow_task_warn_millis\": 60001}}", "slow_task_warn_millis"),
-            new Invalid("{\"section_size\": 20}", "section_size"),
-            new Invalid("{\"section_size\": 512}", null),
-            new Invalid("{\"region_threads\": \"lots\"}", null),
-            new Invalid("{oops", null),
-            new Invalid("", null)
-        );
+    @Test
+    void aRewriteRefusesAValueTheFileWouldDrop(@TempDir Path directory) {
+        Path file = directory.resolve("leafs.json");
+        LeafsConfig.load(file);
 
-        for (Invalid invalid : cases) {
-            Path file = directory.resolve("leafs.json");
-            Files.writeString(file, invalid.json());
-
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> LeafsConfig.load(file), invalid.json());
-            assertTrue(exception.getMessage().contains(file.toString()), invalid.json());
-            if (invalid.cause() != null) {
-                assertTrue(exception.getMessage().contains(invalid.cause()), invalid.json());
-            }
-        }
+        assertThrows(IllegalArgumentException.class, () -> LeafsConfig.rewrite(file, LeafsConfig.Setting.SECTION_SIZE, 20));
+        assertEquals(LeafsConfig.defaults(), LeafsConfig.load(file));
     }
 }

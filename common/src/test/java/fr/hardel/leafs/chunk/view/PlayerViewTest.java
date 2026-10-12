@@ -7,7 +7,9 @@ import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.chunk.ticket.TicketGraphs;
+import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -25,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MinecraftBootstrap.class)
 class PlayerViewTest {
     private final ChunkPool pool = ChunkFixtures.pool(1);
-    private final TicketGraphs graphs = new TicketGraphs();
-    private final PlayerView view = new PlayerView(new TicketStorage(), graphs);
+    private final TicketGraphs graphs = new TicketGraphs(new TickEpochs(0, () -> { }));
+    private final PlayerView view = new PlayerView(new TicketStorage(), graphs, _ -> false, Integer.MAX_VALUE);
     private final ChunkPlacement placement = new ChunkPlacement(pool, 0, place -> view.urgency(ChunkTask.chunkX(place.chunkKey()), ChunkTask.chunkZ(place.chunkKey())));
 
     @AfterEach
@@ -44,6 +46,17 @@ class PlayerViewTest {
         graphs.players().drain((_, _, _) -> { });
 
         assertTrue(view.urgency(0, 0) > ChunkPool.FIRST);
+    }
+
+    /** 2026-10-01: before the joining player was placed, the spawn square generated in no order and showed up as a line. */
+    @Test
+    void aChunkNoPlayerSeesIsAsUrgentAsItIsDeepInsideTheTicketThatLoadsIt() {
+        view.viewDistance(10);
+        graphs.loading().setSource(0, 0, ChunkLevel.byStatus(FullChunkStatus.FULL) - 3);
+        graphs.loading().drain((_, _, _) -> { });
+
+        assertTrue(view.urgency(0, 0) < view.urgency(2, 0), "the center passes before the second ring");
+        assertTrue(view.urgency(2, 0) < view.urgency(3, 0), "the second ring passes before the border");
     }
 
     /** 2026-09-24: a far chunk waited behind the pregen steps to unload, and stayed in memory meanwhile. */

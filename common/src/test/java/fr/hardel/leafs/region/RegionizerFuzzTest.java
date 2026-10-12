@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegionizerFuzzTest {
     private static final int OPERATIONS = 4000;
@@ -19,10 +20,11 @@ class RegionizerFuzzTest {
     private static final int CLUSTER_SPREAD = 8;
 
     @ParameterizedTest
-    @ValueSource(longs = {1, 7, 42, 1337, 20260731})
+    @ValueSource(longs = {1, 7, 42, 1337, 20260731, 3, 11, 99, 2024, 31337, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377})
     void randomChurnPreservesEveryInvariant(long seed) {
         Random random = new Random(seed);
-        Regionizer<Object> regionizer = new Regionizer<>(2, 1, 1, new RecordingCallbacks());
+        RecordingCallbacks callbacks = new RecordingCallbacks();
+        Regionizer<Object> regionizer = new Regionizer<>(2, 1, 1, callbacks);
         LongOpenHashSet chunks = new LongOpenHashSet();
         LongArrayList chunkList = new LongArrayList();
         List<Region<Object>> ticking = new ArrayList<>();
@@ -39,6 +41,7 @@ class RegionizerFuzzTest {
                 releaseRandomTickingRegion(random, ticking);
             }
 
+            assertEveryRegionIsScheduledOrWaitsForAMerge(regionizer, callbacks, operation);
             if (operation % CHECK_INTERVAL == 0) {
                 RegionizerAssertions.assertInvariants(regionizer, false);
             }
@@ -55,6 +58,14 @@ class RegionizerFuzzTest {
             int chunkZ = CoordinateKey.z(chunkKey);
             Region<Object> owner = regionizer.regionAt(chunkX, chunkZ);
             assertNotNull(owner, "chunk [%s, %s] lost its region".formatted(chunkX, chunkZ));
+        }
+    }
+
+    /** 2026-10-06: a region that waited for a merge took its target in instead and was never scheduled again, the world stood still. */
+    private static void assertEveryRegionIsScheduledOrWaitsForAMerge(Regionizer<Object> regionizer, RecordingCallbacks callbacks, int operation) {
+        for (Region<Object> region : regionizer.regionsView()) {
+            assertTrue(callbacks.scheduled.contains(region.id()) || !region.mergeIntoLater.isEmpty(),
+                "%s is not scheduled and waits for no merge, after operation %s".formatted(region, operation));
         }
     }
 
@@ -94,8 +105,9 @@ class RegionizerFuzzTest {
             return;
         }
 
+        // A worker ticks a region that waits for no merge; a thread that borrows one holds it whatever it waits for.
         Region<Object> candidate = regions.get(random.nextInt(regions.size()));
-        if (candidate.tryMarkTicking()) {
+        if (random.nextBoolean() ? candidate.tryMarkTicking() : candidate.tryHold()) {
             ticking.add(candidate);
         }
     }
