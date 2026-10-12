@@ -9,7 +9,6 @@ import java.util.function.Supplier;
 public final class RegionTickData {
     private final RegionInbox inbox;
     private volatile RegionTickHandle handle;
-    private volatile RegionClock clock;
     private volatile RegionWorldData worldData;
 
     RegionTickData(Supplier<ChunkOwners> owners) {
@@ -30,16 +29,11 @@ public final class RegionTickData {
         this.handle = handle;
     }
 
-    public RegionClock clock() {
-        return clock;
-    }
-
     public RegionWorldData worldData() {
         return worldData;
     }
 
-    void equipWorld(RegionClock clock, RegionWorldData worldData) {
-        this.clock = clock;
+    void equipWorld(RegionWorldData worldData) {
         this.worldData = worldData;
     }
 }

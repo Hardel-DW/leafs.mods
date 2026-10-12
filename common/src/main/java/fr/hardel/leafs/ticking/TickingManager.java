@@ -2,6 +2,7 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.leafs.Leafs;
 import fr.hardel.leafs.LeafsConfig;
+import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.metrics.TickStages.TickStage;
@@ -12,8 +13,8 @@ import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.ServerTickRateManager;
 import net.minecraft.server.dedicated.DedicatedServer;
-import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.thread.BlockableEventLoop;
 
@@ -24,10 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 
 public final class TickingManager {
     private final MinecraftServer server;
-    private final ServerMetrics metrics = new ServerMetrics();
+    private final ServerMetrics metrics;
     private final LeafsWatchdog watchdog;
     private final RegionTickScheduler scheduler;
     private final ChunkPool chunkPool;
@@ -41,16 +43,17 @@ public final class TickingManager {
     private final AtomicReference<CrashReport> regionCrash = new AtomicReference<>();
     private volatile boolean globalTicking;
     private volatile boolean halted;
-    private volatile boolean paused;
+    private volatile TickState state = TickState.INITIAL;
 
     public TickingManager(MinecraftServer server, LeafsConfig config) {
         this.server = server;
+        this.metrics = new ServerMetrics(this::nanosPerTick);
         long warnNanos = config.debug().watchdogWarnNanos();
         this.watchdog = new LeafsWatchdog(warnNanos, () -> killAfterNanos(server), now -> ThreadWaits.stalled(now, warnNanos), Leafs.LOGGER::error, new WatchdogKill(server));
         ThreadGroup serverThreads = Leafs.serverThreads();
-        this.scheduler = new RegionTickScheduler(serverThreads, config.effectiveRegionThreads(), () -> server.tickRateManager().nanosecondsPerTick(),
-            config.debug().perRegionLogs(), watchdog, this::onRegionTickFailure);
-        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, this::onChunkTaskFailure);
+        this.scheduler = new RegionTickScheduler(serverThreads, new TickEpochs(config.effectiveRegionThreads(), this::drainAtTickEnd), config.debug().perRegionLogs(), watchdog,
+            this::onRegionTickFailure);
+        this.chunkPool = new ChunkPool(serverThreads, config.effectiveChunkThreads(), ChunkPool.PRIORITIES, this::onChunkTaskFailure);
         watchdog.start();
         scheduler.start();
         Leafs.LOGGER.info("Leafs ticking live - {} region workers and {} chunk workers; regions tick free-running, the serial remainder stays on the server thread",
@@ -76,6 +79,13 @@ public final class TickingManager {
         return scheduler;
     }
 
+    // A tick can write the graphs of any level, a player crossing dimensions included.
+    private void drainAtTickEnd() {
+        for (ServerLevel level : levelUnits.keySet()) {
+            LevelChunks.of(level).graphs().drain();
+        }
+    }
+
     public LevelTickUnit unitOf(ServerLevel level) {
         return levelUnits.get(level);
     }
@@ -95,8 +105,22 @@ public final class TickingManager {
         return halted;
     }
 
-    public boolean paused() {
-        return paused;
+    public TickState state() {
+        return state;
+    }
+
+    public long nanosPerTick() {
+        return state.nanosPerTick();
+    }
+
+    public boolean everyRegion(Predicate<RegionTime> test) {
+        for (LevelTickUnit unit : levelUnits.values()) {
+            if (!unit.regions().all(test)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public void throwRegionCrash() {
@@ -107,7 +131,9 @@ public final class TickingManager {
     }
 
     public void endServerTick(boolean ticked) {
-        paused = !ticked;
+        ServerTickRateManager rate = server.tickRateManager();
+        TickOrders orders = (TickOrders) rate;
+        state = new TickState(rate.tickrate(), rate.nanosecondsPerTick(), rate.isFrozen(), !ticked, orders.leafs$step(), orders.leafs$sprint());
         scheduler.wakeMissed();
     }
 
@@ -135,7 +161,7 @@ public final class TickingManager {
         }
 
         WorldTickContext mine = WorldTickContext.current();
-        new OwnWork(() -> mine != null && mine.region().data().inbox().drainChunkWork() > 0).until(done, help);
+        new OwnWork(() -> mine != null && mine.region().data().inbox().pollChunkWork()).until(done, help);
     }
 
     private boolean pumpServer() {
@@ -168,7 +194,7 @@ public final class TickingManager {
 
     public void tickLevel(ServerLevel level, Runnable vanillaTick) {
         globalTicking = true;
-        levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, scheduler)).tick(vanillaTick);
+        levelUnits.computeIfAbsent(level, _ -> new LevelTickUnit(nextUnitId.getAndIncrement(), level, this)).tick(vanillaTick);
     }
 
     public void forgetLevel(ServerLevel level) {

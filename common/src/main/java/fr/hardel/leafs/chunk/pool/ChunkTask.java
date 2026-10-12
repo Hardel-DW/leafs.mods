@@ -22,7 +22,8 @@ public abstract class ChunkTask {
 
     public record Place(long chunkKey, long centerKey, ChunkStatus status, Urgency urgency) {
         public int priority() {
-            return urgency.of(this);
+            int urgent = urgency.of(this);
+            return urgent < ChunkPool.THIRD || status.isOrAfter(ChunkStatus.LIGHT) ? urgent : urgent + ChunkPool.BAND;
         }
     }
 

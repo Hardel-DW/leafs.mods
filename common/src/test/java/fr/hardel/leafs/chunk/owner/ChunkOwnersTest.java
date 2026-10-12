@@ -3,13 +3,14 @@ package fr.hardel.leafs.chunk.owner;
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
+import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
-import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.global.GlobalScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -31,8 +32,7 @@ class ChunkOwnersTest {
     private final List<String> taken = new CopyOnWriteArrayList<>();
     private final ChunkFixtures.TestRegions regions = new ChunkFixtures.TestRegions(inbox);
     private boolean chunkHeldByAnother;
-    private int urgency;
-    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, _ -> urgency);
+    private final ChunkOwners owners = ChunkFixtures.owners(pool, regions, this::take, server, _ -> 0);
 
     private boolean take(int chunkX, int chunkZ, Runnable task) {
         if (chunkHeldByAnother) {
@@ -80,6 +80,20 @@ class ChunkOwnersTest {
         assertEquals(List.of(), ran);
         assertTrue(server.drain());
         assertEquals(List.of("next tick"), ran);
+    }
+
+    /** 2026-10-01: a singleplayer server pauses until the joining player is placed, so its spawn chunks never took their full status and their entities never loaded. */
+    @Test
+    void laterBeforeTheRegionsAreLiveWaitsInTheSerialQueueThatDrainsEvenWhileTheServerIsPaused() {
+        List<Runnable> serial = new ArrayList<>();
+        ChunkOwners paused = new ChunkOwners(pool, new ChunkPlacement(pool, 0, _ -> 0), regions, Thread.currentThread(), serial::add, this::take, server);
+        regions.live(false);
+
+        paused.later(1, 1, Work.CHUNK, () -> ran.add("full status"));
+
+        assertEquals(List.of(), ran, "later never runs in line");
+        serial.forEach(Runnable::run);
+        assertEquals(List.of("full status"), ran);
     }
 
     @Test
@@ -239,57 +253,47 @@ class ChunkOwnersTest {
         assertFalse(owners.holds(1, 1));
     }
 
-    /** 2026-09-24: an owner task took the first priority whatever its chunk, and passed before the chunks a player waited for. */
+
+    /** 2026-09-26: a region published every chunk that turned FULL in its area, up to 1500 inbox tasks after a join. 2026-10-06: a join kept its region ticking without a gap, and the chunks waited at SPAWN in its inbox. */
     @Test
-    void anOwnerTaskTakesTheUrgencyOfItsChunk() {
-        regions.cover(null);
-        urgency = 5;
-        CountDownLatch release = TestThreads.occupy(pool);
-        CountDownLatch done = new CountDownLatch(2);
-
-        owners.submit(1, 1, Work.CHUNK, () -> {
-            ran.add("owner");
-            done.countDown();
-        });
-        pool.submit(ChunkTask.of(ChunkTask.Kind.STEP, 2, ChunkTask.NO_RESERVATION, () -> {
-            ran.add("step");
-            done.countDown();
-        }));
-        release.countDown();
-        TestThreads.await(done);
-
-        assertEquals(List.of("step", "owner"), ran);
-    }
-
-    /** 2026-09-26: a region published every chunk that turned FULL in its area, up to 1500 inbox tasks after a join. */
-    @Test
-    void aPublicationBetweenTwoRegionTicksRunsOnThePoolWhichHoldsItsChunk() {
+    void aChunkIsBuiltAndPublishedOnThePoolBesideATickingRegion() {
+        regions.tickOn(new Thread(() -> { }, "region"));
         CountDownLatch published = new CountDownLatch(1);
-        boolean[] held = new boolean[1];
+        boolean[] held = new boolean[2];
 
-        owners.publish(1, 1, () -> {
+        owners.build(1, 1, () -> {
             held[0] = owners.holds(1, 1);
-            published.countDown();
+            return () -> {
+                held[1] = owners.holds(1, 1);
+                published.countDown();
+            };
         });
 
         TestThreads.await(published);
-        assertTrue(held[0], "the pool worker holds the chunk it publishes");
-        assertEquals(0, inbox.size(), "the region inbox never saw the publication");
+        assertTrue(held[0], "the pool worker holds the chunk it builds");
+        assertFalse(held[1], "nobody stands on the chunk when it is published");
+        assertEquals(0, inbox.size(), "the region inbox never saw the chunk");
+        assertNotNull(owners.borrow(1, 1), "the pool gave the chunk back");
     }
 
     @Test
-    void aPublicationWhileTheRegionTicksWaitsInItsInbox() throws InterruptedException {
-        regions.tickOn(new Thread(() -> { }, "region"));
+    void aBuildOnAChunkAnotherThreadHoldsWaitsForItsRelease() throws InterruptedException {
+        AtomicReference<ChunkClaim> other = new AtomicReference<>();
+        Thread holder = new Thread(() -> other.set(owners.borrow(1, 1)), "holder");
+        holder.start();
+        holder.join();
+        ChunkClaim claim = other.get();
+        CountDownLatch published = new CountDownLatch(1);
 
-        owners.publish(1, 1, () -> ran.add("published"));
-        for (int attempt = 0; attempt < 500 && inbox.size() == 0; attempt++) {
+        owners.build(1, 1, () -> published::countDown);
+        for (int attempt = 0; attempt < 500 && claim.mail().size() == 0; attempt++) {
             Thread.sleep(10);
         }
 
-        assertEquals(List.of(), ran, "the pool never publishes beside a ticking region");
-        assertEquals(1, inbox.drain());
-        assertEquals(List.of("published"), ran);
-        assertNotNull(owners.borrow(1, 1), "the pool gave the chunk back");
+        assertEquals(1, published.getCount(), "the build waits in the mail of the thread that holds the chunk");
+        owners.release(1, 1, claim);
+        assertEquals(1, inbox.drain(), "the released build comes back through the region that covers the chunk");
+        TestThreads.await(published);
     }
 
     /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. 2026-09-14: game work waits for the next pump, a release runs nothing on its thread. */

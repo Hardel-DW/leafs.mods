@@ -7,10 +7,13 @@ import fr.hardel.leafs.chunk.ticket.TicketGraphs;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.level.ChunkLevel;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.TicketStorage;
+
+import java.util.function.LongPredicate;
 
 public final class PlayerView {
     private static final int SPAWN_RADIUS = 8;
@@ -20,11 +23,11 @@ public final class PlayerView {
     private final PlayerSources sources;
     private final ViewTickets tickets;
 
-    public PlayerView(TicketStorage storage, TicketGraphs graphs) {
+    public PlayerView(TicketStorage storage, TicketGraphs graphs, LongPredicate full, int loads) {
         this.graphs = graphs;
         this.players = graphs.players();
         this.sources = new PlayerSources(storage, players, DEFAULT_SIMULATION_DISTANCE);
-        this.tickets = new ViewTickets(storage, players, 0);
+        this.tickets = new ViewTickets(storage, players, 0, full, loads);
     }
 
     public LevelListener tickets() {
@@ -32,15 +35,19 @@ public final class PlayerView {
     }
 
     public void enter(long chunkKey) {
-        graphs.batch(() -> sources.enter(chunkKey));
+        sources.enter(chunkKey);
     }
 
     public void leave(long chunkKey) {
-        graphs.batch(() -> sources.leave(chunkKey));
+        sources.leave(chunkKey);
+    }
+
+    public void arrived(long chunkKey) {
+        tickets.arrived(chunkKey);
     }
 
     public void viewDistance(int distance) {
-        graphs.batch(() -> tickets.viewDistance(distance));
+        players.exclusive(() -> tickets.viewDistance(distance));
     }
 
     public void simulationDistance(int distance) {
@@ -53,7 +60,9 @@ public final class PlayerView {
             return ChunkPool.SECOND;
         }
 
-        return ChunkPool.SECOND + Math.min(players.level(chunkKey), tickets.viewDistance());
+        int seen = players.level(chunkKey);
+        int depth = seen == players.none() ? graphs.loading().level(chunkKey) - ChunkLevel.byStatus(FullChunkStatus.FULL) + tickets.viewDistance() : seen;
+        return ChunkPool.THIRD + Math.clamp(depth, 0, tickets.viewDistance());
     }
 
     public TriState nearby(long chunkKey) {

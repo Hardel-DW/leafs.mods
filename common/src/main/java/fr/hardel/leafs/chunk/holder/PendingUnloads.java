@@ -3,7 +3,27 @@ package fr.hardel.leafs.chunk.holder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import net.minecraft.server.level.ChunkHolder;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public final class PendingUnloads extends Long2ObjectLinkedOpenHashMap<ChunkHolder> {
+    private final AtomicInteger teardowns = new AtomicInteger();
+
+    /** A holder leaves the map when its teardown starts, and is on its way to the disk only once that teardown ends. */
+    public Runnable counted(Runnable teardown) {
+        teardowns.incrementAndGet();
+        return () -> {
+            try {
+                teardown.run();
+            } finally {
+                teardowns.decrementAndGet();
+            }
+        };
+    }
+
+    public synchronized boolean settled() {
+        return super.isEmpty() && teardowns.get() == 0;
+    }
+
     @Override
     public synchronized ChunkHolder put(long key, ChunkHolder value) {
         return super.put(key, value);

@@ -3,6 +3,8 @@ package fr.hardel.leafs.ticking;
 import fr.hardel.leafs.metrics.StageTimings;
 import net.minecraft.CrashReportCategory;
 
+import java.util.function.LongSupplier;
+
 public abstract class TickHandle {
     private final long id;
     private final String dimension;
@@ -10,10 +12,10 @@ public abstract class TickHandle {
     private volatile boolean cancelled;
     private volatile long scheduledStartNanos;
 
-    protected TickHandle(long id, String dimension, int stageCount) {
+    protected TickHandle(long id, String dimension, int stageCount, LongSupplier nanosPerTick) {
         this.id = id;
         this.dimension = dimension;
-        this.stages = new StageTimings(stageCount);
+        this.stages = new StageTimings(stageCount, nanosPerTick);
     }
 
     // Used by the Leafs Debug mod
@@ -53,6 +55,8 @@ public abstract class TickHandle {
     }
 
     public abstract long currentTick();
+
+    protected abstract long nextStartDelayNanos();
 
     protected abstract boolean tick();
 }

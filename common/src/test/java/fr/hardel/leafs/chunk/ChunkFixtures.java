@@ -7,13 +7,13 @@ import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.Urgency;
 import fr.hardel.leafs.global.GlobalScheduler;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import org.jspecify.annotations.Nullable;
 
 public final class ChunkFixtures {
     public static final class TestRegions implements ChunkOwners.Regions {
         private @Nullable RegionInbox inbox;
         private @Nullable Thread ticker;
+        private boolean live = true;
 
         public TestRegions(@Nullable RegionInbox inbox) {
             this.inbox = inbox;
@@ -28,8 +28,16 @@ public final class ChunkFixtures {
         }
 
         @Override
+        public void chunkChanged(int chunkX, int chunkZ) {
+        }
+
+        public void live(boolean live) {
+            this.live = live;
+        }
+
+        @Override
         public boolean live() {
-            return true;
+            return live;
         }
 
         @Override
@@ -47,7 +55,7 @@ public final class ChunkFixtures {
     }
 
     public static ChunkPool pool(int threads) {
-        return new ChunkPool(Thread.currentThread().getThreadGroup(), threads, ChunkTaskPriorityQueue.PRIORITY_LEVEL_COUNT, (_, _) -> { });
+        return new ChunkPool(Thread.currentThread().getThreadGroup(), threads, ChunkPool.PRIORITIES, (_, _) -> { });
     }
 
     public static ChunkOwners owners(ChunkPool pool, ChunkOwners.Regions regions, ChunkOwners.Taker taker, GlobalScheduler server, Urgency urgency) {

@@ -9,7 +9,7 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
-import java.util.function.LongSupplier;
+import java.util.stream.IntStream;
 
 public final class RegionTickScheduler {
     private static final long IDLE_POLL_NANOS = 50_000_000L;
@@ -17,29 +17,27 @@ public final class RegionTickScheduler {
     private final Queue<ScheduledTick> missed = new ConcurrentLinkedQueue<>();
     private final List<Thread> workers = new ArrayList<>();
     private final ThreadGroup serverThreads;
-    private final int threadCount;
-    private final LongSupplier periodNanos;
     private final boolean regionThreadNames;
     private final LeafsWatchdog watchdog;
     private final BiConsumer<TickHandle, Throwable> failurePolicy;
+    private final TickEpochs epochs;
     private volatile boolean running = true;
 
-    public RegionTickScheduler(ThreadGroup serverThreads, int threadCount, LongSupplier periodNanos, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
+    public RegionTickScheduler(ThreadGroup serverThreads, TickEpochs epochs, boolean regionThreadNames, LeafsWatchdog watchdog, BiConsumer<TickHandle, Throwable> failurePolicy) {
         this.serverThreads = serverThreads;
-        this.threadCount = threadCount;
-        this.periodNanos = periodNanos;
         this.regionThreadNames = regionThreadNames;
         this.watchdog = watchdog;
         this.failurePolicy = failurePolicy;
+        this.epochs = epochs;
     }
 
     public void start() {
-        for (int index = 1; index <= threadCount; index++) {
-            Thread worker = new Worker(serverThreads, this::workerLoop, index);
+        IntStream.rangeClosed(1, epochs.workers()).forEach(slot -> {
+            Thread worker = new Worker(serverThreads, () -> workerLoop(slot), slot);
             worker.setDaemon(true);
             workers.add(worker);
             worker.start();
-        }
+        });
     }
 
     public void shutdown(boolean crashed, OwnWork wait) {
@@ -52,7 +50,7 @@ public final class RegionTickScheduler {
     }
 
     public void schedule(TickHandle handle) {
-        handle.setScheduledStartNanos(System.nanoTime() + periodNanos.getAsLong());
+        handle.setScheduledStartNanos(System.nanoTime() + handle.nextStartDelayNanos());
         queue.add(new ScheduledTick(handle));
     }
 
@@ -68,12 +66,16 @@ public final class RegionTickScheduler {
         return Thread.currentThread() instanceof Worker;
     }
 
+    public TickEpochs epochs() {
+        return epochs;
+    }
+
     // Used by the Leafs Debug mod
     public List<Thread> workerThreads() {
         return Collections.unmodifiableList(workers);
     }
 
-    private void workerLoop() {
+    private void workerLoop(int slot) {
         while (running) {
             ScheduledTick next;
             try {
@@ -97,7 +99,7 @@ public final class RegionTickScheduler {
             boolean started;
             watchdog.beginTick(handle);
             try {
-                started = handle.tick();
+                started = tickInEpoch(handle, slot);
             } catch (Throwable throwable) {
                 if (running) {
                     failurePolicy.accept(handle, throwable);
@@ -121,8 +123,18 @@ public final class RegionTickScheduler {
                 continue;
             }
 
-            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + periodNanos.getAsLong()));
+            handle.setScheduledStartNanos(Math.max(System.nanoTime(), handle.scheduledStartNanos() + handle.nextStartDelayNanos()));
             queue.add(next);
+        }
+    }
+
+    // The drain at the epoch close fails like the tick itself, through the failure policy.
+    private boolean tickInEpoch(TickHandle handle, int slot) {
+        epochs.open(slot);
+        try {
+            return handle.tick();
+        } finally {
+            epochs.close(slot);
         }
     }
 

@@ -3,12 +3,14 @@ package fr.hardel.leafs.chunk.pool;
 import fr.hardel.MinecraftBootstrap;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.chunk.ChunkFixtures;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkPyramid;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -28,6 +30,44 @@ class ChunkPlacementTest {
     @AfterEach
     void stop() {
         pool.shutdown();
+    }
+
+    /** 2026-09-24: an owner task passed before the awaited chunks. 2026-09-29: a chunk done with SPAWN waited three times behind the generation of others before FULL. */
+    @Test
+    void theWorkThatFinishesAChunkPassesBeforeTheGenerationAndAfterTheAwaitedChunks() {
+        long awaited = ChunkTask.key(0, 9, 9);
+        ChunkPlacement frontier = new ChunkPlacement(pool, 0, place -> place.chunkKey() == awaited ? ChunkPool.FIRST : ChunkPool.THIRD);
+        CountDownLatch release = TestThreads.occupy(pool);
+        CountDownLatch done = new CountDownLatch(4);
+        frontier.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 8, 4, 1, () -> finish(done, "generation"));
+        frontier.onPool(ChunkTask.Kind.STEP, ChunkStatus.FULL, 3, 4, -1, () -> finish(done, "full step"));
+        frontier.onPool(ChunkTask.Kind.OWNER, ChunkStatus.FULL, 3, 4, 0, () -> finish(done, "publication"));
+        frontier.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 9, 9, 1, () -> finish(done, "awaited"));
+        release.countDown();
+        TestThreads.await(done);
+
+        assertEquals(List.of("awaited", "full step", "publication", "generation"), ran);
+    }
+
+    /** 2026-10-01: every chunk of a joining player's view was finishing at once, so the view filled in random pockets instead of from the player outward. */
+    @Test
+    void theNearestChunkPassesFirstInsideTheWorkThatFinishesChunksAndInsideTheGeneration() {
+        ChunkPlacement view = new ChunkPlacement(pool, 0, place -> ChunkPool.THIRD + Math.max(Math.abs(ChunkTask.chunkX(place.chunkKey())), Math.abs(ChunkTask.chunkZ(place.chunkKey()))));
+        CountDownLatch release = TestThreads.occupy(pool);
+        CountDownLatch done = new CountDownLatch(4);
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 10, 0, 1, () -> finish(done, "far generation"));
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FEATURES, 1, 0, 1, () -> finish(done, "near generation"));
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FULL, 20, 0, -1, () -> finish(done, "far finish"));
+        view.onPool(ChunkTask.Kind.STEP, ChunkStatus.FULL, 2, 0, -1, () -> finish(done, "near finish"));
+        release.countDown();
+        TestThreads.await(done);
+
+        assertEquals(List.of("near finish", "far finish", "near generation", "far generation"), ran);
+    }
+
+    private void finish(CountDownLatch done, String task) {
+        ran.add(task);
+        done.countDown();
     }
 
     @Test
@@ -92,5 +132,29 @@ class ChunkPlacementTest {
         release.countDown();
         TestThreads.await(done);
         assertEquals(List.of("load"), ran);
+    }
+
+    /** 2026-10-01: a drain sorted its holders by priorities other threads changed meanwhile, and the sort threw on the broken comparison contract. */
+    @Test
+    void aBatchIsOrderedByThePrioritiesReadOnceAtItsStart() {
+        int[] reads = new int[1];
+        ChunkPlacement flying = new ChunkPlacement(pool, 0, place -> ChunkPool.THIRD + Math.abs(ChunkTask.chunkX(place.chunkKey()) - reads[0]++ / 50 % 64));
+        List<ChunkPos> batch = new ArrayList<>();
+        for (int index = 0; index < 4096; index++) {
+            batch.add(new ChunkPos(index * 7919 % 64, index / 64));
+        }
+
+        List<ChunkPos> ordered = flying.finishingOrder(batch, pos -> pos);
+
+        assertEquals(batch.size(), ordered.size());
+        assertTrue(ordered.containsAll(batch));
+    }
+
+    @Test
+    void aBatchGoesFromTheNearestChunkToTheFarthest() {
+        ChunkPlacement view = new ChunkPlacement(pool, 0, place -> ChunkPool.THIRD + Math.abs(ChunkTask.chunkX(place.chunkKey())));
+        List<ChunkPos> batch = List.of(new ChunkPos(9, 0), new ChunkPos(-1, 0), new ChunkPos(4, 0), new ChunkPos(0, 0), new ChunkPos(-7, 0));
+
+        assertEquals(List.of(new ChunkPos(0, 0), new ChunkPos(-1, 0), new ChunkPos(4, 0), new ChunkPos(-7, 0), new ChunkPos(9, 0)), view.finishingOrder(batch, pos -> pos));
     }
 }

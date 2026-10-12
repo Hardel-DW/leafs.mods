@@ -1,5 +1,6 @@
 package fr.hardel.leafs.chunk.level;
 
+import fr.hardel.leafs.ticking.TickEpochs;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +18,7 @@ class PlayersGraphTest {
     private static final int RING_CHUNKS = 125;
     private static final int STEPS = 300;
 
-    private final ChunkLevels graph = new ChunkLevels(LEVELS);
+    private final ChunkLevels graph = new ChunkLevels(LEVELS, new TickEpochs(0, () -> { }));
 
     @Test
     void fiveMovingBotsSettleInMillisecondsFromFiveThreads() throws InterruptedException {

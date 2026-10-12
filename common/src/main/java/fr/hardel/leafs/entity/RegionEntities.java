@@ -1,16 +1,17 @@
 package fr.hardel.leafs.entity;
 
+import fr.hardel.leafs.ticking.LevelRegions;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.EntitySection;
-import net.minecraft.world.level.entity.EntitySectionStorage;
 import net.minecraft.world.level.entity.Visibility;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -21,19 +22,18 @@ public final class RegionEntities {
     private ServerLevel level;
     private long lastTrackingNanos;
 
-    public void refresh(ServerLevel level, List<ChunkHolder> holders) {
+    public void refresh(ServerLevel level, Collection<EntitySection<Entity>> sections) {
         this.level = level;
         entities.clear();
         accessible.clear();
         ids.clear();
-        EntitySectionStorage<Entity> storage = level.entityManager.sectionStorage;
-        for (ChunkHolder holder : holders) {
-            ChunkPos pos = holder.getPos();
-            for (long key : storage.getChunkSections(pos.x(), pos.z())) {
-                EntitySection<Entity> section = storage.sections.get(key);
-                if (section != null) {
-                    collect(section);
-                }
+        sections.forEach(this::collect);
+
+        LevelRegions regions = LevelRegions.of(level);
+        for (ServerPlayer player : level.players()) {
+            ChunkPos pos = player.chunkPosition();
+            if (!player.isRemoved() && regions.tickerAt(pos.x(), pos.z()) == Thread.currentThread()) {
+                add(player);
             }
         }
     }
@@ -48,14 +48,20 @@ public final class RegionEntities {
             }
 
             if (!entity.isRemoved() && (ticking || entity.isAlwaysTicking())) {
-                entities.add(entity);
-                ids.add(entity.getId());
+                add(entity);
             }
         });
     }
 
+    public void add(Entity entity) {
+        if (ids.add(entity.getId())) {
+            entities.add(entity);
+        }
+    }
+
     public void forEach(Consumer<Entity> action) {
-        for (Entity entity : entities) {
+        for (int index = 0, size = entities.size(); index < size; index++) {
+            Entity entity = entities.get(index);
             if (entity.level() == level) {
                 action.accept(entity);
             }

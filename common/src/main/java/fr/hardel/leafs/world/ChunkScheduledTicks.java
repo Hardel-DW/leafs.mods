@@ -2,18 +2,17 @@ package fr.hardel.leafs.world;
 
 import fr.hardel.excess.ConcurrentLong2ObjectMap;
 import fr.hardel.leafs.chunk.owner.Router;
+import fr.hardel.leafs.ticking.RegionTime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.ticks.LevelChunkTicks;
 import net.minecraft.world.ticks.LevelTicks;
 import net.minecraft.world.ticks.ScheduledTick;
-import net.minecraft.world.ticks.TickPriority;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
@@ -22,12 +21,13 @@ import java.util.LongSummaryStatistics;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
 public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     private final ConcurrentLong2ObjectMap<LevelChunkTicks<T>> containers = new ConcurrentLong2ObjectMap<>();
     private final ServerLevel level;
-    private final ScheduledTickAccess ticks;
+    private final LongSupplier gameTime;
     private final Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf;
     private final Router owners;
 
@@ -35,10 +35,10 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         void visit(long chunkKey, LevelChunkTicks<C> container);
     }
 
-    public ChunkScheduledTicks(ServerLevel level, ScheduledTickAccess ticks, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf, Router owners) {
+    public ChunkScheduledTicks(ServerLevel level, LongSupplier gameTime, Function<RegionWorldData, ScheduledTickDrain<LevelChunk, T>> drainOf, Router owners) {
         super(_ -> true);
         this.level = level;
-        this.ticks = ticks;
+        this.gameTime = gameTime;
         this.drainOf = drainOf;
         this.owners = owners;
     }
@@ -57,14 +57,8 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
     public void schedule(ScheduledTick<T> tick) {
         long chunkKey = ChunkPos.pack(tick.pos());
         if (containers.containsKey(chunkKey)) {
-            write(chunkKey, container -> container.schedule(tick));
-        }
-    }
-
-    public void schedule(BlockPos pos, T type, int delay, TickPriority priority) {
-        long chunkKey = ChunkPos.pack(pos);
-        if (containers.containsKey(chunkKey)) {
-            write(chunkKey, container -> container.schedule(ticks.createTick(pos, type, delay, priority)));
+            long delay = tick.triggerTick() - gameTime.getAsLong();
+            write(chunkKey, container -> container.schedule(retimed(tick, RegionTime.now(container, level) + delay)));
         }
     }
 
@@ -107,7 +101,12 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
             drain.collectInside(area, collected::add);
         }
 
-        chunked.forEachContainerIn(area, (_, container) -> container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(collected::add));
+        long now = gameTime.getAsLong();
+        chunked.forEachContainerIn(area, (_, container) -> {
+            long toNow = now - RegionTime.now(container, chunked.level);
+            container.getAll().filter(tick -> area.isInside(tick.pos())).forEach(tick -> collected.add(retimed(tick, tick.triggerTick() + toNow)));
+        });
+        
         LongSummaryStatistics subTicks = collected.stream().mapToLong(ScheduledTick::subTickOrder).summaryStatistics();
         long shift = subTicks.getMax() - subTicks.getMin() + 1;
         for (ScheduledTick<T> tick : collected) {
@@ -115,20 +114,8 @@ public final class ChunkScheduledTicks<T> extends LevelTicks<T> {
         }
     }
 
-    public static void rebase(LevelChunk chunk, long tickOffset) {
-        rebase(chunk.blockTicks, tickOffset);
-        rebase(chunk.fluidTicks, tickOffset);
-    }
-
-    public static <T> void rebase(LevelChunkTicks<T> container, long tickOffset) {
-        List<ScheduledTick<T>> drained = new ArrayList<>();
-        while (container.peek() != null) {
-            drained.add(container.poll());
-        }
-
-        for (ScheduledTick<T> tick : drained) {
-            container.schedule(new ScheduledTick<>(tick.type(), tick.pos(), tick.triggerTick() + tickOffset, tick.priority(), tick.subTickOrder()));
-        }
+    private static <T> ScheduledTick<T> retimed(ScheduledTick<T> tick, long triggerTick) {
+        return triggerTick == tick.triggerTick() ? tick : new ScheduledTick<>(tick.type(), tick.pos(), triggerTick, tick.priority(), tick.subTickOrder());
     }
 
     @Override

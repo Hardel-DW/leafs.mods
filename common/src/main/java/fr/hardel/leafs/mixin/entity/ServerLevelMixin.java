@@ -18,6 +18,7 @@ import fr.hardel.leafs.world.RegionWorldData;
 import fr.hardel.leafs.world.WorldTickContext;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.waypoints.ServerWaypointManager;
 import net.minecraft.world.entity.Entity;
@@ -77,7 +78,8 @@ public abstract class ServerLevelMixin implements ServerLevelEntityAccess {
         this.waypointManager = new ConcurrentWaypointManager(self);
         this.leafs$entityTeleports = new EntityTeleports(self);
         EntityManagerAccess manager = (EntityManagerAccess) self.entityManager;
-        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainInboxes());
+        this.leafs$entityPersistence = new RegionEntityPersistence(self, manager, () -> LevelRegions.of(self).drainInboxes(),
+            (chunkKey, task) -> LevelChunks.of(self).owners().later(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey), Work.CHUNK, task));
         manager.leafs$bindPersistence(this.leafs$entityPersistence);
     }
 

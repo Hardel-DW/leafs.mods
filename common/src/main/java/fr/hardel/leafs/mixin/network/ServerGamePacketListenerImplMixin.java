@@ -9,7 +9,7 @@ import fr.hardel.leafs.network.GameListenerNetworkAccess;
 import fr.hardel.leafs.network.PacketRouting;
 import fr.hardel.leafs.network.PlayerPacketQueue;
 import fr.hardel.leafs.network.RegionNetworkTick;
-import fr.hardel.leafs.ticking.RegionBorrow;
+import fr.hardel.leafs.metrics.DeferReason;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
@@ -32,6 +32,9 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     @Shadow
     public ServerPlayer player;
 
+    @Shadow
+    public abstract void resetPosition();
+
     @Unique
     private final PlayerPacketQueue leafs$inboundQueue = new PlayerPacketQueue();
 
@@ -40,14 +43,19 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
         return leafs$inboundQueue;
     }
 
-    @WrapMethod(method = "tickPlayer")
-    private boolean leafs$tickOnLandedChunks(Operation<Boolean> original) {
-        ChunkPos chunk = player.chunkPosition();
-        if (!RegionChunkAccess.fullAround(player.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
-            return false;
+    @WrapOperation(method = "tickPlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerPlayer;doTick()V"))
+    private void leafs$tickOnLandedChunks(ServerPlayer ticked, Operation<Void> original) {
+        ChunkPos chunk = ticked.chunkPosition();
+        if (!RegionChunkAccess.fullAround(ticked.level().getChunkSource().chunkMap, chunk.x(), chunk.z())) {
+            return;
         }
 
-        return original.call();
+        original.call(ticked);
+    }
+
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void leafs$movesStartAtTheJoin(CallbackInfo callbackInfo) {
+        resetPosition();
     }
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/FutureChain;<init>(Ljava/util/concurrent/Executor;)V"))
@@ -78,8 +86,7 @@ public abstract class ServerGamePacketListenerImplMixin implements GameListenerN
     }
 
     @WrapMethod(method = "onDisconnect")
-    private void leafs$lockThePlayerOnDisconnect(DisconnectionDetails details, Operation<Void> original) {
-        RegionBorrow.atContact(player);
-        original.call(details);
+    private void leafs$disconnectOnTheOwner(DisconnectionDetails details, Operation<Void> original) {
+        RegionNetworkTick.onTheOwner(player, DeferReason.LEAVE, () -> true, () -> original.call(details));
     }
 }

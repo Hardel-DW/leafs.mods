@@ -68,22 +68,28 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     public enum Setting {
-        REGION_THREADS("region_threads", LeafsConfig::regionThreads),
-        CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
-        SECTION_SIZE("section_size", LeafsConfig::sectionSize),
-        REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance),
-        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance);
+        REGION_THREADS("region_threads", LeafsConfig::regionThreads, true),
+        CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads, true),
+        SECTION_SIZE("section_size", LeafsConfig::sectionSize, false),
+        REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance, false),
+        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance, false);
 
         private final String key;
         private final ToIntFunction<LeafsConfig> getter;
+        private final boolean hardware;
 
-        Setting(String key, ToIntFunction<LeafsConfig> getter) {
+        Setting(String key, ToIntFunction<LeafsConfig> getter, boolean hardware) {
             this.key = key;
             this.getter = getter;
+            this.hardware = hardware;
         }
 
         public String key() {
             return key;
+        }
+
+        public boolean hardware() {
+            return hardware;
         }
 
         public int read(LeafsConfig config) {
@@ -119,24 +125,24 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
             : DataResult.success(value));
 
     private static final MapCodec<Debug> DEBUG = RecordCodecBuilder.mapCodec(builder -> builder.group(
-        WATCHDOG_WARN_SECONDS.optionalFieldOf("watchdog_warn_seconds", Debug.DISABLED).forGetter(Debug::watchdogWarnSeconds),
-        Codec.BOOL.optionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs),
-        atMost("slow_task_warn_millis", 60_000, "negative disables it").optionalFieldOf("slow_task_warn_millis", Debug.DISABLED).forGetter(Debug::slowTaskWarnMillis)
+        WATCHDOG_WARN_SECONDS.lenientOptionalFieldOf("watchdog_warn_seconds", Debug.DISABLED).forGetter(Debug::watchdogWarnSeconds),
+        Codec.BOOL.lenientOptionalFieldOf("per_region_logs", false).forGetter(Debug::perRegionLogs),
+        atMost("slow_task_warn_millis", 60_000, "negative disables it").lenientOptionalFieldOf("slow_task_warn_millis", Debug.DISABLED).forGetter(Debug::slowTaskWarnMillis)
     ).apply(builder, Debug::new));
 
     private static final MapCodec<Gameplay> GAMEPLAY = RecordCodecBuilder.mapCodec(builder -> builder.group(
-        StringRepresentable.fromEnum(MobCapScope::values).optionalFieldOf("mob_cap_scope", MobCapScope.LEVEL).forGetter(Gameplay::mobCapScope),
-        Codec.unboundedMap(MobCategory.CODEC, Codec.intRange(0, 100_000)).optionalFieldOf("mob_cap", vanillaMobCaps()).forGetter(Gameplay::mobCap)
+        StringRepresentable.fromEnum(MobCapScope::values).lenientOptionalFieldOf("mob_cap_scope", MobCapScope.LEVEL).forGetter(Gameplay::mobCapScope),
+        Codec.unboundedMap(MobCategory.CODEC, Codec.intRange(0, 100_000)).lenientOptionalFieldOf("mob_cap", vanillaMobCaps()).forGetter(Gameplay::mobCap)
     ).apply(builder, Gameplay::new));
 
     private static final Codec<LeafsConfig> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-        threads(Setting.REGION_THREADS).optionalFieldOf(Setting.REGION_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::regionThreads),
-        threads(Setting.CHUNK_THREADS).optionalFieldOf(Setting.CHUNK_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::chunkThreads),
-        SECTION_SIZE.optionalFieldOf(Setting.SECTION_SIZE.key(), 2).forGetter(LeafsConfig::sectionSize),
-        Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
-        Codec.intRange(1, 8).optionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
-        DEBUG.codec().optionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug),
-        GAMEPLAY.codec().optionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
+        threads(Setting.REGION_THREADS).lenientOptionalFieldOf(Setting.REGION_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::regionThreads),
+        threads(Setting.CHUNK_THREADS).lenientOptionalFieldOf(Setting.CHUNK_THREADS.key(), ALL_CORES).forGetter(LeafsConfig::chunkThreads),
+        SECTION_SIZE.lenientOptionalFieldOf(Setting.SECTION_SIZE.key(), 2).forGetter(LeafsConfig::sectionSize),
+        Codec.intRange(1, 8).lenientOptionalFieldOf(Setting.REGION_MERGE_DISTANCE.key(), 1).forGetter(LeafsConfig::regionMergeDistance),
+        Codec.intRange(1, 8).lenientOptionalFieldOf(Setting.REGION_BUFFER_DISTANCE.key(), 1).forGetter(LeafsConfig::regionBufferDistance),
+        DEBUG.codec().lenientOptionalFieldOf("debug", defaultsOf(DEBUG.codec())).forGetter(LeafsConfig::debug),
+        GAMEPLAY.codec().lenientOptionalFieldOf("gameplay", defaultsOf(GAMEPLAY.codec())).forGetter(LeafsConfig::gameplay)
     ).apply(builder, LeafsConfig::new));
 
     private static LeafsConfig instance = defaults();
@@ -170,7 +176,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     static LeafsConfig load(Path file) {
-        return Files.notExists(file) ? write(file, defaults()) : parse(file, read(file));
+        return Files.notExists(file) ? write(file, defaults()) : parse(read(file));
     }
 
     public static void rewrite(Setting setting, int value) {
@@ -178,9 +184,14 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     static void rewrite(Path file, Setting setting, int value) {
-        JsonObject json = read(file).getAsJsonObject();
+        JsonElement read = read(file);
+        JsonObject json = read.isJsonObject() ? read.getAsJsonObject() : new JsonObject();
         json.addProperty(setting.key(), value);
-        write(file, parse(file, json));
+        LeafsConfig config = parse(json);
+        if (setting.read(config) != value)
+            throw new IllegalArgumentException("%s %s is invalid".formatted(setting.key(), value));
+
+        write(file, config);
     }
 
     public int effectiveRegionThreads() {
@@ -207,15 +218,15 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
         return CODEC.encodeStart(JsonOps.INSTANCE, config).getOrThrow().getAsJsonObject();
     }
 
-    private static LeafsConfig parse(Path file, JsonElement json) {
-        return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new IllegalArgumentException("Config %s is invalid: %s".formatted(file, error)));
+    private static LeafsConfig parse(JsonElement json) {
+        return CODEC.parse(JsonOps.INSTANCE, json).result().orElseGet(LeafsConfig::defaults);
     }
 
     private static JsonElement read(Path file) {
         try {
             return JsonParser.parseString(Files.readString(file));
         } catch (JsonParseException exception) {
-            throw new IllegalArgumentException("Config %s is not valid JSON".formatted(file), exception);
+            return new JsonObject();
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to read %s".formatted(file), exception);
         }
@@ -224,7 +235,7 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     private static LeafsConfig write(Path file, LeafsConfig config) {
         try {
             Files.createDirectories(file.getParent());
-            Files.writeString(file, GSON.toJson(encode(config)) + System.lineSeparator());
+            Files.writeString(file, "%s%s".formatted(GSON.toJson(encode(config)), System.lineSeparator()));
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to write %s".formatted(file), exception);
         }

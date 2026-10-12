@@ -1,6 +1,7 @@
 package fr.hardel.leafs.gametest;
 
 import fr.hardel.leafs.ticking.LevelRegions;
+import fr.hardel.leafs.world.RegionWorldData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
@@ -24,6 +25,7 @@ record RegionTicks(GameTestHelper helper, BlockPos pos, long target) implements 
     private static long now(GameTestHelper helper, BlockPos pos) {
         ServerLevel level = helper.getLevel();
         ChunkPos chunk = ChunkPos.containing(helper.absolutePos(pos));
-        return LevelRegions.of(level).timeAt(chunk.x(), chunk.z(), level.getGameTime());
+        RegionWorldData region = LevelRegions.of(level).worldDataAt(chunk.x(), chunk.z());
+        return region == null ? level.getLevelData().getGameTime() : region.time().currentTick();
     }
 }

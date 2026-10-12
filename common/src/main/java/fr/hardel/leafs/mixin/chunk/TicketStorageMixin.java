@@ -12,6 +12,9 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -19,96 +22,80 @@ import java.util.function.BiConsumer;
 @Mixin(TicketStorage.class)
 public abstract class TicketStorageMixin implements TicketStorageAccess {
     @Unique
-    private final TicketGraphs leafs$graphs = new TicketGraphs();
+    private TicketGraphs leafs$graphs;
 
     @Unique
     private TicketTimeoutIndex leafs$timeouts;
 
-    @Override
-    public TicketGraphs leafs$graphs() {
-        return leafs$graphs;
-    }
+    @Unique
+    private volatile int leafs$keepingActive;
 
     @Override
-    public void leafs$bindTimeouts(TicketTimeoutIndex timeouts) {
+    public void leafs$bind(TicketGraphs graphs, TicketTimeoutIndex timeouts) {
+        leafs$graphs = graphs;
         leafs$timeouts = timeouts;
     }
 
     @WrapMethod(method = "setLoadingChunkUpdatedListener")
     private void leafs$feedTheLoadingGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        original.call(leafs$graphs.loadingFeed());
+        original.call((TicketStorage.ChunkUpdated) (key, level, _) -> leafs$graphs.loading().setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level));
     }
 
     @WrapMethod(method = "setSimulationChunkUpdatedListener")
     private void leafs$feedTheSimulationGraph(TicketStorage.ChunkUpdated listener, Operation<Void> original) {
-        original.call(leafs$graphs.simulationFeed());
+        original.call((TicketStorage.ChunkUpdated) (key, level, _) -> leafs$graphs.simulation().setSource(ChunkPos.getX(key), ChunkPos.getZ(key), level));
     }
 
     @WrapMethod(method = "addTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredAdd(long key, Ticket ticket, Operation<Boolean> original) {
-        boolean added = leafs$graphs.batch(() -> {
-            synchronized (this) {
-                boolean stored = original.call(key, ticket);
-                if (stored && ticket.getType().hasTimeout()) {
-                    leafs$timeouts.track(key, ticket);
-                }
-
-                return stored;
+        synchronized (this) {
+            boolean added = original.call(key, ticket);
+            if (added) {
+                leafs$entered(key, ticket);
             }
-        });
-        if (added) {
-            leafs$graphs.settle(key, ticket);
-        }
 
-        return added;
+            return added;
+        }
     }
 
     @WrapMethod(method = "removeTicket(JLnet/minecraft/server/level/Ticket;)Z")
     private boolean leafs$monitoredRemove(long key, Ticket ticket, Operation<Boolean> original) {
-        return leafs$graphs.batch(() -> {
-            synchronized (this) {
-                boolean removed = original.call(key, ticket);
-                if (removed && ticket.getType().hasTimeout()) {
-                    leafs$timeouts.untrack(key, ticket);
-                }
-
-                return removed;
+        synchronized (this) {
+            boolean removed = original.call(key, ticket);
+            if (removed) {
+                leafs$left(key, ticket);
             }
-        });
+
+            return removed;
+        }
     }
 
     @WrapMethod(method = "removeTicketIf")
     private void leafs$monitoredRemoveIf(TicketStorage.TicketPredicate predicate, Long2ObjectOpenHashMap<List<Ticket>> removedTickets, Operation<Void> original) {
-        leafs$graphs.batch(() -> {
-            synchronized (this) {
-                original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
-                    boolean removed = predicate.test(ticket, chunkPos);
-                    if (removed && ticket.getType().hasTimeout()) {
-                        leafs$timeouts.untrack(chunkPos, ticket);
-                    }
+        synchronized (this) {
+            original.call((TicketStorage.TicketPredicate) (ticket, chunkPos) -> {
+                boolean removed = predicate.test(ticket, chunkPos);
+                if (removed) {
+                    leafs$left(chunkPos, ticket);
+                }
 
-                    return removed;
-                }, removedTickets);
-            }
-        });
+                return removed;
+            }, removedTickets);
+        }
     }
 
     @WrapMethod(method = "replaceTicketLevelOfType")
     private void leafs$monitoredReplace(int newLevel, TicketType ticketType, Operation<Void> original) {
-        leafs$graphs.batch(() -> {
-            synchronized (this) {
-                original.call(newLevel, ticketType);
-            }
-        });
+        synchronized (this) {
+            original.call(newLevel, ticketType);
+        }
     }
 
     @WrapMethod(method = "activateAllDeactivatedTickets")
     private void leafs$monitoredActivate(Operation<Void> original) {
-        leafs$graphs.batch(() -> {
-            synchronized (this) {
-                original.call();
-            }
-        });
+        synchronized (this) {
+            original.call();
+        }
     }
 
     @WrapMethod(method = "getTicketLevelAt(JZ)I")
@@ -132,17 +119,37 @@ public abstract class TicketStorageMixin implements TicketStorageAccess {
         }
     }
 
-    @WrapMethod(method = "shouldKeepDimensionActive")
-    private boolean leafs$monitoredActivityRead(Operation<Boolean> original) {
-        synchronized (this) {
-            return original.call();
-        }
+    @Inject(method = "shouldKeepDimensionActive", at = @At("HEAD"), cancellable = true)
+    private void leafs$countedActivityRead(CallbackInfoReturnable<Boolean> callbackInfo) {
+        callbackInfo.setReturnValue(leafs$keepingActive > 0);
     }
 
     @WrapMethod(method = "hasTickets")
     private boolean leafs$monitoredEmptinessRead(Operation<Boolean> original) {
         synchronized (this) {
             return original.call();
+        }
+    }
+
+    @Unique
+    private void leafs$entered(long key, Ticket ticket) {
+        if (ticket.getType().hasTimeout()) {
+            leafs$timeouts.track(key, ticket);
+        }
+
+        if (ticket.getType().shouldKeepDimensionActive()) {
+            leafs$keepingActive++;
+        }
+    }
+
+    @Unique
+    private void leafs$left(long key, Ticket ticket) {
+        if (ticket.getType().hasTimeout()) {
+            leafs$timeouts.untrack(key, ticket);
+        }
+
+        if (ticket.getType().shouldKeepDimensionActive()) {
+            leafs$keepingActive--;
         }
     }
 }

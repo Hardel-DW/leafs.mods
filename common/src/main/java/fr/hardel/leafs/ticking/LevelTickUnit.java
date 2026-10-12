@@ -15,15 +15,17 @@ public final class LevelTickUnit {
     private final String dimension;
     private final ServerLevel level;
     private final LevelRegions regions;
-    private final StageTimings stages = new StageTimings(TickStages.count(TickFamily.SERIAL));
+    private final StageTimings stages;
     private volatile int lastChunkCount;
 
-    LevelTickUnit(long id, ServerLevel level, RegionTickScheduler scheduler) {
+    LevelTickUnit(long id, ServerLevel level, TickingManager ticking) {
         this.id = id;
         this.dimension = level.dimension().identifier().toString();
         this.level = level;
+        this.stages = new StageTimings(TickStages.count(TickFamily.SERIAL), ticking::nanosPerTick);
         this.regions = LevelRegions.of(level);
-        regions.activate(dimension, scheduler, level::getGameTime, time -> RegionWorldData.regional(level, time), new RegionTickBody(level));
+        regions.activate(dimension, ticking.scheduler(), ticking::nanosPerTick,
+            () -> RegionWorldData.regional(level, new RegionTime(level.getLevelData().getGameTime(), ticking.state())), new RegionTickBody(level));
     }
 
     // Used by the Leafs Debug mod

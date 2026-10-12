@@ -47,6 +47,9 @@ public final class ConfigCommand {
 
     private static int set(CommandSourceStack source, String key, int value) throws CommandSyntaxException {
         Setting setting = setting(key);
+        if (setting.hardware())
+            throw new SimpleCommandExceptionType(Component.literal("%s sets the hardware Leafs uses, edit config/leafs.json".formatted(key))).create();
+
         try {
             LeafsConfig.rewrite(setting, value);
         } catch (IllegalArgumentException exception) {
