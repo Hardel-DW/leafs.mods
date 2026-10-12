@@ -7,7 +7,6 @@
 	"entrypoints": {
 		"fabric-gametest": [
 			"fr.hardel.leafs.gametest.ChunkLoadEventsTest",
-			"fr.hardel.leafs.gametest.BorrowReleaseTest",
 			"fr.hardel.leafs.gametest.CommandBlockChainTest",
 			"fr.hardel.leafs.gametest.PoiWriteTest",
 			"fr.hardel.leafs.gametest.PlayerTickTest",
@@ -16,10 +15,12 @@
 			"fr.hardel.leafs.gametest.StructureStartsTest",
 			"fr.hardel.leafs.gametest.ChunkPacketTest",
 			"fr.hardel.leafs.gametest.FlushingSaveTest",
-			"fr.hardel.leafs.gametest.RegionChunksTest",
-			"fr.hardel.leafs.gametest.TickOrderTest"
+			"fr.hardel.leafs.gametest.RegionChunksTest"
 		]
 	},
+	"mixins": [
+		"leafs-gametest.mixins.json"
+	],
 	"depends": {
 		"leafs": "*",
 		"fabric-gametest-api-v1": "*"
