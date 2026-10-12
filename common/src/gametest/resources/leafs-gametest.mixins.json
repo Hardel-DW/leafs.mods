@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "fr.hardel.leafs.gametest.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"GameTestHelperAccessor",
+		"GameTestServerMixin",
+		"MinecraftServerAccessor",
+		"SectionStorageAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -20,21 +20,21 @@ import java.util.function.Consumer;
 public final class LeafsGameTests {
     static final String MOD_ID = "leafs_gametest";
     private static final List<Test> TESTS = List.of(
-            new Test("the_test_chunk_is_owned_by_a_region", 20, RegionOwnershipTest::theTestChunkIsOwnedByARegion),
-            new Test("mod_work_runs_on_the_player_queue", 40, PayloadWorkTest::modWorkRunsOnThePlayerQueue),
-            new Test("a_cancelled_placement_primes_no_tnt", 20, CancelledPlacementTest::aCancelledPlacementPrimesNoTnt),
-            new Test("every_listener_hears_its_invalidation", 200, CapabilityListenerTest::everyListenerHearsItsInvalidation)
+            new Test("the_test_chunk_is_owned_by_a_region", RegionOwnershipTest::theTestChunkIsOwnedByARegion),
+            new Test("mod_work_runs_on_the_player_queue", PayloadWorkTest::modWorkRunsOnThePlayerQueue),
+            new Test("a_cancelled_placement_primes_no_tnt", CancelledPlacementTest::aCancelledPlacementPrimesNoTnt),
+            new Test("every_listener_hears_its_invalidation", CapabilityListenerTest::everyListenerHearsItsInvalidation)
     );
 
     public LeafsGameTests(IEventBus modBus) {
         modBus.addListener((RegisterEvent event) -> TESTS.forEach(test -> event.register(Registries.TEST_FUNCTION, test.id(), test::function)));
         modBus.addListener((RegisterGameTestsEvent event) -> {
             Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(Identifier.fromNamespaceAndPath(MOD_ID, "default"));
-            TESTS.forEach(test -> event.registerTest(test.id(), new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, test.id()), new TestData<>(environment, Identifier.withDefaultNamespace("empty"), test.maxTicks(), 0, true))));
+            TESTS.forEach(test -> event.registerTest(test.id(), new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, test.id()), new TestData<>(environment, Identifier.withDefaultNamespace("empty"), HangGuard.TICKS, 0, true))));
         });
     }
 
-    private record Test(String name, int maxTicks, Consumer<GameTestHelper> function) {
+    private record Test(String name, Consumer<GameTestHelper> function) {
         Identifier id() {
             return Identifier.fromNamespaceAndPath(MOD_ID, name);
         }

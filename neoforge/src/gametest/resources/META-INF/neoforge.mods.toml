@@ -7,6 +7,9 @@ modId = "leafs_gametest"
 version = "1"
 displayName = "Leafs Game Tests"
 
+[[mixins]]
+config = "leafs-gametest.mixins.json"
+
 [[dependencies.leafs_gametest]]
 modId = "leafs"
 type = "required"
