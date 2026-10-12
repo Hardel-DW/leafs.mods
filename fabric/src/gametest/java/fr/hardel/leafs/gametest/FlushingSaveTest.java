@@ -60,7 +60,6 @@ public final class FlushingSaveTest {
             .thenExecute(() -> busy.set(HeldPool.untilTheEndOf(helper, LevelChunks.of(level).pool())))
             .thenWaitUntil(() -> helper.assertTrue(busy.get().holdsEveryWorker(), "every chunk worker is busy"))
             .thenExecute(() -> {
-                // The save pumps the server tasks while it waits for the unloads: the pool is freed there, never before the save.
                 TickingManager.of(level.getServer()).globalScheduler().run(busy.get()::release);
                 source.save(true);
                 queued.set(square.stream().filter(pos -> writes.pending(pos) != null).count());

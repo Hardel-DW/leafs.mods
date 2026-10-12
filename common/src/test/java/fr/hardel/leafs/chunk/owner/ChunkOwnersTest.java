@@ -297,7 +297,10 @@ class ChunkOwnersTest {
 
         TestThreads.await(chunkWork);
         assertEquals(List.of(), ran, "the game work did not run on the releasing thread");
-        TestThreads.until(() -> server.drain() || !ran.isEmpty());
+        TestThreads.until(() -> {
+            server.drain();
+            return !ran.isEmpty();
+        });
 
         assertEquals(List.of("game"), ran);
         assertEquals(List.of("1,1"), taken);

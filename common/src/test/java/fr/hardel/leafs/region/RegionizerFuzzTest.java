@@ -105,7 +105,6 @@ class RegionizerFuzzTest {
             return;
         }
 
-        // A worker ticks a region that waits for no merge; a thread that borrows one holds it whatever it waits for.
         Region<Object> candidate = regions.get(random.nextInt(regions.size()));
         if (random.nextBoolean() ? candidate.tryMarkTicking() : candidate.tryHold()) {
             ticking.add(candidate);
