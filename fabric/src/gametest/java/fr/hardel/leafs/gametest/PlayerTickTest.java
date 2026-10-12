@@ -51,7 +51,7 @@ public final class PlayerTickTest {
         Vec3 spawn = onRawTerrain(rawChunk(helper, 600));
         ServerPlayer player = joined(helper, spawn);
 
-        accept(player, 1, spawn);
+        accept(player, 1);
         Vec3 moved = moveOnce(player, spawn);
         helper.getLevel().getServer().getPlayerList().remove(player);
 
@@ -63,13 +63,13 @@ public final class PlayerTickTest {
     public void aPlayerWaitingForItsChunksKeepsItsMoves(GameTestHelper helper) {
         ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
         player.connection.tick();
-        accept(player, 1, player.position());
+        accept(player, 1);
         Vec3 position = onRawTerrain(rawChunk(helper, 900));
 
         player.connection.teleport(position.x, position.y, position.z, 0, 0);
         player.connection.resetPosition();
         player.connection.tick();
-        accept(player, 2, position);
+        accept(player, 2);
         for (int step = 0; step < STEPS; step++) {
             position = moveOnce(player, position);
             player.connection.tick();
@@ -94,7 +94,7 @@ public final class PlayerTickTest {
         helper.startSequence()
             .thenExecute(() -> {
                 player.connection.tick();
-                accept(player, 1, player.position());
+                accept(player, 1);
                 for (int worker = 0; worker < pool.threads(); worker++) {
                     pool.execute(() -> holdUntil(held, released));
                 }
@@ -144,8 +144,8 @@ public final class PlayerTickTest {
         return new Vec3(raw.getMiddleBlockX(), RAW_Y, raw.getMiddleBlockZ());
     }
 
-    static void accept(ServerPlayer player, int teleport, Vec3 position) {
-        player.connection.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(teleport, position.x, position.y, position.z, 0, 0));
+    static void accept(ServerPlayer player, int teleport) {
+        player.connection.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(teleport));
     }
 
     private static Vec3 moveOnce(ServerPlayer player, Vec3 from) {

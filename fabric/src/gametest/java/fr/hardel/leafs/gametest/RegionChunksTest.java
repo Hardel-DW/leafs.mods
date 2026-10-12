@@ -69,14 +69,14 @@ public final class RegionChunksTest {
 
     private static void arrive(ServerPlayer player) {
         player.connection.tick();
-        PlayerTickTest.accept(player, 1, player.position());
+        PlayerTickTest.accept(player, 1);
     }
 
     private static void land(ServerPlayer player, int teleport, ChunkPos chunk) {
         Vec3 position = PlayerTickTest.onRawTerrain(chunk);
         player.connection.teleport(position.x, position.y, position.z, 0, 0);
         player.connection.resetPosition();
-        PlayerTickTest.accept(player, teleport, position);
+        PlayerTickTest.accept(player, teleport);
     }
 
     /** Reads the table of every region on its own thread and compares it with the lists the region keeps. */
