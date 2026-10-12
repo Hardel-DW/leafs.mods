@@ -68,22 +68,28 @@ public record LeafsConfig(int regionThreads, int chunkThreads, int sectionSize, 
     }
 
     public enum Setting {
-        REGION_THREADS("region_threads", LeafsConfig::regionThreads),
-        CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads),
-        SECTION_SIZE("section_size", LeafsConfig::sectionSize),
-        REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance),
-        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance);
+        REGION_THREADS("region_threads", LeafsConfig::regionThreads, true),
+        CHUNK_THREADS("chunk_threads", LeafsConfig::chunkThreads, true),
+        SECTION_SIZE("section_size", LeafsConfig::sectionSize, false),
+        REGION_MERGE_DISTANCE("region_merge_distance", LeafsConfig::regionMergeDistance, false),
+        REGION_BUFFER_DISTANCE("region_buffer_distance", LeafsConfig::regionBufferDistance, false);
 
         private final String key;
         private final ToIntFunction<LeafsConfig> getter;
+        private final boolean hardware;
 
-        Setting(String key, ToIntFunction<LeafsConfig> getter) {
+        Setting(String key, ToIntFunction<LeafsConfig> getter, boolean hardware) {
             this.key = key;
             this.getter = getter;
+            this.hardware = hardware;
         }
 
         public String key() {
             return key;
+        }
+
+        public boolean hardware() {
+            return hardware;
         }
 
         public int read(LeafsConfig config) {
