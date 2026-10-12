@@ -13,7 +13,6 @@ import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
@@ -22,11 +21,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Timeout(30)
 @ExtendWith(MinecraftBootstrap.class)
 class ChunkWritesTest {
     private final ChunkPool pool = ChunkFixtures.pool(2);
@@ -44,7 +41,7 @@ class ChunkWritesTest {
 
     /** B01: the older photo of a chunk finished encoding after the newer one and wrote its stale state over it; the disk keeps the last photo, like vanilla's write queue. */
     @Test
-    void anOlderPhotoFinishingAfterANewerOneIsNeverWritten() throws InterruptedException {
+    void anOlderPhotoFinishingAfterANewerOneIsNeverWritten() {
         ChunkWrites writes = new ChunkWrites(pool, storage.worker);
         ChunkPos pos = new ChunkPos(3, 4);
         CountDownLatch olderTaken = new CountDownLatch(1);
@@ -55,7 +52,7 @@ class ChunkWritesTest {
             TestThreads.await(newerWritten);
             return ChunkFixtures.photo(1);
         });
-        olderTaken.await(5, TimeUnit.SECONDS);
+        TestThreads.await(olderTaken);
         PendingWrite newer = writes.photograph(pos, () -> ChunkFixtures.photo(2));
         newer.written().join();
         newerWritten.countDown();
@@ -78,9 +75,7 @@ class ChunkWritesTest {
 
         CompletableFuture<Void> first = writes.photograph(new ChunkPos(0, 0), () -> ChunkFixtures.photo(1)).written().thenRun(() -> order.add("write"));
         CompletableFuture<Void> second = writes.photograph(new ChunkPos(1, 0), () -> ChunkFixtures.photo(1)).written().thenRun(() -> order.add("write"));
-        while (storage.worker.consecutiveExecutor.size() < 2) {
-            Thread.onSpinWait();
-        }
+        TestThreads.until(() -> storage.worker.consecutiveExecutor.size() >= 2);
 
         CompletableFuture<Void> read = storage.worker.loadAsync(new ChunkPos(5, 5)).thenRun(() -> order.add("read"));
         disk.countDown();

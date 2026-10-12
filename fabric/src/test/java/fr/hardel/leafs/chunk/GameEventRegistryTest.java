@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -48,15 +47,15 @@ class GameEventRegistryTest {
                 TestThreads.await(release);
             }));
             try {
-                assertTrue(visiting.await(5, TimeUnit.SECONDS));
+                TestThreads.await(visiting);
                 var concurrent = workers.submit(() -> registry.visitInRangeListeners(GameEvent.STEP, Vec3.ZERO, new GameEvent.Context(null, null),
                     (_, _) -> registry.unregister(second)));
-                assertTrue(concurrent.get(5, TimeUnit.SECONDS));
+                assertTrue(concurrent.get());
             } finally {
                 release.countDown();
             }
 
-            assertTrue(outer.get(5, TimeUnit.SECONDS));
+            assertTrue(outer.get());
         }
 
         assertEquals(List.of(first), seen);

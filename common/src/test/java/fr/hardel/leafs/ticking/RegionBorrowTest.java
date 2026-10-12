@@ -1,6 +1,7 @@
 package fr.hardel.leafs.ticking;
 
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import fr.hardel.leafs.LeafsConfig;
 import fr.hardel.leafs.chunk.ChunkFixtures;
 import fr.hardel.leafs.chunk.owner.ChunkClaim;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -94,11 +94,12 @@ class RegionBorrowTest {
         });
 
         borrower.start();
-        assertFalse(borrowed.await(100, TimeUnit.MILLISECONDS), "the region in flight is not taken before its tick ends");
+        TestThreads.awaitParked(borrower);
+        assertEquals(1, borrowed.getCount(), "the region in flight is not taken before its tick ends");
         assertTrue(tookTheOther.get(), "the idle region was taken without waiting");
 
         ticking.markNotTicking();
-        assertTrue(borrowed.await(2, TimeUnit.SECONDS));
+        TestThreads.await(borrowed);
         assertEquals(RegionState.TICKING, ticking.state());
         borrower.join();
     }
@@ -145,7 +146,7 @@ class RegionBorrowTest {
         });
 
         borrower.start();
-        assertTrue(done.await(2, TimeUnit.SECONDS), "borrowAll takes the region owed a merge without waiting for the fold");
+        TestThreads.await(done);
         assertEquals(2, heldAfter.get(), "both sides of the merge are held");
         borrower.join();
         assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran at the release");
@@ -172,9 +173,10 @@ class RegionBorrowTest {
         });
 
         borrower.start();
-        Thread.sleep(100);
+        TestThreads.awaitParked(borrower);
+        assertEquals(1, done.getCount(), "borrowAll waits for the tick in flight");
         west.markNotTicking();
-        assertTrue(done.await(5, TimeUnit.SECONDS), "borrowAll ends once the tick in flight ends");
+        TestThreads.await(done);
         borrower.join();
         assertEquals(2, heldAfter.get(), "both sides of the merge were held");
         assertSame(regions.regionizer().regionAt(96, 0), regions.regionizer().regionAt(0, 0), "the merge ran at the release");

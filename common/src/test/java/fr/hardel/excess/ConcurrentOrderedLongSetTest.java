@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Random;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,11 +48,14 @@ class ConcurrentOrderedLongSetTest {
     @Test
     void iterationIsSortedSignedOrder() {
         TreeSet<Long> reference = new TreeSet<>();
-        Random random = new Random(42);
-        for (int i = 0; i < 2000; i++) {
-            long key = sectionKey(random.nextInt(200) - 100, random.nextInt(24) - 4, random.nextInt(200) - 100);
-            set.add(key);
-            reference.add(key);
+        for (int x = -100; x < 100; x += 7) {
+            for (int y = -4; y < 20; y += 5) {
+                for (int z = -100; z < 100; z += 11) {
+                    long key = sectionKey(x, y, z);
+                    set.add(key);
+                    reference.add(key);
+                }
+            }
         }
 
         assertEquals(new ArrayList<>(reference), drain(set.iterator()));
@@ -107,11 +109,14 @@ class ConcurrentOrderedLongSetTest {
     @Test
     void crossGroupSubSetMatchesReference() {
         TreeSet<Long> reference = new TreeSet<>();
-        Random random = new Random(7);
-        for (int i = 0; i < 500; i++) {
-            long key = sectionKey(random.nextInt(40) - 20, random.nextInt(10), random.nextInt(40) - 20);
-            set.add(key);
-            reference.add(key);
+        for (int x = -20; x < 20; x += 3) {
+            for (int y = 0; y < 10; y += 4) {
+                for (int z = -20; z < 20; z += 3) {
+                    long key = sectionKey(x, y, z);
+                    set.add(key);
+                    reference.add(key);
+                }
+            }
         }
 
         long from = sectionKey(-10, 0, 0);

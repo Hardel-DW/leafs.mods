@@ -15,9 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,9 +41,9 @@ class TicketStorageActivityTest {
         });
 
         held.join();
-        Boolean active = CompletableFuture.supplyAsync(storage::shouldKeepDimensionActive).completeOnTimeout(null, 5, TimeUnit.SECONDS).join();
+        boolean active = storage.shouldKeepDimensionActive();
         released.complete(null);
-        assertEquals(Boolean.TRUE, active, "the activity read waited for the thread writing a ticket");
+        assertTrue(active, "the activity read sees the forced ticket while a writer holds the storage");
     }
 
     @Test

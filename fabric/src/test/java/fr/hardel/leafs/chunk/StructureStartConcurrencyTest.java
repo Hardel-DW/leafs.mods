@@ -2,6 +2,7 @@ package fr.hardel.leafs.chunk;
 
 import com.mojang.serialization.MapCodec;
 import fr.hardel.MinecraftBootstrap;
+import fr.hardel.TestThreads;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.world.level.ChunkPos;
@@ -16,8 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.Optional;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -45,6 +47,8 @@ class StructureStartConcurrencyTest {
     /** 2026-09-22: STRUCTURE_STARTS declares no write radius, so two strongholds could assemble at once through the same static piece list. */
     @Test
     void twoStartsOfOneTypeNeverOverlap() throws InterruptedException {
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         AtomicInteger inside = new AtomicInteger();
         AtomicInteger overlaps = new AtomicInteger();
         Runnable body = () -> {
@@ -52,11 +56,21 @@ class StructureStartConcurrencyTest {
                 overlaps.incrementAndGet();
             }
 
-            sleep();
+            firstInside.countDown();
+            TestThreads.await(release);
             inside.decrementAndGet();
         };
 
-        runTogether(new Probe(StructureType.STRONGHOLD, body), new Probe(StructureType.STRONGHOLD, body));
+        Thread one = Thread.ofPlatform().start(new Probe(StructureType.STRONGHOLD, body)::start);
+        TestThreads.await(firstInside);
+        Thread two = Thread.ofPlatform().start(new Probe(StructureType.STRONGHOLD, body)::start);
+        TestThreads.awaitParked(two);
+        int overlapsWhileTheFirstRuns = overlaps.get();
+        release.countDown();
+        one.join();
+        two.join();
+
+        assertEquals(0, overlapsWhileTheFirstRuns, "the second stronghold waits for the first");
         assertEquals(0, overlaps.get());
     }
 
@@ -71,34 +85,27 @@ class StructureStartConcurrencyTest {
         assertEquals(2, startsThatMeet(StructureType.JIGSAW, StructureType.JIGSAW));
     }
 
+    // Each start waits inside its generation for the other one: two starts that cannot run together never meet and hang.
     private static int startsThatMeet(StructureType<?> first, StructureType<?> second) throws InterruptedException {
         CyclicBarrier both = new CyclicBarrier(2);
         AtomicInteger met = new AtomicInteger();
         Runnable body = () -> {
-            try {
-                both.await(5, TimeUnit.SECONDS);
-                met.incrementAndGet();
-            } catch (Exception exception) {
-                Thread.currentThread().interrupt();
-            }
+            meet(both);
+            met.incrementAndGet();
         };
 
-        runTogether(new Probe(first, body), new Probe(second, body));
+        Thread one = Thread.ofPlatform().start(new Probe(first, body)::start);
+        Thread two = Thread.ofPlatform().start(new Probe(second, body)::start);
+        one.join();
+        two.join();
         return met.get();
     }
 
-    private static void runTogether(Probe first, Probe second) throws InterruptedException {
-        Thread one = Thread.ofPlatform().start(first::start);
-        Thread two = Thread.ofPlatform().start(second::start);
-        one.join(10_000);
-        two.join(10_000);
-    }
-
-    private static void sleep() {
+    private static void meet(CyclicBarrier barrier) {
         try {
-            Thread.sleep(50);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
+            barrier.await();
+        } catch (InterruptedException | BrokenBarrierException exception) {
+            throw new IllegalStateException(exception);
         }
     }
 
