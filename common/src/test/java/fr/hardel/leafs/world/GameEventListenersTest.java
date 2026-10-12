@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -128,7 +127,7 @@ class GameEventListenersTest {
                 TestThreads.await(release);
             }));
             try {
-                assertTrue(visiting.await(5, TimeUnit.SECONDS));
+                TestThreads.await(visiting);
                 var concurrent = workers.submit(() -> {
                     listeners.remove(second);
                     listeners.add(added);
@@ -137,11 +136,11 @@ class GameEventListenersTest {
                     return nested;
                 });
 
-                assertEquals(List.of(first), concurrent.get(5, TimeUnit.SECONDS));
+                assertEquals(List.of(first), concurrent.get());
             } finally {
                 release.countDown();
             }
-            outer.get(5, TimeUnit.SECONDS);
+            outer.get();
         }
 
         assertEquals(List.of(first), seen);

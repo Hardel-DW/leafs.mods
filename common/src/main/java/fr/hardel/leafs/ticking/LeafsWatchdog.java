@@ -48,23 +48,26 @@ public final class LeafsWatchdog {
     private void watch() {
         long checkMillis = Math.clamp(warnNanos / 4_000_000L, 10L, 1_000L);
         while (sleepUntilNextCheck(checkMillis)) {
-            long now = System.nanoTime();
-            for (var entry : running.entrySet()) {
-                RunningTick tick = entry.getValue();
-                if (killNanos.getAsLong() > 0 && now - tick.startNanos >= killNanos.getAsLong() && !tick.killed) {
-                    tick.killed = true;
-                    killer.accept(new Stall(headerLine(entry.getKey(), tick, now), tick.thread));
-                    continue;
-                }
+            check(System.nanoTime());
+        }
+    }
 
-                if (now - Math.max(tick.startNanos, tick.lastReportNanos) >= warnNanos) {
-                    tick.lastReportNanos = now;
-                    reporter.accept(describeStall(entry.getKey(), tick, now));
-                }
+    void check(long now) {
+        for (var entry : running.entrySet()) {
+            RunningTick tick = entry.getValue();
+            if (killNanos.getAsLong() > 0 && now - tick.startNanos >= killNanos.getAsLong() && !tick.killed) {
+                tick.killed = true;
+                killer.accept(new Stall(headerLine(entry.getKey(), tick, now), tick.thread));
+                continue;
             }
 
-            reportStalledWaits(now);
+            if (now - Math.max(tick.startNanos, tick.lastReportNanos) >= warnNanos) {
+                tick.lastReportNanos = now;
+                reporter.accept(describeStall(entry.getKey(), tick, now));
+            }
         }
+
+        reportStalledWaits(now);
     }
 
     private static boolean sleepUntilNextCheck(long checkMillis) {

@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -141,7 +140,7 @@ class ChunkOwnersTest {
 
     /** 2026-09-05: a respawn sent to the pool waited for its spawn chunk under the reservation of that same chunk, forever. */
     @Test
-    void gameWorkFromThePoolGoesToTheServerThread() throws InterruptedException {
+    void gameWorkFromThePoolGoesToTheServerThread() {
         regions.cover(null);
         CountDownLatch posted = new CountDownLatch(1);
 
@@ -150,7 +149,7 @@ class ChunkOwnersTest {
             posted.countDown();
         });
 
-        assertTrue(posted.await(5, TimeUnit.SECONDS));
+        TestThreads.await(posted);
         assertEquals(List.of(), ran);
         assertTrue(server.drain());
         assertEquals(List.of("game"), ran);
@@ -159,7 +158,7 @@ class ChunkOwnersTest {
 
     /** N02: the pool and a taker kept two registries of the same chunk; the pool task now takes the chunk for its duration, so a taker meanwhile finds it held and its work waits for the release. */
     @Test
-    void aPoolTaskHoldsItsChunkAgainstATakerUntilItEnds() throws InterruptedException {
+    void aPoolTaskHoldsItsChunkAgainstATakerUntilItEnds() {
         regions.cover(null);
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch finish = new CountDownLatch(1);
@@ -168,42 +167,34 @@ class ChunkOwnersTest {
             started.countDown();
             TestThreads.await(finish);
         });
-        assertTrue(started.await(5, TimeUnit.SECONDS));
+        TestThreads.await(started);
 
         assertNull(owners.borrow(1, 1), "the chunk is held by the running pool task");
         assertFalse(owners.submit(1, 1, Work.GAME, () -> ran.add("after")), "game work meanwhile is mail for the pool task");
         assertEquals(List.of(), ran);
         finish.countDown();
 
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (!server.drain()) {
-            assertTrue(System.nanoTime() < deadline, "the mail finds its owner again at release: game work from the pool goes to the server thread");
-            Thread.onSpinWait();
-        }
+        TestThreads.until(server::drain);
 
-        assertEquals(List.of("after"), ran);
+        assertEquals(List.of("after"), ran, "the mail finds its owner again at release: game work from the pool goes to the server thread");
         assertNotNull(owners.borrow(1, 1), "the chunk is free again");
     }
 
     /** B02: a pool task queued before a thread took the chunk would have run beside it; it reads the owner again when it starts. */
     @Test
-    void aQueuedPoolTaskFindsTheChunkTakenWhenItStartsAndHandsItOver() throws InterruptedException {
+    void aQueuedPoolTaskFindsTheChunkTakenWhenItStartsAndHandsItOver() {
         regions.cover(null);
         CountDownLatch release = TestThreads.occupy(pool);
         owners.submit(1, 1, Work.CHUNK, () -> ran.add("chunk work"));
         ChunkClaim taken = owners.borrow(1, 1);
 
         release.countDown();
-        for (int attempt = 0; attempt < 500 && taken.mail().size() == 0; attempt++) {
-            Thread.sleep(10);
-        }
+        TestThreads.until(() -> taken.mail().size() > 0 || !ran.isEmpty());
 
         assertEquals(List.of(), ran, "the pool task never ran beside the taker");
         assertEquals(1, taken.mail().size());
         owners.release(1, 1, taken);
-        for (int attempt = 0; attempt < 500 && ran.isEmpty(); attempt++) {
-            Thread.sleep(10);
-        }
+        TestThreads.until(() -> !ran.isEmpty());
 
         assertEquals(List.of("chunk work"), ran);
     }
@@ -222,7 +213,7 @@ class ChunkOwnersTest {
             owners.release(1, 1, taken.get());
         });
         taker.start();
-        assertTrue(took.await(5, TimeUnit.SECONDS));
+        TestThreads.await(took);
         regions.cover(inbox);
 
         assertFalse(owners.holds(1, 1), "the region does not hold a chunk another thread took");
@@ -237,7 +228,7 @@ class ChunkOwnersTest {
 
     /** 2026-09-04: a status change on an uncovered chunk re-submitted itself to the pool forever, the worker not counting as its owner. */
     @Test
-    void thePoolWorkerHoldsTheChunkOfTheTaskItRuns() throws InterruptedException {
+    void thePoolWorkerHoldsTheChunkOfTheTaskItRuns() {
         regions.cover(null);
         CountDownLatch done = new CountDownLatch(1);
         boolean[] inLine = new boolean[1];
@@ -247,7 +238,7 @@ class ChunkOwnersTest {
             done.countDown();
         });
 
-        assertTrue(done.await(5, TimeUnit.SECONDS));
+        TestThreads.await(done);
         assertTrue(inLine[0]);
         assertEquals(List.of("nested"), ran);
         assertFalse(owners.holds(1, 1));
@@ -286,9 +277,7 @@ class ChunkOwnersTest {
         CountDownLatch published = new CountDownLatch(1);
 
         owners.build(1, 1, () -> published::countDown);
-        for (int attempt = 0; attempt < 500 && claim.mail().size() == 0; attempt++) {
-            Thread.sleep(10);
-        }
+        TestThreads.until(() -> claim.mail().size() > 0 || published.getCount() == 0);
 
         assertEquals(1, published.getCount(), "the build waits in the mail of the thread that holds the chunk");
         owners.release(1, 1, claim);
@@ -298,7 +287,7 @@ class ChunkOwnersTest {
 
     /** 2026-09-06: a teleport left waiting in a dead region went back to the pool as chunk work; the kind travels with the task. 2026-09-14: game work waits for the next pump, a release runs nothing on its thread. */
     @Test
-    void aDeadRegionHandsItsTasksBackAsTheWorkTheyAre() throws InterruptedException {
+    void aDeadRegionHandsItsTasksBackAsTheWorkTheyAre() {
         CountDownLatch chunkWork = new CountDownLatch(1);
         owners.submit(1, 1, Work.CHUNK, chunkWork::countDown);
         owners.submit(1, 1, Work.GAME, () -> ran.add("game"));
@@ -306,12 +295,9 @@ class ChunkOwnersTest {
         regions.cover(null);
         owners.resubmit(inbox);
 
-        assertTrue(chunkWork.await(5, TimeUnit.SECONDS));
+        TestThreads.await(chunkWork);
         assertEquals(List.of(), ran, "the game work did not run on the releasing thread");
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (ran.isEmpty() && System.nanoTime() < deadline) {
-            server.drain();
-        }
+        TestThreads.until(() -> server.drain() || !ran.isEmpty());
 
         assertEquals(List.of("game"), ran);
         assertEquals(List.of("1,1"), taken);

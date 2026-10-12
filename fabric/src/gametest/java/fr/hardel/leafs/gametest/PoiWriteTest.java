@@ -1,7 +1,10 @@
 package fr.hardel.leafs.gametest;
 
 import fr.hardel.leafs.chunk.LevelChunks;
+import fr.hardel.leafs.chunk.SectionStorageAccess;
+import fr.hardel.leafs.gametest.mixin.SectionStorageAccessor;
 import fr.hardel.leafs.ticking.LevelRegions;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -11,12 +14,10 @@ import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 
-import java.util.concurrent.TimeUnit;
-
 public final class PoiWriteTest {
-    private static final long WRITE_WAIT_NANOS = TimeUnit.SECONDS.toNanos(5);
+    private static final int FAR = 4096;
 
-    @GameTest(maxTicks = 100)
+    @GameTest(maxTicks = HangGuard.TICKS)
     public void aBellAddsThenDropsItsMeetingPoint(GameTestHelper helper) {
         BlockPos bell = new BlockPos(1, 1, 1);
         BlockPos absolute = helper.absolutePos(bell);
@@ -30,7 +31,7 @@ public final class PoiWriteTest {
             .thenSucceed();
     }
 
-    @GameTest(maxTicks = 100)
+    @GameTest(maxTicks = HangGuard.TICKS)
     public void theAutosaveWritesTheClaimOfASavedChunk(GameTestHelper helper) {
         BlockPos bell = new BlockPos(1, 1, 1);
         BlockPos absolute = helper.absolutePos(bell);
@@ -51,25 +52,28 @@ public final class PoiWriteTest {
                     level.getChunkSource().save(false);
                 }
 
-                helper.assertFalse(pois.hasWork(), "the autosave writes every poi change");
+                helper.assertFalse(dirty(pois, chunk), "the autosave writes the poi change of %s".formatted(chunk));
             })
             .thenSucceed();
     }
 
-    @GameTest(maxTicks = 100)
+    /** The server thread waits for the write: a write that needs the server thread hangs the test. */
+    @GameTest
     public void aGenerationThreadWritesThePoiOfAChunkNoRegionOwns(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        BlockPos bell = helper.absolutePos(new BlockPos(1, 1, 1)).offset(4096, 0, 4096);
+        BlockPos bell = helper.absolutePos(new BlockPos(1, 1, 1)).offset(FAR, 0, FAR);
         PoiManager pois = level.getPoiManager();
         LevelChunks.of(level).pool().execute(() -> level.updatePOIOnBlockStateChange(bell, Blocks.AIR.defaultBlockState(), Blocks.BELL.defaultBlockState()));
-        long deadline = System.nanoTime() + WRITE_WAIT_NANOS;
-        while (!pois.existsAtPosition(PoiTypes.MEETING, bell) && System.nanoTime() < deadline) {
+        while (!pois.existsAtPosition(PoiTypes.MEETING, bell)) {
             Thread.onSpinWait();
         }
 
-        helper.assertTrue(pois.existsAtPosition(PoiTypes.MEETING, bell), "the poi write of a chunk no region owns waits for the server thread");
-        helper.startSequence()
-            .thenExecuteAfter(1, () -> pois.flush(ChunkPos.containing(bell)))
-            .thenSucceed();
+        helper.succeed();
+    }
+
+    // The regions write the dirty set under the lock of the storage.
+    private static boolean dirty(PoiManager pois, ChunkPos chunk) {
+        LongSet dirty = ((SectionStorageAccessor) pois).leafs$dirtyChunks();
+        return ((SectionStorageAccess) pois).leafs$lock().callLocked(() -> dirty.contains(chunk.pack()) ? 1 : 0) == 1;
     }
 }

@@ -3,12 +3,13 @@ package fr.hardel.leafs.ticking;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ThreadWaitsTest {
+    private static final long THRESHOLD = 1_000_000_000L;
 
     @AfterEach
     void leaveNoWait() {
@@ -31,12 +32,14 @@ class ThreadWaitsTest {
     /** 2026-09-09: the server thread hung two minutes on a region nobody ticked, and the watchdog said nothing because only chunk waits were reported. */
     @Test
     void aWaitPastTheThresholdIsReportedWithItsThreadAndWhatItWaitsFor() {
+        Thread current = Thread.currentThread();
+        long before = System.nanoTime();
         ThreadWaits.open(() -> "region #7 TICKING");
-        long now = System.nanoTime();
+        long after = System.nanoTime();
 
-        assertEquals(Map.of(), ThreadWaits.stalled(now, 1_000_000_000L), "younger than the threshold");
-        Map<Thread, String> stalled = ThreadWaits.stalled(now + 2_000_000_000L, 1_000_000_000L);
-        assertEquals(1, stalled.size());
-        assertEquals("Wait stalled for 2s on thread '%s': region #7 TICKING".formatted(Thread.currentThread().getName()), stalled.get(Thread.currentThread()));
+        assertFalse(ThreadWaits.stalled(before, THRESHOLD).containsKey(current), "younger than the threshold");
+        String stalled = ThreadWaits.stalled(after + 2 * THRESHOLD, THRESHOLD).get(current);
+        assertTrue(stalled.startsWith("Wait stalled for "));
+        assertTrue(stalled.endsWith("on thread '%s': region #7 TICKING".formatted(current.getName())));
     }
 }

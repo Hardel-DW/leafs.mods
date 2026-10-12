@@ -22,7 +22,7 @@ public final class ChunkLoadEventsTest {
         });
     }
 
-    @GameTest(maxTicks = 100)
+    @GameTest(maxTicks = HangGuard.TICKS)
     public void aChunkLoadedByAModFiresTheLoadEvents(GameTestHelper helper) {
         ChunkPos origin = ChunkPos.containing(helper.absolutePos(BlockPos.ZERO));
         ChunkPos far = new ChunkPos(origin.x() + 64, origin.z());

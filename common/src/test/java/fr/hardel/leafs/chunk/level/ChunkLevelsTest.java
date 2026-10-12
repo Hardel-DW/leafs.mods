@@ -3,16 +3,12 @@ package fr.hardel.leafs.chunk.level;
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.ticking.TickEpochs;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChunkLevelsTest {
     private static final int LEVELS = 46;
     private static final int NONE = LEVELS - 1;
+    private static final int THREADS = 8;
+    private static final int SPAN = 120;
+    private static final int CHURN = 3_000;
     private final TickEpochs epochs = new TickEpochs(0, () -> { });
     private final ChunkLevels graph = new ChunkLevels(LEVELS, epochs);
     private final Long2IntOpenHashMap reported = new Long2IntOpenHashMap();
@@ -148,51 +147,65 @@ class ChunkLevelsTest {
         assertTrue(reported.isEmpty());
     }
 
-    /** 2026-09-24: two threads posted the same chunk, and the expectation kept the lower source while the graph keeps the last one. */
+    /** 2026-09-24: two threads posted the same chunk, and the expectation kept the lower source while the graph keeps the last one. Here each chunk has one writer, so its last source is known. */
     @Test
-    void concurrentDrainsSettleLikeASerialComputation() throws InterruptedException {
-        int threads = 8;
-        int span = 300;
-        List<long[]> sources = new ArrayList<>();
-        LongSet positions = new LongOpenHashSet();
-        Random random = new Random(42);
-        while (sources.size() < 400) {
-            int chunkX = random.nextInt(span);
-            int chunkZ = random.nextInt(span);
-            int level = 25 + random.nextInt(16);
-            if (positions.add(ChunkPos.pack(chunkX, chunkZ))) {
-                sources.add(new long[] {chunkX, chunkZ, level});
-            }
+    void aChurnFromEightThreadsSettlesLikeTheBruteForce() throws InterruptedException {
+        long[][] operations = new long[CHURN][];
+        Long2IntOpenHashMap sources = new Long2IntOpenHashMap();
+        sources.defaultReturnValue(NONE);
+        for (int index = 0; index < CHURN; index++) {
+            int chunkX = index * 37 % SPAN;
+            int chunkZ = (index * 53 + index / SPAN * 13) % SPAN;
+            int level = index % 4 == 0 ? NONE : 20 + index * 7 % (NONE - 20);
+            operations[index] = new long[] {chunkX, chunkZ, level};
+            sources.put(ChunkPos.pack(chunkX, chunkZ), level);
         }
 
-        CountDownLatch done = new CountDownLatch(threads);
-        for (int thread = 0; thread < threads; thread++) {
-            int slice = thread;
-            new Thread(() -> {
-                for (int index = slice; index < sources.size(); index += threads) {
-                    long[] source = sources.get(index);
-                    graph.setSource((int) source[0], (int) source[1], (int) source[2]);
-                    graph.drain((key, old, now) -> {
-                    });
-                }
-
-                done.countDown();
-            }).start();
+        List<Thread> writers = new ArrayList<>();
+        for (int thread = 0; thread < THREADS; thread++) {
+            int writer = thread;
+            writers.add(Thread.ofPlatform().start(() -> churn(operations, writer)));
         }
 
-        assertTrue(done.await(30, TimeUnit.SECONDS));
+        for (Thread writer : writers) {
+            writer.join();
+        }
+
         graph.drain(this::record);
-        for (int chunkX = -50; chunkX < span + 50; chunkX++) {
-            for (int chunkZ = -50; chunkZ < span + 50; chunkZ++) {
-                int expected = NONE;
-                for (long[] source : sources) {
-                    int distance = Math.max(Math.abs(chunkX - (int) source[0]), Math.abs(chunkZ - (int) source[1]));
-                    expected = Math.min(expected, (int) source[2] + distance);
-                }
-
-                assertEquals(expected, level(chunkX, chunkZ), "chunk %s,%s".formatted(chunkX, chunkZ));
+        for (int chunkX = -50; chunkX < SPAN + 50; chunkX++) {
+            for (int chunkZ = -50; chunkZ < SPAN + 50; chunkZ++) {
+                assertEquals(expected(sources, chunkX, chunkZ), level(chunkX, chunkZ), "chunk %s,%s".formatted(chunkX, chunkZ));
             }
         }
+    }
+
+    // A writer owns the chunks of its column modulo, and drains after some of its writes only.
+    private void churn(long[][] operations, int writer) {
+        int written = 0;
+        for (long[] operation : operations) {
+            if (operation[0] % THREADS == writer) {
+                graph.setSource((int) operation[0], (int) operation[1], (int) operation[2]);
+                drainEvery(++written);
+            }
+        }
+
+        graph.drain((_, _, _) -> { });
+    }
+
+    private void drainEvery(int written) {
+        if (written % 7 == 0) {
+            graph.drain((_, _, _) -> { });
+        }
+    }
+
+    private static int expected(Long2IntOpenHashMap sources, int chunkX, int chunkZ) {
+        int expected = NONE;
+        for (Long2IntOpenHashMap.Entry entry : sources.long2IntEntrySet()) {
+            int distance = Math.max(Math.abs(chunkX - ChunkPos.getX(entry.getLongKey())), Math.abs(chunkZ - ChunkPos.getZ(entry.getLongKey())));
+            expected = Math.min(expected, entry.getIntValue() + distance);
+        }
+
+        return expected;
     }
 
     /** 2026-09-04: a source at the last real level, a ticket at EMPTY, was never raised: the raise stopped one level short. */

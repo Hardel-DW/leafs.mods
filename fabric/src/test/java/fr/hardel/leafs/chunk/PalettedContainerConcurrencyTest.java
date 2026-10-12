@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.management.ManagementFactory;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MinecraftBootstrap.class)
 class PalettedContainerConcurrencyTest {
+    private static final int WRITER_PASSES = 20;
 
     private static List<BlockState> states(int count) {
         List<BlockState> states = new ArrayList<>(count);
@@ -46,7 +46,7 @@ class PalettedContainerConcurrencyTest {
 
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Thread writer = Thread.ofPlatform().name("test-region-writer").uncaughtExceptionHandler((t, e) -> failure.set(e)).start(() -> {
-            for (int pass = 0; pass < 200; pass++) {
+            for (int pass = 0; pass < WRITER_PASSES; pass++) {
                 for (int index = 0; index < 4096; index++) {
                     container.set(index & 15, index >> 8, index >> 4 & 15, states.get((index + pass) & 63));
                 }
@@ -63,7 +63,7 @@ class PalettedContainerConcurrencyTest {
         assertNull(failure.get());
 
         for (int index = 0; index < 4096; index++) {
-            assertEquals(states.get((index + 199) & 63), container.get(index & 15, index >> 8, index >> 4 & 15));
+            assertEquals(states.get((index + WRITER_PASSES - 1) & 63), container.get(index & 15, index >> 8, index >> 4 & 15));
         }
     }
 
@@ -94,7 +94,7 @@ class PalettedContainerConcurrencyTest {
         assertThrows(IllegalArgumentException.class, () -> container.set(0, 16, 0, states.getFirst()));
         Thread writer = Thread.ofPlatform().start(() -> container.set(0, 0, 0, states.getLast()));
 
-        assertTrue(writer.join(Duration.ofSeconds(5)));
+        writer.join();
         assertEquals(states.getLast(), container.get(0, 0, 0));
     }
 

@@ -14,10 +14,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 2026-09-04: a villager read a chunk behind fifteen thousand equally urgent tasks, its region waited four seconds. 2026-09-05: a region waited 54 s for a light task no index knew. */
 @ExtendWith(MinecraftBootstrap.class)
@@ -37,7 +35,7 @@ class PlacedTasksTest {
 
     /** 2026-09-26: a bot spawn put a thousand tasks around the chunks it read at the first priority, and its region waited 300 ms behind them. */
     @Test
-    void onlyWhatTheAwaitedChunkNeedsMovesToTheHead() throws InterruptedException {
+    void onlyWhatTheAwaitedChunkNeedsMovesToTheHead() {
         CountDownLatch done = new CountDownLatch(4);
         CountDownLatch gate = TestThreads.occupy(pool);
 
@@ -50,13 +48,13 @@ class PlacedTasksTest {
         placement.expedite(ChunkNeed.of(ChunkPyramid.GENERATION_PYRAMID, 3, 4, ChunkStatus.FULL));
         gate.countDown();
 
-        assertTrue(done.await(5, TimeUnit.SECONDS));
+        TestThreads.await(done);
         assertEquals(Set.of("itself", "structure starts it needs"), Set.copyOf(order.subList(0, 2)));
         assertEquals(List.of("far", "biomes it does not need"), order.subList(2, 4));
     }
 
     @Test
-    void aChunkThatCameCloserToThePlayersMovesUp() throws InterruptedException {
+    void aChunkThatCameCloserToThePlayersMovesUp() {
         CountDownLatch done = new CountDownLatch(2);
         CountDownLatch gate = TestThreads.occupy(pool);
 
@@ -68,7 +66,7 @@ class PlacedTasksTest {
         pool.changed(key(3, 4));
         gate.countDown();
 
-        assertTrue(done.await(5, TimeUnit.SECONDS));
+        TestThreads.await(done);
         assertEquals(List.of("ahead", "behind"), order);
     }
 

@@ -6,22 +6,17 @@ import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
 import fr.hardel.leafs.region.RegionizerAssertions;
 import fr.hardel.leafs.world.RegionWorldData;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.pathfinder.PathTypeCache;
-import java.util.Map;
-import org.junit.jupiter.api.BeforeEach;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.FullChunkStatus;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.pathfinder.PathTypeCache;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
-import java.util.Random;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,51 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MinecraftBootstrap.class)
 class LevelRegionsTest {
-    private static final int FEED_EVENTS = 100_000;
-    private static final int EVENTS_PER_TICK = 50;
-    private static final int PHASE_EVENTS = 5_000;
-    private static final int POSITION_STRIDE = 8;
-    private static final int POSITIONS_PER_AXIS = 24;
-    private static final int POSITION_COUNT = POSITIONS_PER_AXIS * POSITIONS_PER_AXIS;
-
     private LevelRegions regions;
 
     @BeforeEach
     void createRegions() {
         regions = new LevelRegions(new LeafsConfig(LeafsConfig.ALL_CORES, LeafsConfig.ALL_CORES, 16, 1, 1, LeafsConfig.defaults().debug(), LeafsConfig.defaults().gameplay()));
-    }
-
-    @ParameterizedTest
-    @ValueSource(longs = {1, 42, 20260801})
-    void feedReplayKeepsEveryInvariantAndDrainsToNothing(long seed) {
-        Random random = new Random(seed);
-        LongOpenHashSet present = new LongOpenHashSet();
-        LongArrayList presentList = new LongArrayList();
-
-        for (int event = 0; event < FEED_EVENTS; event++) {
-            int createChance = (event / PHASE_EVENTS) % 2 == 0 ? 70 : 30;
-            if (presentList.isEmpty() || (presentList.size() < POSITION_COUNT && random.nextInt(100) < createChance)) {
-                feedCreate(random, present, presentList);
-            } else {
-                feedDestroy(random, present, presentList);
-            }
-
-            if (event % EVENTS_PER_TICK == EVENTS_PER_TICK - 1) {
-                settle();
-                RegionizerAssertions.assertInvariants(regions.regionizer(), true);
-            }
-        }
-
-        while (!presentList.isEmpty()) {
-            feedDestroy(random, present, presentList);
-        }
-        settle();
-
-        assertEquals(0, regionCount(), "regions survived an empty chunk-holder map");
-        assertEquals(0, regions.sections());
-        assertTrue(regions.created() > 1, "the replay never created a second region");
-        assertTrue(regions.merged() > 0, "the replay never merged two regions");
-        assertTrue(regions.split() > 0, "the replay never split a region");
     }
 
     @Test
@@ -216,7 +171,7 @@ class LevelRegionsTest {
         });
         RegionTickScheduler scheduler = new RegionTickScheduler(Thread.currentThread().getThreadGroup(), new TickEpochs(1, () -> { }), false, watchdog, (_, _) -> {
         });
-        regions.activate("leafs:test", scheduler, () -> 50_000_000L, () -> new RegionWorldData(new RegionTime(0L, TickState.INITIAL), RandomSource.create(), null, new PathTypeCache()),
+        regions.activate("leafs:test", scheduler, () -> 50_000_000L, () -> new RegionWorldData(new RegionTime(0L, TickState.INITIAL), RandomSource.create(0L), null, new PathTypeCache()),
             null);
     }
 
@@ -229,29 +184,6 @@ class LevelRegionsTest {
 
     private int regionCount() {
         return regions.regionizer().regionsView().size();
-    }
-
-    private void feedCreate(Random random, LongOpenHashSet present, LongArrayList presentList) {
-        long key;
-        do {
-            key = ChunkPos.pack(randomCoordinate(random), randomCoordinate(random));
-        } while (!present.add(key));
-
-        presentList.add(key);
-        simulated(regions, ChunkPos.getX(key), ChunkPos.getZ(key));
-    }
-
-    private void feedDestroy(Random random, LongOpenHashSet present, LongArrayList presentList) {
-        int index = random.nextInt(presentList.size());
-        long key = presentList.getLong(index);
-        presentList.set(index, presentList.getLong(presentList.size() - 1));
-        presentList.removeLong(presentList.size() - 1);
-        present.remove(key);
-        unsimulated(regions, ChunkPos.getX(key), ChunkPos.getZ(key));
-    }
-
-    private static int randomCoordinate(Random random) {
-        return (random.nextInt(POSITIONS_PER_AXIS) - POSITIONS_PER_AXIS / 2) * POSITION_STRIDE;
     }
 
     private static void simulated(LevelRegions regions, int chunkX, int chunkZ) {

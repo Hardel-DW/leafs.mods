@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,7 +43,7 @@ class EntitySectionConcurrencyTest {
         }
 
         done.countDown();
-        reader.join(TimeUnit.SECONDS.toMillis(10));
+        reader.join();
         assertNull(readerFailure.get());
         assertEquals(WRITES, section.size());
         Collection<Mob> mobs = section.find(Mob.class);

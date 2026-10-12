@@ -1,25 +1,47 @@
-# Automatically build the project and run any configured tests for every push
-# and submitted pull request. This can help catch issues that only occur on
-# certain platforms or Java versions, and provides a first line of defence
-# against bad commits.
+# Builds Leafs and runs its tests on every push and pull request.
+# Firefly and Maple are on no public Maven: the job builds them into the local Maven, from their branch of the same name.
 
 name: build
-on: [pull_request, push]
+on:
+  push:
+    branches: [main, '26.*']
+  pull_request:
+
+env:
+  DEPENDENCY_BRANCH: ${{ github.base_ref || github.ref_name }}
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - name: checkout repository
+      - name: checkout leafs
         uses: actions/checkout@v6
-      - name: validate gradle wrapper
+      - name: checkout firefly
+        uses: actions/checkout@v6
+        with:
+          repository: Hardel-DW/firefly.mods
+          ref: ${{ env.DEPENDENCY_BRANCH }}
+          path: dependencies/firefly
+      - name: checkout maple
+        uses: actions/checkout@v6
+        with:
+          repository: Hardel-DW/Maple
+          ref: ${{ env.DEPENDENCY_BRANCH }}
+          path: dependencies/maple
+      - name: validate gradle wrappers
         uses: gradle/actions/wrapper-validation@v6
       - name: setup jdk
         uses: actions/setup-java@v5
         with:
           java-version: '25'
           distribution: 'microsoft'
-      - name: make gradle wrapper executable
-        run: chmod +x ./gradlew
+      - name: setup gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: publish firefly
+        working-directory: dependencies/firefly
+        run: chmod +x ./gradlew && ./gradlew publishToMavenLocal -x test
+      - name: publish maple
+        working-directory: dependencies/maple
+        run: chmod +x ./gradlew && ./gradlew publishToMavenLocal -x test
       - name: build
-        run: ./gradlew build
+        run: chmod +x ./gradlew && ./gradlew build

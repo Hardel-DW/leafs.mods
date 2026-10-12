@@ -12,7 +12,7 @@ public final class MobCensusTest {
     private static final int SPIDERS = 3;
 
     /** 2026-09-24: a region without a player nearby never published its census, so the level cap kept a stale count. */
-    @GameTest(maxTicks = 100)
+    @GameTest(maxTicks = HangGuard.TICKS)
     public void aRegionWithoutPlayersCountsItsMobs(GameTestHelper helper) {
         BlockPos pos = new BlockPos(1, 1, 1);
         ChunkPos chunk = ChunkPos.containing(helper.absolutePos(pos));
