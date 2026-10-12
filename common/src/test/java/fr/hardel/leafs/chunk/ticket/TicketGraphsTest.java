@@ -104,7 +104,7 @@ class TicketGraphsTest {
         assertTrue(drainers.getFirst().startsWith("Leafs Chunk Worker"));
     }
 
-    /** 2026-09-25: a light task drained the whole loading graph under a ScalableLux monitor, and a region waited 71 ms on it. */
+    /** 2026-09-25: a light task drained the whole loading graph, and a region waited 71 ms on it. */
     @Test
     void aWorkerHandsTheLoadingDrainOver() throws InterruptedException {
         graphs.listen(() -> loading, (key, old, now) -> {}, (key, old, now) -> {}, pool);

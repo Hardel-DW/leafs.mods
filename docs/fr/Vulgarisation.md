@@ -43,10 +43,7 @@ Ces threads tournent en priorité système minimale sur le système d'exploitati
 Un chunk reste chargé tant qu'un ticket le demande, comme en vanilla. Un joueur, un `forceload` ou un portail pose des tickets. Poser ou retirer un ticket note seulement la demande, puis rend la main. Ce sont les threads de chunks qui calculent ensuite quels chunks charger ou décharger. Un thread qui a besoin d'un chunk tout de suite applique lui-même les demandes qui chargent ce chunk, jamais celles qui le déchargent.
 
 ## Threads de Lumière
-- Pour la lumière, si vous utilisez **Firefly**, il utilise le pool de threads de chunks mentionné avant.
-- Dans le cas d'un moteur Starlight comme **ScalableLux**, il déclare de nouveaux threads indépendants.
-
-Comme **Firefly** utilise les threads de chunks, il passe lui aussi automatiquement en priorité basse. Les TPS des régions n'en sont pas affectés en forte charge.
+La lumière passe par **Firefly**, qui utilise le pool de threads de chunks mentionné avant. Il passe donc lui aussi automatiquement en priorité basse. Les TPS des régions n'en sont pas affectés en forte charge.
 
 # Lecture/Ecriture
 Minecraft est fait de `chunks` de 16x16 blocs. Une région est un groupe de chunks qui tick ensemble, chaque chunk a un propriétaire, c'est le seul qui a le droit d'écrire.

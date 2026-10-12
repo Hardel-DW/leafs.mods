@@ -1,5 +1,5 @@
 # Benchmark
-Les benchmarks ont lieu sur un repo privé sur un Ryzen 5900X, 12 cœurs / 24 threads et 32 Go de RAM. Le serveur tourne avec Leafs, Maple, Prune et ScalableLux/Firefly, en ZGC.
+Les benchmarks ont lieu sur un repo privé sur un Ryzen 5900X, 12 cœurs / 24 threads et 32 Go de RAM. Le serveur tourne avec Leafs, Maple, Prune et Firefly, en ZGC.
 Les scénarios sont `worldgen`, `roam`, `isolation`, `solo`, `join`, `generate`, `ramp` et `hubs`.
 Un serveur vierge démarre sur un monde vierge avec une `seed` identique, Leafs utilise le mod Overstress qui simule des joueurs aussi authentiques que de vrais joueurs, avec des scénarios. Les bots font donc les mêmes actions dans le même ordre, sans aléatoire dans le jeu.
 
@@ -71,6 +71,6 @@ Cela calcule le nombre de joueurs que la machine tient à 20 TPS. C'est la limit
 
 ## Comparer à C2ME
 Leafs possède des valeurs relativement identiques sur 12 threads, `329` annoncés par C2ME mais en interne on a obtenu `366`. Pour Leafs il obtient `387`. Soit légèrement supérieur de quelques chunks par seconde, le gain s'explique par du bruit de mesure.
-C2ME et Leafs sont tous deux basés sur ScalableLux, et l'approche reste relativement similaire.
+C2ME s'appuie sur ScalableLux et Leafs sur Firefly, et l'approche reste relativement similaire.
 Comme C2ME les gains scalent linéairement avec le nombre de threads.
 Lithium/VMP/Chunky n'ont pas été utilisés pour les benchmarks.

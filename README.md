@@ -5,7 +5,7 @@ On a vanilla server, a single thread does everything. The game works in such a w
 Leafs adds multithreading and nothing else. No gameplay feature, no API, no hidden optimization. Mods, datapacks and command blocks work like in vanilla.
 All the information is on the website, with interactive simulations: [leafs.hardel.io](https://leafs.hardel.io).
 
-> Leafs requires Fabric API, as well as ScalableLux or Firefly.
+> Leafs requires Fabric API and Firefly.
 
 ## Features:
 - Each region has its own 20 TPS. A giant farm only slows down the players of that region.

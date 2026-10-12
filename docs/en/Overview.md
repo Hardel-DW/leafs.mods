@@ -39,10 +39,7 @@ These threads run at the lowest system priority on the operating system. When th
 - The pool first handles the chunks a thread waits for, then the chunks almost finished, then the generation. Always from the closest to the player to the farthest.
 
 ## Light threads
-- For the light, if you use **Firefly**, it uses the pool of chunk threads mentioned before.
-- With a Starlight engine like **ScalableLux**, it declares new independent threads.
-
-Since **Firefly** uses the chunk threads, it also automatically runs at low priority. The TPS of the regions is not affected under heavy load.
+The light goes through **Firefly**, which uses the pool of chunk threads mentioned before. It therefore also runs at low priority automatically. The TPS of the regions is not affected under heavy load.
 
 # Reading/Writing
 Minecraft is made of `chunks` of 16x16 blocks. A region is a group of chunks that tick together, each chunk has an owner, the only one allowed to write.
