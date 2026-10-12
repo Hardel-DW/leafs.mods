@@ -101,7 +101,6 @@ class RegionInboxTest {
     }
 
     /** 2026-09-05: a publication waited for a neighbour whose own publication sat behind it in the same pass, forever. */
-
     @Test
     void aTaskThatDrainsWhileRunningReachesWhatWasPostedAfterIt() {
         inbox.post(0, 0, Work.CHUNK, () -> {

@@ -46,7 +46,6 @@ public final class EntityAddTest {
         BlockPos start = helper.absolutePos(SAND);
         AtomicLong birth = new AtomicLong();
         AtomicLong missedTicks = new AtomicLong(NOT_LANDED);
-        // The sand is born in the block ticks of its region and lands ticks later, both on the region thread.
         ServerEntityEvents.ENTITY_LOAD.register((entity, _) -> {
             if (entity instanceof FallingBlockEntity falling && falling.getStartPos().equals(start)) {
                 birth.set(level.getGameTime());
