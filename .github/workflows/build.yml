@@ -21,7 +21,6 @@ jobs:
         with:
           repository: Hardel-DW/firefly.mods
           ref: ${{ env.DEPENDENCY_BRANCH }}
-          token: ${{ secrets.FIREFLY_TOKEN }}
           path: dependencies/firefly
       - name: checkout maple
         uses: actions/checkout@v6
