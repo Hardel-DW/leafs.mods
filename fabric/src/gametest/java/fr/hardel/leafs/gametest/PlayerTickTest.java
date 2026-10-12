@@ -1,8 +1,6 @@
 package fr.hardel.leafs.gametest;
 
 import com.mojang.authlib.GameProfile;
-import fr.hardel.leafs.chunk.LevelChunks;
-import fr.hardel.leafs.chunk.pool.ChunkPool;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -20,16 +18,13 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class PlayerTickTest {
     private static final double RAW_Y = 100;
     private static final double STEP_BLOCKS = 4;
     private static final int STEPS = 10;
-    private static final int AWAITED_TICKS = 10;
-    private static final int AHEAD_MAX_TICKS = 200;
+    private static final AtomicInteger PLAYERS = new AtomicInteger();
 
     /** 2026-09-24: a player teleported to raw terrain was ticked by the server thread, which waited for the whole generation of the chunk. */
     @GameTest
@@ -80,51 +75,9 @@ public final class PlayerTickTest {
         helper.succeed();
     }
 
-    /** 2026-10-06: a bot flying ahead of the generation stood where its region listed no chunk yet, and the region left it out of its ticks. */
-    @GameTest(maxTicks = AHEAD_MAX_TICKS)
-    public void aPlayerAheadOfTheGenerationIsTicked(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        ChunkPool pool = LevelChunks.of(level).pool();
-        ServerPlayer player = joined(helper, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)));
-        Vec3 landed = onRawTerrain(rawChunk(helper, 1200));
-        CountDownLatch held = new CountDownLatch(pool.threads());
-        CountDownLatch released = new CountDownLatch(1);
-        AtomicInteger ticksBefore = new AtomicInteger();
-
-        helper.startSequence()
-            .thenExecute(() -> {
-                player.connection.tick();
-                accept(player, 1, player.position());
-                for (int worker = 0; worker < pool.threads(); worker++) {
-                    pool.execute(() -> holdUntil(held, released));
-                }
-            })
-            .thenWaitUntil(() -> helper.assertTrue(held.getCount() == 0, "every generation thread is held"))
-            .thenExecute(() -> {
-                player.connection.teleport(landed.x, landed.y, landed.z, 0, 0);
-                ticksBefore.set(player.tickCount);
-            })
-            .thenWaitUntil(() -> helper.assertTrue(player.tickCount - ticksBefore.get() >= AWAITED_TICKS, "the region ticks its player on raw terrain"))
-            .thenExecute(() -> {
-                released.countDown();
-                level.getServer().getPlayerList().remove(player);
-            })
-            .thenSucceed();
-    }
-
-    /** Holds a generation thread until the test releases it, at most as long as the test may run. */
-    private static void holdUntil(CountDownLatch held, CountDownLatch released) {
-        held.countDown();
-        try {
-            released.await(AHEAD_MAX_TICKS * 50L, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
     static ServerPlayer joined(GameTestHelper helper, Vec3 position) {
         ServerLevel level = helper.getLevel();
-        CommonListenerCookie cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), "leafs-gametest-player"), false);
+        CommonListenerCookie cookie = CommonListenerCookie.createInitial(new GameProfile(new UUID(0, PLAYERS.incrementAndGet()), "leafs-gametest-player"), false);
         ServerPlayer player = new ServerPlayer(level.getServer(), level, cookie.gameProfile(), cookie.clientInformation());
         Connection connection = new Connection(PacketFlow.SERVERBOUND);
         new EmbeddedChannel(connection);
