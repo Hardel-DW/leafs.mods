@@ -1,0 +1,25 @@
+base {
+	archivesName = "Leafs-transform-${minecraftMajor}"
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = 'NeoForged'
+		url = 'https://maven.neoforged.net/releases/'
+	}
+}
+
+dependencies {
+	compileOnly "org.ow2.asm:asm-tree:${rootProject.asm_version}"
+	compileOnly "org.ow2.asm:asm-analysis:${rootProject.asm_version}"
+	compileOnly("net.neoforged.fancymodloader:loader:${rootProject.fml_version}") {
+		transitive = false
+	}
+}
+
+jar {
+	manifest {
+		attributes 'FMLModType': 'LIBRARY'
+	}
+}

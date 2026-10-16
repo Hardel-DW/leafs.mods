@@ -50,7 +50,7 @@ class PlayerPacketQueueTest {
         assertThrows(IllegalStateException.class, () -> queue.drain(() -> true));
 
         assertEquals(List.of(), handled);
-        assertFalse(PlayerPacketQueue.handlingPackets(), "the handling scope must not leak past a failing drain");
+        assertFalse(queue.handledByCurrentThread(), "the handling scope must not leak past a failing drain");
 
         queue.drain(() -> true);
         assertEquals(List.of("survivor"), handled);
@@ -102,7 +102,7 @@ class PlayerPacketQueueTest {
         TestThreads.await(insideDrain);
 
         assertFalse(queue.drain(() -> true), "a held player is refused, not waited for");
-        assertFalse(PlayerPacketQueue.handlingPackets(), "a refusal leaves no handling scope behind");
+        assertFalse(queue.handledByCurrentThread(), "a refusal leaves no handling scope behind");
 
         release.countDown();
         regionDrainer.join();

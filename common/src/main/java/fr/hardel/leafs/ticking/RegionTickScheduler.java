@@ -1,5 +1,8 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.thread.GameThreads;
+import fr.hardel.leafs.thread.RegionWorker;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -33,8 +36,7 @@ public final class RegionTickScheduler {
 
     public void start() {
         IntStream.rangeClosed(1, epochs.workers()).forEach(slot -> {
-            Thread worker = new Worker(serverThreads, () -> workerLoop(slot), slot);
-            worker.setDaemon(true);
+            Thread worker = new RegionWorker(serverThreads, () -> workerLoop(slot), slot);
             workers.add(worker);
             worker.start();
         });
@@ -59,11 +61,6 @@ public final class RegionTickScheduler {
             tick.handle.setScheduledStartNanos(System.nanoTime());
             queue.add(tick);
         }
-    }
-
-    /** Vanilla and mods see a worker as the server thread. */
-    public static boolean onWorker() {
-        return Thread.currentThread() instanceof Worker;
     }
 
     public TickEpochs epochs() {
@@ -93,6 +90,7 @@ public final class RegionTickScheduler {
             Thread worker = Thread.currentThread();
             String workerName = worker.getName();
             if (regionThreadNames) {
+                // Keeps "Server", see LeafsThread.
                 worker.setName("Leafs Server R#%s %s".formatted(handle.id(), handle.dimension()));
             }
 
@@ -130,18 +128,12 @@ public final class RegionTickScheduler {
 
     // The drain at the epoch close fails like the tick itself, through the failure policy.
     private boolean tickInEpoch(TickHandle handle, int slot) {
+        GameThreads.beginWork();
         epochs.open(slot);
         try {
             return handle.tick();
         } finally {
             epochs.close(slot);
-        }
-    }
-
-    /** The name contains "Server", the rename per tick included: some mods recognise the server thread by its name. */
-    private static final class Worker extends Thread {
-        private Worker(ThreadGroup group, Runnable loop, int index) {
-            super(group, loop, "Leafs Server Region Worker #%s".formatted(index));
         }
     }
 

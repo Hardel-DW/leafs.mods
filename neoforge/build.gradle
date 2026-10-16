@@ -93,6 +93,9 @@ configurations {
 dependencies {
 	mods "fr.hardel:firefly-neoforge-${minecraftMajor}:${rootProject.firefly_version}"
 	mods "fr.hardel:maple-neoforge-${minecraftMajor}:${rootProject.maple_version}"
+	runtimeOnly project(':transform')
+	gametestRuntimeOnly project(':transform')
+	jarJar(project(':transform'))
 }
 
 tasks.named('compileJava') {

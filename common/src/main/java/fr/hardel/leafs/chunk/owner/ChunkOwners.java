@@ -5,6 +5,7 @@ import fr.hardel.leafs.chunk.pool.ChunkPlacement;
 import fr.hardel.leafs.chunk.pool.ChunkPool;
 import fr.hardel.leafs.chunk.pool.ChunkTask;
 import fr.hardel.leafs.global.GlobalScheduler;
+import fr.hardel.leafs.thread.GameThreads;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
@@ -73,7 +74,7 @@ public final class ChunkOwners implements Router {
                 return false;
             }
 
-            if (ChunkPool.isWorker()) {
+            if (GameThreads.isChunkWorker()) {
                 server.run(() -> submit(chunkX, chunkZ, work, task));
                 return false;
             }
@@ -156,12 +157,14 @@ public final class ChunkOwners implements Router {
             return null;
         }
 
+        GameThreads.heldChunk();
         regions.chunkChanged(chunkX, chunkZ);
         return claim;
     }
 
     public void release(int chunkX, int chunkZ, ChunkClaim claim) {
         borrowed.remove(ChunkPos.pack(chunkX, chunkZ), claim);
+        GameThreads.releasedChunk();
         regions.chunkChanged(chunkX, chunkZ);
         resubmit(claim.mail());
     }
