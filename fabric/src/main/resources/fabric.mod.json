@@ -12,13 +12,15 @@
 	"accessWidener": "leafs.accesswidener",
 	"environment": "*",
 	"entrypoints": {
+		"preLaunch": [
+			"fr.hardel.leafs.fabric.LeafsPreLaunch"
+		],
 		"main": [
 			"fr.hardel.leafs.fabric.LeafsFabric"
 		]
 	},
 	"mixins": [
 		"leafs.mixins.json",
-		"leafs.compat.mixins.json",
 		"leafs.fabric.mixins.json"
 	],
 	"breaks": {
