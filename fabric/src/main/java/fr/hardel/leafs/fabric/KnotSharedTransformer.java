@@ -50,7 +50,7 @@ final class KnotSharedTransformer implements InvocationHandler {
 
     private static byte[] rewrite(String name, byte[] bytes) {
         String internalName = name.replace('.', '/');
-        if (!SharedTransform.covers(internalName)) {
+        if (!SharedTransform.covers(internalName) || !SharedTransform.mayRewrite(bytes)) {
             return bytes;
         }
 

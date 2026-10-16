@@ -25,7 +25,6 @@ import java.util.Set;
 final class Births {
     private static final String SHARED = "fr/hardel/shared/Shared";
     private static final String WRAP_DESCRIPTOR = "(Ljava/lang/Object;)Ljava/lang/Object;";
-    private static final List<String> COLLECTION_SUFFIXES = List.of("Map", "Set", "List", "Queue", "Deque");
 
     private final MethodNode method;
     private final Frame<SourceValue>[] frames;
@@ -72,7 +71,7 @@ final class Births {
         Set<TypeInsnNode> births = new LinkedHashSet<>();
         Set<AbstractInsnNode> visited = new HashSet<>();
         stores.stream().filter(store -> frameAt(store) != null).forEach(store -> trace(top(store), births, visited));
-        births.removeIf(birth -> !isCollection(birth.desc));
+        births.removeIf(birth -> !CollectionTypes.isCollection(birth.desc));
         List<MethodInsnNode> constructors = constructorsOf(births);
         constructors.forEach(this::wrapAfter);
         return !constructors.isEmpty();
@@ -135,10 +134,5 @@ final class Births {
 
     private Frame<SourceValue> frameAt(AbstractInsnNode instruction) {
         return frames[method.instructions.indexOf(instruction)];
-    }
-
-    private static boolean isCollection(String type) {
-        boolean library = (type.startsWith("java/util/") && type.indexOf('/', "java/util/".length()) < 0) || type.startsWith("it/unimi/dsi/fastutil/");
-        return library && type.indexOf('$') < 0 && COLLECTION_SUFFIXES.stream().anyMatch(type::endsWith);
     }
 }
