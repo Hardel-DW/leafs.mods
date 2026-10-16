@@ -3,6 +3,7 @@ package fr.hardel.leafs.thread;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -40,9 +41,7 @@ class GameThreadsTest {
 
     @Test
     void theLoopsOfTheServerThreadAreSharedByEveryGameThread() throws InterruptedException {
-        Thread server = new Thread(GameThreads::bindServer, "Server thread");
-        server.start();
-        server.join();
+        Thread server = bound(new AtomicInteger());
         Thread render = new Thread(() -> {
         }, "Render thread");
 
@@ -50,8 +49,32 @@ class GameThreadsTest {
         assertEquals(List.of(false), answers(body -> new Thread(body, "mod"), () -> List.of(GameThreads.sameThreadAs(server))));
     }
 
-    private static List<Boolean> answers(Function<Runnable, Thread> threads, Supplier<List<Boolean>> questions) throws InterruptedException {
-        AtomicReference<List<Boolean>> seen = new AtomicReference<>();
+    /** 2026-10-16: Open Parties and Claims turned its loot protection off, the server tick count moved between two hooks of one sheep death. */
+    @Test
+    void aChunkWorkerKeepsTheServerTickOfTheChunkItHolds() throws InterruptedException {
+        AtomicInteger serverTicks = new AtomicInteger(7);
+        bound(serverTicks);
+        List<Integer> seen = answers(body -> new ChunkWorker(GROUP, body, 1), () -> {
+            int generating = GameThreads.tickCount(serverTicks.get());
+            GameThreads.heldChunk();
+            serverTicks.addAndGet(2);
+            int holding = GameThreads.tickCount(serverTicks.get());
+            GameThreads.releasedChunk();
+            return List.of(generating, holding, GameThreads.tickCount(serverTicks.get()));
+        });
+
+        assertEquals(List.of(7, 7, 9), seen);
+    }
+
+    private static Thread bound(AtomicInteger serverTicks) throws InterruptedException {
+        Thread server = new Thread(() -> GameThreads.bindServer(serverTicks::get), "Server thread");
+        server.start();
+        server.join();
+        return server;
+    }
+
+    private static <T> List<T> answers(Function<Runnable, Thread> threads, Supplier<List<T>> questions) throws InterruptedException {
+        AtomicReference<List<T>> seen = new AtomicReference<>();
         Thread thread = threads.apply(() -> seen.set(questions.get()));
         thread.start();
         thread.join();

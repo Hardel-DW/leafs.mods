@@ -1,5 +1,6 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.thread.GameThreads;
 import fr.hardel.leafs.thread.RegionWorker;
 
 import java.util.ArrayList;
@@ -127,6 +128,7 @@ public final class RegionTickScheduler {
 
     // The drain at the epoch close fails like the tick itself, through the failure policy.
     private boolean tickInEpoch(TickHandle handle, int slot) {
+        GameThreads.beginWork();
         epochs.open(slot);
         try {
             return handle.tick();

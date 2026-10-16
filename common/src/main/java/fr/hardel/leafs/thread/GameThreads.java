@@ -1,13 +1,27 @@
 package fr.hardel.leafs.thread;
 
+import java.util.function.IntSupplier;
+
 public final class GameThreads {
     private static volatile Thread server;
+    private static volatile IntSupplier serverTicks = () -> 0;
 
     private GameThreads() {
     }
 
-    public static void bindServer() {
+    public static void bindServer(IntSupplier tickCount) {
+        serverTicks = tickCount;
         server = Thread.currentThread();
+    }
+
+    public static void beginWork() {
+        if (Thread.currentThread() instanceof LeafsThread worker) {
+            worker.beginWork(serverTicks.getAsInt());
+        }
+    }
+
+    public static int tickCount(int serverTick) {
+        return Thread.currentThread() instanceof LeafsThread worker && worker.runsGame() ? worker.workTick() : serverTick;
     }
 
     public static boolean isServer() {
@@ -36,6 +50,10 @@ public final class GameThreads {
 
     public static void heldChunk() {
         if (Thread.currentThread() instanceof ChunkWorker worker) {
+            if (!worker.runsGame()) {
+                worker.beginWork(serverTicks.getAsInt());
+            }
+
             worker.hold();
         }
     }
