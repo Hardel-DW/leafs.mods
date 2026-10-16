@@ -1,6 +1,7 @@
 package fr.hardel.leafs.chunk.pool;
 
 import fr.hardel.leafs.Leafs;
+import fr.hardel.leafs.thread.ChunkWorker;
 import net.minecraft.server.level.ChunkMap;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -38,8 +39,7 @@ public final class ChunkPool implements Executor {
         this.failures = failures;
         List<Thread> started = new ArrayList<>(threads);
         for (int index = 1; index <= threads; index++) {
-            Thread worker = new Worker(serverThreads, this::work, index);
-            worker.setDaemon(true);
+            Thread worker = new ChunkWorker(serverThreads, this::work, index);
             started.add(worker);
             worker.start();
         }
@@ -50,10 +50,6 @@ public final class ChunkPool implements Executor {
     public static void yieldToRegions() {
         Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
         NativeThreadPriority.lowerCurrentThread();
-    }
-
-    public static boolean isWorker() {
-        return Thread.currentThread() instanceof Worker;
     }
 
     public int threads() {
@@ -205,11 +201,5 @@ public final class ChunkPool implements Executor {
     private void finish(ChunkTask task) {
         active.decrementAndGet();
         reservations.release(task);
-    }
-
-    private static final class Worker extends Thread {
-        private Worker(ThreadGroup group, Runnable work, int index) {
-            super(group, work, "Leafs Chunk Worker #%s".formatted(index));
-        }
     }
 }

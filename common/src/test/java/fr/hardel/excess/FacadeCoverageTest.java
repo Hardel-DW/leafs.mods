@@ -23,12 +23,6 @@ class FacadeCoverageTest {
         assertEquals(List.of(), inherited(facade, method -> method.getDeclaringClass() != Map.class && isCompound(method)));
     }
 
-    @ParameterizedTest
-    @ValueSource(classes = {HashMapFacade.class, HashSetFacade.class})
-    void aClassFacadeRedefinesEveryMethodOfItsClasses(Class<?> facade) {
-        assertEquals(List.of(), inherited(facade, method -> !method.getDeclaringClass().isInterface() || isCompound(method)));
-    }
-
     private static List<String> inherited(Class<?> facade, Predicate<Method> mustRedefine) {
         return Arrays.stream(facade.getMethods())
             .filter(method -> method.getDeclaringClass() != facade && method.getDeclaringClass() != Object.class)

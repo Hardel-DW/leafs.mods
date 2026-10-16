@@ -2,11 +2,13 @@ package fr.hardel.leafs.ticking;
 
 import fr.hardel.TestThreads;
 import fr.hardel.leafs.network.PacketRouting;
+import fr.hardel.leafs.thread.GameThreads;
 import net.minecraft.CrashReportCategory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -88,6 +90,30 @@ class RegionTickSchedulerTest {
         assertFalse(flushOnWorker.get());
         assertTrue(PacketRouting.scopedFlush(true));
         assertFalse(PacketRouting.scopedFlush(false));
+    }
+
+    /** 2026-10-16: Open Parties and Claims turned its loot protection off, the server tick count moved between two hooks of one sheep death. */
+    @Test
+    void aRegionTickKeepsTheServerTickItBeganAt() throws InterruptedException {
+        AtomicInteger serverTicks = new AtomicInteger(40);
+        Thread server = new Thread(() -> GameThreads.bindServer(serverTicks::get), "Server thread");
+        server.start();
+        server.join();
+        started();
+        CountDownLatch ticked = new CountDownLatch(1);
+        AtomicReference<List<Integer>> seen = new AtomicReference<>();
+        TestTickHandle handle = new TestTickHandle(1, () -> {
+            int began = GameThreads.tickCount(serverTicks.get());
+            serverTicks.addAndGet(2);
+            seen.compareAndSet(null, List.of(began, GameThreads.tickCount(serverTicks.get())));
+            ticked.countDown();
+        });
+
+        scheduler.schedule(handle);
+        TestThreads.await(ticked);
+        handle.cancel();
+
+        assertEquals(List.of(40, 40), seen.get());
     }
 
     @Test

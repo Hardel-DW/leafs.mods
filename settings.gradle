@@ -14,4 +14,4 @@ pluginManagement {
 }
 
 rootProject.name = 'leafs'
-include 'common', 'fabric', 'neoforge'
+include 'transform', 'common', 'fabric', 'neoforge'

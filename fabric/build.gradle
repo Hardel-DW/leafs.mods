@@ -61,12 +61,18 @@ sourceSets.gametest {
 	resources.srcDir(project(':common').file('src/gametest/resources'))
 }
 
+def transformSources = project(':transform').sourceSets.main.allJava.matching {
+	exclude 'fr/hardel/shared/transform/neoforge/**'
+}
+
 tasks.named('compileJava') {
 	source(project(':common').sourceSets.main.allJava)
+	source(transformSources)
 }
 
 tasks.named('sourcesJar') {
 	from(project(':common').sourceSets.main.allSource)
+	from(transformSources)
 }
 
 test {

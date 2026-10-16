@@ -52,9 +52,6 @@ versionRange = "*"
 config = "leafs.mixins.json"
 
 [[mixins]]
-config = "leafs.compat.mixins.json"
-
-[[mixins]]
 config = "leafs.neoforge.mixins.json"
 
 ["lithium:options"]

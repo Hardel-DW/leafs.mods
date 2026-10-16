@@ -13,10 +13,6 @@ public final class PlayerPacketQueue {
     private final AtomicBoolean claimed = new AtomicBoolean();
     private volatile boolean handedOver;
 
-    public static boolean handlingPackets() {
-        return DRAINING.get() != null;
-    }
-
     public void add(PacketProcessor.ListenerAndPacket<?> entry) {
         packets.add(entry::handle);
     }
