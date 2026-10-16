@@ -121,4 +121,21 @@ class RegionTimeTest {
         assertSame(into, ticks.leafs$clock());
         assertEquals(1000L, RegionTime.now(ticks, null));
     }
+
+    /** 2026-10-16: Vanilla Perfected crashed with Lithium, a region taking a chunk polled its ticks until null and Lithium's poll() needs a tick. */
+    @Test
+    void retimingPollsOnlyTheTicksAPeekFound() {
+        BlockPos pos = new BlockPos(3, 64, 3);
+        RegionTime from = new RegionTime(100L, TickState.INITIAL);
+        RegionTime into = new RegionTime(1000L, TickState.INITIAL);
+        PeekFirstChunkTicks<Block> ticks = new PeekFirstChunkTicks<>(from);
+        PeekFirstChunkTicks<Block> empty = new PeekFirstChunkTicks<>(from);
+        ticks.schedule(new ScheduledTick<>(Blocks.STONE, pos, 103L, 0L));
+
+        RegionTime.retime(ticks, null, into);
+        RegionTime.retime(empty, null, into);
+
+        assertEquals(1003L, ticks.peek().triggerTick());
+        assertEquals(0, empty.count());
+    }
 }
