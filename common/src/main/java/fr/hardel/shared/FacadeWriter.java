@@ -137,9 +137,17 @@ final class FacadeWriter implements Opcodes {
         code.visitInsn(Type.getReturnType(descriptor).getOpcode(IRETURN));
     }
 
+    /** Like a view, a caller holding the monitor walks the original: a copy constructor like ArrayDeque(Collection) walks the facade it copies. */
     private void writeWalk(ClassWriter writer, Method method, String descriptor) {
+        Label outside = new Label();
         MethodVisitor code = writer.visitMethod(ACC_PUBLIC, method.getName(), descriptor, null, null);
         code.visitCode();
+        code.visitVarInsn(ALOAD, 0);
+        code.visitMethodInsn(INVOKESTATIC, "java/lang/Thread", "holdsLock", "(Ljava/lang/Object;)Z", false);
+        code.visitJumpInsn(IFEQ, outside);
+        invokeOriginal(code, method.getName(), descriptor);
+        code.visitInsn(RETURN);
+        code.visitLabel(outside);
         code.visitVarInsn(ALOAD, 0);
         code.visitMethodInsn(INVOKEVIRTUAL, NAME, "leafs$snapshot", SNAPSHOT_DESCRIPTOR, false);
         code.visitTypeInsn(CHECKCAST, superName);
