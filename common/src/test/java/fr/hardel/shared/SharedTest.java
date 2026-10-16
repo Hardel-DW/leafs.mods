@@ -62,6 +62,21 @@ class SharedTest {
         }
     }
 
+    /** 2026-10-16: ATM 11 crashed with a StackOverflowError, the copy ArrayDeque(Collection) takes walks the facade with forEach, which copied it again. */
+    @Test
+    void everyFacadeWalksAndCopiesItself() {
+        List<Object> collections = List.of(new HashMap<>(Map.of("a", 1)), new LinkedHashMap<>(Map.of("a", 1)), new TreeMap<>(Map.of("a", 1)), new HashSet<>(Set.of(1)),
+            new TreeSet<>(Set.of(1)), new ArrayList<>(List.of(1)), new LinkedList<>(List.of(1)), new ArrayDeque<>(List.of(1)), new PriorityQueue<>(List.of(1)),
+            new Object2ObjectOpenHashMap<>(Map.of("a", 1)), new ObjectArrayList<>(List.of(1)), new ObjectOpenHashSet<>(Set.of(1)), new LongArrayList(new long[]{1}));
+
+        for (Object collection : collections) {
+            Object shared = Shared.wrap(collection);
+            Object expected = contents(collection);
+            assertEquals(expected, contents(((SharedCollection) shared).leafs$snapshot()), collection.getClass().getName());
+            assertEquals(expected, walked(shared), collection.getClass().getName());
+        }
+    }
+
     @Test
     void aFacadeRedefinesEveryMethodItsClassDeclares() {
         List<Object> collections = List.of(new HashMap<>(), new TreeMap<>(), new ArrayList<>(), new Long2ObjectOpenHashMap<>(), new ObjectOpenHashSet<>());
@@ -206,6 +221,20 @@ class SharedTest {
         });
 
         assertEquals(2, map.get("b"));
+    }
+
+    private static Object walked(Object collection) {
+        if (collection instanceof Map<?, ?> map) {
+            Map<Object, Object> walked = new HashMap<>();
+            map.forEach(walked::put);
+            return walked;
+        }
+
+        List<Object> walked = new ArrayList<>();
+        ((Collection<?>) collection).forEach(walked::add);
+        ((Collection<?>) collection).iterator().forEachRemaining(_ -> { });
+        ((Collection<?>) collection).stream().count();
+        return walked;
     }
 
     private static Object contents(Object collection) {
