@@ -5,6 +5,7 @@
 	"mixins": [
 		"BlockCaptureShim",
 		"CapabilityListenerHolderShim",
+		"ChunkEventsShim",
 		"FreshBlockEntitiesShim",
 		"LevelChunkSnapshotCaptureShim",
 		"LevelSnapshotCaptureShim",
