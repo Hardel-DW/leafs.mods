@@ -7,7 +7,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** The regions tick at the tick rate on their own threads: the test server keeps that rate too, like a dedicated server, so a test tick is a world tick. */
 @Mixin(GameTestServer.class)
 public abstract class GameTestServerMixin {
 
