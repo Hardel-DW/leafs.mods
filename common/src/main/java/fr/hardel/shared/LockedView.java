@@ -3,7 +3,6 @@ package fr.hardel.shared;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Iterator;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -63,6 +62,6 @@ final class LockedView implements InvocationHandler {
 
     private Object walk(Method method, Object[] callArguments) {
         Object result = Reflection.invoke(method, copy(), callArguments);
-        return result instanceof Iterator<?> iterator ? SnapshotIterator.proxy(lock, live, method.getReturnType(), iterator) : result;
+        return SnapshotIterator.over(lock, live, method.getReturnType(), result);
     }
 }
