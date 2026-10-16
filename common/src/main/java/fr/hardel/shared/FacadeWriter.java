@@ -25,6 +25,8 @@ import java.util.Set;
 final class FacadeWriter implements Opcodes {
     private static final String NAME = "fr/hardel/shared/SharedFacade";
     private static final String OBJECT = "java/lang/Object";
+    private static final String OBJECT_DESCRIPTOR = "Ljava/lang/Object;";
+    private static final String COPY = "leafs$copy";
     private static final String SNAPSHOT_DESCRIPTOR = "()Ljava/lang/Object;";
     private static final String VIEWS = Type.getInternalName(Views.class);
     private static final String VIEW_DESCRIPTOR = "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
@@ -96,16 +98,40 @@ final class FacadeWriter implements Opcodes {
         code.visitEnd();
     }
 
+    /** The copy stays until a method that may change the collection drops it: a collection read every tick is copied once. */
     private void writeSnapshot(ClassWriter writer) {
+        writer.visitField(ACC_PRIVATE, COPY, OBJECT_DESCRIPTOR, null, null).visitEnd();
+        Label kept = new Label();
         MethodVisitor code = writer.visitMethod(ACC_PUBLIC | ACC_SYNCHRONIZED, "leafs$snapshot", SNAPSHOT_DESCRIPTOR, null, null);
         code.visitCode();
+        code.visitVarInsn(ALOAD, 0);
+        code.visitFieldInsn(GETFIELD, NAME, COPY, OBJECT_DESCRIPTOR);
+        code.visitJumpInsn(IFNONNULL, kept);
+        code.visitVarInsn(ALOAD, 0);
         code.visitTypeInsn(NEW, superName);
         code.visitInsn(DUP);
         code.visitVarInsn(ALOAD, 0);
         code.visitMethodInsn(INVOKESPECIAL, superName, "<init>", copyDescriptor, false);
+        code.visitFieldInsn(PUTFIELD, NAME, COPY, OBJECT_DESCRIPTOR);
+        code.visitLabel(kept);
+        code.visitVarInsn(ALOAD, 0);
+        code.visitFieldInsn(GETFIELD, NAME, COPY, OBJECT_DESCRIPTOR);
         code.visitInsn(ARETURN);
         code.visitMaxs(0, 0);
         code.visitEnd();
+
+        MethodVisitor changed = writer.visitMethod(ACC_PUBLIC | ACC_SYNCHRONIZED, "leafs$changed", "()V", null, null);
+        changed.visitCode();
+        dropCopy(changed);
+        changed.visitInsn(RETURN);
+        changed.visitMaxs(0, 0);
+        changed.visitEnd();
+    }
+
+    private static void dropCopy(MethodVisitor code) {
+        code.visitVarInsn(ALOAD, 0);
+        code.visitInsn(ACONST_NULL);
+        code.visitFieldInsn(PUTFIELD, NAME, COPY, OBJECT_DESCRIPTOR);
     }
 
     private void writeOverride(ClassWriter writer, Method method) {
@@ -128,6 +154,10 @@ final class FacadeWriter implements Opcodes {
     }
 
     private void writeLockedBody(MethodVisitor code, Method method, String descriptor) {
+        if (!Reads.only(method.getName())) {
+            dropCopy(code);
+        }
+
         if (NESTING.contains(method.getName()) && !method.getReturnType().isPrimitive()) {
             writeNesting(code, method, descriptor, putFor(method));
             return;

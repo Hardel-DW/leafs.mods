@@ -8,16 +8,18 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-/** An entry of a copy, whose setValue also writes the live map. */
+/** An entry of a copy the facade shares with other walks: setValue writes the live map and keeps the new value here, never in the copy. */
 final class SnapshotEntry implements InvocationHandler {
     private final Object lock;
     private final Map<?, ?> live;
     private final Map.Entry<?, ?> copy;
+    private Object value;
 
     private SnapshotEntry(Object lock, Map<?, ?> live, Map.Entry<?, ?> copy) {
         this.lock = lock;
         this.live = live;
         this.copy = copy;
+        this.value = copy.getValue();
     }
 
     static Object proxy(Object lock, Map<?, ?> live, Map.Entry<?, ?> copy) {
@@ -44,13 +46,20 @@ final class SnapshotEntry implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] arguments) {
-        Object result = Reflection.invoke(method, copy, arguments);
-        if (method.getName().equals("setValue") && arguments.length == 1) {
-            synchronized (lock) {
-                Reflection.put(live, copy.getKey(), arguments[0]);
-            }
+        return switch (method.getName()) {
+            case "setValue" -> replace(arguments[0]);
+            case "getValue" -> value;
+            default -> Reflection.invoke(method, copy, arguments);
+        };
+    }
+
+    private Object replace(Object replacement) {
+        Object previous = value;
+        value = replacement;
+        synchronized (lock) {
+            Reflection.put(live, copy.getKey(), replacement);
         }
 
-        return result;
+        return previous;
     }
 }
