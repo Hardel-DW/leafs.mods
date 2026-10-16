@@ -116,9 +116,11 @@ public final class RegionTime {
         return clock == null ? level.getLevelData().getGameTime() : clock.tick;
     }
 
+    /** Polls only what a peek found, as vanilla's LevelTicks does: Lithium replaces poll() and relies on it. */
     private static <T> void shift(LevelChunkTicks<T> ticks, long offset) {
         List<ScheduledTick<T>> shifted = new ArrayList<>();
-        for (ScheduledTick<T> tick = ticks.poll(); tick != null; tick = ticks.poll()) {
+        for (ScheduledTick<T> tick = ticks.peek(); tick != null; tick = ticks.peek()) {
+            ticks.poll();
             shifted.add(new ScheduledTick<>(tick.type(), tick.pos(), tick.triggerTick() + offset, tick.priority(), tick.subTickOrder()));
         }
 
