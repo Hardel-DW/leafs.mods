@@ -30,6 +30,7 @@ final class FacadeWriter implements Opcodes {
     private static final String SNAPSHOT_DESCRIPTOR = "()Ljava/lang/Object;";
     private static final String VIEWS = Type.getInternalName(Views.class);
     private static final String VIEW_DESCRIPTOR = "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;";
+    private static final String WALKED_DESCRIPTOR = "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;";
     private static final String SHARED = Type.getInternalName(Shared.class);
     private static final String WRAP_DESCRIPTOR = "(Ljava/lang/Object;)Ljava/lang/Object;";
     private static final Set<String> NESTING = Set.of("computeIfAbsent", "compute", "computeIfPresent", "merge");
@@ -141,6 +142,11 @@ final class FacadeWriter implements Opcodes {
             return;
         }
 
+        if (Views.isIterator(method)) {
+            writeIterator(writer, method, descriptor);
+            return;
+        }
+
         if (Views.isView(method)) {
             writeView(writer, method, descriptor);
             return;
@@ -184,6 +190,32 @@ final class FacadeWriter implements Opcodes {
         loadArguments(code, descriptor);
         code.visitMethodInsn(INVOKEVIRTUAL, superName, method.getName(), descriptor, false);
         code.visitInsn(RETURN);
+        code.visitMaxs(0, 0);
+        code.visitEnd();
+    }
+
+    /** A for loop of a mod walks the copy: the same method called on the copy, with remove reaching the facade. The original class calling itself walks itself. */
+    private void writeIterator(ClassWriter writer, Method method, String descriptor) {
+        Label outside = new Label();
+        String result = Type.getInternalName(method.getReturnType());
+        MethodVisitor code = writer.visitMethod(ACC_PUBLIC, method.getName(), descriptor, null, null);
+        code.visitCode();
+        code.visitVarInsn(ALOAD, 0);
+        code.visitMethodInsn(INVOKESTATIC, "java/lang/Thread", "holdsLock", "(Ljava/lang/Object;)Z", false);
+        code.visitJumpInsn(IFEQ, outside);
+        invokeOriginal(code, method.getName(), descriptor);
+        code.visitInsn(ARETURN);
+        code.visitLabel(outside);
+        code.visitVarInsn(ALOAD, 0);
+        code.visitVarInsn(ALOAD, 0);
+        code.visitMethodInsn(INVOKEVIRTUAL, NAME, "leafs$snapshot", SNAPSHOT_DESCRIPTOR, false);
+        code.visitTypeInsn(CHECKCAST, superName);
+        loadArguments(code, descriptor);
+        code.visitMethodInsn(INVOKEVIRTUAL, superName, method.getName(), descriptor, false);
+        code.visitLdcInsn(Type.getType(method.getReturnType()));
+        code.visitMethodInsn(INVOKESTATIC, VIEWS, "walked", WALKED_DESCRIPTOR, false);
+        code.visitTypeInsn(CHECKCAST, result);
+        code.visitInsn(ARETURN);
         code.visitMaxs(0, 0);
         code.visitEnd();
     }
