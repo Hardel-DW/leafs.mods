@@ -1,5 +1,6 @@
 package fr.hardel.leafs.global;
 
+import fr.hardel.leafs.thread.GameThreads;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.TickingManager;
@@ -16,7 +17,7 @@ public final class CommandEngine {
     }
 
     public static boolean divert(MinecraftServer server, Runnable execution) {
-        if (TickingManager.of(server).onServerThread()) {
+        if (GameThreads.isServer()) {
             return false;
         }
 

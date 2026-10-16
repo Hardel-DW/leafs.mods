@@ -74,7 +74,7 @@ class TicketGraphsTest {
         TestThreads.await(published);
         TestThreads.await(others);
         assertEquals(3, threads.size());
-        assertTrue(threads.stream().allMatch(name -> name.startsWith("Leafs Chunk Worker")));
+        assertTrue(threads.stream().allMatch(name -> name.startsWith("Leafs Server Chunk Worker")));
     }
 
     /** 2026-09-27: the server thread drained the players and simulation writes of every region at each tick. 2026-10-06: a region of forty players spent a fifth of its tick draining them itself. */
@@ -100,7 +100,7 @@ class TicketGraphsTest {
         scheduler.shutdown(false, new OwnWork(() -> false));
 
         assertEquals(1, drainers.size());
-        assertTrue(drainers.getFirst().startsWith("Leafs Chunk Worker"));
+        assertTrue(drainers.getFirst().startsWith("Leafs Server Chunk Worker"));
     }
 
     /** 2026-09-25: a light task drained the whole loading graph, and a region waited 71 ms on it. */

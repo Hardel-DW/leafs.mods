@@ -9,6 +9,7 @@ import fr.hardel.leafs.metrics.TickStages.TickStage;
 import fr.hardel.leafs.metrics.ServerMetrics;
 import fr.hardel.leafs.network.RegionNetworkTick;
 import fr.hardel.leafs.global.GlobalScheduler;
+import fr.hardel.leafs.thread.GameThreads;
 import fr.hardel.leafs.world.WorldTickContext;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportedException;
@@ -142,12 +143,8 @@ public final class TickingManager {
         return chunkPool;
     }
 
-    public boolean onServerThread() {
-        return Thread.currentThread() == server.getRunningThread();
-    }
-
     public boolean pumpDiverted() {
-        return globalTicking && onServerThread() && globalScheduler.drain();
+        return globalTicking && GameThreads.isServer() && globalScheduler.drain();
     }
 
     public void await(BooleanSupplier done) {
@@ -155,7 +152,7 @@ public final class TickingManager {
     }
 
     public void await(BooleanSupplier done, BooleanSupplier help) {
-        if (onServerThread()) {
+        if (GameThreads.isServer()) {
             serverWork.until(done, help);
             return;
         }
@@ -174,11 +171,11 @@ public final class TickingManager {
     }
 
     public boolean divertExecute(Runnable task) {
-        if (!globalTicking || onServerThread()) {
+        if (!globalTicking || GameThreads.isServer()) {
             return false;
         }
 
-        if (RegionTickScheduler.onWorker()) {
+        if (GameThreads.isGameWorker()) {
             task.run();
             return true;
         }

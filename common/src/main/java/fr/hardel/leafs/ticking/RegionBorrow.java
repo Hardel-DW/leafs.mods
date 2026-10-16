@@ -5,6 +5,7 @@ import fr.hardel.leafs.chunk.owner.ChunkClaim;
 import fr.hardel.leafs.chunk.owner.ChunkOwners;
 import fr.hardel.leafs.region.Region;
 import fr.hardel.leafs.region.RegionState;
+import fr.hardel.leafs.thread.GameThreads;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.server.level.ServerLevel;
@@ -132,7 +133,7 @@ public final class RegionBorrow {
     }
 
     private static boolean serverThread(LevelRegions regions) {
-        return !regions.live() || TickingManager.of(regions.level().getServer()).onServerThread();
+        return !regions.live() || GameThreads.isServer();
     }
 
     private boolean take(LevelRegions regions, Region<RegionTickData> region) {

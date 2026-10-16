@@ -6,6 +6,7 @@ import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
 import fr.hardel.leafs.chunk.owner.DeferredWork;
 import fr.hardel.leafs.metrics.DeferReason;
+import fr.hardel.leafs.thread.GameThreads;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.ticking.ServerLevelRegionAccess;
@@ -77,7 +78,7 @@ public abstract class LevelMixin {
 
     @Inject(method = "getBlockEntity(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/entity/BlockEntity;", at = @At("HEAD"), cancellable = true)
     private void leafs$regionBlockEntityPath(BlockPos pos, CallbackInfoReturnable<BlockEntity> callbackInfo) {
-        if (!((Object) this instanceof ServerLevel level) || !level.isInValidBounds(pos)) {
+        if (!((Object) this instanceof ServerLevel level) || !level.isInValidBounds(pos) || !GameThreads.isGame()) {
             return;
         }
 

@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import fr.hardel.leafs.chunk.LevelChunks;
 import fr.hardel.leafs.chunk.RegionChunkAccess;
+import fr.hardel.leafs.thread.GameThreads;
 import fr.hardel.leafs.ticking.LevelRegions;
 import fr.hardel.leafs.ticking.RegionBorrow;
 import fr.hardel.leafs.world.WorldTickContext;
@@ -37,13 +38,9 @@ public abstract class ServerChunkCacheMixin {
     @Final
     private ServerLevel level;
 
-    @Shadow
-    @Final
-    private Thread mainThread;
-
     @Inject(method = "getChunkNow(II)Lnet/minecraft/world/level/chunk/LevelChunk;", at = @At("HEAD"), cancellable = true)
     private void leafs$concurrentReadPath(int x, int z, CallbackInfoReturnable<LevelChunk> callbackInfo) {
-        if (Thread.currentThread() != this.mainThread) {
+        if (GameThreads.isGameWorker()) {
             WorldTickContext tick = WorldTickContext.current();
             LevelChunk last = tick == null ? null : tick.lastChunk(this.level, x, z);
             callbackInfo.setReturnValue(last == null ? RegionChunkAccess.fullChunkOrNull(leafs$chunkMap(), x, z) : last);
