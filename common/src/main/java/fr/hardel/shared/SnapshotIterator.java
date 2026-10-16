@@ -54,6 +54,7 @@ final class SnapshotIterator implements InvocationHandler {
 
         synchronized (lock) {
             ((Collection<?>) live).remove(last);
+            ((SharedCollection) lock).leafs$changed();
         }
 
         returned = false;

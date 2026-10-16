@@ -1,5 +1,7 @@
 package fr.hardel.leafs.ticking;
 
+import fr.hardel.leafs.thread.SerialEvents;
+
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
@@ -15,6 +17,10 @@ public final class OwnWork {
     }
 
     public void until(BooleanSupplier done, BooleanSupplier help) {
+        SerialEvents.released(() -> work(done, help));
+    }
+
+    private void work(BooleanSupplier done, BooleanSupplier help) {
         RegionBorrow borrow = RegionBorrow.current();
         Thread waiter = Thread.currentThread();
         while (!done.getAsBoolean()) {

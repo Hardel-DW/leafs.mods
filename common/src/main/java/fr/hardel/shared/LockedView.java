@@ -37,7 +37,7 @@ final class LockedView implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] callArguments) {
         if (Thread.holdsLock(lock)) {
-            return Reflection.invoke(method, live, callArguments);
+            return change(method, callArguments);
         }
 
         if (WALKS.contains(method.getName()) || method.getName().startsWith("forEach")) {
@@ -46,10 +46,19 @@ final class LockedView implements InvocationHandler {
 
         Object result;
         synchronized (lock) {
-            result = Reflection.invoke(method, live, callArguments);
+            result = change(method, callArguments);
         }
 
         return result != null && Views.isView(method) ? proxy(lock, this::copy, method, callArguments, result) : result;
+    }
+
+    private Object change(Method method, Object[] callArguments) {
+        Object result = Reflection.invoke(method, live, callArguments);
+        if (!Reads.only(method.getName())) {
+            ((SharedCollection) lock).leafs$changed();
+        }
+
+        return result;
     }
 
     private Object walk(Method method, Object[] callArguments) {
