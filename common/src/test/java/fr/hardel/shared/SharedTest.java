@@ -133,7 +133,7 @@ class SharedTest {
         assertEquals(80_000, list.size());
     }
 
-    /** 2026-10-16: a HashMap filled by two regions while the server tick walked it threw ConcurrentModificationException. */
+    /** 2026-10-16: a HashMap filled by two regions while the server tick walked it threw ConcurrentModificationException. Stellaris walks its planets with a for loop. */
     @Test
     void walkingWhileAnotherThreadWritesNeverThrows() throws InterruptedException {
         Map<Integer, Integer> map = shared(new HashMap<>());
@@ -153,6 +153,9 @@ class SharedTest {
             map.values().forEach(_ -> { });
             list.forEach(_ -> { });
             list.stream().count();
+            walk(list);
+            walk(map.entrySet());
+            walk(map.keySet());
         }
 
         writer.join();
@@ -243,6 +246,17 @@ class SharedTest {
         assertNotEquals(9, ((Map<?, ?>) afterIterator).get(entry.getKey()), "the shared copy is never written");
     }
 
+    /** 2026-10-16: in ATM 11, Stellaris spent 2.6 s of region ticks walking its planets through a reflective proxy, one call per hasNext and next. */
+    @Test
+    void aForLoopWalksWithoutReflection() {
+        List<Integer> list = shared(new ArrayList<>(List.of(1, 2)));
+        Map<String, Integer> map = shared(new HashMap<>(Map.of("a", 1)));
+
+        assertSame(SnapshotIterator.class, list.iterator().getClass());
+        assertSame(SnapshotIterator.class, map.entrySet().iterator().getClass());
+        assertSame(SnapshotEntry.class, map.entrySet().iterator().next().getClass());
+    }
+
     @Test
     void forEachCallsTheModOutsideTheMonitor() {
         Map<String, Integer> map = shared(new HashMap<>(Map.of("a", 1)));
@@ -253,6 +267,13 @@ class SharedTest {
         });
 
         assertEquals(2, map.get("b"));
+    }
+
+    /** The for loop of a mod: iterator() on the facade itself, then hasNext and next across several calls. */
+    private static void walk(Iterable<?> iterable) {
+        for (Object _ : iterable) {
+            Thread.onSpinWait();
+        }
     }
 
     private static Object walked(Object collection) {

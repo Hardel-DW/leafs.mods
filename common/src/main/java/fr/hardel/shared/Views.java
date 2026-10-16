@@ -24,6 +24,16 @@ final class Views {
     private Views() {
     }
 
+    static boolean isIterator(Method method) {
+        Class<?> result = method.getReturnType();
+        return result.isInterface() && (Iterator.class.isAssignableFrom(result) || Spliterator.class.isAssignableFrom(result));
+    }
+
+    /** Called by a facade with the iterator of its copy. */
+    static Object walked(Object facade, Object walk, Class<?> api) {
+        return SnapshotIterator.over(facade, facade, api, walk);
+    }
+
     static boolean isView(Method method) {
         Class<?> result = method.getReturnType();
         return result.isInterface() && VIEW_TYPES.stream().anyMatch(view -> view.isAssignableFrom(result));
