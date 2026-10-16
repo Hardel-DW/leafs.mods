@@ -41,6 +41,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -209,6 +210,37 @@ class SharedTest {
         assertSame(created, map.get("a"));
         assertInstanceOf(SharedCollection.class, positions);
         assertSame(positions, chunks.get(4L));
+    }
+
+    /** A collection read every tick and rarely written is copied once per write, not once per walk. */
+    @Test
+    void aWalkReusesTheCopyUntilTheCollectionChanges() {
+        Map<String, Integer> map = shared(new HashMap<>(Map.of("a", 1, "b", 2)));
+        SharedCollection facade = (SharedCollection) map;
+        Object first = facade.leafs$snapshot();
+        map.forEach((_, _) -> { });
+        map.get("a");
+        assertSame(first, facade.leafs$snapshot());
+
+        map.put("c", 3);
+        Object afterPut = facade.leafs$snapshot();
+        assertTrue(afterPut != first);
+        map.keySet().remove("c");
+        Object afterView = facade.leafs$snapshot();
+        assertTrue(afterView != afterPut);
+        Iterator<String> walk = map.keySet().iterator();
+        walk.next();
+        walk.remove();
+        Object afterIterator = facade.leafs$snapshot();
+        assertTrue(afterIterator != afterView);
+        Map.Entry<String, Integer> entry = map.entrySet().iterator().next();
+        entry.setValue(9);
+
+        assertEquals(9, entry.getValue());
+        assertEquals(Map.of(entry.getKey(), 9), map);
+        assertTrue(facade.leafs$snapshot() != afterIterator);
+        assertEquals(1, ((Map<?, ?>) afterIterator).size());
+        assertNotEquals(9, ((Map<?, ?>) afterIterator).get(entry.getKey()), "the shared copy is never written");
     }
 
     @Test
