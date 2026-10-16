@@ -79,11 +79,24 @@ class SharedTransformTest {
         assertSame(ArrayList.class, instanceField(entity, "owned").getClass());
     }
 
+    /** 2026-10-16: FML warned that the processor claimed 84 % of the classes of ATM 11, it claimed every class of a mod before reading it. */
+    @Test
+    void theIndexClaimsOnlyTheClassesTheTransformRewrites() {
+        List.of("ModState", "ModManager", "ModRegistry", "ModBlock").forEach(name -> assertTrue(SharedTransform.wouldRewrite(original(name), SUPERS), name));
+        assertFalse(SharedTransform.wouldRewrite(original("ModEntity"), SUPERS));
+        assertFalse(SharedTransform.mayRewrite(original("BaseBlock")));
+        assertTrue(SharedTransform.mayRewrite(original("ModEntity")));
+    }
+
     @Test
     void thePlatformAndTheCollectionLibrariesAreNeverRewritten() {
         Set.of("net/minecraft/world/level/Level", "it/unimi/dsi/fastutil/longs/LongSet", "fr/hardel/leafs/Leafs", "java/util/HashMap", "com/google/common/collect/Maps")
             .forEach(name -> assertFalse(SharedTransform.covers(name), name));
         assertTrue(SharedTransform.covers("com/example/mod/ModState"));
+    }
+
+    private static byte[] original(String simpleName) {
+        return TransformingLoader.original(SharedTransformTest.class.getClassLoader(), "%s%s".formatted(FIXTURES, simpleName));
     }
 
     private static Object field(Class<?> owner, String name) throws ReflectiveOperationException {
@@ -118,24 +131,20 @@ class SharedTransformTest {
             }
         }
 
-        private byte[] rewritten(String name) throws ClassNotFoundException {
+        private byte[] rewritten(String name) {
             ClassNode node = new ClassNode();
-            new ClassReader(original(name)).accept(node, ClassReader.EXPAND_FRAMES);
+            new ClassReader(original(getParent(), name)).accept(node, ClassReader.EXPAND_FRAMES);
             SharedTransform.apply(node, SUPERS);
             ClassWriter writer = new ClassWriter(0);
             node.accept(writer);
             return writer.toByteArray();
         }
 
-        private byte[] original(String name) throws ClassNotFoundException {
-            try (InputStream stream = getParent().getResourceAsStream("%s.class".formatted(name.replace('.', '/')))) {
-                if (stream == null) {
-                    throw new ClassNotFoundException(name);
-                }
-
+        private static byte[] original(ClassLoader loader, String name) {
+            try (InputStream stream = loader.getResourceAsStream("%s.class".formatted(name.replace('.', '/')))) {
                 return stream.readAllBytes();
             } catch (IOException failure) {
-                throw new ClassNotFoundException(name, failure);
+                throw new IllegalStateException(name, failure);
             }
         }
     }

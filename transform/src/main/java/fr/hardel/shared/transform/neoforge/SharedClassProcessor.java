@@ -1,18 +1,18 @@
 package fr.hardel.shared.transform.neoforge;
 
 import fr.hardel.shared.transform.SharedTransform;
-import net.neoforged.neoforgespi.transformation.BytecodeProvider;
+import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.neoforgespi.transformation.ClassProcessor;
 import net.neoforged.neoforgespi.transformation.ClassProcessorIds;
 import net.neoforged.neoforgespi.transformation.ProcessorName;
-import org.objectweb.asm.ClassReader;
 
 import java.util.Set;
 
+/** Runs after Mixin, so the code other mods merged into a class is rewritten too. It claims only the classes the index found. */
 public final class SharedClassProcessor implements ClassProcessor {
     private static final ProcessorName NAME = new ProcessorName("leafs", "shared_collections");
 
-    private volatile BytecodeProvider bytecode;
+    private volatile SharedIndex index;
 
     @Override
     public ProcessorName name() {
@@ -25,35 +25,22 @@ public final class SharedClassProcessor implements ClassProcessor {
     }
 
     @Override
+    public void link(LinkContext context) {
+        index = SharedIndex.scan(FMLLoader.getCurrent().getLoadingModList().getAllModFiles());
+    }
+
+    @Override
     public boolean handlesClass(SelectionContext context) {
-        return !context.empty() && SharedTransform.covers(context.type().getInternalName());
+        return !context.empty() && index.rewrites(context.type().getInternalName());
     }
 
     @Override
     public ComputeFlags processClass(TransformationContext context) {
-        if (!SharedTransform.apply(context.node(), this::superName)) {
+        if (!SharedTransform.apply(context.node(), index::superName)) {
             return ComputeFlags.NO_REWRITE;
         }
 
         context.audit("shared collections");
         return ComputeFlags.SIMPLE_REWRITE;
-    }
-
-    @Override
-    public void link(LinkContext context) {
-        bytecode = context.bytecodeProvider();
-    }
-
-    private String superName(String internalName) {
-        byte[] classBytes = bytesOf(internalName);
-        return classBytes == null ? null : new ClassReader(classBytes).getSuperName();
-    }
-
-    private byte[] bytesOf(String internalName) {
-        try {
-            return bytecode.getByteCode(internalName.replace('/', '.'));
-        } catch (ClassNotFoundException absent) {
-            return null;
-        }
     }
 }
