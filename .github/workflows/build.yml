@@ -1,5 +1,5 @@
 # Builds Leafs and runs its tests on every push and pull request.
-# Firefly and Maple are on no public Maven: the job builds them into the local Maven, from their branch of the same name.
+# Firefly and Maple are on no public Maven: the job builds them into the local Maven, each from the tag of the version Leafs reads.
 
 name: build
 on:
@@ -7,26 +7,26 @@ on:
     branches: [main, '26.*']
   pull_request:
 
-env:
-  DEPENDENCY_BRANCH: ${{ github.base_ref || github.ref_name }}
-
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
       - name: checkout leafs
         uses: actions/checkout@v6
+      - name: read the dependency versions
+        id: versions
+        run: grep -E '^(firefly|maple)_version=' gradle.properties >> "$GITHUB_OUTPUT"
       - name: checkout firefly
         uses: actions/checkout@v6
         with:
           repository: Hardel-DW/firefly.mods
-          ref: ${{ env.DEPENDENCY_BRANCH }}
+          ref: refs/tags/${{ steps.versions.outputs.firefly_version }}
           path: dependencies/firefly
       - name: checkout maple
         uses: actions/checkout@v6
         with:
           repository: Hardel-DW/Maple
-          ref: ${{ env.DEPENDENCY_BRANCH }}
+          ref: refs/tags/${{ steps.versions.outputs.maple_version }}
           path: dependencies/maple
       - name: validate gradle wrappers
         uses: gradle/actions/wrapper-validation@v6
